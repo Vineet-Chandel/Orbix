@@ -1,12 +1,3 @@
-interface Iidentity {
-    firstName: string,
-    middleName: string | undefined,
-    lastName: string,
-    gmail: string,
-    password: string,
-    username: string,
-    termsAccepted: boolean,
-}
 
 const weakPatterns = [
     // ============================================================
@@ -540,10 +531,10 @@ export class ValidationError extends Error {
 
 const SignupValidator = (data: any) => {
     // 1. Strict Type & Presence Checking
-    if (typeof data.firstName !== "string" || 
-        typeof data.lastName !== "string" || 
-        typeof data.gmail !== "string" || 
-        typeof data.username !== "string" || 
+    if (typeof data.firstName !== "string" ||
+        typeof data.lastName !== "string" ||
+        typeof data.gmail !== "string" ||
+        typeof data.username !== "string" ||
         typeof data.password !== "string") {
         throw new ValidationError("All fields must be valid strings.");
     }

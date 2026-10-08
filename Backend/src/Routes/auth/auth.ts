@@ -4,24 +4,27 @@ import jwt from "jsonwebtoken";
 import SignupValidator, { ValidationError } from '../../validators/SignupValidator.js';
 import { query } from "../../database/client.js"
 import SigninValidator from '../../validators/SigninValidator.js';
+import { failsOccursSignin, failsOccursSignup, resetSigninFailures, getFailures } from '../../redis/rate-limiters/rate-limiters-auth.js';
+import { getUserDetailsCache, userDetailsCache } from '../../redis/cache/cache-auth.js';
 const authRouter = express.Router();
-interface Iidentity {
-    firstName: string,
-    middleName: string | undefined,
-    lastName: string,
-    gmail: string,
-    password: string,
-    username: string,
-    termsAccepted: boolean,
-}
+
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
     console.error("FATAL: JWT_SECRET is not configured");
     process.exit(1);
 }
 
+
+
 authRouter.post('/signup', async (req: Request, res: Response) => {
     try {
+        // Rate Limiting
+        const ip = req.ip || "unknown";
+        const attempts = await failsOccursSignup({ ip });
+        if (attempts > 5) {
+            return res.status(429).json({ success: false, message: "Too many signup attempts. Please try again later." });
+        }
+
         // Validate Data
         const validatedData = SignupValidator(req.body);
 
@@ -33,12 +36,12 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             `
                 INSERT INTO users (
                 username,
-                first_name,
-                middle_name,
-                last_name,
-                gmail,
-                password_hash,
-                terms_accepted
+                firstName,
+                middleName,
+                lastName,
+                email,
+                password,
+                termsAccepted
             )  VALUES ($1,$2,$3,$4,$5,$6,$7)`,
             [
                 validatedData.username,
@@ -107,42 +110,71 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
 
 authRouter.post('/signin', async (req: Request, res: Response) => {
     try {
+
+        // -- Validation of the data from the request payload of the API 
         const validatedData = SigninValidator(req.body);
 
-        const Result = await query(
-            `SELECT
-                id,
-                first_name,
-                middle_name,
-                last_name,
-                gmail,
-                username,
-                password_hash
-            FROM users
-            WHERE gmail = $1 OR username = $1
-            LIMIT 1;`, 
-            [validatedData.identity]
-        );
 
-        const user = Result.rows[0];
+        // -- Rate Limiting
+        const failures = await getFailures({
+            email: validatedData.gmail,
+            ip: req.ip || "unknown",
+        });
 
-        if (!user) {
-            return res.status(401).json({
+        if (failures >= 10) {
+            return res.status(429).json({
                 success: false,
-                message: "Invalid Credentials"
+                message: "Too many failed attempts. Please try again later."
             });
         }
 
+
+        // -- Caching with the redis 
+        let user = await getUserDetailsCache(validatedData.gmail);
+
+        if (!user) {
+            // -- if the cache doesn't found -> query from the DB 
+            const Result = await query(
+                `SELECT
+                id,
+                firstName,
+                middleName,
+                lastName,
+                email AS gmail,
+                username,
+                password AS password_hash,
+                termsAccepted
+            FROM users
+            WHERE email = $1 OR username = $1
+            LIMIT 1;`,
+                [validatedData.gmail]
+            );
+            user = Result.rows[0];
+            if (!user) {
+                // Prevent timing attacks by running a dummy bcrypt compare
+                // 10 rounds hash of empty string: "$2b$10$xyz..."
+                await bcrypt.compare("dummy", "$2b$10$XN4E5x6gT3x7l3eUaR9UOuQYx8wO1bU1Jv3bT6D2p7t3Z6U1q9F4W");
+                const failures = await failsOccursSignin({ email: validatedData.gmail, ip: req.ip || "unknown" })
+                return res.status(401).json({
+                    success: false,
+                    message: "Invalid Credentials"
+                });
+            }
+        }
+
+        // -- Password verification
         const isPasswordValid = await bcrypt.compare(validatedData.password, user.password_hash);
 
         if (!isPasswordValid) {
+
+            const failures = await failsOccursSignin({ email: validatedData.gmail, ip: req.ip || "unknown" })
             return res.status(401).json({
                 success: false,
                 message: "Invalid Credentials"
             });
         }
 
-        // Generate JWT
+        // Generate JWT Session
         const token = jwt.sign(
             {
                 sub: user.id,
@@ -167,7 +199,9 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
 
         // Strip password_hash before returning user
         const { password_hash, ...safeUser } = user;
+        await resetSigninFailures({ email: validatedData.gmail, ip: req.ip || "unknown" })
 
+        await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, password_hash, termsAccepted: user.termsAccepted });
         return res.status(200).json({
             success: true, // FIXED: was previously false on success
             message: "Login successfully",
