@@ -1,33 +1,60 @@
-import 'dotenv/config';
+
+import "dotenv/config";
 import pg from "pg";
+import { performance } from "node:perf_hooks";
 
 const { Pool } = pg;
 
-const DATABASE_URL = process.env.DATABASE_URL;
+const DATABASE_URL = process.env.SUPABASE_DB_URL;
 
 if (!DATABASE_URL) {
-    throw new Error("DATABASE_URL is not configured");
+    throw new Error("SUPABASE_DB_URL is not configured");
 }
 
 export const pool = new Pool({
     connectionString: DATABASE_URL,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
+    max: 10,
+});
+
+// Detect unexpected errors on idle pooled connections.
+pool.on("error", (error) => {
+    console.error(
+        "Unexpected PostgreSQL pool error:",
+        error
+    );
 });
 
 export const testDatabaseConnection = async () => {
+    const start = performance.now();
+
     try {
         const result = await pool.query("SELECT NOW()");
 
-        console.log("✅ Neon DB connected");
-        console.log("Database time:", result.rows[0].now);
+        const durationMs = performance.now() - start;
+
+        console.log("✅ Supabase PostgreSQL connected");
+        console.log(
+            "Query round-trip:",
+            `${durationMs.toFixed(2)} ms`
+        );
+        console.log(
+            "Database time:",
+            result.rows[0].now
+        );
     } catch (error) {
-        console.error("❌ Neon DB connection failed:", error);
+        console.error(
+            "❌ Supabase PostgreSQL connection failed:",
+            error
+        );
         throw error;
     }
 };
 
 export const query = (
     text: string,
-    params?: unknown[]
+    params?: any[]
 ) => {
     return pool.query(text, params);
 };

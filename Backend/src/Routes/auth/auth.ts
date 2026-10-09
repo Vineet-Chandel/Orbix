@@ -6,6 +6,7 @@ import { query } from "../../database/client.js"
 import SigninValidator from '../../validators/SigninValidator.js';
 import { failsOccursSignin, failsOccursSignup, resetSigninFailures, getFailures } from '../../redis/rate-limiters/rate-limiters-auth.js';
 import { getUserDetailsCache, userDetailsCache } from '../../redis/cache/cache-auth.js';
+import { time } from 'node:console';
 const authRouter = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -75,7 +76,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             sameSite: "lax",
             maxAge: 8 * 60 * 60 * 1000 // 8 hours
         });
-
+        await userDetailsCache({ id: "New-user", firstName: validatedData.firstName, middleName: validatedData.middleName, lastName: validatedData.lastName, gmail: validatedData.gmail, username: validatedData.username, password_hash: hashedPassword, termsAccepted: validatedData.termsAccepted });
         // 4. Return Success
         return res.status(201).json({
             success: true,
@@ -112,6 +113,8 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
     try {
 
         // -- Validation of the data from the request payload of the API 
+
+
         const validatedData = SigninValidator(req.body);
 
 
