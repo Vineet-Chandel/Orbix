@@ -1,4 +1,4 @@
-import Redis from "ioredis";
+import { Redis } from "ioredis";
 
 const redis = new Redis({
     host: process.env.REDIS_HOST,
@@ -12,7 +12,7 @@ redis.on("connect", () => {
     console.log("Redis connected");
 });
 
-redis.on("error", (err) => {
+redis.on("error", (err: Error) => {
     console.error("Redis error:", err);
 });
 

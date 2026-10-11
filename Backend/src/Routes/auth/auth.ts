@@ -5,7 +5,7 @@ import SignupValidator, { ValidationError } from '../../validators/SignupValidat
 import { query } from "../../database/client.js"
 import SigninValidator from '../../validators/SigninValidator.js';
 import { failsOccursSignin, failsOccursSignup, resetSigninFailures, getFailures } from '../../redis/rate-limiters/rate-limiters-auth.js';
-import { getUserDetailsCache, userDetailsCache } from '../../redis/cache/cache-auth.js';
+import { deleteUserDetailsCache, getUserDetailsCache, userDetailsCache } from '../../redis/cache/cache-auth.js';
 import { time } from 'node:console';
 const authRouter = express.Router();
 
@@ -227,5 +227,20 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
     }
 });
 
+authRouter.post('/signout', async (req: Request, res: Response) => {
+    const gmail: string = req.body;
 
+    if (gmail) {
+        await deleteUserDetailsCache(gmail);
+    }
+
+    res.cookie("token", null, {
+        expires: new Date(Date.now()),
+    })
+
+    res.json({
+        Success: true,
+        message: "Logout Successfully !"
+    })
+})
 export default authRouter;

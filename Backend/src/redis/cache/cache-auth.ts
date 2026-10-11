@@ -28,16 +28,16 @@ const userDetailsCache = async (user: IUserDetails) => {
     await redis.expire(key, CACHE_TTL);
 };
 
-const getUserDetailsCache = async (gmail: string) => {
+const getUserDetailsCache = async (gmail: string): Promise<IUserDetails | null> => {
     const key = `auth:user:gmail:${gmail}`;
     const user = await redis.hgetall(key);
     if (Object.keys(user).length === 0) {
         return null;
     }
     return {
-        ...user,
+        ...(user as any),
         termsAccepted: user.termsAccepted === "true"
-    };
+    } as IUserDetails;
 };
 
 const deleteUserDetailsCache = async (gmail: string) => {

@@ -13,8 +13,8 @@ const failsOccursSignin = async ({ email, ip }: Iidentity) => {
     
     if (!results) return 1;
 
-    const failures = results[0][1] as number;
-    const ttl = results[1][1] as number;
+    const failures = results[0]?.[1] as number;
+    const ttl = results[1]?.[1] as number;
 
     if (ttl === -1) {
         await redis.expire(key, 15 * 60);
@@ -31,8 +31,8 @@ const failsOccursSignup = async ({ ip }: { ip: string }) => {
     
     if (!results) return 1;
 
-    const attempts = results[0][1] as number;
-    const ttl = results[1][1] as number;
+    const attempts = results[0]?.[1] as number;
+    const ttl = results[1]?.[1] as number;
 
     if (ttl === -1) {
         await redis.expire(key, 60 * 60); // 1 hour for signup limit
