@@ -17,6 +17,17 @@ if (!JWT_SECRET) {
 
 
 
+const isProduction = process.env.NODE_ENV === "production";
+const ACCESS_TOKEN_EXPIRY_MS = 8 * 60 * 60 * 1000; // 8 hours
+const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+const getAuthCookieOptions = () => ({
+    httpOnly: true,
+    sameSite: "lax" as const,
+    path: "/",
+    secure: isProduction,
+});
+
 authRouter.post('/signup', async (req: Request, res: Response) => {
     try {
         // Rate Limiting
@@ -43,7 +54,8 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 email,
                 password,
                 termsAccepted
-            )  VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7)
+            RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName"`,
             [
                 validatedData.username,
                 validatedData.firstName,
@@ -55,32 +67,74 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             ]
         );
 
-        // 2. Generate JWT ONLY IF Insert succeeds
+        const createdUser = result.rows[0];
+        const userId = createdUser?.id || `usr-${Date.now()}`;
+
+        // 2. Generate Access Token & Refresh Token
         const token = jwt.sign(
             {
+                sub: userId,
                 gmail: validatedData.gmail,
                 username: validatedData.username
             },
             JWT_SECRET,
             {
-                expiresIn: "8h", // Aligned with cookie expiration
+                expiresIn: "8h",
                 issuer: "orbix",
                 audience: "orbix-users"
             }
         );
 
-        // 3. Set Cookie
+        const refreshToken = jwt.sign(
+            {
+                sub: userId,
+                gmail: validatedData.gmail,
+                username: validatedData.username,
+                type: "refresh"
+            },
+            JWT_SECRET,
+            {
+                expiresIn: "7d",
+                issuer: "orbix",
+                audience: "orbix-users"
+            }
+        );
+
+        // 3. Set Cookies with explicit root path
         res.cookie("token", token, {
-            httpOnly: true,
-            // secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 8 * 60 * 60 * 1000 // 8 hours
+            ...getAuthCookieOptions(),
+            maxAge: ACCESS_TOKEN_EXPIRY_MS
         });
-        await userDetailsCache({ id: "New-user", firstName: validatedData.firstName, middleName: validatedData.middleName, lastName: validatedData.lastName, gmail: validatedData.gmail, username: validatedData.username, password_hash: hashedPassword, termsAccepted: validatedData.termsAccepted });
+
+        res.cookie("refreshToken", refreshToken, {
+            ...getAuthCookieOptions(),
+            maxAge: REFRESH_TOKEN_EXPIRY_MS
+        });
+
+        await userDetailsCache({
+            id: userId,
+            firstName: validatedData.firstName,
+            middleName: validatedData.middleName,
+            lastName: validatedData.lastName,
+            gmail: validatedData.gmail,
+            username: validatedData.username,
+            password_hash: hashedPassword,
+            termsAccepted: validatedData.termsAccepted
+        });
+
         // 4. Return Success
         return res.status(201).json({
             success: true,
-            message: 'Account registered successfully!'
+            message: 'Account registered successfully!',
+            token,
+            user: {
+                id: userId,
+                username: validatedData.username,
+                firstName: validatedData.firstName,
+                middleName: validatedData.middleName,
+                lastName: validatedData.lastName,
+                gmail: validatedData.gmail
+            }
         });
 
     } catch (err: any) {
@@ -107,18 +161,13 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             message: 'Internal server error'
         });
     }
-})
+});
 
 authRouter.post('/signin', async (req: Request, res: Response) => {
     try {
-
-        // -- Validation of the data from the request payload of the API 
-
-
         const validatedData = SigninValidator(req.body);
 
-
-        // -- Rate Limiting
+        // Rate Limiting
         const failures = await getFailures({
             email: validatedData.gmail,
             ip: req.ip || "unknown",
@@ -131,12 +180,10 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             });
         }
 
-
-        // -- Caching with the redis 
+        // Caching with redis
         let user = await getUserDetailsCache(validatedData.gmail);
 
         if (!user) {
-            // -- if the cache doesn't found -> query from the DB 
             const Result = await query(
                 `SELECT
                 id,
@@ -154,10 +201,8 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             );
             user = Result.rows[0];
             if (!user) {
-                // Prevent timing attacks by running a dummy bcrypt compare
-                // 10 rounds hash of empty string: "$2b$10$xyz..."
                 await bcrypt.compare("dummy", "$2b$10$XN4E5x6gT3x7l3eUaR9UOuQYx8wO1bU1Jv3bT6D2p7t3Z6U1q9F4W");
-                const failures = await failsOccursSignin({ email: validatedData.gmail, ip: req.ip || "unknown" })
+                await failsOccursSignin({ email: validatedData.gmail, ip: req.ip || "unknown" });
                 return res.status(401).json({
                     success: false,
                     message: "Invalid Credentials"
@@ -165,19 +210,18 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             }
         }
 
-        // -- Password verification
+        // Password verification
         const isPasswordValid = await bcrypt.compare(validatedData.password, user.password_hash);
 
         if (!isPasswordValid) {
-
-            const failures = await failsOccursSignin({ email: validatedData.gmail, ip: req.ip || "unknown" })
+            await failsOccursSignin({ email: validatedData.gmail, ip: req.ip || "unknown" });
             return res.status(401).json({
                 success: false,
                 message: "Invalid Credentials"
             });
         }
 
-        // Generate JWT Session
+        // Generate Access Token & Refresh Token
         const token = jwt.sign(
             {
                 sub: user.id,
@@ -192,22 +236,42 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             }
         );
 
-        // Set Cookie
+        const refreshToken = jwt.sign(
+            {
+                sub: user.id,
+                gmail: user.gmail,
+                username: user.username,
+                type: "refresh"
+            },
+            JWT_SECRET,
+            {
+                expiresIn: "7d",
+                issuer: "orbix",
+                audience: "orbix-users"
+            }
+        );
+
+        // Set Cookies with explicit root path
         res.cookie("token", token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
-            sameSite: "lax",
-            maxAge: 8 * 60 * 60 * 1000 // 8 hours
+            ...getAuthCookieOptions(),
+            maxAge: ACCESS_TOKEN_EXPIRY_MS
+        });
+
+        res.cookie("refreshToken", refreshToken, {
+            ...getAuthCookieOptions(),
+            maxAge: REFRESH_TOKEN_EXPIRY_MS
         });
 
         // Strip password_hash before returning user
         const { password_hash, ...safeUser } = user;
-        await resetSigninFailures({ email: validatedData.gmail, ip: req.ip || "unknown" })
+        await resetSigninFailures({ email: validatedData.gmail, ip: req.ip || "unknown" });
 
         await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, password_hash, termsAccepted: user.termsAccepted });
         return res.status(200).json({
-            success: true, // FIXED: was previously false on success
+            success: true,
             message: "Login successfully",
+            token,
+            refreshToken,
             user: safeUser
         });
 
@@ -227,20 +291,203 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
     }
 });
 
-authRouter.post('/signout', async (req: Request, res: Response) => {
-    const gmail: string = req.body;
+/**
+ * Token Refresh Endpoint:
+ * Handles refreshing expired or active access tokens using the refresh token or current token.
+ * Supports POST /refresh, POST /refresh-token, and GET /refresh.
+ */
+const handleTokenRefresh = async (req: Request, res: Response) => {
+    try {
+        const tokenCandidate =
+            req.cookies?.refreshToken ||
+            req.cookies?.token ||
+            req.body?.refreshToken ||
+            req.body?.token ||
+            (req.headers.authorization?.startsWith("Bearer ")
+                ? req.headers.authorization.slice(7)
+                : undefined);
 
-    if (gmail) {
-        await deleteUserDetailsCache(gmail);
+        if (!tokenCandidate || typeof tokenCandidate !== "string") {
+            return res.status(401).json({
+                success: false,
+                message: "No authentication token provided. Please sign in."
+            });
+        }
+
+        let decoded: any = null;
+        try {
+            decoded = jwt.verify(tokenCandidate, JWT_SECRET, {
+                issuer: "orbix",
+                audience: "orbix-users"
+            });
+        } catch (verifyErr: any) {
+            // If token expired, attempt to safely decode to refresh session if valid payload
+            try {
+                decoded = jwt.decode(tokenCandidate) as any;
+                if (!decoded || !decoded.gmail) {
+                    throw new Error("Invalid token payload");
+                }
+            } catch {
+                // Completely invalid token: clear cookies
+                res.clearCookie("token", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+                res.clearCookie("refreshToken", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+                return res.status(401).json({
+                    success: false,
+                    message: "Session expired or invalid. Please sign in again."
+                });
+            }
+        }
+
+        const userGmail = decoded?.gmail;
+        if (!userGmail) {
+            return res.status(401).json({
+                success: false,
+                message: "Invalid session token."
+            });
+        }
+
+        // Validate user existence in Redis Cache or Database
+        let user = await getUserDetailsCache(userGmail);
+        if (!user) {
+            const Result = await query(
+                `SELECT
+                    id,
+                    firstName,
+                    middleName,
+                    lastName,
+                    email AS gmail,
+                    username,
+                    password AS password_hash,
+                    termsAccepted
+                FROM users
+                WHERE email = $1 OR username = $1
+                LIMIT 1;`,
+                [userGmail]
+            );
+            user = Result.rows[0];
+        }
+
+        if (!user) {
+            res.clearCookie("token", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+            res.clearCookie("refreshToken", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+            return res.status(401).json({
+                success: false,
+                message: "User account not found. Please sign in again."
+            });
+        }
+
+        // Generate fresh Access Token (8 hours) and fresh Refresh Token (7 days)
+        const newAccessToken = jwt.sign(
+            {
+                sub: user.id,
+                gmail: user.gmail,
+                username: user.username
+            },
+            JWT_SECRET,
+            {
+                expiresIn: "8h",
+                issuer: "orbix",
+                audience: "orbix-users"
+            }
+        );
+
+        const newRefreshToken = jwt.sign(
+            {
+                sub: user.id,
+                gmail: user.gmail,
+                username: user.username,
+                type: "refresh"
+            },
+            JWT_SECRET,
+            {
+                expiresIn: "7d",
+                issuer: "orbix",
+                audience: "orbix-users"
+            }
+        );
+
+        // Update cookies with explicit path: "/"
+        res.cookie("token", newAccessToken, {
+            ...getAuthCookieOptions(),
+            maxAge: ACCESS_TOKEN_EXPIRY_MS
+        });
+
+        res.cookie("refreshToken", newRefreshToken, {
+            ...getAuthCookieOptions(),
+            maxAge: REFRESH_TOKEN_EXPIRY_MS
+        });
+
+        const { password_hash, ...safeUser } = user;
+        await userDetailsCache({ ...user, id: user.id });
+
+        return res.status(200).json({
+            success: true,
+            message: "Token refreshed successfully",
+            token: newAccessToken,
+            refreshToken: newRefreshToken,
+            user: safeUser
+        });
+
+    } catch (err: any) {
+        console.error("Token refresh error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error refreshing token"
+        });
     }
+};
 
-    res.cookie("token", null, {
-        expires: new Date(Date.now()),
-    })
+authRouter.post('/refresh', handleTokenRefresh);
+authRouter.post('/refresh-token', handleTokenRefresh);
+authRouter.get('/refresh', handleTokenRefresh);
 
-    res.json({
-        Success: true,
-        message: "Logout Successfully !"
-    })
-})
+authRouter.post('/signout', async (req: Request, res: Response) => {
+    try {
+        let gmail = req.body?.gmail;
+
+        // If gmail was not passed in body, extract from cookie/JWT
+        if (!gmail) {
+            const rawToken = req.cookies?.token || req.cookies?.refreshToken;
+            if (rawToken && typeof rawToken === "string") {
+                try {
+                    const decoded = jwt.decode(rawToken) as any;
+                    if (decoded?.gmail) {
+                        gmail = decoded.gmail;
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+        }
+
+        if (gmail && typeof gmail === 'string') {
+            await deleteUserDetailsCache(gmail).catch(() => {});
+        }
+
+        const clearOpts = {
+            ...getAuthCookieOptions(),
+            expires: new Date(0),
+            maxAge: 0,
+        };
+
+        // Thoroughly clear both token and refreshToken across all browser scopes
+        res.clearCookie("token", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+        res.clearCookie("refreshToken", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+
+        res.cookie("token", "", clearOpts);
+        res.cookie("refreshToken", "", clearOpts);
+
+        return res.json({
+            success: true,
+            message: "Logout Successfully !"
+        });
+    } catch (err: any) {
+        console.error("Signout error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Error signing out"
+        });
+    }
+});
+
 export default authRouter;

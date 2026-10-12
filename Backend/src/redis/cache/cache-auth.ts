@@ -30,6 +30,7 @@ const userDetailsCache = async (user: IUserDetails) => {
 
 const getUserDetailsCache = async (gmail: string): Promise<IUserDetails | null> => {
     const key = `auth:user:gmail:${gmail}`;
+
     const user = await redis.hgetall(key);
     if (Object.keys(user).length === 0) {
         return null;
@@ -41,8 +42,13 @@ const getUserDetailsCache = async (gmail: string): Promise<IUserDetails | null> 
 };
 
 const deleteUserDetailsCache = async (gmail: string) => {
-    const key = `auth:user:gmail:${gmail}`;
-    await redis.del(key);
+    try {
+        const key = `auth:user:gmail:${gmail}`;
+
+        await redis.del(key);
+    } catch (err: any) {
+        throw new Error("Key not founded")
+    }
 };
 
 export {

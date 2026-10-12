@@ -142,40 +142,27 @@ function PixelRow({
 }
 
 function SignInBanner() {
+    const [wordIndex, setWordIndex] = useState(0);
+
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setWordIndex((prev) => (prev + 1) % WORDS.length);
+        }, 2000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const currentWord = WORDS[wordIndex];
+    const currentGrid = WORD_GRIDS[currentWord];
+
     const topRows = [
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0],
+        [0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 0, 1, 0, 1, 0, 0, 0],
+        [0, 0, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
     ];
-
-    const bottomRows = [
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-    ];
-
     const topColors = [
         "bg-[#00a2ff]",
         "bg-[#00b0ff]",
@@ -207,11 +194,11 @@ function SignInBanner() {
     return (
         <div className="relative w-full h-full overflow-hidden bg-[#111118] flex flex-col justify-between select-none border border-white/[0.04]">
             {/* Gradients */}
-            <div className="absolute top-0 left-0 w-full h-[55%] bg-gradient-to-b from-[#00bfff]/10 to-transparent pointer-events-none" />
-            <div className="absolute bottom-0 left-0 w-full h-[45%] bg-gradient-to-t from-[#00d4dd]/8 to-transparent pointer-events-none" />
+            <div className="absolute top-0 left-0 w-full h-[50%] bg-gradient-to-b from-[#ff6a33]/8 to-transparent pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-full h-[50%] bg-gradient-to-t from-[#9058e8]/8 to-transparent pointer-events-none" />
 
-            {/* Top pixel blocks – 28% of total height */}
-            <div className="relative z-10 w-full h-[28%] flex flex-col justify-stretch min-h-0">
+            {/* Top pixel blocks – 22% of total height */}
+            <div className="relative z-10 w-full h-[22%] flex flex-col justify-stretch min-h-0">
                 {topRows.map((row, ri) => (
                     <PixelRow
                         key={ri}
@@ -237,29 +224,58 @@ function SignInBanner() {
                 </span>
             </motion.div>
 
-            {/* Center content – 40% of total height, guaranteed breathing room */}
-            <div className="relative z-10 w-full h-[40%] flex flex-col items-center justify-center px-4 sm:px-6 lg:px-8 min-h-0">
+            {/* Center content – 44% of total height */}
+            <div className="relative z-10 w-full h-[44%] flex flex-col items-start justify-center px-4 sm:px-6 lg:px-8 min-h-0">
                 <motion.h2
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.5, delay: 0.35 }}
-                    className="text-center font-bold font-mono text-white tracking-tight leading-[1.15]"
-                    style={{ fontSize: "clamp(1.15rem, 2.2vw + 1.2vh, 2.75rem)" }}
+                    className="font-bold font-mono text-white tracking-tight leading-[1.15]"
+                    style={{ fontSize: "clamp(1.15rem, 2.2vw + 1.2vh, 2.65rem)" }}
                 >
-                    Welcome to AWS <br />Student Builder Group PSIT
+                    Build with <span className="text-cyan-400">Codexa</span>,
+                    <br />
+                    Evolve with  <span className="text-cyan-400">Evolexa</span>,
+                    <br />
+                    Automate with  <span className="text-cyan-400">Flowexa</span>.
                 </motion.h2>
             </div>
 
-            {/* Bottom pixel blocks – 32% of total height */}
-            <div className="relative z-10 w-full h-[32%] flex flex-col justify-stretch min-h-0">
-                {bottomRows.map((row, ri) => (
-                    <PixelRow
-                        key={ri}
-                        cells={row}
-                        color={bottomColors[ri] || bottomColors[bottomColors.length - 1]}
-                        delay={0.3 + ri * 0.04}
-                    />
-                ))}
+            {/* Bottom dynamic word pixel grid – 34% of total height, changing every 2s */}
+            <div className="relative z-10 w-full h-[34%] flex flex-col justify-stretch min-h-0 overflow-hidden">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={currentWord}
+                        initial={{ opacity: 0, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.96 }}
+                        transition={{ duration: 0.35, ease: "easeInOut" }}
+                        className="w-full h-full flex flex-col justify-stretch min-h-0"
+                    >
+                        {currentGrid.map((row, ri) => (
+                            <div
+                                key={ri}
+                                className="flex w-full flex-1 min-h-0"
+                                style={{ gap: 0 }}
+                            >
+                                {row.map((cell, ci) => (
+                                    <div
+                                        key={ci}
+                                        style={{
+                                            width: `${100 / row.length}%`,
+                                            height: "100%",
+                                            background: cell ? undefined : "transparent",
+                                        }}
+                                        className={`transition-colors duration-200 ${cell
+                                            ? bottomColors[ri % bottomColors.length]
+                                            : "bg-transparent"
+                                            }`}
+                                    />
+                                ))}
+                            </div>
+                        ))}
+                    </motion.div>
+                </AnimatePresence>
             </div>
         </div>
     );
