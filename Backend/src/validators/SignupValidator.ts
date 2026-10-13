@@ -579,8 +579,8 @@ const SignupValidator = (data: any) => {
         throw new ValidationError("Email is not valid.");
     }
 
-    if (!validator.matches(normalizedUsername, /^[a-z0-9._]{3,20}$/)) {
-        throw new ValidationError("Username must be 3-20 characters, containing only lowercase letters, numbers, dots, or underscores.");
+    if (!validator.matches(normalizedUsername, /^[a-z0-9._-]{3,20}$/)) {
+        throw new ValidationError("Username must be 3-20 characters, containing only lowercase letters, numbers, dots, underscores, or hyphens.");
     }
 
     if (!validator.isStrongPassword(password)) {

@@ -2,10 +2,12 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FormInput } from "../FormInput";
 import { useToast } from "../../../context/ToastContext";
+import { useAppDispatch, setUser } from "../../../store";
 
 export default function SigninForm() {
     const navigate = useNavigate();
     const toast = useToast();
+    const dispatch = useAppDispatch();
 
     const [formData, setFormData] = useState({
         gmail: "",
@@ -81,12 +83,16 @@ export default function SigninForm() {
                 return;
             }
 
-            if (resultData?.user) {
+            if (resultData?.token) {
                 try {
-                    localStorage.setItem("orbix_user", JSON.stringify(resultData.user));
-                } catch (e) {
-                    console.warn("Storage error", e);
+                    localStorage.setItem("orbix_token", resultData.token);
+                } catch {
+                    // ignore quota errors
                 }
+            }
+
+            if (resultData?.user) {
+                dispatch(setUser(resultData.user));
             }
 
             toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });

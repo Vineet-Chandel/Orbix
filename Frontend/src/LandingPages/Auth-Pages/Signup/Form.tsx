@@ -2,12 +2,15 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FormInput } from "../FormInput";
 import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
+import { UsernameRulesIndicator } from "../UsernameRulesIndicator";
 import { evaluatePassword } from "../passwordValidator";
 import { useToast } from "../../../context/ToastContext";
+import { useAppDispatch, setUser } from "../../../store";
 
 export default function SignupForm() {
     const navigate = useNavigate();
     const toast = useToast();
+    const dispatch = useAppDispatch();
 
     const [formData, setFormData] = useState({
         username: "",
@@ -29,6 +32,7 @@ export default function SignupForm() {
     }>({});
 
     const [loading, setLoading] = useState(false);
+    const [usernameFocused, setUsernameFocused] = useState(false);
 
     const passwordStrength = evaluatePassword(formData.password);
 
@@ -38,8 +42,8 @@ export default function SignupForm() {
         const normalizedUsername = formData.username.trim().toLowerCase();
         if (!normalizedUsername) {
             newErrors.username = "Username is required";
-        } else if (!/^[a-z0-9._]{3,20}$/.test(normalizedUsername)) {
-            newErrors.username = "Must be 3-20 chars: lowercase, numbers, dot, or _";
+        } else if (!/^[a-z0-9._-]{3,20}$/.test(normalizedUsername)) {
+            newErrors.username = "Must be 3-20 chars: lowercase, numbers, dot, _, or -";
         }
 
         if (!formData.firstName.trim()) {
@@ -129,23 +133,27 @@ export default function SignupForm() {
                 return;
             }
 
-            try {
-                localStorage.setItem(
-                    "orbix_user",
-                    JSON.stringify({
-                        username: payload.username,
-                        firstName: payload.firstName,
-                        middleName: payload.middleName,
-                        lastName: payload.lastName,
-                        gmail: payload.gmail,
-                    })
-                );
-            } catch (e) {
-                console.warn("Storage error", e);
+            const resData = await response.json().catch(() => null);
+            if (resData?.token) {
+                try {
+                    localStorage.setItem("orbix_token", resData.token);
+                } catch {
+                    // ignore quota errors
+                }
             }
 
+            const fullUser = resData?.user || {
+                username: payload.username,
+                firstName: payload.firstName,
+                middleName: payload.middleName,
+                lastName: payload.lastName,
+                gmail: payload.gmail,
+            };
+
+            dispatch(setUser(fullUser));
+
             toast.success("Account registered successfully! Welcome to Orbix.", { title: "Welcome!" });
-            navigate("/dashboard");
+            navigate("/onboarding");
         } catch (err: any) {
             console.error("Sign up error:", err);
             await toast.handleError(err, "An unexpected error occurred during registration.");
@@ -200,20 +208,30 @@ export default function SignupForm() {
                 />
             </div>
 
-            {/* Username Input */}
-            <FormInput
-                name="username"
-                type="text"
-                placeholder="Username"
-                hideLabel
-                value={formData.username}
-                onChange={(e) => {
-                    setFormData({ ...formData, username: e.target.value.toLowerCase() });
-                    if (errors.username) setErrors({ ...errors, username: undefined });
-                }}
-                error={errors.username}
-                autoComplete="username"
-            />
+            {/* Username Input with Live Rules Display */}
+            <div>
+                <FormInput
+                    name="username"
+                    type="text"
+                    placeholder="Username"
+                    hideLabel
+                    value={formData.username}
+                    onChange={(e) => {
+                        setFormData({ ...formData, username: e.target.value.toLowerCase() });
+                        if (errors.username) setErrors({ ...errors, username: undefined });
+                    }}
+                    onFocus={() => setUsernameFocused(true)}
+                    onBlur={() => setUsernameFocused(false)}
+                    error={errors.username}
+                    autoComplete="username"
+                />
+
+                <UsernameRulesIndicator
+                    username={formData.username}
+                    hasInput={formData.username.length > 0}
+                    isFocused={usernameFocused}
+                />
+            </div>
 
             {/* Email Input */}
             <FormInput

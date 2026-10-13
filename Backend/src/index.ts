@@ -3,6 +3,7 @@ import 'dotenv/config';
 import express, { type Express, type Request, type Response } from 'express';
 import cookieParser from 'cookie-parser';
 import authRouter from './Routes/auth/auth.js';
+import portalsRouter from './Routes/portals/portals.js';
 import { testDatabaseConnection } from './database/client.js';
 import redis from './redis/client.js';
 
@@ -36,6 +37,8 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
 });
 
 app.use('/api', authRouter);
+app.use('/api/portals', portalsRouter);
+app.use('/profile', portalsRouter);
 app.get('/', (req: Request, res: Response) => {
     res.send('Hello World!');
 });
@@ -46,16 +49,15 @@ const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
     try {
-        await testDatabaseConnection();
-
         app.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
         });
 
-
+        testDatabaseConnection().catch((error) => {
+            console.warn("⚠️ Database connection check warning:", error.message || error);
+        });
     } catch (error) {
         console.error("Server startup failed:", error);
-        process.exit(1);
     }
 };
 

@@ -6,6 +6,8 @@ import { query } from "../../database/client.js"
 import SigninValidator from '../../validators/SigninValidator.js';
 import { failsOccursSignin, failsOccursSignup, resetSigninFailures, getFailures } from '../../redis/rate-limiters/rate-limiters-auth.js';
 import { deleteUserDetailsCache, getUserDetailsCache, userDetailsCache } from '../../redis/cache/cache-auth.js';
+import { authenticate } from '../../middlewares/auth.middleware.js';
+import { handleSavePortals, handleGetSavedPortals } from '../portals/portals.js';
 import { time } from 'node:console';
 const authRouter = express.Router();
 
@@ -111,6 +113,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             maxAge: REFRESH_TOKEN_EXPIRY_MS
         });
 
+
         await userDetailsCache({
             id: userId,
             firstName: validatedData.firstName,
@@ -123,6 +126,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
         });
 
         // 4. Return Success
+
         return res.status(201).json({
             success: true,
             message: 'Account registered successfully!',
@@ -461,7 +465,7 @@ authRouter.post('/signout', async (req: Request, res: Response) => {
         }
 
         if (gmail && typeof gmail === 'string') {
-            await deleteUserDetailsCache(gmail).catch(() => {});
+            await deleteUserDetailsCache(gmail).catch(() => { });
         }
 
         const clearOpts = {
@@ -489,5 +493,49 @@ authRouter.post('/signout', async (req: Request, res: Response) => {
         });
     }
 });
+
+
+
+
+
+authRouter.get("/profile/me", authenticate, async (req: Request, res: Response) => {
+    try {
+        const user = req.user;
+
+        // Authentication middleware must populate req.user.
+        if (!user) {
+            return res.status(401).json({
+                status: "failed",
+                message: "Authentication required",
+            });
+        }
+
+        return res.status(200).json({
+            status: "success",
+            users: user,
+            user: {
+                id: user.id,
+                firstName: user.firstName,
+                middleName: user.middleName,
+                lastName: user.lastName,
+                gmail: user.gmail,
+                termsAccepted: user.termsAccepted,
+                username: user.username,
+            },
+        });
+    } catch (err: unknown) {
+        // Replace with your production logger if available.
+        console.error("GET /me failed:", err);
+
+        return res.status(500).json({
+            status: "error",
+            message: "An internal server error occurred",
+        });
+    }
+});
+
+// Profile portal save & retrieval endpoints (/api/profile/save)
+authRouter.post("/profile/save", authenticate, handleSavePortals);
+authRouter.get("/profile/save", authenticate, handleGetSavedPortals);
 
 export default authRouter;

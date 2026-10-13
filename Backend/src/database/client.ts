@@ -16,6 +16,7 @@ export const pool = new Pool({
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 30000,
     max: 10,
+    ssl: { rejectUnauthorized: false },
 });
 
 // Detect unexpected errors on idle pooled connections.
