@@ -8,6 +8,8 @@ import PricingPage from "./LandingPages/Pricing/Landing";
 import SupportPage from "./LandingPages/Support/Landing";
 import PlatformPage from "./LandingPages/Platform/Landing";
 import Dashboard from "./app/Dashboard/Landing";
+import ProfileManager from "./app/Profile/ProfileManager";
+import PublicProfilePage from "./app/Profile/PublicProfilePage";
 import ProfilesOnboardingPage from "./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
@@ -38,6 +40,9 @@ const App = () => {
           <Route path="/platform" element={<PlatformPage />} />
           <Route path="/demo" element={<SupportPage />} />
 
+          {/* Public Shareable Profile Showcase Route */}
+          <Route path="/profile/:username" element={<PublicProfilePage />} />
+
           {/* Auth Pages */}
           <Route path="/auth/signup" element={<SignUpPage />} />
           <Route path="/auth/signin" element={<SignInPage />} />
@@ -52,7 +57,7 @@ const App = () => {
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/profile" element={<Dashboard />} />
+            <Route path="/profile" element={<ProfileManager />} />
             <Route path="/resume" element={<Dashboard />} />
             <Route path="/projects" element={<Dashboard />} />
           </Route>

@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS user_links (
     display_name VARCHAR(150),
     avatar_url TEXT,
     stats JSONB DEFAULT '[]'::jsonb,
+    last_sync_status VARCHAR(50) DEFAULT 'valid',
+    last_sync_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_user_portal UNIQUE (username, portal)

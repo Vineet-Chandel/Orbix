@@ -6,6 +6,7 @@ import { query } from "../../database/client.js"
 import SigninValidator from '../../validators/SigninValidator.js';
 import { failsOccursSignin, failsOccursSignup, resetSigninFailures, getFailures } from '../../redis/rate-limiters/rate-limiters-auth.js';
 import { deleteUserDetailsCache, getUserDetailsCache, userDetailsCache } from '../../redis/cache/cache-auth.js';
+import redis from '../../redis/client.js';
 import { authenticate } from '../../middlewares/auth.middleware.js';
 import { handleSavePortals, handleGetSavedPortals } from '../portals/portals.js';
 import { time } from 'node:console';
@@ -466,6 +467,17 @@ authRouter.post('/signout', async (req: Request, res: Response) => {
 
         if (gmail && typeof gmail === 'string') {
             await deleteUserDetailsCache(gmail).catch(() => { });
+            // Also invalidate profile and portals caches in Redis
+            try {
+                if (redis && redis.status === "ready") {
+                    await Promise.allSettled([
+                        redis.del(`user:portals:${gmail}`),
+                        redis.del(`profile:public:${gmail}`),
+                    ]);
+                }
+            } catch {
+                // ignore
+            }
         }
 
         const clearOpts = {
@@ -494,45 +506,80 @@ authRouter.post('/signout', async (req: Request, res: Response) => {
     }
 });
 
-
-
-
-
-authRouter.get("/profile/me", authenticate, async (req: Request, res: Response) => {
+const handleMeEndpoint = async (req: Request, res: Response) => {
     try {
         const user = req.user;
 
-        // Authentication middleware must populate req.user.
         if (!user) {
             return res.status(401).json({
                 status: "failed",
+                success: false,
                 message: "Authentication required",
             });
         }
 
+        // Fetch fresh profile metadata from database
+        const dbResult = await query(
+            `SELECT
+                id,
+                username,
+                firstname AS "firstName",
+                middlename AS "middleName",
+                lastname AS "lastName",
+                email AS gmail,
+                termsaccepted AS "termsAccepted",
+                headline,
+                bio,
+                avatar_url AS "avatarUrl",
+                cover_image_url AS "coverImageUrl",
+                website,
+                location,
+                skills,
+                is_public AS "isPublic",
+                created_at AS "createdAt"
+            FROM users
+            WHERE id = $1 OR email = $2
+            LIMIT 1;`,
+            [user.id, user.gmail]
+        );
+
+        const fullUser = dbResult.rows[0] || user;
+
         return res.status(200).json({
             status: "success",
-            users: user,
+            success: true,
+            users: fullUser,
             user: {
-                id: user.id,
-                firstName: user.firstName,
-                middleName: user.middleName,
-                lastName: user.lastName,
-                gmail: user.gmail,
-                termsAccepted: user.termsAccepted,
-                username: user.username,
+                id: fullUser.id,
+                firstName: fullUser.firstName,
+                middleName: fullUser.middleName,
+                lastName: fullUser.lastName,
+                gmail: fullUser.gmail,
+                termsAccepted: fullUser.termsAccepted,
+                username: fullUser.username,
+                headline: fullUser.headline || null,
+                bio: fullUser.bio || null,
+                avatarUrl: fullUser.avatarUrl || null,
+                coverImageUrl: fullUser.coverImageUrl || null,
+                website: fullUser.website || null,
+                location: fullUser.location || null,
+                skills: Array.isArray(fullUser.skills) ? fullUser.skills : [],
+                isPublic: fullUser.isPublic !== false,
+                createdAt: fullUser.createdAt || null,
             },
         });
     } catch (err: unknown) {
-        // Replace with your production logger if available.
         console.error("GET /me failed:", err);
-
         return res.status(500).json({
             status: "error",
+            success: false,
             message: "An internal server error occurred",
         });
     }
-});
+};
+
+authRouter.get("/profile/me", authenticate, handleMeEndpoint);
+authRouter.get("/me", authenticate, handleMeEndpoint);
 
 // Profile portal save & retrieval endpoints (/api/profile/save)
 authRouter.post("/profile/save", authenticate, handleSavePortals);

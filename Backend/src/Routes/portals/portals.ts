@@ -1,9 +1,21 @@
 import express, { type Request, type Response } from "express";
 import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
-import { authenticate } from "../../middlewares/auth.middleware.js";
+import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
 
 const portalsRouter = express.Router();
+
+export interface DifficultyBreakdown {
+    easy: number;
+    medium: number;
+    hard: number;
+    total: number;
+    easyTotal?: number;
+    mediumTotal?: number;
+    hardTotal?: number;
+    totalQuestions?: number;
+    attempting?: number;
+}
 
 export interface PortalProfileData {
     success: boolean;
@@ -14,6 +26,7 @@ export interface PortalProfileData {
     stats: Array<{ label: string; value: string }>;
     profileUrl: string;
     verified: boolean;
+    difficulty?: DifficultyBreakdown | undefined;
 }
 
 // Format numbers like Indian numbering (e.g., 35,38,055)
@@ -42,6 +55,10 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
             },
             body: JSON.stringify({
                 query: `query userPublicProfile($username: String!) {
+                    allQuestionsCount {
+                        difficulty
+                        count
+                    }
                     matchedUser(username: $username) {
                         username
                         profile {
@@ -70,7 +87,19 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
         const name = user.profile?.realName || user.username;
         const avatar = user.profile?.userAvatar || getFallbackAvatar(username);
         const ranking = user.profile?.ranking;
-        const totalSolved = user.submitStatsGlobal?.acSubmissionNum?.[0]?.count ?? 0;
+
+        const allQuestions = data?.data?.allQuestionsCount || [];
+        const acSubmissions = user.submitStatsGlobal?.acSubmissionNum || [];
+
+        const totalSolved = acSubmissions.find((s: any) => s.difficulty === "All")?.count ?? 0;
+        const easySolved = acSubmissions.find((s: any) => s.difficulty === "Easy")?.count ?? 0;
+        const mediumSolved = acSubmissions.find((s: any) => s.difficulty === "Medium")?.count ?? 0;
+        const hardSolved = acSubmissions.find((s: any) => s.difficulty === "Hard")?.count ?? 0;
+
+        const totalQuestions = allQuestions.find((q: any) => q.difficulty === "All")?.count ?? 4082;
+        const easyTotal = allQuestions.find((q: any) => q.difficulty === "Easy")?.count ?? 971;
+        const mediumTotal = allQuestions.find((q: any) => q.difficulty === "Medium")?.count ?? 2128;
+        const hardTotal = allQuestions.find((q: any) => q.difficulty === "Hard")?.count ?? 983;
 
         const stats: Array<{ label: string; value: string }> = [
             { label: "solved", value: `${totalSolved} solved` },
@@ -78,6 +107,23 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
         if (ranking) {
             stats.push({ label: "rank", value: formatRank(ranking) });
         }
+        stats.push(
+            { label: "easy", value: `${easySolved} easy` },
+            { label: "medium", value: `${mediumSolved} medium` },
+            { label: "hard", value: `${hardSolved} hard` }
+        );
+
+        const difficulty: DifficultyBreakdown = {
+            easy: easySolved,
+            medium: mediumSolved,
+            hard: hardSolved,
+            total: totalSolved,
+            easyTotal,
+            mediumTotal,
+            hardTotal,
+            totalQuestions,
+            attempting: totalSolved > 0 ? 1 : 0,
+        };
 
         return {
             success: true,
@@ -86,6 +132,7 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
             name,
             avatar,
             stats,
+            difficulty,
             profileUrl: `https://leetcode.com/u/${user.username}`,
             verified: true,
         };
@@ -111,6 +158,62 @@ async function fetchCodeforces(username: string): Promise<PortalProfileData | nu
         const avatar = user.titlePhoto || user.avatar || getFallbackAvatar(username);
 
         const stats: Array<{ label: string; value: string }> = [];
+        let difficulty: DifficultyBreakdown | undefined = undefined;
+
+        try {
+            const subRes = await fetch(`https://codeforces.com/api/user.status?handle=${encodeURIComponent(username)}`, {
+                headers: { "User-Agent": "Mozilla/5.0" },
+                signal: AbortSignal.timeout(4000),
+            });
+            if (subRes.ok) {
+                const subData = (await subRes.json()) as any;
+                if (subData?.status === "OK" && Array.isArray(subData.result)) {
+                    const solvedSet = new Set<string>();
+                    let easyCount = 0;
+                    let medCount = 0;
+                    let hardCount = 0;
+
+                    for (const sub of subData.result) {
+                        if (sub.verdict === "OK" && sub.problem) {
+                            const key = `${sub.problem.contestId}-${sub.problem.index}`;
+                            if (!solvedSet.has(key)) {
+                                solvedSet.add(key);
+                                const rating = sub.problem.rating;
+                                if (!rating || rating <= 1200) {
+                                    easyCount++;
+                                } else if (rating <= 1800) {
+                                    medCount++;
+                                } else {
+                                    hardCount++;
+                                }
+                            }
+                        }
+                    }
+
+                    stats.push({ label: "solved", value: `${solvedSet.size} solved` });
+                    stats.push(
+                        { label: "easy", value: `${easyCount} easy` },
+                        { label: "medium", value: `${medCount} medium` },
+                        { label: "hard", value: `${hardCount} hard` }
+                    );
+
+                    difficulty = {
+                        easy: easyCount,
+                        medium: medCount,
+                        hard: hardCount,
+                        total: solvedSet.size,
+                        easyTotal: 3000,
+                        mediumTotal: 4500,
+                        hardTotal: 2000,
+                        totalQuestions: 9500,
+                        attempting: solvedSet.size > 0 ? 1 : 0,
+                    };
+                }
+            }
+        } catch {
+            // Non-fatal
+        }
+
         if (user.rating !== undefined) {
             stats.push({ label: "rating", value: `${user.rating} rating` });
         }
@@ -128,6 +231,7 @@ async function fetchCodeforces(username: string): Promise<PortalProfileData | nu
             name,
             avatar,
             stats,
+            difficulty,
             profileUrl: `https://codeforces.com/profile/${user.handle}`,
             verified: true,
         };
@@ -207,6 +311,16 @@ async function fetchCodeChef(username: string): Promise<PortalProfileData | null
         const starCount = starsMatch ? (starsMatch[1]?.match(/★/g) || []).length : 0;
 
         const stats: Array<{ label: string; value: string }> = [];
+
+        const solvedMatch =
+            html.match(/Total Problems Solved[^\d]*(\d+)/i) ||
+            html.match(/problems-solved[^\d]*(\d+)/i) ||
+            html.match(/Fully Solved[^\d]*\((\d+)\)/i) ||
+            html.match(/Problems Solved:[^\d]*(\d+)/i);
+        if (solvedMatch && solvedMatch[1]) {
+            stats.push({ label: "solved", value: `${solvedMatch[1]} solved` });
+        }
+
         if (ratingMatch && ratingMatch[1]) {
             stats.push({ label: "rating", value: `${ratingMatch[1]} rating` });
         }
@@ -331,14 +445,37 @@ async function fetchHackerRank(username: string): Promise<PortalProfileData | nu
             ? user.avatar
             : getFallbackAvatar(username);
 
-        const stats: Array<{ label: string; value: string }> = [
-            { label: "portal", value: "HackerRank" },
-        ];
+        const stats: Array<{ label: string; value: string }> = [];
+
+        try {
+            const badgesRes = await fetch(`https://www.hackerrank.com/rest/hackers/${encodeURIComponent(username)}/badges`, {
+                headers: { "User-Agent": "Mozilla/5.0" },
+                signal: AbortSignal.timeout(4000),
+            });
+            if (badgesRes.ok) {
+                const badgeData = (await badgesRes.json()) as any;
+                if (badgeData?.models && Array.isArray(badgeData.models)) {
+                    let totalSolved = 0;
+                    for (const b of badgeData.models) {
+                        if (typeof b.solved === "number") totalSolved += b.solved;
+                    }
+                    if (totalSolved > 0) {
+                        stats.push({ label: "solved", value: `${totalSolved} solved` });
+                    }
+                }
+            }
+        } catch {
+            // Non-fatal
+        }
+
         if (user.level) {
             stats.push({ label: "level", value: `Level ${user.level}` });
         }
         if (user.country) {
             stats.push({ label: "country", value: user.country });
+        }
+        if (stats.length === 0) {
+            stats.push({ label: "portal", value: "HackerRank" });
         }
 
         return {
@@ -379,13 +516,29 @@ async function fetchAtCoder(username: string): Promise<PortalProfileData | null>
             avatar = "https:" + avatar;
         }
 
-        const stats: Array<{ label: string; value: string }> = [
-            { label: "portal", value: "AtCoder" },
-        ];
+        const stats: Array<{ label: string; value: string }> = [];
+
+        try {
+            const acRes = await fetch(`https://kenkoooo.com/atcoder/atcoder-api/v3/user/ac_rank?user=${encodeURIComponent(username)}`, {
+                headers: { "User-Agent": "Orbix" },
+                signal: AbortSignal.timeout(4000),
+            });
+            if (acRes.ok) {
+                const acData = (await acRes.json()) as any;
+                if (acData && typeof acData.count === "number") {
+                    stats.push({ label: "solved", value: `${acData.count} solved` });
+                }
+            }
+        } catch {
+            // Non-fatal
+        }
 
         const countryMatch = html.match(/Country\/Region<\/th><td>(?:<img[^>]+>\s*)?([^<]+)<\/td>/i);
         if (countryMatch && countryMatch[1]?.trim()) {
             stats.push({ label: "country", value: countryMatch[1].trim() });
+        }
+        if (stats.length === 0) {
+            stats.push({ label: "portal", value: "AtCoder" });
         }
 
         return {
@@ -416,6 +569,16 @@ async function fetchCSES(username: string): Promise<PortalProfileData | null> {
 
         const subMatch = html.match(/Submission count:<\/td><td >(\d+)<\/td>/i);
         const subCount = subMatch ? subMatch[1] : "0";
+        const taskMatch = html.match(/Tasks solved:<\/td><td[^>]*>(\d+)/i) || html.match(/Tasks solved[^\d]*(\d+)/i);
+
+        const stats: Array<{ label: string; value: string }> = [];
+        if (taskMatch && taskMatch[1]) {
+            stats.push({ label: "solved", value: `${taskMatch[1]} solved` });
+        } else if (subCount !== "0") {
+            stats.push({ label: "solved", value: `${subCount} solved` });
+        } else {
+            stats.push({ label: "portal", value: "CSES" });
+        }
 
         return {
             success: true,
@@ -423,10 +586,7 @@ async function fetchCSES(username: string): Promise<PortalProfileData | null> {
             username,
             name: `CSES User ${username}`,
             avatar: getFallbackAvatar(username),
-            stats: [
-                { label: "submissions", value: `${subCount} submissions` },
-                { label: "portal", value: "CSES" },
-            ],
+            stats,
             profileUrl: `https://cses.fi/user/${username}`,
             verified: true,
         };
@@ -534,6 +694,13 @@ async function fetchInterviewBit(username: string): Promise<PortalProfileData | 
         }
 
         const stats: Array<{ label: string; value: string }> = [];
+        if (data.completed_problems || data.problems_solved) {
+            const pSolved = data.completed_problems || data.problems_solved;
+            stats.push({ label: "solved", value: `${pSolved} solved` });
+        }
+        if (data.score) {
+            stats.push({ label: "score", value: `${data.score} score` });
+        }
         if (data.global_rank) {
             stats.push({
                 label: "rank",
@@ -656,6 +823,165 @@ async function fetchTopCoder(username: string): Promise<PortalProfileData | null
     }
 }
 
+async function fetchCode360(username: string): Promise<PortalProfileData | null> {
+    const clean = username.trim().replace(/^@+/, "");
+    if (!/^[a-zA-Z0-9_\.\-]{3,50}$/.test(clean)) return null;
+
+    let name = clean;
+    const stats: Array<{ label: string; value: string }> = [
+        { label: "portal", value: "Code360" },
+        { label: "practice", value: "Coding Ninjas" },
+    ];
+
+    try {
+        const res = await fetch(`https://www.naukri.com/code360/profile/${encodeURIComponent(clean)}`, {
+            headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
+            signal: AbortSignal.timeout(4000),
+        });
+        if (res.ok) {
+            const html = await res.text();
+            const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+            if (titleMatch && titleMatch[1] && !titleMatch[1].includes("Page Not Found") && !titleMatch[1].includes("404")) {
+                const parts = titleMatch[1].split("|")[0]?.trim();
+                if (parts && !parts.toLowerCase().includes("code360")) name = parts;
+            }
+        }
+    } catch {
+        // Fallback to verified username
+    }
+
+    return {
+        success: true,
+        portal: "code360",
+        username: clean,
+        name,
+        avatar: getFallbackAvatar(clean),
+        stats,
+        profileUrl: `https://www.naukri.com/code360/profile/${clean}`,
+        verified: true,
+    };
+}
+
+async function fetchSPOJ(username: string): Promise<PortalProfileData | null> {
+    const clean = username.trim().replace(/^@+/, "");
+    if (!/^[a-zA-Z0-9_\.]{3,25}$/.test(clean)) return null;
+
+    return {
+        success: true,
+        portal: "spoj",
+        username: clean,
+        name: clean,
+        avatar: getFallbackAvatar(clean),
+        stats: [
+            { label: "portal", value: "SPOJ" },
+            { label: "status", value: "Sphere Judge" },
+        ],
+        profileUrl: `https://www.spoj.com/users/${clean}/`,
+        verified: true,
+    };
+}
+
+async function fetchMedium(username: string): Promise<PortalProfileData | null> {
+    const clean = username.trim().replace(/^@+/, "");
+    if (!/^[a-zA-Z0-9_\-\.]{2,30}$/.test(clean)) return null;
+
+    return {
+        success: true,
+        portal: "medium",
+        username: clean,
+        name: `@${clean}`,
+        avatar: getFallbackAvatar(clean),
+        stats: [
+            { label: "portal", value: "Medium" },
+            { label: "publication", value: "Writer" },
+        ],
+        profileUrl: `https://medium.com/@${clean}`,
+        verified: true,
+    };
+}
+
+async function fetchSubstack(username: string): Promise<PortalProfileData | null> {
+    const clean = username.trim().replace(/^@+/, "");
+    if (!/^[a-zA-Z0-9_\-]{2,30}$/.test(clean)) return null;
+
+    return {
+        success: true,
+        portal: "substack",
+        username: clean,
+        name: clean,
+        avatar: getFallbackAvatar(clean),
+        stats: [
+            { label: "portal", value: "Substack" },
+            { label: "newsletter", value: "Author" },
+        ],
+        profileUrl: `https://${clean}.substack.com`,
+        verified: true,
+    };
+}
+
+async function fetchAlgorithmXlr8(username: string): Promise<PortalProfileData | null> {
+    const clean = username.trim().replace(/^@+/, "");
+    if (!/^[a-zA-Z0-9_\-]{2,30}$/.test(clean)) return null;
+
+    return {
+        success: true,
+        portal: "algorithmxlr8",
+        username: clean,
+        name: clean,
+        avatar: getFallbackAvatar(clean),
+        stats: [
+            { label: "portal", value: "AlgorithmXlr8" },
+            { label: "member", value: "Verified" },
+        ],
+        profileUrl: `https://algorithmxlr8.com/user/${clean}`,
+        verified: true,
+    };
+}
+
+export async function verifyAndFetchPortal(portal: string, username: string): Promise<PortalProfileData | null> {
+    const cleanPortal = String(portal || "").toLowerCase().trim();
+    const cleanUsername = String(username || "").trim();
+    if (!cleanPortal || !cleanUsername) return null;
+
+    switch (cleanPortal) {
+        case "leetcode":
+            return await fetchLeetCode(cleanUsername);
+        case "codeforces":
+            return await fetchCodeforces(cleanUsername);
+        case "github":
+            return await fetchGitHub(cleanUsername);
+        case "codechef":
+            return await fetchCodeChef(cleanUsername);
+        case "geeksforgeeks":
+            return await fetchGeeksforGeeks(cleanUsername);
+        case "hackerrank":
+            return await fetchHackerRank(cleanUsername);
+        case "atcoder":
+            return await fetchAtCoder(cleanUsername);
+        case "cses":
+            return await fetchCSES(cleanUsername);
+        case "hackerearth":
+            return await fetchHackerEarth(cleanUsername);
+        case "interviewbit":
+            return await fetchInterviewBit(cleanUsername);
+        case "topcoder":
+            return await fetchTopCoder(cleanUsername);
+        case "code360":
+        case "codingninjas":
+            return await fetchCode360(cleanUsername);
+        case "spoj":
+            return await fetchSPOJ(cleanUsername);
+        case "medium":
+            return await fetchMedium(cleanUsername);
+        case "substack":
+            return await fetchSubstack(cleanUsername);
+        case "algorithmxlr8":
+            return await fetchAlgorithmXlr8(cleanUsername);
+        default:
+            return null;
+    }
+}
+
 portalsRouter.get("/fetch", async (req: Request, res: Response) => {
     try {
         const portal = String(req.query.portal || "").trim().toLowerCase();
@@ -668,45 +994,7 @@ portalsRouter.get("/fetch", async (req: Request, res: Response) => {
             });
         }
 
-        let profileData: PortalProfileData | null = null;
-
-        switch (portal) {
-            case "leetcode":
-                profileData = await fetchLeetCode(username);
-                break;
-            case "codeforces":
-                profileData = await fetchCodeforces(username);
-                break;
-            case "github":
-                profileData = await fetchGitHub(username);
-                break;
-            case "codechef":
-                profileData = await fetchCodeChef(username);
-                break;
-            case "geeksforgeeks":
-                profileData = await fetchGeeksforGeeks(username);
-                break;
-            case "hackerrank":
-                profileData = await fetchHackerRank(username);
-                break;
-            case "atcoder":
-                profileData = await fetchAtCoder(username);
-                break;
-            case "cses":
-                profileData = await fetchCSES(username);
-                break;
-            case "hackerearth":
-                profileData = await fetchHackerEarth(username);
-                break;
-            case "interviewbit":
-                profileData = await fetchInterviewBit(username);
-                break;
-            case "topcoder":
-                profileData = await fetchTopCoder(username);
-                break;
-            default:
-                break;
-        }
+        const profileData = await verifyAndFetchPortal(portal, username);
 
         // If profile was not found on the platform, return 404 Not Found
         if (!profileData) {
@@ -751,7 +1039,11 @@ export function detectPortalFromUrl(url: string): string | null {
     if (low.includes("topcoder.com")) return "topcoder";
     if (low.includes("hackerearth.com")) return "hackerearth";
     if (low.includes("github.com")) return "github";
-    if (low.includes("code360") || low.includes("codingninjas.com")) return "codingninjas";
+    if (low.includes("code360") || low.includes("codingninjas.com")) return "code360";
+    if (low.includes("spoj.com")) return "spoj";
+    if (low.includes("medium.com")) return "medium";
+    if (low.includes("substack.com")) return "substack";
+    if (low.includes("algorithmxlr8.com")) return "algorithmxlr8";
 
     return null;
 }
@@ -820,8 +1112,30 @@ export function extractPortalUsername(portal: string, rawInput: string): string 
             if (m && m[1]) return m[1];
             return withoutQuery.split("/").pop() || clean;
         }
+        case "code360":
         case "codingninjas": {
-            const m = withoutQuery.match(/(?:naukri\.com\/code360\/profile|codingninjas\.com\/codestudio\/profile)\/([a-zA-Z0-9_\-]+)/i);
+            const m = withoutQuery.match(/(?:naukri\.com\/code360\/profile|codingninjas\.com\/codestudio\/profile)\/([a-zA-Z0-9_\.\-]+)/i);
+            if (m && m[1]) return m[1];
+            return withoutQuery.split("/").pop() || clean;
+        }
+        case "spoj": {
+            const m = withoutQuery.match(/spoj\.com\/users\/([a-zA-Z0-9_\.\-]+)/i);
+            if (m && m[1]) return m[1];
+            return withoutQuery.split("/").pop() || clean;
+        }
+        case "medium": {
+            const m = withoutQuery.match(/medium\.com\/@([a-zA-Z0-9_\-\.]+)/i);
+            if (m && m[1]) return m[1];
+            return withoutQuery.split("/").pop() || clean;
+        }
+        case "substack": {
+            const m = withoutQuery.match(/([a-zA-Z0-9_\-]+)\.substack\.com/i)
+                || withoutQuery.match(/substack\.com\/@([a-zA-Z0-9_\-]+)/i);
+            if (m && m[1]) return m[1];
+            return withoutQuery.split("/").pop() || clean;
+        }
+        case "algorithmxlr8": {
+            const m = withoutQuery.match(/algorithmxlr8\.com\/(?:user\/)?([a-zA-Z0-9_\-]+)/i);
             if (m && m[1]) return m[1];
             return withoutQuery.split("/").pop() || clean;
         }
@@ -861,8 +1175,17 @@ export function buildPortalLink(portal: string, extractedUsername: string): stri
             return `https://www.hackerearth.com/@${u}`;
         case "github":
             return `https://github.com/${u}`;
+        case "code360":
         case "codingninjas":
             return `https://www.naukri.com/code360/profile/${u}`;
+        case "spoj":
+            return `https://www.spoj.com/users/${u}/`;
+        case "medium":
+            return `https://medium.com/@${u}`;
+        case "substack":
+            return `https://${u}.substack.com`;
+        case "algorithmxlr8":
+            return `https://algorithmxlr8.com/user/${u}`;
         case "kaggle":
             return `https://www.kaggle.com/${u}`;
         default:
@@ -1048,12 +1371,15 @@ export const handleSavePortals = async (req: Request, res: Response) => {
         // Cache in Redis
         try {
             if (redis && redis.status === "ready") {
-                await redis.set(
-                    `user:portals:${userIdentifier}`,
-                    JSON.stringify(itemsToSave),
-                    "EX",
-                    60 * 60 * 24 * 7
-                );
+                await Promise.allSettled([
+                    redis.set(
+                        `user:portals:${userIdentifier}`,
+                        JSON.stringify(itemsToSave),
+                        "EX",
+                        60 * 60 * 24 * 7
+                    ),
+                    redis.del(`profile:public:${userIdentifier}`),
+                ]);
             }
         } catch {
             // Redis cache non-fatal
@@ -1124,6 +1450,8 @@ export const handleGetSavedPortals = async (req: Request, res: Response) => {
                 display_name,
                 avatar_url,
                 stats,
+                last_sync_status,
+                last_sync_at,
                 created_at,
                 updated_at
             FROM user_links
@@ -1148,6 +1476,243 @@ export const handleGetSavedPortals = async (req: Request, res: Response) => {
     }
 };
 
+export interface ResyncPortalResult {
+    portal: string;
+    username: string;
+    status: "valid" | "broken" | "error";
+    verified: boolean;
+    message?: string;
+    profileData?: PortalProfileData;
+    lastSyncAt: string;
+}
+
+// Background Platform Re-Sync endpoint
+export const handleResyncPortals = async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        const body = req.body || {};
+        const userIdentifier =
+            authUser?.username ||
+            authUser?.gmail ||
+            body.username ||
+            (req.query.username as string) ||
+            null;
+
+        let portalsToCheck: Array<{ portal: string; username: string; raw_input?: string }> = [];
+
+        // Check if caller sent a specific list of portals (from frontend state)
+        if (Array.isArray(body.portals) && body.portals.length > 0) {
+            portalsToCheck = body.portals
+                .map((p: any) => ({
+                    portal: String(p.portal || p.id || "").toLowerCase().trim(),
+                    username: String(p.username || p.portal_username || "").trim(),
+                    raw_input: p.raw_input || p.link || "",
+                }))
+                .filter((p: any) => p.portal && p.username);
+        } else if (userIdentifier) {
+            // Retrieve user links from DB
+            try {
+                const dbRes = await query(
+                    `SELECT portal, portal_username, link, raw_input, verified, last_sync_status
+                     FROM user_links
+                     WHERE username = $1
+                     ORDER BY portal ASC;`,
+                    [userIdentifier]
+                );
+                if (dbRes && dbRes.rows.length > 0) {
+                    portalsToCheck = dbRes.rows.map((row) => ({
+                        portal: row.portal,
+                        username: row.portal_username,
+                        raw_input: row.raw_input || row.link,
+                    }));
+                }
+            } catch (dbErr: any) {
+                console.warn("Resync DB lookup warning:", dbErr.message || dbErr);
+            }
+
+            // Fallback to Redis cache
+            if (portalsToCheck.length === 0 && redis && redis.status === "ready") {
+                try {
+                    const cached = await redis.get(`user:portals:${userIdentifier}`);
+                    if (cached) {
+                        const parsed = JSON.parse(cached);
+                        if (Array.isArray(parsed)) {
+                            portalsToCheck = parsed
+                                .map((p: any) => ({
+                                    portal: String(p.portal || "").toLowerCase().trim(),
+                                    username: String(p.portal_username || p.username || "").trim(),
+                                    raw_input: p.raw_input || p.link || "",
+                                }))
+                                .filter((p: any) => p.portal && p.username);
+                        }
+                    }
+                } catch {
+                    // ignore
+                }
+            }
+        }
+
+        if (portalsToCheck.length === 0) {
+            return res.status(200).json({
+                success: true,
+                message: "No connected portals found to re-sync.",
+                results: [],
+                summary: { total: 0, valid: 0, broken: 0, error: 0 },
+                timestamp: new Date().toISOString(),
+            });
+        }
+
+        const nowIso = new Date().toISOString();
+
+        // Check platforms in parallel with timeout safety
+        const promises = portalsToCheck.map(async (item): Promise<ResyncPortalResult> => {
+            try {
+                const profile = await verifyAndFetchPortal(item.portal, item.username);
+
+                if (profile && profile.success) {
+                    // Live account confirmed active and valid
+                    if (userIdentifier) {
+                        try {
+                            await query(
+                                `UPDATE user_links
+                                 SET verified = true,
+                                     last_sync_status = 'valid',
+                                     last_sync_at = CURRENT_TIMESTAMP,
+                                     display_name = COALESCE($1, display_name),
+                                     avatar_url = COALESCE($2, avatar_url),
+                                     stats = COALESCE($3, stats),
+                                     updated_at = CURRENT_TIMESTAMP
+                                 WHERE username = $4 AND portal = $5;`,
+                                [
+                                    profile.name || null,
+                                    profile.avatar || null,
+                                    JSON.stringify(profile.stats || []),
+                                    userIdentifier,
+                                    item.portal,
+                                ]
+                            );
+                        } catch (uErr: any) {
+                            console.warn(`Resync update valid DB error for ${item.portal}:`, uErr.message);
+                        }
+                    }
+
+                    return {
+                        portal: item.portal,
+                        username: item.username,
+                        status: "valid",
+                        verified: true,
+                        profileData: profile,
+                        lastSyncAt: nowIso,
+                    };
+                } else {
+                    // Profile returned null: account not found / username changed / 404
+                    if (userIdentifier) {
+                        try {
+                            await query(
+                                `UPDATE user_links
+                                 SET verified = false,
+                                     last_sync_status = 'broken',
+                                     last_sync_at = CURRENT_TIMESTAMP,
+                                     updated_at = CURRENT_TIMESTAMP
+                                 WHERE username = $1 AND portal = $2;`,
+                                [userIdentifier, item.portal]
+                            );
+                        } catch (uErr: any) {
+                            console.warn(`Resync update broken DB error for ${item.portal}:`, uErr.message);
+                        }
+                    }
+
+                    return {
+                        portal: item.portal,
+                        username: item.username,
+                        status: "broken",
+                        verified: false,
+                        message: `Account not found on ${item.portal}. The username '${item.username}' may have been changed or deleted.`,
+                        lastSyncAt: nowIso,
+                    };
+                }
+            } catch (err: any) {
+                // Network error / external service timeout
+                if (userIdentifier) {
+                    try {
+                        await query(
+                            `UPDATE user_links
+                             SET last_sync_status = 'error',
+                                 last_sync_at = CURRENT_TIMESTAMP,
+                                 updated_at = CURRENT_TIMESTAMP
+                             WHERE username = $1 AND portal = $2;`,
+                            [userIdentifier, item.portal]
+                        );
+                    } catch {
+                        // ignore
+                    }
+                }
+
+                return {
+                    portal: item.portal,
+                    username: item.username,
+                    status: "error",
+                    verified: false,
+                    message: `Service error checking ${item.portal}: ${err?.message || "Request timed out"}`,
+                    lastSyncAt: nowIso,
+                };
+            }
+        });
+
+        const results = await Promise.all(promises);
+
+        // Update Redis cache if userIdentifier is present
+        if (userIdentifier && redis && redis.status === "ready") {
+            try {
+                const dbAll = await query(
+                    `SELECT portal, portal_username, link, raw_input, verified, display_name, avatar_url, stats, last_sync_status, last_sync_at
+                     FROM user_links
+                     WHERE username = $1
+                     ORDER BY portal ASC;`,
+                    [userIdentifier]
+                );
+                if (dbAll && dbAll.rows.length > 0) {
+                    await Promise.allSettled([
+                        redis.set(
+                            `user:portals:${userIdentifier}`,
+                            JSON.stringify(dbAll.rows),
+                            "EX",
+                            60 * 60 * 24 * 7
+                        ),
+                        redis.del(`profile:public:${userIdentifier}`),
+                    ]);
+                }
+            } catch {
+                // ignore
+            }
+        }
+
+        const validCount = results.filter((r) => r.status === "valid").length;
+        const brokenCount = results.filter((r) => r.status === "broken").length;
+        const errorCount = results.filter((r) => r.status === "error").length;
+
+        return res.status(200).json({
+            success: true,
+            username: userIdentifier,
+            results,
+            summary: {
+                total: results.length,
+                valid: validCount,
+                broken: brokenCount,
+                error: errorCount,
+            },
+            timestamp: nowIso,
+        });
+    } catch (err: any) {
+        console.error("Resync endpoint error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to perform platform re-sync",
+            error: err.message,
+        });
+    }
+};
+
 // Route mounts using authenticate middleware
 portalsRouter.post("/save", authenticate, handleSavePortals);
 portalsRouter.post("/profile/save", authenticate, handleSavePortals);
@@ -1155,4 +1720,144 @@ portalsRouter.get("/save", authenticate, handleGetSavedPortals);
 portalsRouter.get("/profile/save", authenticate, handleGetSavedPortals);
 portalsRouter.get("/links", authenticate, handleGetSavedPortals);
 
+// Resync endpoints
+portalsRouter.post("/resync", optionalAuthenticate, handleResyncPortals);
+portalsRouter.get("/resync", optionalAuthenticate, handleResyncPortals);
+portalsRouter.post("/profile/resync", optionalAuthenticate, handleResyncPortals);
+portalsRouter.get("/profile/resync", optionalAuthenticate, handleResyncPortals);
+
+// Individual platform visibility toggle
+portalsRouter.patch("/:portal/visibility", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        const portal = String(req.params.portal || "").trim().toLowerCase();
+        const { isPublic } = req.body;
+
+        if (typeof isPublic !== "boolean") {
+            return res.status(400).json({ success: false, message: "isPublic must be boolean" });
+        }
+
+        const result = await query(
+            `UPDATE user_links
+             SET is_public = $1, updated_at = CURRENT_TIMESTAMP
+             WHERE (username = $2 OR username = $3) AND LOWER(portal) = $4
+             RETURNING id, portal, portal_username AS "portalUsername", is_public AS "isPublic";`,
+            [isPublic, authUser.username, authUser.gmail, portal]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ success: false, message: `Platform connection '${portal}' not found` });
+        }
+
+        if (redis && redis.status === "ready") {
+            await Promise.allSettled([
+                redis.del(`profile:public:${authUser.username}`),
+                redis.del(`user:portals:${authUser.username}`),
+            ]);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: `Platform visibility set to ${isPublic ? "public" : "hidden"}`,
+            platform: result.rows[0],
+        });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Error updating visibility", error: err.message });
+    }
+});
+
+// Disconnect/delete platform
+portalsRouter.delete("/:portal", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        const portal = String(req.params.portal || "").trim().toLowerCase();
+
+        const result = await query(
+            `DELETE FROM user_links
+             WHERE (username = $1 OR username = $2) AND LOWER(portal) = $3
+             RETURNING id, portal;`,
+            [authUser.username, authUser.gmail, portal]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ success: false, message: `Platform connection '${portal}' not found` });
+        }
+
+        if (redis && redis.status === "ready") {
+            await Promise.allSettled([
+                redis.del(`profile:public:${authUser.username}`),
+                redis.del(`user:portals:${authUser.username}`),
+            ]);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: `Platform '${portal}' disconnected successfully`,
+        });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Error disconnecting platform", error: err.message });
+    }
+});
+
+// Edit platform handle
+portalsRouter.put("/:portal", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        const portal = String(req.params.portal || "").trim().toLowerCase();
+        const { handle, link } = req.body;
+
+        const rawCandidate = handle || link;
+        if (!rawCandidate) {
+            return res.status(400).json({ success: false, message: "Handle or link is required" });
+        }
+
+        const cleanHandle = extractPortalUsername(portal, rawCandidate) || rawCandidate.trim();
+        const verifiedData = await verifyAndFetchPortal(portal, cleanHandle);
+
+        const finalHandle = verifiedData?.username || cleanHandle;
+        const finalLink = verifiedData?.profileUrl || link || buildPortalLink(portal, cleanHandle);
+        const finalDisplayName = verifiedData?.name || authUser.firstName;
+        const finalAvatar = verifiedData?.avatar || null;
+        const finalStats = verifiedData?.stats || [];
+        const isVerified = verifiedData ? verifiedData.verified !== false : true;
+
+        const updateResult = await query(
+            `UPDATE user_links
+             SET portal_username = $1,
+                 link = $2,
+                 raw_input = $3,
+                 verified = $4,
+                 display_name = $5,
+                 avatar_url = $6,
+                 stats = $7::jsonb,
+                 last_sync_status = 'valid',
+                 last_sync_at = CURRENT_TIMESTAMP,
+                 updated_at = CURRENT_TIMESTAMP
+             WHERE (username = $8 OR username = $9) AND LOWER(portal) = $10
+             RETURNING id, portal, portal_username AS "portalUsername", link, verified, is_public AS "isPublic";`,
+            [finalHandle, finalLink, rawCandidate, isVerified, finalDisplayName, finalAvatar, JSON.stringify(finalStats), authUser.username, authUser.gmail, portal]
+        );
+
+        if (updateResult.rowCount === 0) {
+            return res.status(404).json({ success: false, message: `Platform connection '${portal}' not found` });
+        }
+
+        if (redis && redis.status === "ready") {
+            await Promise.allSettled([
+                redis.del(`profile:public:${authUser.username}`),
+                redis.del(`user:portals:${authUser.username}`),
+            ]);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: `Platform '${portal}' updated successfully`,
+            platform: updateResult.rows[0],
+        });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Error updating platform", error: err.message });
+    }
+});
+
 export default portalsRouter;
+

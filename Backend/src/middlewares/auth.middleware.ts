@@ -83,3 +83,63 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         });
     }
 };
+
+export const optionalAuthenticate = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+        if (!JWT_SECRET) {
+            return next();
+        }
+
+        const token =
+            req.cookies?.token ||
+            (req.headers.authorization?.startsWith("Bearer ")
+                ? req.headers.authorization.slice(7)
+                : undefined);
+
+        if (!token) {
+            return next();
+        }
+
+        let decoded: any;
+        try {
+            decoded = jwt.verify(token, JWT_SECRET, {
+                issuer: "orbix",
+                audience: "orbix-users",
+            });
+        } catch {
+            return next();
+        }
+
+        const userGmail = decoded?.gmail;
+        if (!userGmail) {
+            return next();
+        }
+
+        let user = await getUserDetailsCache(userGmail);
+        if (!user) {
+            const result = await query(
+                `SELECT
+                    id,
+                    firstName,
+                    middleName,
+                    lastName,
+                    email AS gmail,
+                    username,
+                    termsAccepted
+                FROM users
+                WHERE email = $1
+                LIMIT 1;`,
+                [userGmail]
+            );
+            user = result.rows[0];
+        }
+
+        if (user) {
+            req.user = user;
+        }
+
+        return next();
+    } catch {
+        return next();
+    }
+};
