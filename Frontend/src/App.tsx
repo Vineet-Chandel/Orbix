@@ -42,6 +42,7 @@ const App = () => {
 
           {/* Public Shareable Profile Showcase Route */}
           <Route path="/profile/:username" element={<PublicProfilePage />} />
+          <Route path="/u/:username" element={<PublicProfilePage />} />
 
           {/* Auth Pages */}
           <Route path="/auth/signup" element={<SignUpPage />} />

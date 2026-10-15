@@ -81,9 +81,44 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS location VARCHAR(150);
             ALTER TABLE users ADD COLUMN IF NOT EXISTS skills JSONB DEFAULT '[]'::jsonb;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_public_id TEXT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS previous_photo_url TEXT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS previous_photo_public_id TEXT NULL;
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+
+            -- Ensure photo_upload_intents table exists for signed upload tracking and replay protection
+            CREATE TABLE IF NOT EXISTS photo_upload_intents (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID,
+                username VARCHAR(100),
+                user_email VARCHAR(255),
+                public_id TEXT NOT NULL UNIQUE,
+                signature TEXT NOT NULL,
+                timestamp BIGINT NOT NULL,
+                folder TEXT NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                expires_at TIMESTAMPTZ NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_photo_upload_intents_public_id ON photo_upload_intents(public_id);
+            CREATE INDEX IF NOT EXISTS idx_photo_upload_intents_user ON photo_upload_intents(username, status);
+
+            -- Ensure photo_cleanup_queue table exists for safe, retryable asset deletion
+            CREATE TABLE IF NOT EXISTS photo_cleanup_queue (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                public_id TEXT NOT NULL,
+                reason VARCHAR(50) NOT NULL,
+                attempts INT NOT NULL DEFAULT 0,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                last_error TEXT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_photo_cleanup_queue_status ON photo_cleanup_queue(status);
         `);
-        console.log("✅ Database schema verified for users & user_links profile columns");
+        console.log("✅ Database schema verified for users & user_links profile and photo columns");
     } catch (error) {
         console.error(
             "❌ Supabase PostgreSQL connection failed:",

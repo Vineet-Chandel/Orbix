@@ -11,6 +11,9 @@ export interface User {
     headline?: string | null;
     bio?: string | null;
     avatarUrl?: string | null;
+    photoUrl?: string | null;
+    previousPhotoUrl?: string | null;
+    hasPreviousPhoto?: boolean;
     coverImageUrl?: string | null;
     website?: string | null;
     location?: string | null;

@@ -10,8 +10,12 @@ import {
     type PublicProfilePayload,
 } from "../../redis/cache/cache-profile.js";
 import { verifyAndFetchPortal, extractPortalUsername } from "../portals/portals.js";
+import photoRouter from "./photo.js";
 
 const profileRouter = express.Router();
+
+// Mount dedicated profile photo management router (/api/profile/photo & /profile/photo)
+profileRouter.use("/photo", photoRouter);
 
 /**
  * Helper to normalize skills input
@@ -56,6 +60,9 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 headline,
                 bio,
                 avatar_url AS "avatarUrl",
+                photo_url AS "photoUrl",
+                previous_photo_url AS "previousPhotoUrl",
+                (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
                 cover_image_url AS "coverImageUrl",
                 website,
                 location,
@@ -286,6 +293,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 headline,
                 bio,
                 avatar_url AS "avatarUrl",
+                photo_url AS "photoUrl",
                 cover_image_url AS "coverImageUrl",
                 website,
                 location,
@@ -307,16 +315,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
 
         const userRow = userResult.rows[0];
 
-        // Access control: if profile is private and viewer is not the owner
-        if (userRow.isPublic === false && !isOwner) {
-            return res.status(404).json({
-                success: false,
-                message: `Profile '@${username}' is private`,
-            });
-        }
-
-        // Query platforms: if owner, return all; if visitor, only is_public = true
-        const platformCondition = isOwner ? "" : "AND is_public = true";
+        // Query all verified/connected platforms for showcase
         const linksResult = await query(
             `SELECT
                 portal,
@@ -326,12 +325,10 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 display_name AS "displayName",
                 avatar_url AS "avatarUrl",
                 stats,
-                is_public AS "isPublic",
                 last_sync_status AS "lastSyncStatus",
                 last_sync_at AS "lastSyncAt"
             FROM user_links
             WHERE (LOWER(username) = $1)
-            ${platformCondition}
             ORDER BY portal ASC;`,
             [username]
         );
@@ -339,13 +336,16 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
         const fullName = `${userRow.firstName} ${userRow.lastName || ""}`.trim();
         const displayName = fullName || userRow.username;
 
+        const canonicalAvatar = userRow.photoUrl || userRow.avatarUrl || null;
+
         const publicProfilePayload: PublicProfilePayload = {
             id: userRow.id,
             username: userRow.username,
             displayName,
             firstName: userRow.firstName,
             lastName: userRow.lastName,
-            avatarUrl: userRow.avatarUrl,
+            avatarUrl: canonicalAvatar || undefined,
+            photoUrl: userRow.photoUrl || null,
             coverImageUrl: userRow.coverImageUrl,
             headline: userRow.headline,
             bio: userRow.bio,
@@ -382,62 +382,6 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
 profileRouter.get("/public/:username", optionalAuthenticate, handleGetPublicProfile);
 profileRouter.get("/user/:username", optionalAuthenticate, handleGetPublicProfile);
 
-/**
- * PATCH /api/profile/platforms/:portal/visibility (or /api/portals/:portal/visibility)
- * Toggles individual platform visibility on the public profile.
- */
-profileRouter.patch("/platforms/:portal/visibility", authenticate, async (req: Request, res: Response) => {
-    try {
-        const authUser = req.user;
-        if (!authUser) {
-            return res.status(401).json({ success: false, message: "Authentication required" });
-        }
-        const portal = String(req.params.portal || "").trim().toLowerCase();
-        const { isPublic } = req.body;
-
-        if (typeof isPublic !== "boolean") {
-            return res.status(400).json({
-                success: false,
-                message: "isPublic must be a boolean",
-            });
-        }
-
-        const result = await query(
-            `UPDATE user_links
-             SET is_public = $1,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE (username = $2 OR username = $3) AND LOWER(portal) = $4
-             RETURNING id, portal, portal_username AS "portalUsername", is_public AS "isPublic";`,
-            [isPublic, authUser.username, authUser.gmail, portal]
-        );
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({
-                success: false,
-                message: `Platform connection '${portal}' not found`,
-            });
-        }
-
-        // Invalidate Redis caches
-        await invalidateAllUserCaches({
-            username: authUser.username,
-            gmail: authUser.gmail,
-        });
-
-        return res.status(200).json({
-            success: true,
-            message: `Platform visibility set to ${isPublic ? "public" : "hidden"}`,
-            platform: result.rows[0],
-        });
-    } catch (err: any) {
-        console.error("Platform visibility update error:", err);
-        return res.status(500).json({
-            success: false,
-            message: "Failed to update platform visibility",
-            error: err.message,
-        });
-    }
-});
 
 /**
  * DELETE /api/profile/platforms/:portal (or /api/portals/:portal)

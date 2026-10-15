@@ -1726,46 +1726,6 @@ portalsRouter.get("/resync", optionalAuthenticate, handleResyncPortals);
 portalsRouter.post("/profile/resync", optionalAuthenticate, handleResyncPortals);
 portalsRouter.get("/profile/resync", optionalAuthenticate, handleResyncPortals);
 
-// Individual platform visibility toggle
-portalsRouter.patch("/:portal/visibility", authenticate, async (req: Request, res: Response) => {
-    try {
-        const authUser = (req as any).user;
-        const portal = String(req.params.portal || "").trim().toLowerCase();
-        const { isPublic } = req.body;
-
-        if (typeof isPublic !== "boolean") {
-            return res.status(400).json({ success: false, message: "isPublic must be boolean" });
-        }
-
-        const result = await query(
-            `UPDATE user_links
-             SET is_public = $1, updated_at = CURRENT_TIMESTAMP
-             WHERE (username = $2 OR username = $3) AND LOWER(portal) = $4
-             RETURNING id, portal, portal_username AS "portalUsername", is_public AS "isPublic";`,
-            [isPublic, authUser.username, authUser.gmail, portal]
-        );
-
-        if (result.rowCount === 0) {
-            return res.status(404).json({ success: false, message: `Platform connection '${portal}' not found` });
-        }
-
-        if (redis && redis.status === "ready") {
-            await Promise.allSettled([
-                redis.del(`profile:public:${authUser.username}`),
-                redis.del(`user:portals:${authUser.username}`),
-            ]);
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: `Platform visibility set to ${isPublic ? "public" : "hidden"}`,
-            platform: result.rows[0],
-        });
-    } catch (err: any) {
-        return res.status(500).json({ success: false, message: "Error updating visibility", error: err.message });
-    }
-});
-
 // Disconnect/delete platform
 portalsRouter.delete("/:portal", authenticate, async (req: Request, res: Response) => {
     try {

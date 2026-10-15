@@ -103,12 +103,10 @@ export default function PublicProfilePage() {
                         </svg>
                     </div>
                     <h2 className="text-xl font-black text-neutral-900 tracking-tight mb-2">
-                        Profile Unavailable
+                        Profile Not Found
                     </h2>
                     <p className="text-xs text-neutral-500 mb-6 leading-relaxed">
-                        {error?.includes("private")
-                            ? "This user has configured their profile to be private."
-                            : `The developer profile '@${username}' could not be found or does not exist.`}
+                        The developer profile '@{username}' could not be found or does not exist.
                     </p>
                     <div className="flex items-center justify-center gap-3">
                         <Link
@@ -124,6 +122,7 @@ export default function PublicProfilePage() {
     }
 
     const avatarSrc =
+        profile.photoUrl ||
         profile.avatarUrl ||
         `https://ui-avatars.com/api/?name=${encodeURIComponent(
             profile.displayName
@@ -301,7 +300,7 @@ export default function PublicProfilePage() {
                                 Connected Platforms
                             </h2>
                             <p className="text-xs text-neutral-500">
-                                Publicly verified developer and competitive programming profiles.
+                                Verified developer and competitive programming profiles.
                             </p>
                         </div>
                         <span className="text-xs font-bold text-neutral-500 bg-white px-3 py-1 rounded-full border border-neutral-200">
@@ -312,10 +311,10 @@ export default function PublicProfilePage() {
                     {profile.platforms.length === 0 ? (
                         <div className="rounded-3xl bg-white border border-neutral-200/90 p-8 text-center">
                             <p className="text-sm font-semibold text-neutral-700 mb-1">
-                                No public platforms connected yet.
+                                No platforms connected yet.
                             </p>
                             <p className="text-xs text-neutral-400">
-                                This developer hasn't added any public coding platform accounts.
+                                This developer hasn't added any coding platform accounts.
                             </p>
                         </div>
                     ) : (

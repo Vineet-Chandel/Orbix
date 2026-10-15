@@ -18,6 +18,8 @@ export interface PublicProfileData {
     firstName: string;
     lastName: string;
     avatarUrl?: string;
+    photoUrl?: string | null;
+    previousPhotoUrl?: string | null;
     coverImageUrl?: string;
     headline?: string;
     bio?: string;
@@ -155,41 +157,6 @@ export async function updateProfile(payload: {
 }
 
 /**
- * Toggle platform visibility
- */
-export async function togglePlatformVisibility(portal: string, isPublic: boolean): Promise<any> {
-    const endpoints = [
-        `/api/portals/${portal}/visibility`,
-        `http://localhost:3000/api/portals/${portal}/visibility`,
-        `/api/profile/platforms/${portal}/visibility`,
-        `http://localhost:3000/api/profile/platforms/${portal}/visibility`,
-    ];
-
-    let lastError = "Failed to update platform visibility";
-
-    for (const url of endpoints) {
-        try {
-            const response = await fetch(url, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ isPublic }),
-            });
-
-            if (response.ok) {
-                const json = await response.json();
-                invalidatePublicProfileClientCache();
-                return json.platform;
-            }
-        } catch (err: any) {
-            lastError = err.message || lastError;
-        }
-    }
-
-    throw new Error(lastError);
-}
-
-/**
  * Disconnect a platform
  */
 export async function disconnectPlatform(portal: string): Promise<boolean> {
@@ -252,3 +219,235 @@ export async function editPlatformHandle(portal: string, handleOrLink: string): 
 
     throw new Error(`Failed to update ${portal}`);
 }
+
+/**
+ * Cloudinary Direct Upload Configuration returned by server
+ */
+export interface PhotoUploadConfig {
+    cloudName: string;
+    apiKey: string;
+    timestamp: number;
+    signature: string;
+    publicId: string;
+    folder: string;
+    uploadUrl: string;
+    maxBytes: number;
+    allowedFormats: string[];
+}
+
+export interface PhotoOperationResult {
+    success: boolean;
+    message: string;
+    photoUrl: string | null;
+    hasPreviousPhoto: boolean;
+    previousPhotoUrl?: string | null;
+}
+
+/**
+ * Step A: Request signed direct upload configuration from backend
+ */
+export async function requestPhotoUploadSignature(): Promise<PhotoUploadConfig> {
+    const endpoints = [
+        "/api/profile/photo/upload-signature",
+        "http://localhost:3000/api/profile/photo/upload-signature",
+        "/profile/photo/upload-signature",
+    ];
+
+    let lastError = "Unable to request upload signature";
+
+    for (const url of endpoints) {
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+            });
+
+            if (response.ok) {
+                const json = await response.json();
+                if (json.success && json.uploadConfig) {
+                    return json.uploadConfig as PhotoUploadConfig;
+                }
+            } else {
+                const errJson = await response.json().catch(() => null);
+                lastError = errJson?.message || `Error (${response.status}): ${response.statusText}`;
+            }
+        } catch (err: any) {
+            lastError = err?.message || lastError;
+        }
+    }
+
+    throw new Error(lastError);
+}
+
+/**
+ * Step B: Upload image file directly from browser to Cloudinary
+ */
+export function uploadPhotoToCloudinary(
+    config: PhotoUploadConfig,
+    file: File,
+    onProgress?: (percent: number) => void
+): Promise<{ publicId: string; version?: number; secureUrl: string }> {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+
+        xhr.upload.addEventListener("progress", (event) => {
+            if (event.lengthComputable && onProgress) {
+                const percent = Math.round((event.loaded / event.total) * 100);
+                onProgress(percent);
+            }
+        });
+
+        xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    const response = JSON.parse(xhr.responseText);
+                    resolve({
+                        publicId: response.public_id || config.publicId,
+                        version: response.version,
+                        secureUrl: response.secure_url,
+                    });
+                } catch {
+                    reject(new Error("Failed to parse Cloudinary response."));
+                }
+            } else {
+                try {
+                    const errRes = JSON.parse(xhr.responseText);
+                    reject(new Error(errRes.error?.message || "Cloudinary direct upload failed."));
+                } catch {
+                    reject(new Error(`Upload failed with HTTP ${xhr.status}`));
+                }
+            }
+        });
+
+        xhr.addEventListener("error", () => {
+            reject(new Error("Network connection lost during upload. Please check your connection and try again."));
+        });
+
+        xhr.addEventListener("abort", () => {
+            reject(new Error("Upload was cancelled."));
+        });
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("api_key", config.apiKey);
+        formData.append("timestamp", String(config.timestamp));
+        formData.append("signature", config.signature);
+        formData.append("public_id", config.publicId);
+        formData.append("folder", config.folder);
+        formData.append("overwrite", "true");
+
+        xhr.open("POST", config.uploadUrl, true);
+        xhr.send(formData);
+    });
+}
+
+/**
+ * Step C: Confirm verified upload and persist to database
+ */
+export async function confirmPhotoUpload(publicId: string, version?: number): Promise<PhotoOperationResult> {
+    const endpoints = [
+        "/api/profile/photo/confirm",
+        "http://localhost:3000/api/profile/photo/confirm",
+        "/profile/photo/confirm",
+    ];
+
+    let lastError = "Unable to confirm photo update";
+
+    for (const url of endpoints) {
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ publicId, version }),
+            });
+
+            if (response.ok) {
+                const json = await response.json();
+                invalidatePublicProfileClientCache();
+                return json as PhotoOperationResult;
+            } else {
+                const errJson = await response.json().catch(() => null);
+                lastError = errJson?.message || `Server error (${response.status})`;
+            }
+        } catch (err: any) {
+            lastError = err?.message || lastError;
+        }
+    }
+
+    throw new Error(lastError);
+}
+
+/**
+ * Restore previous profile photo
+ */
+export async function restorePreviousPhoto(): Promise<PhotoOperationResult> {
+    const endpoints = [
+        "/api/profile/photo/restore",
+        "http://localhost:3000/api/profile/photo/restore",
+        "/profile/photo/restore",
+    ];
+
+    let lastError = "Unable to restore previous photo";
+
+    for (const url of endpoints) {
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+            });
+
+            if (response.ok) {
+                const json = await response.json();
+                invalidatePublicProfileClientCache();
+                return json as PhotoOperationResult;
+            } else {
+                const errJson = await response.json().catch(() => null);
+                lastError = errJson?.message || `Error (${response.status})`;
+            }
+        } catch (err: any) {
+            lastError = err?.message || lastError;
+        }
+    }
+
+    throw new Error(lastError);
+}
+
+/**
+ * Reset to application default avatar
+ */
+export async function useDefaultAvatar(): Promise<PhotoOperationResult> {
+    const endpoints = [
+        "/api/profile/photo/default",
+        "http://localhost:3000/api/profile/photo/default",
+        "/profile/photo/default",
+    ];
+
+    let lastError = "Unable to set default avatar";
+
+    for (const url of endpoints) {
+        try {
+            const response = await fetch(url, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+            });
+
+            if (response.ok) {
+                const json = await response.json();
+                invalidatePublicProfileClientCache();
+                return json as PhotoOperationResult;
+            } else {
+                const errJson = await response.json().catch(() => null);
+                lastError = errJson?.message || `Error (${response.status})`;
+            }
+        } catch (err: any) {
+            lastError = err?.message || lastError;
+        }
+    }
+
+    throw new Error(lastError);
+}
+

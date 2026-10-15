@@ -7,6 +7,7 @@ export interface PublicProfilePayload {
     firstName: string;
     lastName: string;
     avatarUrl?: string;
+    photoUrl?: string | null;
     coverImageUrl?: string;
     headline?: string;
     bio?: string;

@@ -75,7 +75,7 @@ export const Sidebar = ({
         : user?.username || "Vineet Chandel";
 
     const displayEmail = user?.gmail || (user as any)?.email || "vineetsinghbitu@gmail.com";
-    const avatarSrc = (user as any)?.avatar || "/avatar.png";
+    const avatarSrc = user?.photoUrl || user?.avatarUrl || (user as any)?.avatar || "/avatar.png";
 
     const handleSignOut = async () => {
         try {

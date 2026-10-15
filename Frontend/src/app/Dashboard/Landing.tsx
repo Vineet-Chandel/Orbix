@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector, clearUser, fetchUserProfile } from "../../store";
 import { Sidebar, type SidebarTab } from "./Sidebar";
-import { ConnectedPlatformsSection } from "./ConnectedPlatformsSection";
 import { usePlatformSync } from "../../hooks/usePlatformSync";
 
 export default function Dashboard() {
@@ -281,12 +280,72 @@ export default function Dashboard() {
                             </div>
                         </div>
 
-                        {/* Platforms / Connected Accounts Grid Section */}
-                        <ConnectedPlatformsSection
-                            connectedPortals={connectedPortals}
-                            onPortalsChange={(updated) => setConnectedPortals(updated)}
-                            syncState={platformSync}
-                        />
+                        {/* Dashboard Overview Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div className="rounded-2xl bg-white border border-neutral-200/90 p-5 shadow-xs flex flex-col justify-between">
+                                <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Connected Portals</span>
+                                <div className="mt-3 flex items-baseline justify-between">
+                                    <span className="text-2xl font-black text-neutral-900">{connectedPortalsCount} / 16</span>
+                                    <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Active</span>
+                                </div>
+                                <Link to="/profile" className="text-xs font-bold text-neutral-900 hover:underline mt-4 flex items-center gap-1">
+                                    <span>Manage in Profile</span>
+                                    <span>→</span>
+                                </Link>
+                            </div>
+
+                            <div className="rounded-2xl bg-white border border-neutral-200/90 p-5 shadow-xs flex flex-col justify-between">
+                                <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Sync Health</span>
+                                <div className="mt-3 flex items-baseline justify-between">
+                                    <span className="text-2xl font-black text-neutral-900">
+                                        {platformSync.isSyncing ? "Syncing..." : "All Verified"}
+                                    </span>
+                                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => platformSync.resyncAll({ force: true })}
+                                    disabled={platformSync.isSyncing}
+                                    className="text-xs font-bold text-neutral-900 hover:underline mt-4 text-left cursor-pointer disabled:opacity-50"
+                                >
+                                    {platformSync.isSyncing ? "Checking stats..." : "Refresh Stats Now →"}
+                                </button>
+                            </div>
+
+                            <div className="rounded-2xl bg-white border border-neutral-200/90 p-5 shadow-xs flex flex-col justify-between">
+                                <span className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Public Showcase</span>
+                                <div className="mt-3 flex items-baseline justify-between">
+                                    <span className="text-2xl font-black text-neutral-900">Live</span>
+                                    <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">Public</span>
+                                </div>
+                                <Link
+                                    to={`/profile/${encodeURIComponent(user?.username || "")}`}
+                                    className="text-xs font-bold text-neutral-900 hover:underline mt-4 flex items-center gap-1"
+                                >
+                                    <span>View Showcase Profile</span>
+                                    <span>→</span>
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* Quick Hub Navigation Card */}
+                        <div className="rounded-2xl bg-white border border-neutral-200/90 p-6 sm:p-7 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+                            <div>
+                                <h3 className="text-base font-extrabold text-neutral-900">
+                                    Platform Management Shifted to Profile
+                                </h3>
+                                <p className="text-xs text-neutral-500 mt-1 max-w-xl leading-relaxed">
+                                    All connected platforms, live problem gauges (Easy / Medium / Hard), ratings, and handle verifications are now located directly on your Profile page below your personal details card.
+                                </p>
+                            </div>
+                            <Link
+                                to="/profile"
+                                className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-black text-white hover:bg-neutral-800 text-xs font-bold transition-all shadow-sm flex-shrink-0"
+                            >
+                                <span>Go to Profile & Platforms</span>
+                                <span>→</span>
+                            </Link>
+                        </div>
                     </main>
                 )}
 
