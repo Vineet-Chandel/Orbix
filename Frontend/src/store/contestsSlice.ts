@@ -103,13 +103,16 @@ export const fetchContestPerformance = createAsyncThunk<
         const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
         const now = Date.now();
 
-        // If existing data is present, fresh (< 10 mins), has full platform registry, and no missing connected portals, return immediately
+        // Check if any connected portal in client portals is missing from existing platforms
         const hasMissingConnected = portals && Object.entries(portals).some(([k, v]) => {
             const u = typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "");
             return Boolean(u) && !existing?.platforms?.some((p) => p.portal === k && p.connected);
         });
 
-        if (existing && !force && existing.platforms?.length >= 10 && !hasMissingConnected && now - lastFetched < 10 * 60 * 1000) {
+        // Invalidate old cache if it contained unconnected platforms
+        const hasUnconnectedInCache = existing?.platforms?.some((p) => !p.connected || p.status === "not_connected");
+
+        if (existing && !force && !hasUnconnectedInCache && !hasMissingConnected && now - lastFetched < 10 * 60 * 1000) {
             return existing;
         }
 

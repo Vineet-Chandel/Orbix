@@ -1501,12 +1501,11 @@ export async function calculateUserContestPerformance(
         }
     }
 
-    // Process all eligible contest platforms: connected first, followed by the remaining eligible platforms
+    // Process ONLY eligible contest platforms that the user has connected
     const allEligibleKeys = Object.keys(ELIGIBLE_CONTEST_PLATFORMS);
     const connectedEligibleKeys = allEligibleKeys.filter((k) => connectedMap.has(k));
-    const nonConnectedEligibleKeys = allEligibleKeys.filter((k) => !connectedMap.has(k));
 
-    const keysToProcess = [...connectedEligibleKeys, ...nonConnectedEligibleKeys];
+    const keysToProcess = connectedEligibleKeys;
 
     const platforms: PlatformContestAnalytics[] = [];
     let totalRatedContests = 0;
@@ -1651,15 +1650,18 @@ export async function calculateUserContestPerformance(
         })
     );
 
-    // Collect settled platform analytics
+    // Collect settled platform analytics where contest data could be extracted
     for (const res of results) {
         if (res.status === "fulfilled" && res.value) {
-            platforms.push(res.value);
-            if (res.value.connected && res.value.ratedContestsCount > 0) {
-                totalRatedContests += res.value.ratedContestsCount;
-                platformContestCounts[res.value.portal] = res.value.ratedContestsCount;
-            } else if (res.value.connected) {
-                platformContestCounts[res.value.portal] = 0;
+            // Only include platform if user is connected and contest data could be extracted
+            if (res.value.connected && res.value.status !== "error" && res.value.status !== "not_connected") {
+                platforms.push(res.value);
+                if (res.value.ratedContestsCount > 0) {
+                    totalRatedContests += res.value.ratedContestsCount;
+                    platformContestCounts[res.value.portal] = res.value.ratedContestsCount;
+                } else {
+                    platformContestCounts[res.value.portal] = 0;
+                }
             }
         }
     }

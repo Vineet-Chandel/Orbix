@@ -62,146 +62,73 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
         dispatch(fetchContestPerformance({ username: effectiveUser, portals: connectedPortals }));
     }, [effectiveUser, dispatch, connectedPortals]);
 
-    // Discover eligible platforms dynamically
+    // Discover eligible platforms dynamically - ONLY those where contest data can be extracted AND user is connected
     const platformsList: PlatformContestAnalytics[] = useMemo(() => {
-        const eligibleKeys = Object.keys(CONTEST_ELIGIBLE_REGISTRY);
-
         if (contestData?.platforms && contestData.platforms.length > 0) {
-            // Start with backend-returned platforms (filtered strictly to eligible contest platforms)
-            const map = new Map<string, PlatformContestAnalytics>();
-            for (const p of contestData.platforms) {
-                if (CONTEST_ELIGIBLE_REGISTRY[p.portal]) {
-                    map.set(p.portal, { ...p });
-                }
-            }
+            // Filter strictly to platforms that are connected with a username and where contest data can be extracted
+            const filtered = contestData.platforms.filter((p) => {
+                const isConn = Boolean(p.connected && p.portalUsername);
+                const isExtractable = p.status === "valid" || p.status === "no_contests" || p.status === "syncing";
+                const isEligible = Boolean(CONTEST_ELIGIBLE_REGISTRY[p.portal]);
+                return isConn && isExtractable && isEligible;
+            });
 
-            // Sync any client-side connected portals if not marked connected yet
-            if (connectedPortals && typeof connectedPortals === "object") {
-                for (const [k, v] of Object.entries(connectedPortals)) {
-                    if (CONTEST_ELIGIBLE_REGISTRY[k]) {
-                        const pUser = typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "");
-                        const existing = map.get(k);
-                        if (!existing) {
-                            map.set(k, {
-                                portal: k,
-                                portalName: CONTEST_ELIGIBLE_REGISTRY[k]!.name,
-                                portalUsername: pUser,
-                                profileUrl: "",
-                                connected: Boolean(pUser),
-                                currentRating: null,
-                                peakRating: null,
-                                tier: null,
-                                tierColor: null,
-                                tierInfo: null,
-                                officialRank: null,
-                                percentile: null,
-                                ratedContestsCount: 0,
-                                history: [],
-                                recentChange90d: null,
-                                lastSyncAt: new Date().toISOString(),
-                                status: pUser ? "syncing" : "not_connected",
-                                exploreContestsUrl: CONTEST_ELIGIBLE_REGISTRY[k]!.exploreUrl,
-                            });
-                        } else if (pUser && !existing.connected) {
-                            existing.connected = true;
-                            existing.portalUsername = pUser;
-                            if (existing.status === "not_connected") {
-                                existing.status = "syncing";
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Ensure every eligible contest platform is present in the list
-            for (const k of eligibleKeys) {
-                if (!map.has(k)) {
-                    const cfg = CONTEST_ELIGIBLE_REGISTRY[k]!;
-                    const isConn = Boolean(connectedPortals && connectedPortals[k]);
-                    const pUsername = connectedPortals?.[k]?.username || (typeof connectedPortals?.[k] === "string" ? connectedPortals[k] : "");
-                    map.set(k, {
-                        portal: k,
-                        portalName: cfg.name,
-                        portalUsername: pUsername,
-                        profileUrl: "",
-                        connected: isConn,
-                        currentRating: null,
-                        peakRating: null,
-                        tier: null,
-                        tierColor: null,
-                        tierInfo: null,
-                        officialRank: null,
-                        percentile: null,
-                        ratedContestsCount: 0,
-                        history: [],
-                        recentChange90d: null,
-                        lastSyncAt: new Date().toISOString(),
-                        status: isConn ? "syncing" : "not_connected",
-                        exploreContestsUrl: cfg.exploreUrl,
-                    });
-                }
-            }
-
-            const list = Array.from(map.values());
-            // Sort: connected with contests first, then connected without contests, then unconnected
-            list.sort((a, b) => {
-                if (a.connected && !b.connected) return -1;
-                if (!a.connected && b.connected) return 1;
+            // Sort: highest contest count first, then rating, then alphabetical
+            return [...filtered].sort((a, b) => {
                 if (a.ratedContestsCount !== b.ratedContestsCount) {
                     return b.ratedContestsCount - a.ratedContestsCount;
                 }
+                const ratingA = a.currentRating || 0;
+                const ratingB = b.currentRating || 0;
+                if (ratingA !== ratingB) return ratingB - ratingA;
                 return a.portalName.localeCompare(b.portalName);
             });
+        }
 
+        // Fallback local discovery from connectedPortals props if remote not loaded yet
+        if (connectedPortals && typeof connectedPortals === "object") {
+            const list: PlatformContestAnalytics[] = [];
+            for (const [k, v] of Object.entries(connectedPortals)) {
+                if (CONTEST_ELIGIBLE_REGISTRY[k]) {
+                    const pUser = typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "");
+                    if (pUser) {
+                        const cfg = CONTEST_ELIGIBLE_REGISTRY[k]!;
+                        list.push({
+                            portal: k,
+                            portalName: cfg.name,
+                            portalUsername: pUser,
+                            profileUrl: "",
+                            connected: true,
+                            currentRating: null,
+                            peakRating: null,
+                            tier: null,
+                            tierColor: null,
+                            tierInfo: null,
+                            officialRank: null,
+                            percentile: null,
+                            ratedContestsCount: 0,
+                            history: [],
+                            recentChange90d: null,
+                            lastSyncAt: new Date().toISOString(),
+                            status: "syncing",
+                            exploreContestsUrl: cfg.exploreUrl,
+                        });
+                    }
+                }
+            }
             return list;
         }
 
-        // Fallback local discovery from CONTEST_ELIGIBLE_REGISTRY and connectedPortals props if remote not loaded yet
-        const fallbackList = eligibleKeys.map((p) => {
-            const cfg = CONTEST_ELIGIBLE_REGISTRY[p]!;
-            const isConn = Boolean(connectedPortals && connectedPortals[p]);
-            const pUsername = connectedPortals?.[p]?.username || (typeof connectedPortals?.[p] === "string" ? connectedPortals[p] : "");
-            return {
-                portal: p,
-                portalName: cfg.name,
-                portalUsername: pUsername,
-                profileUrl: "",
-                connected: isConn,
-                currentRating: null,
-                peakRating: null,
-                tier: null,
-                tierColor: null,
-                tierInfo: null,
-                officialRank: null,
-                percentile: null,
-                ratedContestsCount: 0,
-                history: [],
-                recentChange90d: null,
-                lastSyncAt: new Date().toISOString(),
-                status: isConn ? "syncing" : "not_connected",
-                exploreContestsUrl: cfg.exploreUrl,
-            } as PlatformContestAnalytics;
-        });
-
-        fallbackList.sort((a, b) => {
-            if (a.connected && !b.connected) return -1;
-            if (!a.connected && b.connected) return 1;
-            return a.portalName.localeCompare(b.portalName);
-        });
-
-        return fallbackList;
+        return [];
     }, [contestData, connectedPortals]);
 
     // Default select the first connected platform that has contests or is connected
     useEffect(() => {
         if (platformsList.length > 0) {
             const currentSelected = platformsList.find((p) => p.portal === selectedPortal);
-            // If the user hasn't explicitly picked a platform, or the current selected is not connected,
-            // automatically select the first connected platform (with contests preferred)
-            if (!hasUserSelected || !currentSelected?.connected) {
-                const firstConnectedWithContests = platformsList.find((p) => p.connected && p.ratedContestsCount > 0);
-                const firstConnected = platformsList.find((p) => p.connected);
-                const target = firstConnectedWithContests || firstConnected || platformsList[0];
+            if (!hasUserSelected || !currentSelected) {
+                const firstWithContests = platformsList.find((p) => p.ratedContestsCount > 0);
+                const target = firstWithContests || platformsList[0];
                 if (target && target.portal !== selectedPortal) {
                     setSelectedPortal(target.portal);
                 }
@@ -458,39 +385,49 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                             </div>
                         </div>
 
-                        {/* Platform Selector Tabs */}
-                        <div
-                            role="tablist"
-                            aria-label="Eligible Contest Platforms"
-                            className="flex items-center gap-1.5 p-1 rounded-xl bg-[#121824] border border-neutral-800 overflow-x-auto no-scrollbar self-start sm:self-auto max-w-full"
-                        >
-                            {platformsList.map((platform) => {
-                                const isActive = platform.portal === selectedPortal;
-                                return (
-                                    <button
-                                        key={platform.portal}
-                                        type="button"
-                                        role="tab"
-                                        aria-selected={isActive}
-                                        onClick={() => {
-                                            setSelectedPortal(platform.portal);
-                                            setHasUserSelected(true);
-                                            setHoveredPoint(null);
-                                        }}
-                                        className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-amber-400/50 ${
-                                            isActive
-                                                ? "bg-[#1c2436] text-white border border-neutral-700 shadow-sm"
-                                                : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
-                                        }`}
-                                    >
-                                        <span className="w-3.5 h-3.5 flex items-center justify-center">
-                                            {getPortalIcon(platform.portal, "w-3.5 h-3.5")}
-                                        </span>
-                                        <span>{platform.portalName}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        {/* Platform Selector Tabs - strictly platforms connected with extractable contest data */}
+                        {platformsList.length > 0 ? (
+                            <div
+                                role="tablist"
+                                aria-label="Connected Contest Platforms"
+                                className="flex items-center gap-1.5 p-1 rounded-xl bg-[#121824] border border-neutral-800 overflow-x-auto no-scrollbar self-start sm:self-auto max-w-full"
+                            >
+                                {platformsList.map((platform) => {
+                                    const isActive = platform.portal === selectedPortal;
+                                    return (
+                                        <button
+                                            key={platform.portal}
+                                            type="button"
+                                            role="tab"
+                                            aria-selected={isActive}
+                                            onClick={() => {
+                                                setSelectedPortal(platform.portal);
+                                                setHasUserSelected(true);
+                                                setHoveredPoint(null);
+                                            }}
+                                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-amber-400/50 ${
+                                                isActive
+                                                    ? "bg-[#1c2436] text-white border border-neutral-700 shadow-sm"
+                                                    : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
+                                            }`}
+                                        >
+                                            <span className="w-3.5 h-3.5 flex items-center justify-center">
+                                                {getPortalIcon(platform.portal, "w-3.5 h-3.5")}
+                                            </span>
+                                            <span>{platform.portalName}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <Link
+                                to="/profile"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 border border-amber-500/20 transition-all cursor-pointer"
+                            >
+                                <span>Connect contest platform</span>
+                                <ChevronRight className="w-3.5 h-3.5" />
+                            </Link>
+                        )}
                     </div>
 
                     {/* Rating Summary (Primary & Supporting Metrics) */}
@@ -953,117 +890,127 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                 </div>
 
                 {/* Responsive Multi-Platform Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-                    {platformsList.map((platform) => {
-                        const isSelected = platform.portal === selectedPortal;
-                        const hasContests = platform.ratedContestsCount > 0;
-                        const hasRating = platform.currentRating !== null && platform.currentRating !== undefined;
+                {platformsList.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        {platformsList.map((platform) => {
+                            const isSelected = platform.portal === selectedPortal;
+                            const hasContests = platform.ratedContestsCount > 0;
+                            const hasRating = platform.currentRating !== null && platform.currentRating !== undefined;
 
-                        return (
-                            <button
-                                key={platform.portal}
-                                type="button"
-                                onClick={() => {
-                                    setSelectedPortal(platform.portal);
-                                    setHasUserSelected(true);
-                                    chartContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                                }}
-                                className={`flex flex-col justify-between p-5 rounded-2xl transition-all cursor-pointer text-left relative overflow-hidden border ${
-                                    isSelected
-                                        ? "bg-[#141b28] border-amber-500/50 shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30"
-                                        : "bg-[#0f141f] border-neutral-800/90 hover:border-neutral-700 hover:bg-[#121825]"
-                                }`}
-                            >
-                                {/* Top: Platform Icon + Name + Verified Badge */}
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="w-7 h-7 rounded-lg bg-white/[0.06] border border-white/10 flex items-center justify-center">
-                                                {getPortalIcon(platform.portal, "w-4 h-4")}
+                            return (
+                                <button
+                                    key={platform.portal}
+                                    type="button"
+                                    onClick={() => {
+                                        setSelectedPortal(platform.portal);
+                                        setHasUserSelected(true);
+                                        chartContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                                    }}
+                                    className={`flex flex-col justify-between p-5 rounded-2xl transition-all cursor-pointer text-left relative overflow-hidden border ${
+                                        isSelected
+                                            ? "bg-[#141b28] border-amber-500/50 shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30"
+                                            : "bg-[#0f141f] border-neutral-800/90 hover:border-neutral-700 hover:bg-[#121825]"
+                                    }`}
+                                >
+                                    {/* Top: Platform Icon + Name + Verified Badge */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-7 h-7 rounded-lg bg-white/[0.06] border border-white/10 flex items-center justify-center">
+                                                    {getPortalIcon(platform.portal, "w-4 h-4")}
+                                                </div>
+                                                <span className="font-extrabold text-sm text-white">
+                                                    {platform.portalName}
+                                                </span>
                                             </div>
-                                            <span className="font-extrabold text-sm text-white">
-                                                {platform.portalName}
-                                            </span>
-                                        </div>
 
-                                        {platform.connected && (
-                                            <div
-                                                className="w-4 h-4 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center"
-                                                title="Verified Connected Profile"
-                                            >
-                                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Middle: Rating & Tier Badge */}
-                                    <div className="flex items-baseline gap-2 pt-1">
-                                        <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                                            {hasRating ? platform.currentRating : "—"}
-                                        </span>
-
-                                        {platform.tier && (
-                                            <span
-                                                style={{
-                                                    backgroundColor: platform.tierColor || "#ea3943",
-                                                }}
-                                                className="px-2 py-0.5 rounded text-[11px] font-black text-white uppercase tracking-wider"
-                                            >
-                                                {platform.tier}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Bottom: Tier Progress or Platform Rank Milestone */}
-                                <div className="pt-4 space-y-1.5 border-t border-neutral-800/60 mt-3">
-                                    {platform.tierInfo?.nextTierName && typeof platform.tierInfo.pointsToNextTier === "number" ? (
-                                        <>
-                                            {/* Progress Bar */}
-                                            <div className="w-full h-1.5 rounded-full bg-[#1c2436] overflow-hidden">
+                                            {platform.connected && (
                                                 <div
-                                                    style={{
-                                                        width: `${platform.tierInfo.progressPercent || 0}%`,
-                                                        backgroundColor: platform.tierColor || "#f59e0b",
-                                                    }}
-                                                    className="h-full rounded-full transition-all duration-500"
-                                                />
-                                            </div>
-                                            <div className="text-[11px] text-neutral-400 flex items-center gap-1 font-medium">
-                                                <span>{platform.tierInfo.pointsToNextTier} to</span>
-                                                <strong className="text-white font-bold">
-                                                    {platform.tierInfo.nextTierName}
-                                                </strong>
-                                            </div>
-                                        </>
-                                    ) : platform.officialRank ? (
-                                        <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
-                                            <span>Rank #{formatNumber(platform.officialRank)}</span>
-                                            {platform.peakRating && (
-                                                <>
-                                                    <span className="w-1 h-1 rounded-full bg-neutral-600" />
-                                                    <span>max {platform.peakRating}</span>
-                                                </>
+                                                    className="w-4 h-4 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center"
+                                                    title="Verified Connected Profile"
+                                                >
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                </div>
                                             )}
                                         </div>
-                                    ) : hasContests ? (
-                                        <div className="text-[11px] text-neutral-400">
-                                            {platform.ratedContestsCount} contests attended
+
+                                        {/* Middle: Rating & Tier Badge */}
+                                        <div className="flex items-baseline gap-2 pt-1">
+                                            <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                                                {hasRating ? platform.currentRating : "—"}
+                                            </span>
+
+                                            {platform.tier && (
+                                                <span
+                                                    style={{
+                                                        backgroundColor: platform.tierColor || "#ea3943",
+                                                    }}
+                                                    className="px-2 py-0.5 rounded text-[11px] font-black text-white uppercase tracking-wider"
+                                                >
+                                                    {platform.tier}
+                                                </span>
+                                            )}
                                         </div>
-                                    ) : platform.connected ? (
-                                        <div className="text-[11px] text-neutral-500 italic">
-                                            Attend a contest to get started
-                                        </div>
-                                    ) : (
-                                        <div className="text-[11px] text-amber-400/90 font-medium">
-                                            Connect platform
-                                        </div>
-                                    )}
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
+                                    </div>
+
+                                    {/* Bottom: Tier Progress or Platform Rank Milestone */}
+                                    <div className="pt-4 space-y-1.5 border-t border-neutral-800/60 mt-3">
+                                        {platform.tierInfo?.nextTierName && typeof platform.tierInfo.pointsToNextTier === "number" ? (
+                                            <>
+                                                {/* Progress Bar */}
+                                                <div className="w-full h-1.5 rounded-full bg-[#1c2436] overflow-hidden">
+                                                    <div
+                                                        style={{
+                                                            width: `${platform.tierInfo.progressPercent || 0}%`,
+                                                            backgroundColor: platform.tierColor || "#f59e0b",
+                                                        }}
+                                                        className="h-full rounded-full transition-all duration-500"
+                                                    />
+                                                </div>
+                                                <div className="text-[11px] text-neutral-400 flex items-center gap-1 font-medium">
+                                                    <span>{platform.tierInfo.pointsToNextTier} to</span>
+                                                    <strong className="text-white font-bold">
+                                                        {platform.tierInfo.nextTierName}
+                                                    </strong>
+                                                </div>
+                                            </>
+                                        ) : platform.officialRank ? (
+                                            <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
+                                                <span>Rank #{formatNumber(platform.officialRank)}</span>
+                                                {platform.peakRating && (
+                                                    <>
+                                                        <span className="w-1 h-1 rounded-full bg-neutral-600" />
+                                                        <span>max {platform.peakRating}</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                        ) : hasContests ? (
+                                            <div className="text-[11px] text-neutral-400">
+                                                {platform.ratedContestsCount} contests attended
+                                            </div>
+                                        ) : platform.connected ? (
+                                            <div className="text-[11px] text-neutral-500 italic">
+                                                Attend a contest to get started
+                                            </div>
+                                        ) : (
+                                            <div className="text-[11px] text-amber-400/90 font-medium">
+                                                Connect platform
+                                            </div>
+                                        )}
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <div className="w-full p-8 rounded-2xl bg-[#0f141f] border border-dashed border-neutral-800 flex flex-col items-center justify-center text-center space-y-3">
+                        <Award className="w-8 h-8 text-neutral-500" />
+                        <div className="space-y-1">
+                            <h4 className="text-sm font-bold text-white">No platform ranks to display</h4>
+                            <p className="text-xs text-neutral-400">Connect your contest accounts in your profile to see your official standings here.</p>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* ========================================================================= */}
