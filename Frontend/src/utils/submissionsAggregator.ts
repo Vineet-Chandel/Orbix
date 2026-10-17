@@ -128,7 +128,10 @@ export function aggregateClientPortalsSubmissions(
         if (lowerId === "github" || lowerId.startsWith("_") || lowerId === "theme") continue;
 
         const profile = rawProfile;
-        const username = profile.username || profile.portal_username || "";
+        const username = (profile.username || profile.portal_username || "").trim();
+        // Only include platforms where the user actually has a connected username/handle
+        if (!username) continue;
+
         const name = profile.name || profile.display_name || username || lowerId;
 
         let solved = 0;
@@ -154,6 +157,10 @@ export function aggregateClientPortalsSubmissions(
         }
 
         if (subs === 0) subs = solved;
+        const effectiveCount = Math.max(subs, solved);
+
+        // Only include in platform breakdown if questions/submissions can actually be extracted (count > 0)
+        if (effectiveCount <= 0) continue;
 
         // If platform has submission calendar attached
         if (profile.submissionCalendar && typeof profile.submissionCalendar === "object") {
@@ -181,7 +188,7 @@ export function aggregateClientPortalsSubmissions(
             portal: lowerId,
             username,
             solved,
-            submissions: Math.max(subs, solved),
+            submissions: effectiveCount,
             activeDays,
             brandColor: BRAND_COLORS[lowerId] || "#10B981",
         };

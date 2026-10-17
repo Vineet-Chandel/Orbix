@@ -92,19 +92,45 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     };
 
     // Series of platforms sorted strictly from largest number of submissions to lowest
+    // ONLY display platforms that the user is connected to AND whose question/submission data can be extracted (count > 0)
     const connectedPlatformsList = useMemo(() => {
         return Object.values(platformBreakdown)
-            .filter((p) => p.portal !== "github")
+            .filter((p) => {
+                if (p.portal === "github") return false;
+                const count = Math.max(p.submissions || 0, p.solved || 0);
+                const hasConnectedHandle = Boolean(
+                    p.username ||
+                    (connectedPortals && (connectedPortals[p.portal]?.username || connectedPortals[p.portal]?.portal_username))
+                );
+                return hasConnectedHandle && count > 0;
+            })
             .sort((a, b) => {
                 const countA = Math.max(a.submissions || 0, a.solved || 0);
                 const countB = Math.max(b.submissions || 0, b.solved || 0);
                 if (countB !== countA) return countB - countA;
                 return a.portal.localeCompare(b.portal);
             });
-    }, [platformBreakdown]);
+    }, [platformBreakdown, connectedPortals]);
+
+    // Reset selected portal back to "all" if the currently selected portal is no longer in the list
+    useEffect(() => {
+        if (selectedPortal !== "all" && !connectedPlatformsList.some((p) => p.portal === selectedPortal)) {
+            setSelectedPortal("all");
+        }
+    }, [selectedPortal, connectedPlatformsList]);
+
     const hasConnectedPlatforms = useMemo(() => {
         if (connectedPlatformsList.length > 0) return true;
-        if (connectedPortals && Object.keys(connectedPortals).some((k) => k.toLowerCase() !== "github")) return true;
+        if (
+            connectedPortals &&
+            Object.entries(connectedPortals).some(([k, profile]) => {
+                const lower = k.toLowerCase().trim();
+                if (lower === "github" || lower.startsWith("_") || lower === "theme") return false;
+                return Boolean(profile?.username || profile?.portal_username);
+            })
+        ) {
+            return true;
+        }
         return false;
     }, [connectedPlatformsList, connectedPortals]);
 

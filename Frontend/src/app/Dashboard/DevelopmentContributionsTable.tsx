@@ -92,14 +92,27 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
     };
 
     // Series of platforms sorted strictly from largest number of contributions to lowest
+    // ONLY display platforms where contributions can be extracted (count > 0)
     const connectedPlatformsList = useMemo(() => {
-        return Object.values(platformBreakdown).sort((a, b) => {
-            const countA = Math.max(a.submissions || 0, a.solved || 0);
-            const countB = Math.max(b.submissions || 0, b.solved || 0);
-            if (countB !== countA) return countB - countA;
-            return a.portal.localeCompare(b.portal);
-        });
+        return Object.values(platformBreakdown)
+            .filter((p) => {
+                const count = Math.max(p.submissions || 0, p.solved || 0);
+                return count > 0;
+            })
+            .sort((a, b) => {
+                const countA = Math.max(a.submissions || 0, a.solved || 0);
+                const countB = Math.max(b.submissions || 0, b.solved || 0);
+                if (countB !== countA) return countB - countA;
+                return a.portal.localeCompare(b.portal);
+            });
     }, [platformBreakdown]);
+
+    // Reset selected portal back to "all" if the currently selected portal is no longer in the list
+    useEffect(() => {
+        if (selectedPortal !== "all" && !connectedPlatformsList.some((p) => p.portal === selectedPortal)) {
+            setSelectedPortal("all");
+        }
+    }, [selectedPortal, connectedPlatformsList]);
     const isGitHubConnected = useMemo(() => {
         if (platformBreakdown["github"]) return true;
         if (connectedPortals && (connectedPortals.github || connectedPortals["GitHub"] || connectedPortals["Github"])) return true;

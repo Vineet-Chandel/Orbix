@@ -1518,14 +1518,19 @@ export async function calculateUnifiedSubmissions(username: string) {
                 }
             }
 
-            platformBreakdown[portal] = {
-                name: profileData?.name || row.display_name || portal,
-                portal,
-                username: portalUsername,
-                solved: solvedCount,
-                submissions: Math.max(subCount, solvedCount),
-                activeDays: activeDaysCount || (profileData?.submissionCalendar ? Object.keys(profileData.submissionCalendar).length : 0),
-            };
+            const effectiveCount = Math.max(subCount, solvedCount);
+
+            // Only register platform if question/submission count can actually be extracted (count > 0)
+            if (effectiveCount > 0) {
+                platformBreakdown[portal] = {
+                    name: profileData?.name || row.display_name || portal,
+                    portal,
+                    username: portalUsername,
+                    solved: solvedCount,
+                    submissions: effectiveCount,
+                    activeDays: activeDaysCount || (profileData?.submissionCalendar ? Object.keys(profileData.submissionCalendar).length : 0),
+                };
+            }
         })
     );
 
