@@ -92,25 +92,42 @@ const initialState: ContestsState = {
 
 export const fetchContestPerformance = createAsyncThunk<
     UnifiedContestData,
-    { username: string; force?: boolean },
+    { username: string; force?: boolean; portals?: Record<string, any> },
     { state: { contests: ContestsState }; rejectValue: string }
 >(
     "contests/fetchUnified",
-    async ({ username, force = false }, { getState, rejectWithValue }) => {
+    async ({ username, force = false, portals }, { getState, rejectWithValue }) => {
         const effectiveUser = username.trim() || "vineet_chandel";
         const state = getState().contests;
         const existing = state.dataByUser[effectiveUser];
         const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
         const now = Date.now();
 
-        // If existing data is present, fresh (< 10 mins), and not forcing refresh, return immediately
-        if (existing && !force && now - lastFetched < 10 * 60 * 1000) {
+        // If existing data is present, fresh (< 10 mins), has full platform registry, and no missing connected portals, return immediately
+        const hasMissingConnected = portals && Object.entries(portals).some(([k, v]) => {
+            const u = typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "");
+            return Boolean(u) && !existing?.platforms?.some((p) => p.portal === k && p.connected);
+        });
+
+        if (existing && !force && existing.platforms?.length >= 10 && !hasMissingConnected && now - lastFetched < 10 * 60 * 1000) {
             return existing;
         }
 
+        let portalsQuery = "";
+        if (portals && typeof portals === "object") {
+            const simplified: Record<string, string> = {};
+            for (const [k, v] of Object.entries(portals)) {
+                const u = typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "");
+                if (u) simplified[k] = u;
+            }
+            if (Object.keys(simplified).length > 0) {
+                portalsQuery = `&portals=${encodeURIComponent(JSON.stringify(simplified))}`;
+            }
+        }
+
         const endpoints = [
-            `/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}`,
-            `http://localhost:3000/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}`,
+            `/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}${portalsQuery}`,
+            `http://localhost:3000/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}${portalsQuery}`,
         ];
 
         let lastError = "Failed to fetch contest performance";

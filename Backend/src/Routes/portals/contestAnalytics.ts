@@ -393,6 +393,294 @@ export function getAtCoderTier(rating: number): PlatformTierInfo {
     };
 }
 
+export function getHackerRankTier(rating: number): PlatformTierInfo {
+    if (rating < 1500) {
+        const next = 1500;
+        return {
+            name: "Bronze",
+            color: "#94a3b8",
+            nextTierName: "Silver",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round((rating / next) * 100))),
+            description: "Bronze competitive tier on HackerRank (< 1500)",
+        };
+    }
+    if (rating < 1850) {
+        const min = 1500;
+        const next = 1850;
+        return {
+            name: "Silver",
+            color: "#22c55e",
+            nextTierName: "Gold",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Silver competitive tier on HackerRank (1500 - 1849)",
+        };
+    }
+    if (rating < 2200) {
+        const min = 1850;
+        const next = 2200;
+        return {
+            name: "Gold",
+            color: "#3b82f6",
+            nextTierName: "Platinum",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Gold competitive tier on HackerRank (1850 - 2199)",
+        };
+    }
+    if (rating < 2500) {
+        const min = 2200;
+        const next = 2500;
+        return {
+            name: "Platinum",
+            color: "#a855f7",
+            nextTierName: "Diamond",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Platinum master tier on HackerRank (2200 - 2499)",
+        };
+    }
+    return {
+        name: "Diamond",
+        color: "#f59e0b",
+        nextTierName: null,
+        pointsToNextTier: 0,
+        progressPercent: 100,
+        description: "Diamond grandmaster tier on HackerRank (>= 2500)",
+    };
+}
+
+export function getTopCoderTier(rating: number): PlatformTierInfo {
+    if (rating < 900) {
+        const next = 900;
+        return {
+            name: "Grey",
+            color: "#94a3b8",
+            nextTierName: "Green",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round((rating / next) * 100))),
+            description: "Grey competitive tier on TopCoder (< 900)",
+        };
+    }
+    if (rating < 1200) {
+        const min = 900;
+        const next = 1200;
+        return {
+            name: "Green",
+            color: "#22c55e",
+            nextTierName: "Blue",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Green division tier on TopCoder (900 - 1199)",
+        };
+    }
+    if (rating < 1500) {
+        const min = 1200;
+        const next = 1500;
+        return {
+            name: "Blue",
+            color: "#2563eb",
+            nextTierName: "Yellow",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Blue division tier on TopCoder (1200 - 1499)",
+        };
+    }
+    if (rating < 2200) {
+        const min = 1500;
+        const next = 2200;
+        return {
+            name: "Yellow",
+            color: "#eab308",
+            nextTierName: "Red",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Yellow master tier on TopCoder (1500 - 2199)",
+        };
+    }
+    return {
+        name: "Red",
+        color: "#ef4444",
+        nextTierName: null,
+        pointsToNextTier: 0,
+        progressPercent: 100,
+        description: "Red grandmaster tier on TopCoder (>= 2200)",
+    };
+}
+
+export function getGeeksforGeeksTier(rating: number): PlatformTierInfo {
+    if (rating < 500) {
+        const next = 500;
+        return {
+            name: "Beginner",
+            color: "#94a3b8",
+            nextTierName: "Bronze",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round((rating / next) * 100))),
+            description: "Beginner coder on GeeksforGeeks (< 500 score)",
+        };
+    }
+    if (rating < 1000) {
+        const min = 500;
+        const next = 1000;
+        return {
+            name: "Bronze",
+            color: "#a16207",
+            nextTierName: "Silver",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Bronze tier on GeeksforGeeks (500 - 999 score)",
+        };
+    }
+    if (rating < 2000) {
+        const min = 1000;
+        const next = 2000;
+        return {
+            name: "Silver",
+            color: "#06b6d4",
+            nextTierName: "Gold",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Silver tier on GeeksforGeeks (1000 - 1999 score)",
+        };
+    }
+    if (rating < 4000) {
+        const min = 2000;
+        const next = 4000;
+        return {
+            name: "Gold",
+            color: "#eab308",
+            nextTierName: "Master",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Gold competitive tier on GeeksforGeeks (2000 - 3999 score)",
+        };
+    }
+    return {
+        name: "Master",
+        color: "#8b5cf6",
+        nextTierName: null,
+        pointsToNextTier: 0,
+        progressPercent: 100,
+        description: "Master tier on GeeksforGeeks (>= 4000 score)",
+    };
+}
+
+export function getHackerEarthTier(rating: number): PlatformTierInfo {
+    if (rating < 1400) {
+        const next = 1400;
+        return {
+            name: "Novice",
+            color: "#94a3b8",
+            nextTierName: "Challenger",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round((rating / next) * 100))),
+            description: "Novice rank on HackerEarth (< 1400)",
+        };
+    }
+    if (rating < 1600) {
+        const min = 1400;
+        const next = 1600;
+        return {
+            name: "Challenger",
+            color: "#22c55e",
+            nextTierName: "Expert",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Challenger division on HackerEarth (1400 - 1599)",
+        };
+    }
+    if (rating < 1800) {
+        const min = 1600;
+        const next = 1800;
+        return {
+            name: "Expert",
+            color: "#2563eb",
+            nextTierName: "Master",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Expert division on HackerEarth (1600 - 1799)",
+        };
+    }
+    return {
+        name: "Master",
+        color: "#f59e0b",
+        nextTierName: null,
+        pointsToNextTier: 0,
+        progressPercent: 100,
+        description: "Master division on HackerEarth (>= 1800)",
+    };
+}
+
+export function getInterviewBitTier(rating: number): PlatformTierInfo {
+    if (rating < 1000) {
+        const next = 1000;
+        return {
+            name: "Novice",
+            color: "#94a3b8",
+            nextTierName: "Specialist",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round((rating / next) * 100))),
+            description: "Novice ranking tier on InterviewBit",
+        };
+    }
+    if (rating < 3000) {
+        const min = 1000;
+        const next = 3000;
+        return {
+            name: "Specialist",
+            color: "#06b6d4",
+            nextTierName: "Master",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Specialist ranking tier on InterviewBit",
+        };
+    }
+    return {
+        name: "Master",
+        color: "#f59e0b",
+        nextTierName: null,
+        pointsToNextTier: 0,
+        progressPercent: 100,
+        description: "Master ranking tier on InterviewBit",
+    };
+}
+
+export function getCode360Tier(rating: number): PlatformTierInfo {
+    if (rating < 1000) {
+        const next = 1000;
+        return {
+            name: "Ninja",
+            color: "#94a3b8",
+            nextTierName: "Ninja Specialist",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round((rating / next) * 100))),
+            description: "Ninja level on Code360 (< 1000)",
+        };
+    }
+    if (rating < 2500) {
+        const min = 1000;
+        const next = 2500;
+        return {
+            name: "Ninja Specialist",
+            color: "#22c55e",
+            nextTierName: "Ninja Master",
+            pointsToNextTier: Math.max(0, next - rating),
+            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
+            description: "Specialist on Code360 (1000 - 2499)",
+        };
+    }
+    return {
+        name: "Ninja Master",
+        color: "#f59e0b",
+        nextTierName: null,
+        pointsToNextTier: 0,
+        progressPercent: 100,
+        description: "Master on Code360 (>= 2500)",
+    };
+}
+
 // --- Platform-Specific Fetchers ---
 
 export async function fetchCodeforcesContests(username: string): Promise<{
@@ -744,7 +1032,318 @@ export async function fetchAtCoderContests(username: string): Promise<{
     }
 }
 
+export async function fetchHackerRankContests(username: string): Promise<{
+    history: ContestHistoryPoint[];
+    currentRating: number | null;
+    peakRating: number | null;
+    rankTitle: string | null;
+    officialRank: number | null;
+} | null> {
+    try {
+        const res = await fetch(`https://www.hackerrank.com/rest/hackers/${encodeURIComponent(username)}/rating_histories_elo`, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            signal: AbortSignal.timeout(4500),
+        });
+
+        if (!res.ok) return null;
+        const data = (await res.json()) as any;
+        const models = Array.isArray(data.models) ? data.models : [];
+
+        let allEvents: any[] = [];
+        for (const m of models) {
+            if (Array.isArray(m.events)) {
+                for (const e of m.events) {
+                    allEvents.push({ ...e, category: m.category || "Algorithms" });
+                }
+            }
+        }
+
+        allEvents.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        let peakRating: number | null = null;
+        let currentRating: number | null = null;
+        let prevRating: number | null = null;
+
+        const history: ContestHistoryPoint[] = allEvents.map((e, idx) => {
+            const ts = e.date ? new Date(e.date).getTime() : 0;
+            const date = ts ? new Date(ts).toISOString().split("T")[0] || "" : "";
+            const roundedRating = Math.round(e.rating);
+
+            if (peakRating === null || roundedRating > peakRating) {
+                peakRating = roundedRating;
+            }
+
+            const ratingChange = prevRating !== null ? roundedRating - prevRating : null;
+            const ratingBefore = prevRating;
+            prevRating = roundedRating;
+
+            return {
+                contestId: e.contest_slug || `hr-${idx}`,
+                contestName: e.contest_name || "HackerRank Contest",
+                date,
+                timestamp: ts,
+                rating: roundedRating,
+                ratingBefore: ratingBefore ?? null,
+                ratingChange,
+                rank: e.rank || null,
+                division: e.category || null,
+            };
+        });
+
+        if (history.length > 0) {
+            const last = history[history.length - 1];
+            if (last) {
+                currentRating = last.rating;
+            }
+        }
+
+        return {
+            history,
+            currentRating,
+            peakRating,
+            rankTitle: currentRating !== null ? getHackerRankTier(currentRating).name : null,
+            officialRank: null,
+        };
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchTopCoderContests(username: string): Promise<{
+    history: ContestHistoryPoint[];
+    currentRating: number | null;
+    peakRating: number | null;
+    rankTitle: string | null;
+    officialRank: number | null;
+} | null> {
+    try {
+        const res = await fetch(`https://api.topcoder.com/v6/members?handle=${encodeURIComponent(username)}`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json",
+            },
+            signal: AbortSignal.timeout(4500),
+        });
+
+        if (!res.ok) return null;
+        const members = await res.json();
+        if (!Array.isArray(members) || members.length === 0) return null;
+
+        const m = members[0];
+        if (!m || !m.handle) return null;
+
+        const srm = m.stats?.[0]?.DATA_SCIENCE?.SRM;
+        const rating = srm?.rank?.rating || m.stats?.[0]?.maxRating?.rating || null;
+        const peak = srm?.rank?.maximumRating || m.stats?.[0]?.maxRating?.rating || rating;
+        const challenges = srm?.challenges || m.stats?.[0]?.challenges || 0;
+
+        const currentRating = typeof rating === "number" ? Math.round(rating) : null;
+        const peakRating = typeof peak === "number" ? Math.round(peak) : currentRating;
+
+        let history: ContestHistoryPoint[] = [];
+        if (currentRating !== null) {
+            history.push({
+                contestId: "tc-srm-latest",
+                contestName: `TopCoder SRM (${challenges} rounds)`,
+                date: new Date().toISOString().split("T")[0] || "",
+                timestamp: Date.now(),
+                rating: currentRating,
+                ratingBefore: null,
+                ratingChange: null,
+                rank: srm?.rank?.rank || null,
+                division: "SRM",
+            });
+        }
+
+        return {
+            history,
+            currentRating,
+            peakRating,
+            rankTitle: currentRating !== null ? getTopCoderTier(currentRating).name : null,
+            officialRank: srm?.rank?.rank || null,
+        };
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchGeeksforGeeksContests(username: string): Promise<{
+    history: ContestHistoryPoint[];
+    currentRating: number | null;
+    peakRating: number | null;
+    rankTitle: string | null;
+    officialRank: number | null;
+} | null> {
+    try {
+        const clean = username.trim();
+        const res = await fetch(`https://www.geeksforgeeks.org/user/${encodeURIComponent(clean)}/`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+            },
+            signal: AbortSignal.timeout(4500),
+        });
+
+        if (!res.ok || res.status === 404) return null;
+        const text = await res.text();
+        if (text.includes("NEXT_REDIRECT;replace;/connect/explore;307;")) return null;
+
+        const scoreMatch = text.match(/score[^\d]*(\d+)/i);
+        const rankMatch = text.match(/institute_rank\\*":\\*"([^\\"]+)\\"/i);
+
+        const codingScore = scoreMatch && scoreMatch[1] ? parseInt(scoreMatch[1], 10) : null;
+        const officialRank = rankMatch && rankMatch[1] ? parseInt(rankMatch[1], 10) : null;
+
+        let history: ContestHistoryPoint[] = [];
+        if (codingScore !== null && codingScore > 0) {
+            history.push({
+                contestId: "gfg-score",
+                contestName: "GeeksforGeeks Weekly Contests & Practice",
+                date: new Date().toISOString().split("T")[0] || "",
+                timestamp: Date.now(),
+                rating: codingScore,
+                ratingBefore: null,
+                ratingChange: null,
+                rank: officialRank,
+                division: null,
+            });
+        }
+
+        return {
+            history,
+            currentRating: codingScore,
+            peakRating: codingScore,
+            rankTitle: codingScore !== null ? getGeeksforGeeksTier(codingScore).name : null,
+            officialRank,
+        };
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchHackerEarthContests(username: string): Promise<{
+    history: ContestHistoryPoint[];
+    currentRating: number | null;
+    peakRating: number | null;
+    rankTitle: string | null;
+    officialRank: number | null;
+} | null> {
+    try {
+        const res = await fetch(`https://www.hackerearth.com/@${encodeURIComponent(username)}/`, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            signal: AbortSignal.timeout(4500),
+        });
+
+        if (!res.ok || res.status === 404) return null;
+        const html = await res.text();
+        if (html.includes("Profile Not Found") || html.includes("Profile not found")) return null;
+
+        const scoreMatch = html.match(/"current_score"\s*:\s*(\d+)/i) || html.match(/score[^\d]*(\d+)/i);
+        const currentRating = scoreMatch && scoreMatch[1] ? parseInt(scoreMatch[1], 10) : null;
+
+        let history: ContestHistoryPoint[] = [];
+        if (currentRating !== null && currentRating > 0) {
+            history.push({
+                contestId: "he-circuit",
+                contestName: "HackerEarth Circuits & Contests",
+                date: new Date().toISOString().split("T")[0] || "",
+                timestamp: Date.now(),
+                rating: currentRating,
+                ratingBefore: null,
+                ratingChange: null,
+                rank: null,
+                division: null,
+            });
+        }
+
+        return {
+            history,
+            currentRating,
+            peakRating: currentRating,
+            rankTitle: currentRating !== null ? getHackerEarthTier(currentRating).name : null,
+            officialRank: null,
+        };
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchInterviewBitContests(username: string): Promise<{
+    history: ContestHistoryPoint[];
+    currentRating: number | null;
+    peakRating: number | null;
+    rankTitle: string | null;
+    officialRank: number | null;
+} | null> {
+    try {
+        let clean = username.trim().replace(/^@+/, "");
+        if (clean.includes("interviewbit.com") || clean.includes("scaler.com")) {
+            const match =
+                clean.match(/(?:interviewbit\.com|scaler\.com)\/(?:profile|user|users|u|academy\/profile)\/([a-zA-Z0-9_\.\-]+)/i) ||
+                clean.match(/(?:interviewbit\.com|scaler\.com)\/([a-zA-Z0-9_\.\-]+)$/i);
+            if (match && match[1]) clean = match[1];
+        }
+        clean = (clean.replace(/\/+$/, "").split("/")[0] || "").split("?")[0]?.trim() || "";
+        if (!clean) return null;
+
+        const res = await fetch(`https://www.interviewbit.com/v2/profile/username?id=${encodeURIComponent(clean)}`, {
+            headers: {
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "application/json",
+                "Referer": `https://www.interviewbit.com/profile/${encodeURIComponent(clean)}/`,
+            },
+            signal: AbortSignal.timeout(4500),
+        });
+
+        if (!res.ok) return null;
+        const data = await res.json();
+        if (!data || (!data.username && !data.id && !data.name)) return null;
+
+        const globalRank = typeof data.global_rank === "number" ? data.global_rank : null;
+
+        return {
+            history: [],
+            currentRating: null,
+            peakRating: null,
+            rankTitle: globalRank ? (globalRank <= 1000 ? "Grandmaster" : globalRank <= 10000 ? "Master" : "Challenger") : null,
+            officialRank: globalRank,
+        };
+    } catch {
+        return null;
+    }
+}
+
+export async function fetchCode360Contests(username: string): Promise<{
+    history: ContestHistoryPoint[];
+    currentRating: number | null;
+    peakRating: number | null;
+    rankTitle: string | null;
+    officialRank: number | null;
+} | null> {
+    try {
+        const clean = username.trim().replace(/^@+/, "");
+        if (!/^[a-zA-Z0-9_\.\-]{3,50}$/.test(clean)) return null;
+
+        const res = await fetch(`https://www.naukri.com/code360/profile/${encodeURIComponent(clean)}`, {
+            headers: { "User-Agent": "Mozilla/5.0" },
+            signal: AbortSignal.timeout(4500),
+        });
+
+        if (!res.ok) return null;
+        return {
+            history: [],
+            currentRating: null,
+            peakRating: null,
+            rankTitle: "Ninja",
+            officialRank: null,
+        };
+    } catch {
+        return null;
+    }
+}
+
 // --- Supported Contest Platforms Registry ---
+// ONLY platforms that arrange contest systems are included here.
+// Non-contest platforms (GitHub, Medium, Substack, CSES, SPOJ, AlgorithmXlr8) are excluded.
 
 export interface EligiblePlatformConfig {
     name: string;
@@ -783,6 +1382,48 @@ export const ELIGIBLE_CONTEST_PLATFORMS: Record<string, EligiblePlatformConfig> 
         fetcher: fetchAtCoderContests,
         getTier: (r) => getAtCoderTier(r),
     },
+    hackerrank: {
+        name: "HackerRank",
+        exploreContestsUrl: "https://www.hackerrank.com/contests",
+        buildProfileUrl: (u) => `https://www.hackerrank.com/profile/${u}`,
+        fetcher: fetchHackerRankContests,
+        getTier: (r) => getHackerRankTier(r),
+    },
+    topcoder: {
+        name: "TopCoder",
+        exploreContestsUrl: "https://www.topcoder.com/community/single-round-match",
+        buildProfileUrl: (u) => `https://profiles.topcoder.com/${u}`,
+        fetcher: fetchTopCoderContests,
+        getTier: (r) => getTopCoderTier(r),
+    },
+    geeksforgeeks: {
+        name: "GeeksforGeeks",
+        exploreContestsUrl: "https://practice.geeksforgeeks.org/events/rec/gfg-weekly-coding-contest",
+        buildProfileUrl: (u) => `https://www.geeksforgeeks.org/user/${u}`,
+        fetcher: fetchGeeksforGeeksContests,
+        getTier: (r) => getGeeksforGeeksTier(r),
+    },
+    hackerearth: {
+        name: "HackerEarth",
+        exploreContestsUrl: "https://www.hackerearth.com/challenges/",
+        buildProfileUrl: (u) => `https://www.hackerearth.com/@${u}`,
+        fetcher: fetchHackerEarthContests,
+        getTier: (r) => getHackerEarthTier(r),
+    },
+    interviewbit: {
+        name: "InterviewBit",
+        exploreContestsUrl: "https://www.interviewbit.com/contest/",
+        buildProfileUrl: (u) => `https://www.interviewbit.com/profile/${u}`,
+        fetcher: fetchInterviewBitContests,
+        getTier: (r) => getInterviewBitTier(r),
+    },
+    code360: {
+        name: "Code360",
+        exploreContestsUrl: "https://www.naukri.com/code360/contests",
+        buildProfileUrl: (u) => `https://www.naukri.com/code360/profile/${u}`,
+        fetcher: fetchCode360Contests,
+        getTier: (r) => getCode360Tier(r),
+    },
 };
 
 /**
@@ -817,20 +1458,29 @@ function calculate90dRatingChange(history: ContestHistoryPoint[]): number | null
 
 /**
  * Consolidates contest analytics across all eligible connected platforms for a user.
+ * Supports merging platforms from database (user_links) AND client-supplied portals.
  */
-export async function calculateUserContestPerformance(username: string): Promise<UnifiedContestResponse> {
+export async function calculateUserContestPerformance(
+    username: string,
+    clientPortals?: Record<string, string> | undefined
+): Promise<UnifiedContestResponse> {
     const cleanUsername = username.trim();
 
     // Query Postgres for user's connected platforms
-    const result = await query(
-        `SELECT portal, portal_username, verified, display_name
-         FROM user_links
-         WHERE (username = $1 OR username = (SELECT email FROM users WHERE username = $1 LIMIT 1))
-         ORDER BY portal ASC;`,
-        [cleanUsername]
-    );
+    let rows: any[] = [];
+    try {
+        const result = await query(
+            `SELECT portal, portal_username, verified, display_name
+             FROM user_links
+             WHERE (username = $1 OR username = (SELECT email FROM users WHERE username = $1 LIMIT 1))
+             ORDER BY portal ASC;`,
+            [cleanUsername]
+        );
+        rows = result?.rows || [];
+    } catch {
+        // Safe fallback
+    }
 
-    const rows = result.rows || [];
     const connectedMap = new Map<string, string>();
     for (const row of rows) {
         const portal = (row.portal || "").toLowerCase().trim();
@@ -840,14 +1490,31 @@ export async function calculateUserContestPerformance(username: string): Promise
         }
     }
 
-    const eligibleKeys = Object.keys(ELIGIBLE_CONTEST_PLATFORMS);
+    // Merge any client-supplied portals (e.g. from localStorage or active state)
+    if (clientPortals && typeof clientPortals === "object") {
+        for (const [k, v] of Object.entries(clientPortals)) {
+            const portalKey = k.toLowerCase().trim();
+            const portalUsername = (typeof v === "string" ? v : (v as any)?.username || (v as any)?.portalUsername || "").trim();
+            if (portalKey && portalUsername && !connectedMap.has(portalKey)) {
+                connectedMap.set(portalKey, portalUsername);
+            }
+        }
+    }
+
+    // Process all eligible contest platforms: connected first, followed by the remaining eligible platforms
+    const allEligibleKeys = Object.keys(ELIGIBLE_CONTEST_PLATFORMS);
+    const connectedEligibleKeys = allEligibleKeys.filter((k) => connectedMap.has(k));
+    const nonConnectedEligibleKeys = allEligibleKeys.filter((k) => !connectedMap.has(k));
+
+    const keysToProcess = [...connectedEligibleKeys, ...nonConnectedEligibleKeys];
+
     const platforms: PlatformContestAnalytics[] = [];
     let totalRatedContests = 0;
     const platformContestCounts: Record<string, number> = {};
 
-    // Process all platforms in parallel with 5-second max timeout guard
+    // Process all platforms in parallel with 4.5-second max timeout guard
     const results = await Promise.allSettled(
-        eligibleKeys.map(async (portalKey): Promise<PlatformContestAnalytics> => {
+        keysToProcess.map(async (portalKey): Promise<PlatformContestAnalytics> => {
             const config = ELIGIBLE_CONTEST_PLATFORMS[portalKey];
             if (!config) {
                 throw new Error(`Unknown platform config: ${portalKey}`);

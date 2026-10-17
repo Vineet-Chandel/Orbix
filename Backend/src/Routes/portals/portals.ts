@@ -18,6 +18,17 @@ export interface DifficultyBreakdown {
     attempting?: number;
 }
 
+export interface RecentProblemRecord {
+    id: string;
+    title: string;
+    portal: string;
+    platformName?: string;
+    timestamp: number; // unix epoch seconds
+    solvedAt?: string; // ISO string
+    url?: string;
+    difficulty?: "Easy" | "Medium" | "Hard" | null;
+}
+
 export interface PortalProfileData {
     success: boolean;
     portal: string;
@@ -32,6 +43,7 @@ export interface PortalProfileData {
     totalSubmissions?: number | undefined;
     streak?: number | undefined;
     activeDays?: number | undefined;
+    recentSubmissions?: RecentProblemRecord[] | undefined;
 }
 
 // Format numbers like Indian numbering (e.g., 35,38,055)
@@ -49,6 +61,101 @@ const getFallbackAvatar = (nameOrHandle: string) => {
 };
 
 // --- Portal Live Fetchers ---
+
+const LEETCODE_DIFFICULTY_LOOKUP: Record<string, "Easy" | "Medium" | "Hard"> = {
+    "two-sum": "Easy",
+    "valid-parentheses": "Easy",
+    "merge-two-sorted-lists": "Easy",
+    "best-time-to-buy-and-sell-stock": "Easy",
+    "valid-palindrome": "Easy",
+    "invert-binary-tree": "Easy",
+    "valid-anagram": "Easy",
+    "binary-search": "Easy",
+    "flood-fill": "Easy",
+    "maximum-subarray": "Medium",
+    "lowest-common-ancestor-of-a-binary-search-tree": "Medium",
+    "insert-interval": "Medium",
+    "01-matrix": "Medium",
+    "k-closest-points-to-origin": "Medium",
+    "longest-substring-without-repeating-characters": "Medium",
+    "3sum": "Medium",
+    "binary-tree-level-order-traversal": "Medium",
+    "clone-graph": "Medium",
+    "evaluate-reverse-polish-notation": "Medium",
+    "course-schedule": "Medium",
+    "implement-trie-prefix-tree": "Medium",
+    "coin-change": "Medium",
+    "product-of-array-except-self": "Medium",
+    "min-stack": "Medium",
+    "validate-binary-search-tree": "Medium",
+    "number-of-islands": "Medium",
+    "rotting-oranges": "Medium",
+    "search-in-rotated-sorted-array": "Medium",
+    "combination-sum": "Medium",
+    "permutations": "Medium",
+    "merge-intervals": "Medium",
+    "lowest-common-ancestor-of-a-binary-tree": "Medium",
+    "time-based-key-value-store": "Medium",
+    "accounts-merge": "Medium",
+    "sort-colors": "Medium",
+    "word-break": "Medium",
+    "partition-equal-subset-sum": "Medium",
+    "string-to-integer-atoi": "Medium",
+    "spiral-matrix": "Medium",
+    "subsets": "Medium",
+    "binary-tree-right-side-view": "Medium",
+    "longest-palindromic-substring": "Medium",
+    "unique-paths": "Medium",
+    "construct-binary-tree-from-preorder-and-inorder-traversal": "Medium",
+    "container-with-most-water": "Medium",
+    "letter-combinations-of-a-phone-number": "Medium",
+    "word-search": "Medium",
+    "find-all-anagrams-in-a-string": "Medium",
+    "minimum-height-trees": "Medium",
+    "task-scheduler": "Medium",
+    "lru-cache": "Medium",
+    "kth-smallest-element-in-a-bst": "Medium",
+    "daily-temperatures": "Medium",
+    "house-robber": "Medium",
+    "gas-station": "Medium",
+    "next-permutation": "Medium",
+    "majority-element": "Easy",
+    "find-the-duplicate-number": "Medium",
+    "longest-common-prefix": "Easy",
+    "intersection-of-two-arrays-ii": "Easy",
+    "intersection-of-two-arrays": "Easy",
+    "squares-of-a-sorted-array": "Easy",
+    "move-zeroes": "Easy",
+    "search-a-2d-matrix": "Medium",
+    "climbing-stairs": "Easy",
+    "single-number": "Easy",
+    "reverse-linked-list": "Easy",
+    "diameter-of-binary-tree": "Easy",
+    "middle-of-the-linked-list": "Easy",
+    "maximum-depth-of-binary-tree": "Easy",
+    "contains-duplicate": "Easy",
+    "ransom-note": "Easy",
+    "first-bad-version": "Easy",
+    "linked-list-cycle": "Easy",
+    "minimum-window-substring": "Hard",
+    "network-delay-time": "Medium",
+    "burst-balloons": "Hard",
+    "course-schedule-ii": "Medium",
+    "sliding-window-maximum": "Hard",
+    "longest-increasing-path-in-a-matrix": "Hard",
+    "kth-largest-element-in-an-array": "Medium",
+    "trapping-rain-water": "Hard",
+    "median-of-two-sorted-arrays": "Hard",
+    "merge-k-sorted-lists": "Hard",
+    "word-ladder": "Hard",
+    "basic-calculator": "Hard",
+    "maximum-profit-in-job-scheduling": "Hard",
+    "serialize-and-deserialize-binary-tree": "Hard",
+    "find-median-from-data-stream": "Hard",
+    "word-search-ii": "Hard",
+    "alien-dictionary": "Hard",
+    "n-queens": "Hard",
+};
 
 async function fetchLeetCode(username: string): Promise<PortalProfileData | null> {
     try {
@@ -83,6 +190,12 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
                             totalActiveDays
                             submissionCalendar
                         }
+                    }
+                    recentAcSubmissionList(username: $username, limit: 30) {
+                        id
+                        title
+                        titleSlug
+                        timestamp
                     }
                 }`,
                 variables: { username },
@@ -124,6 +237,33 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
                 }
             } catch {
                 // ignore
+            }
+        }
+
+        // Parse recent accepted problem-solving records
+        const rawRecent = data?.data?.recentAcSubmissionList || [];
+        const recentSubmissions: RecentProblemRecord[] = [];
+        const seenSlugs = new Set<string>();
+
+        if (Array.isArray(rawRecent)) {
+            for (const item of rawRecent) {
+                if (!item || !item.title) continue;
+                const slug = (item.titleSlug || "").toLowerCase();
+                // Deduplicate repeated accepted submissions for the same problem on the same platform
+                if (seenSlugs.has(slug)) continue;
+                seenSlugs.add(slug);
+
+                const ts = parseInt(item.timestamp, 10) || Math.floor(Date.now() / 1000);
+                recentSubmissions.push({
+                    id: `leetcode-${item.id || slug}`,
+                    title: item.title,
+                    portal: "leetcode",
+                    platformName: "LeetCode",
+                    timestamp: ts,
+                    solvedAt: new Date(ts * 1000).toISOString(),
+                    url: `https://leetcode.com/problems/${slug}/`,
+                    difficulty: LEETCODE_DIFFICULTY_LOOKUP[slug] ?? null,
+                });
             }
         }
 
@@ -174,6 +314,7 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
             totalSubmissions: totalCalendarSubs || totalSolved,
             streak: userCalendar?.streak || 0,
             activeDays: userCalendar?.totalActiveDays || 0,
+            recentSubmissions,
         };
     } catch {
         return null;
@@ -200,6 +341,7 @@ async function fetchCodeforces(username: string): Promise<PortalProfileData | nu
         let difficulty: DifficultyBreakdown | undefined = undefined;
         let cfCalendar: Record<string, number> = {};
         let cfTotalSubs = 0;
+        let recentSubmissions: RecentProblemRecord[] = [];
 
         try {
             const subRes = await fetch(`https://codeforces.com/api/user.status?handle=${encodeURIComponent(username)}`, {
@@ -237,6 +379,38 @@ async function fetchCodeforces(username: string): Promise<PortalProfileData | nu
                             const d = new Date(sub.creationTimeSeconds * 1000).toISOString().split("T")[0] || "";
                             if (d) {
                                 cfCalendar[d] = (cfCalendar[d] || 0) + 1;
+                            }
+                        }
+                    }
+
+                    recentSubmissions = [];
+                    const seenCf = new Set<string>();
+                    for (const sub of subData.result) {
+                        if (sub.verdict === "OK" && sub.problem) {
+                            const key = `${sub.problem.contestId}-${sub.problem.index}`;
+                            if (!seenCf.has(key)) {
+                                seenCf.add(key);
+                                const rating = sub.problem.rating;
+                                let diff: "Easy" | "Medium" | "Hard" | null = null;
+                                if (typeof rating === "number") {
+                                    if (rating <= 1200) diff = "Easy";
+                                    else if (rating <= 1800) diff = "Medium";
+                                    else diff = "Hard";
+                                }
+                                const ts = sub.creationTimeSeconds || Math.floor(Date.now() / 1000);
+                                recentSubmissions.push({
+                                    id: `codeforces-${sub.id || key}`,
+                                    title: sub.problem.name || `Problem ${sub.problem.contestId}${sub.problem.index}`,
+                                    portal: "codeforces",
+                                    platformName: "Codeforces",
+                                    timestamp: ts,
+                                    solvedAt: new Date(ts * 1000).toISOString(),
+                                    url: sub.problem.contestId
+                                        ? `https://codeforces.com/contest/${sub.problem.contestId}/problem/${sub.problem.index}`
+                                        : `https://codeforces.com/problemset`,
+                                    difficulty: diff,
+                                });
+                                if (recentSubmissions.length >= 25) break;
                             }
                         }
                     }
@@ -291,6 +465,7 @@ async function fetchCodeforces(username: string): Promise<PortalProfileData | nu
             submissionCalendar: cfCalendar,
             totalSubmissions: cfTotalSubs,
             activeDays: Object.keys(cfCalendar).length,
+            recentSubmissions,
         };
     } catch {
         return null;
@@ -1258,8 +1433,9 @@ export async function calculateUnifiedSubmissions(username: string) {
         activeDays: number;
     }> = {};
 
-    // 365-day merged calendar: dateStr ("YYYY-MM-DD") -> { count: number, platforms: string[] }
-    const dailyMerged: Record<string, { count: number; platforms: string[] }> = {};
+    // 365-day merged calendar: dateStr ("YYYY-MM-DD") -> { count: number, platforms: string[], platformCounts: Record<string, number> }
+    const dailyMerged: Record<string, { count: number; platforms: string[]; platformCounts: Record<string, number> }> = {};
+    const collectedRecentSolves: RecentProblemRecord[] = [];
 
     // Process all platforms in parallel with 3.5s timeout guard per platform
     await Promise.allSettled(
@@ -1305,6 +1481,17 @@ export async function calculateUnifiedSubmissions(username: string) {
                 subCount = solvedCount;
             }
 
+            // Collect any recent verified solves from this platform
+            if (profileData?.recentSubmissions && Array.isArray(profileData.recentSubmissions)) {
+                for (const item of profileData.recentSubmissions) {
+                    collectedRecentSolves.push({
+                        ...item,
+                        portal,
+                        platformName: row.display_name || portal,
+                    });
+                }
+            }
+
             // If calendar is available, merge daily
             if (profileData?.submissionCalendar && typeof profileData.submissionCalendar === "object") {
                 for (const [key, val] of Object.entries(profileData.submissionCalendar)) {
@@ -1318,7 +1505,7 @@ export async function calculateUnifiedSubmissions(username: string) {
                     }
 
                     if (!dailyMerged[dateStr]) {
-                        dailyMerged[dateStr] = { count: 0, platforms: [] };
+                        dailyMerged[dateStr] = { count: 0, platforms: [], platformCounts: {} };
                     }
                     const entry = dailyMerged[dateStr];
                     if (entry) {
@@ -1326,6 +1513,7 @@ export async function calculateUnifiedSubmissions(username: string) {
                         if (!entry.platforms.includes(portal)) {
                             entry.platforms.push(portal);
                         }
+                        entry.platformCounts[portal] = (entry.platformCounts[portal] || 0) + count;
                     }
                 }
             }
@@ -1341,33 +1529,180 @@ export async function calculateUnifiedSubmissions(username: string) {
         })
     );
 
+    // Reconcile dailyMerged with dates from verified recent solves
+    for (const solve of collectedRecentSolves) {
+        if (solve.timestamp) {
+            const dateStr = new Date(solve.timestamp * 1000).toISOString().split("T")[0];
+            if (dateStr) {
+                if (!dailyMerged[dateStr]) {
+                    dailyMerged[dateStr] = { count: 0, platforms: [], platformCounts: {} };
+                }
+                const entry = dailyMerged[dateStr];
+                if (entry) {
+                    if (!entry.platforms.includes(solve.portal)) {
+                        entry.platforms.push(solve.portal);
+                    }
+                    if (entry.count === 0) {
+                        entry.count = 1;
+                    }
+                    entry.platformCounts[solve.portal] = (entry.platformCounts[solve.portal] || 0) + 1;
+                }
+            }
+        }
+    }
+
+    // Deduplicate repeated accepted submissions for the same problem on the same platform
+    const seenSolveKeys = new Set<string>();
+    const deduplicatedRecentSolves: RecentProblemRecord[] = [];
+
+    // Sort by timestamp descending first so latest solve is preserved
+    collectedRecentSolves.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    for (const item of collectedRecentSolves) {
+        const canonicalKey = `${item.portal}:${item.title.toLowerCase().trim()}`;
+        if (!seenSolveKeys.has(canonicalKey)) {
+            seenSolveKeys.add(canonicalKey);
+            deduplicatedRecentSolves.push(item);
+        }
+    }
+
+    // Calculate rolling 30-day and 90-day window metrics
+    const now = new Date();
+    const nowUtcMidnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const nowSeconds = Math.floor(now.getTime() / 1000);
+    const seconds30d = 30 * 86400;
+    const seconds90d = 90 * 86400;
+
+    let activeDays30d = 0;
+    let activeDays90d = 0;
+    let calendarSolves30d = 0;
+    let calendarSolves90d = 0;
+
+    const platform30dSolves: Record<string, number> = {};
+    const platform90dSolves: Record<string, number> = {};
+    const platform30dDays: Record<string, Set<string>> = {};
+    const platform90dDays: Record<string, Set<string>> = {};
+
+    for (const portal of Object.keys(platformBreakdown)) {
+        platform30dSolves[portal] = 0;
+        platform90dSolves[portal] = 0;
+        platform30dDays[portal] = new Set();
+        platform90dDays[portal] = new Set();
+    }
+
+    for (const [dateStr, entry] of Object.entries(dailyMerged)) {
+        if (!entry || entry.count <= 0) continue;
+        const [y, m, d] = dateStr.split("-").map(Number);
+        if (!y || !m || !d) continue;
+        const cellDate = new Date(Date.UTC(y, m - 1, d));
+        const diffDays = Math.floor((nowUtcMidnight.getTime() - cellDate.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Distinct calendar dates globally deduplicated (1 date = 1 active day regardless of platforms)
+        if (diffDays >= 0 && diffDays < 30) {
+            activeDays30d++;
+            calendarSolves30d += entry.count;
+            for (const p of entry.platforms) {
+                if (platform30dDays[p]) platform30dDays[p].add(dateStr);
+                const share = entry.platformCounts?.[p] || Math.max(1, Math.round(entry.count / entry.platforms.length));
+                platform30dSolves[p] = (platform30dSolves[p] || 0) + share;
+            }
+        }
+        if (diffDays >= 0 && diffDays < 90) {
+            activeDays90d++;
+            calendarSolves90d += entry.count;
+            for (const p of entry.platforms) {
+                if (platform90dDays[p]) platform90dDays[p].add(dateStr);
+                const share = entry.platformCounts?.[p] || Math.max(1, Math.round(entry.count / entry.platforms.length));
+                platform90dSolves[p] = (platform90dSolves[p] || 0) + share;
+            }
+        }
+    }
+
+    // Solved problems in 30d and 90d from deduplicated recent problem records
+    const solves30dItems = deduplicatedRecentSolves.filter(
+        (s) => nowSeconds - (s.timestamp || 0) >= 0 && nowSeconds - (s.timestamp || 0) <= seconds30d
+    );
+    const solves90dItems = deduplicatedRecentSolves.filter(
+        (s) => nowSeconds - (s.timestamp || 0) >= 0 && nowSeconds - (s.timestamp || 0) <= seconds90d
+    );
+
+    const solved30d = Math.max(solves30dItems.length, calendarSolves30d);
+    const solved90d = Math.max(solves90dItems.length, calendarSolves90d);
+
+    // Platform contribution breakdowns for 30d and 90d
+    const platformContributions30d: Record<string, {
+        portal: string;
+        name: string;
+        solves: number;
+        activeDays: number;
+        percentage: number;
+        status: "active" | "idle" | "unsupported";
+    }> = {};
+
+    const platformContributions90d: Record<string, {
+        portal: string;
+        name: string;
+        solves: number;
+        activeDays: number;
+        percentage: number;
+        status: "active" | "idle" | "unsupported";
+    }> = {};
+
+    for (const [portal, p] of Object.entries(platformBreakdown)) {
+        const solves30 = platform30dSolves[portal] || 0;
+        const days30 = platform30dDays[portal]?.size || 0;
+        const solves90 = platform90dSolves[portal] || 0;
+        const days90 = platform90dDays[portal]?.size || 0;
+
+        const hasHistory = (p.submissions > 0 || p.solved > 0 || p.activeDays > 0);
+
+        platformContributions30d[portal] = {
+            portal,
+            name: p.name || portal,
+            solves: solves30,
+            activeDays: days30,
+            percentage: solved30d > 0 ? Math.round((solves30 / solved30d) * 100) : 0,
+            status: !hasHistory ? "unsupported" : solves30 > 0 ? "active" : "idle",
+        };
+
+        platformContributions90d[portal] = {
+            portal,
+            name: p.name || portal,
+            solves: solves90,
+            activeDays: days90,
+            percentage: solved90d > 0 ? Math.round((solves90 / solved90d) * 100) : 0,
+            status: !hasHistory ? "unsupported" : solves90 > 0 ? "active" : "idle",
+        };
+    }
+
+    // Platform coverage status
+    const totalEligible = Object.keys(platformBreakdown).length;
+    const reporting = Object.values(platformBreakdown).filter(
+        (p) => p.submissions > 0 || p.solved > 0 || p.activeDays > 0
+    ).length;
+    const unavailable = Object.entries(platformBreakdown)
+        .filter(([_, p]) => p.submissions === 0 && p.solved === 0 && p.activeDays === 0)
+        .map(([portal]) => portal);
+
+    let syncStatus: "synced" | "partial" | "empty" = "synced";
+    if (reporting === 0 && totalEligible > 0) {
+        syncStatus = "empty";
+    } else if (reporting < totalEligible) {
+        syncStatus = "partial";
+    }
+
     // Calculate overall totals
     let totalMergedSubmissions = Object.values(dailyMerged).reduce((acc, d) => acc + d.count, 0);
     const sumPlatformSubs = Object.values(platformBreakdown).reduce((acc, p) => acc + p.submissions, 0);
     totalMergedSubmissions = Math.max(totalMergedSubmissions, sumPlatformSubs);
 
-    // If dailyMerged is empty but user has verified submissions/solved, create deterministic distribution
-    if (Object.keys(dailyMerged).length === 0 && totalMergedSubmissions > 0) {
-        const today = new Date();
-        const daysToDistribute = Math.min(Math.max(totalMergedSubmissions, 20), 180);
-        for (let i = 0; i < daysToDistribute; i++) {
-            const step = Math.floor((i * 365) / daysToDistribute);
-            const d = new Date(today);
-            d.setDate(today.getDate() - step);
-            const dateStr = d.toISOString().split("T")[0] || "";
-            const count = 1 + (i % 5);
-            dailyMerged[dateStr] = { count, platforms: Object.keys(platformBreakdown).slice(0, 2) };
-        }
-    }
-
     const activeDays = Object.keys(dailyMerged).length;
 
     // Calculate streak up to today
-    const today = new Date();
     let dayStreak = 0;
     for (let i = 0; i < 365; i++) {
-        const d = new Date(today);
-        d.setDate(today.getDate() - i);
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
         const dateStr = d.toISOString().split("T")[0] || "";
         const entry = dailyMerged[dateStr];
         if (entry && entry.count > 0) {
@@ -1385,7 +1720,23 @@ export async function calculateUnifiedSubmissions(username: string) {
         dayStreak: Math.max(dayStreak, 1),
         platformBreakdown,
         dailyMerged,
-        connectedPlatformsCount: Object.keys(platformBreakdown).length,
+        recentMetrics: {
+            solved30d,
+            solved90d,
+            activeDays30d,
+            activeDays90d,
+        },
+        platformContributions30d,
+        platformContributions90d,
+        recentlySolved: deduplicatedRecentSolves,
+        coverage: {
+            totalEligible,
+            reporting,
+            unavailable,
+            syncStatus,
+            lastSyncedAt: new Date().toISOString(),
+        },
+        connectedPlatformsCount: totalEligible,
         platformsExcluded: ["github"],
         timestamp: new Date().toISOString(),
     };
@@ -1668,6 +2019,20 @@ portalsRouter.get("/contests", async (req: Request, res: Response) => {
             });
         }
 
+        let clientPortals: Record<string, string> | undefined = undefined;
+        if (req.query.portals) {
+            try {
+                clientPortals = JSON.parse(String(req.query.portals));
+            } catch {
+                clientPortals = {};
+                const parts = String(req.query.portals).split(",");
+                for (const p of parts) {
+                    const [k, v] = p.split(":");
+                    if (k && v) clientPortals[k.trim().toLowerCase()] = v.trim();
+                }
+            }
+        }
+
         const cacheKey = `user:contests:unified:${username}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
 
@@ -1683,7 +2048,7 @@ portalsRouter.get("/contests", async (req: Request, res: Response) => {
                     const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
                     if (cacheAge > 3 * 60 * 1000 && !activeContestsRefreshes.has(username)) {
                         activeContestsRefreshes.add(username);
-                        calculateUserContestPerformance(username)
+                        calculateUserContestPerformance(username, clientPortals)
                             .then(async (fresh) => {
                                 if (redis && redis.status === "ready") {
                                     await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
@@ -1703,7 +2068,7 @@ portalsRouter.get("/contests", async (req: Request, res: Response) => {
             }
         }
 
-        const responseData = await calculateUserContestPerformance(username);
+        const responseData = await calculateUserContestPerformance(username, clientPortals);
 
         if (redis && redis.status === "ready") {
             try {

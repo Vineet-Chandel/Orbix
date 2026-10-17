@@ -25,6 +25,19 @@ interface ContestPerformanceSectionProps {
 
 type TimeRangeFilter = "6M" | "1Y" | "ALL";
 
+export const CONTEST_ELIGIBLE_REGISTRY: Record<string, { name: string; exploreUrl: string }> = {
+    codeforces: { name: "Codeforces", exploreUrl: "https://codeforces.com/contests" },
+    leetcode: { name: "LeetCode", exploreUrl: "https://leetcode.com/contest/" },
+    codechef: { name: "CodeChef", exploreUrl: "https://www.codechef.com/contests" },
+    atcoder: { name: "AtCoder", exploreUrl: "https://atcoder.jp/contests/" },
+    hackerrank: { name: "HackerRank", exploreUrl: "https://www.hackerrank.com/contests" },
+    topcoder: { name: "TopCoder", exploreUrl: "https://www.topcoder.com/community/single-round-match" },
+    geeksforgeeks: { name: "GeeksforGeeks", exploreUrl: "https://practice.geeksforgeeks.org/events/rec/gfg-weekly-coding-contest" },
+    hackerearth: { name: "HackerEarth", exploreUrl: "https://www.hackerearth.com/challenges/" },
+    interviewbit: { name: "InterviewBit", exploreUrl: "https://www.interviewbit.com/contest/" },
+    code360: { name: "Code360", exploreUrl: "https://www.naukri.com/code360/contests" },
+};
+
 export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps> = ({
     connectedPortals,
     username = "vineet_chandel",
@@ -38,32 +51,119 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     // Active platform selection
     const [selectedPortal, setSelectedPortal] = useState<string>("codeforces");
+    const [hasUserSelected, setHasUserSelected] = useState<boolean>(false);
     const [timeRange, setTimeRange] = useState<TimeRangeFilter>("ALL");
     const [hoveredPoint, setHoveredPoint] = useState<ContestHistoryPoint | null>(null);
     const [isTierModalOpen, setIsTierModalOpen] = useState<boolean>(false);
     const chartContainerRef = useRef<HTMLDivElement>(null);
 
-    // Initial fetch
+    // Initial fetch passing connected portals from props
     useEffect(() => {
-        if (!contestData) {
-            dispatch(fetchContestPerformance({ username: effectiveUser }));
-        }
-    }, [effectiveUser, contestData, dispatch]);
+        dispatch(fetchContestPerformance({ username: effectiveUser, portals: connectedPortals }));
+    }, [effectiveUser, dispatch, connectedPortals]);
 
     // Discover eligible platforms dynamically
     const platformsList: PlatformContestAnalytics[] = useMemo(() => {
+        const eligibleKeys = Object.keys(CONTEST_ELIGIBLE_REGISTRY);
+
         if (contestData?.platforms && contestData.platforms.length > 0) {
-            return contestData.platforms;
+            // Start with backend-returned platforms (filtered strictly to eligible contest platforms)
+            const map = new Map<string, PlatformContestAnalytics>();
+            for (const p of contestData.platforms) {
+                if (CONTEST_ELIGIBLE_REGISTRY[p.portal]) {
+                    map.set(p.portal, { ...p });
+                }
+            }
+
+            // Sync any client-side connected portals if not marked connected yet
+            if (connectedPortals && typeof connectedPortals === "object") {
+                for (const [k, v] of Object.entries(connectedPortals)) {
+                    if (CONTEST_ELIGIBLE_REGISTRY[k]) {
+                        const pUser = typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "");
+                        const existing = map.get(k);
+                        if (!existing) {
+                            map.set(k, {
+                                portal: k,
+                                portalName: CONTEST_ELIGIBLE_REGISTRY[k]!.name,
+                                portalUsername: pUser,
+                                profileUrl: "",
+                                connected: Boolean(pUser),
+                                currentRating: null,
+                                peakRating: null,
+                                tier: null,
+                                tierColor: null,
+                                tierInfo: null,
+                                officialRank: null,
+                                percentile: null,
+                                ratedContestsCount: 0,
+                                history: [],
+                                recentChange90d: null,
+                                lastSyncAt: new Date().toISOString(),
+                                status: pUser ? "syncing" : "not_connected",
+                                exploreContestsUrl: CONTEST_ELIGIBLE_REGISTRY[k]!.exploreUrl,
+                            });
+                        } else if (pUser && !existing.connected) {
+                            existing.connected = true;
+                            existing.portalUsername = pUser;
+                            if (existing.status === "not_connected") {
+                                existing.status = "syncing";
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Ensure every eligible contest platform is present in the list
+            for (const k of eligibleKeys) {
+                if (!map.has(k)) {
+                    const cfg = CONTEST_ELIGIBLE_REGISTRY[k]!;
+                    const isConn = Boolean(connectedPortals && connectedPortals[k]);
+                    const pUsername = connectedPortals?.[k]?.username || (typeof connectedPortals?.[k] === "string" ? connectedPortals[k] : "");
+                    map.set(k, {
+                        portal: k,
+                        portalName: cfg.name,
+                        portalUsername: pUsername,
+                        profileUrl: "",
+                        connected: isConn,
+                        currentRating: null,
+                        peakRating: null,
+                        tier: null,
+                        tierColor: null,
+                        tierInfo: null,
+                        officialRank: null,
+                        percentile: null,
+                        ratedContestsCount: 0,
+                        history: [],
+                        recentChange90d: null,
+                        lastSyncAt: new Date().toISOString(),
+                        status: isConn ? "syncing" : "not_connected",
+                        exploreContestsUrl: cfg.exploreUrl,
+                    });
+                }
+            }
+
+            const list = Array.from(map.values());
+            // Sort: connected with contests first, then connected without contests, then unconnected
+            list.sort((a, b) => {
+                if (a.connected && !b.connected) return -1;
+                if (!a.connected && b.connected) return 1;
+                if (a.ratedContestsCount !== b.ratedContestsCount) {
+                    return b.ratedContestsCount - a.ratedContestsCount;
+                }
+                return a.portalName.localeCompare(b.portalName);
+            });
+
+            return list;
         }
 
-        // Fallback local discovery from connectedPortals props if remote not loaded yet
-        const defaultPortals = ["codeforces", "leetcode", "codechef", "atcoder"];
-        return defaultPortals.map((p) => {
+        // Fallback local discovery from CONTEST_ELIGIBLE_REGISTRY and connectedPortals props if remote not loaded yet
+        const fallbackList = eligibleKeys.map((p) => {
+            const cfg = CONTEST_ELIGIBLE_REGISTRY[p]!;
             const isConn = Boolean(connectedPortals && connectedPortals[p]);
-            const pUsername = connectedPortals?.[p]?.username || "";
+            const pUsername = connectedPortals?.[p]?.username || (typeof connectedPortals?.[p] === "string" ? connectedPortals[p] : "");
             return {
                 portal: p,
-                portalName: p === "codeforces" ? "Codeforces" : p === "leetcode" ? "LeetCode" : p === "codechef" ? "CodeChef" : "AtCoder",
+                portalName: cfg.name,
                 portalUsername: pUsername,
                 profileUrl: "",
                 connected: isConn,
@@ -79,25 +179,35 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                 recentChange90d: null,
                 lastSyncAt: new Date().toISOString(),
                 status: isConn ? "syncing" : "not_connected",
-                exploreContestsUrl: `https://${p}.com`,
+                exploreContestsUrl: cfg.exploreUrl,
             } as PlatformContestAnalytics;
         });
+
+        fallbackList.sort((a, b) => {
+            if (a.connected && !b.connected) return -1;
+            if (!a.connected && b.connected) return 1;
+            return a.portalName.localeCompare(b.portalName);
+        });
+
+        return fallbackList;
     }, [contestData, connectedPortals]);
 
     // Default select the first connected platform that has contests or is connected
     useEffect(() => {
         if (platformsList.length > 0) {
-            const currentSelectedExists = platformsList.some((p) => p.portal === selectedPortal);
-            if (!currentSelectedExists) {
+            const currentSelected = platformsList.find((p) => p.portal === selectedPortal);
+            // If the user hasn't explicitly picked a platform, or the current selected is not connected,
+            // automatically select the first connected platform (with contests preferred)
+            if (!hasUserSelected || !currentSelected?.connected) {
                 const firstConnectedWithContests = platformsList.find((p) => p.connected && p.ratedContestsCount > 0);
                 const firstConnected = platformsList.find((p) => p.connected);
                 const target = firstConnectedWithContests || firstConnected || platformsList[0];
-                if (target) {
+                if (target && target.portal !== selectedPortal) {
                     setSelectedPortal(target.portal);
                 }
             }
         }
-    }, [platformsList, selectedPortal]);
+    }, [platformsList, selectedPortal, hasUserSelected]);
 
     // Active platform analytics
     const activePlatform = useMemo(() => {
@@ -296,7 +406,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     // Force re-sync handler
     const handleRefresh = () => {
-        dispatch(fetchContestPerformance({ username: effectiveUser, force: true }));
+        dispatch(fetchContestPerformance({ username: effectiveUser, force: true, portals: connectedPortals }));
     };
 
     // Helper formatters
@@ -364,6 +474,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                         aria-selected={isActive}
                                         onClick={() => {
                                             setSelectedPortal(platform.portal);
+                                            setHasUserSelected(true);
                                             setHoveredPoint(null);
                                         }}
                                         className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-amber-400/50 ${
@@ -841,8 +952,8 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                     </div>
                 </div>
 
-                {/* Responsive 4-Column Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Responsive Multi-Platform Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
                     {platformsList.map((platform) => {
                         const isSelected = platform.portal === selectedPortal;
                         const hasContests = platform.ratedContestsCount > 0;
@@ -852,7 +963,11 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                             <button
                                 key={platform.portal}
                                 type="button"
-                                onClick={() => setSelectedPortal(platform.portal)}
+                                onClick={() => {
+                                    setSelectedPortal(platform.portal);
+                                    setHasUserSelected(true);
+                                    chartContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                                }}
                                 className={`flex flex-col justify-between p-5 rounded-2xl transition-all cursor-pointer text-left relative overflow-hidden border ${
                                     isSelected
                                         ? "bg-[#141b28] border-amber-500/50 shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30"
