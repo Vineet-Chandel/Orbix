@@ -46,7 +46,7 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
     onDownload,
     isExporting,
     onCopyLink,
-    connectedPlatformCount,
+    connectedPlatformCount: _connectedPlatformCount,
     maxSlots,
     availablePlatforms,
     currentSlotIds,
@@ -252,7 +252,6 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                 <div className="space-y-2">
                     {Array.from({ length: maxSlots }).map((_, slotIdx) => {
                         const currentId = currentSlotIds[slotIdx] || "";
-                        const selectedPlat = availablePlatforms.find((p) => p.id === currentId);
 
                         return (
                             <div

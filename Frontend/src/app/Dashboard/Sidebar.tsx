@@ -226,8 +226,10 @@ export const Sidebar = ({
                 setIsHovered(false);
                 setIsProfileMenuOpen(false);
             }}
-            className={`h-[calc(100vh-2rem)] flex flex-col justify-between rounded-[32px] bg-[#0c1017] border border-white/[0.08] text-white p-3.5 select-none transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] relative overflow-x-hidden ${
-                isExpanded ? "w-64 sm:w-[264px]" : "w-[72px]"
+            className={`h-[calc(100vh-1.5rem)] sm:h-[calc(100vh-2rem)] flex flex-col justify-between rounded-[32px] bg-[#0c1017] border border-white/[0.08] text-white p-3.5 select-none transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-3 sm:top-4 left-3 sm:left-4 z-50 overflow-x-hidden will-change-[width] ${
+                isExpanded
+                    ? "w-64 sm:w-[264px] shadow-2xl shadow-black/80 ring-1 ring-white/10"
+                    : "w-[72px] shadow-lg shadow-black/40"
             }`}
         >
             {/* Top Brand Header without border or bg around logo */}
@@ -296,41 +298,37 @@ export const Sidebar = ({
                                 key={item.id}
                                 to={item.path}
                                 onClick={() => handleItemClick(item.id)}
-                                className={`flex items-center h-11 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 group cursor-pointer overflow-x-hidden relative ${
-                                    isExpanded
-                                        ? "px-3 justify-between w-full"
-                                        : "w-11 h-11 mx-auto justify-center p-0"
-                                } ${
+                                className={`flex items-center h-11 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 group cursor-pointer overflow-x-hidden relative w-full ${
                                     isCurrentActive
                                         ? "bg-white/[0.1] text-white"
                                         : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
                                 }`}
                                 title={!isExpanded ? item.label : undefined}
                             >
-                                <div className={`flex items-center overflow-x-hidden ${isExpanded ? "gap-2.5 min-w-0" : "justify-center w-full"}`}>
-                                    {/* Active vertical pill accent indicator bar (Matching Image 1) */}
-                                    {isExpanded && (
-                                        <span
-                                            className={`w-1 h-4 rounded-full flex-shrink-0 transition-all ${
-                                                isCurrentActive ? "bg-white" : "bg-transparent"
-                                            }`}
-                                        />
-                                    )}
+                                {/* Active vertical accent bar */}
+                                <span
+                                    className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-200 ${
+                                        isCurrentActive && isExpanded ? "bg-white opacity-100" : "bg-transparent opacity-0"
+                                    }`}
+                                />
 
-                                    {/* SVG Icon: DEAD-CENTER in 44px pill */}
-                                    <span
-                                        className={`w-5 h-5 flex items-center justify-center flex-shrink-0 transition-colors ${
-                                            isCurrentActive
-                                                ? "text-white"
-                                                : "text-neutral-400 group-hover:text-white"
-                                        }`}
-                                    >
-                                        {item.icon}
-                                    </span>
+                                <div className="flex items-center overflow-x-hidden w-full">
+                                    {/* SVG Icon: DEAD-CENTER in 44px container */}
+                                    <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                        <span
+                                            className={`w-5 h-5 flex items-center justify-center transition-colors ${
+                                                isCurrentActive
+                                                    ? "text-white"
+                                                    : "text-neutral-400 group-hover:text-white"
+                                            }`}
+                                        >
+                                            {item.icon}
+                                        </span>
+                                    </div>
 
                                     {/* Text label only rendered when expanded */}
                                     {isExpanded && (
-                                        <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn">
+                                        <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5">
                                             {item.label}
                                         </span>
                                     )}
@@ -384,27 +382,23 @@ export const Sidebar = ({
                                     handleItemClick(item.id);
                                     handleWorkspaceRedirection(item.name, item.url);
                                 }}
-                                className={`flex items-center h-10 rounded-2xl text-xs sm:text-sm font-medium transition-all duration-200 group cursor-pointer text-left overflow-x-hidden relative ${
-                                    isExpanded
-                                        ? "px-3 justify-between w-full"
-                                        : "w-11 h-11 mx-auto justify-center p-0"
-                                } ${
+                                className={`flex items-center h-11 rounded-2xl text-xs sm:text-sm font-medium transition-all duration-200 group cursor-pointer text-left overflow-x-hidden relative w-full ${
                                     isCurrentActive
                                         ? "bg-white/[0.1] text-white"
                                         : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
                                 }`}
                                 title={!isExpanded ? `${item.name} Workspace` : `Redirect to ${item.name} Workspace`}
                             >
-                                <div className={`flex items-center overflow-x-hidden ${isExpanded ? "gap-2.5 min-w-0" : "justify-center w-full"}`}>
-                                    {isExpanded && <span className="w-1 h-4 rounded-full bg-transparent flex-shrink-0" />}
-
-                                    {/* SVG Icon: DEAD-CENTER in 44px pill */}
-                                    <span className="w-5 h-5 flex items-center justify-center text-neutral-400 group-hover:text-white transition-colors flex-shrink-0">
-                                        {item.icon}
-                                    </span>
+                                <div className="flex items-center overflow-x-hidden w-full">
+                                    {/* SVG Icon: DEAD-CENTER in 44px container */}
+                                    <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                        <span className="w-5 h-5 flex items-center justify-center text-neutral-400 group-hover:text-white transition-colors">
+                                            {item.icon}
+                                        </span>
+                                    </div>
 
                                     {isExpanded && (
-                                        <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn">
+                                        <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5">
                                             {item.name}
                                         </span>
                                     )}
@@ -437,14 +431,12 @@ export const Sidebar = ({
                 <button
                     type="button"
                     onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                    className={`flex items-center rounded-2xl hover:bg-white/[0.05] transition-all cursor-pointer group text-left overflow-x-hidden ${
-                        isExpanded ? "w-full p-2 justify-between gap-3" : "w-11 h-11 mx-auto justify-center p-0"
-                    }`}
+                    className="w-full h-12 flex items-center rounded-2xl hover:bg-white/[0.05] transition-colors cursor-pointer group text-left overflow-x-hidden relative"
                     title={`${displayName} (${displayEmail})`}
                 >
-                    <div className={`flex items-center overflow-x-hidden ${isExpanded ? "gap-3 min-w-0 flex-1" : "justify-center w-full"}`}>
-                        {/* Circular Avatar: DEAD CENTER with glowing amber ring */}
-                        <div className="relative flex-shrink-0 w-9 h-9 flex items-center justify-center">
+                    <div className="flex items-center overflow-x-hidden w-full">
+                        {/* Circular Avatar: DEAD CENTER in 44px container with glowing amber ring */}
+                        <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
                             <img
                                 src={avatarSrc}
                                 alt={displayName}
@@ -459,7 +451,7 @@ export const Sidebar = ({
 
                         {/* Name & Email fade in */}
                         {isExpanded && (
-                            <div className="min-w-0 flex-1 overflow-x-hidden animate-fadeIn">
+                            <div className="min-w-0 flex-1 overflow-x-hidden animate-fadeIn pl-2">
                                 <h4 className="text-xs sm:text-sm font-bold text-white whitespace-nowrap truncate group-hover:text-neutral-100">
                                     {displayName}
                                 </h4>
@@ -468,15 +460,15 @@ export const Sidebar = ({
                                 </p>
                             </div>
                         )}
-                    </div>
 
-                    {isExpanded && (
-                        <div className="text-neutral-400 group-hover:text-white transition-colors p-1 flex-shrink-0">
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="6 9 12 15 18 9" />
-                            </svg>
-                        </div>
-                    )}
+                        {isExpanded && (
+                            <div className="text-neutral-400 group-hover:text-white transition-colors p-1 flex-shrink-0 pr-2 ml-auto">
+                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="6 9 12 15 18 9" />
+                                </svg>
+                            </div>
+                        )}
+                    </div>
                 </button>
 
                 {/* Profile Popup Menu */}
@@ -542,8 +534,11 @@ export const Sidebar = ({
 
     return (
         <>
-            {/* Desktop Fixed Floating Sidebar */}
-            <div className="hidden lg:block h-screen sticky top-0 p-3 sm:p-4 flex-shrink-0 z-30">
+            {/* Desktop Fixed Floating Sidebar:
+                Fixed-width placeholder rail (w-[96px] sm:w-[104px]) keeps dashboard width 100% static so UI never hangs or reflows.
+                The expanding aside floats on top (absolute top-3 left-3 z-50).
+            */}
+            <div className="hidden lg:block h-screen sticky top-0 p-3 sm:p-4 flex-shrink-0 w-[96px] sm:w-[104px] z-40 relative">
                 {sidebarContent}
             </div>
 

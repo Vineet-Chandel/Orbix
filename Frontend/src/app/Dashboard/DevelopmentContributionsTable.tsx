@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
     GitBranch,
     GitPullRequest,
@@ -7,6 +8,7 @@ import {
     Layers,
     Sparkles,
     CheckCircle2,
+    ArrowRight,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUnifiedDevelopment } from "../../store";
 import { getPortalIcon } from "../../utils/portalIcons";
@@ -98,6 +100,55 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
             return a.portal.localeCompare(b.portal);
         });
     }, [platformBreakdown]);
+    const isGitHubConnected = useMemo(() => {
+        if (platformBreakdown["github"]) return true;
+        if (connectedPortals && (connectedPortals.github || connectedPortals["GitHub"] || connectedPortals["Github"])) return true;
+        return false;
+    }, [platformBreakdown, connectedPortals]);
+
+    if (!isGitHubConnected) {
+        return (
+            <div className="w-full rounded-3xl bg-[#0c1017] text-white p-8 sm:p-12 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
+                <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                <div className="relative z-10 flex flex-col items-center justify-center text-center max-w-lg mx-auto py-8 space-y-5">
+                    <div className="w-16 h-16 rounded-3xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-xl">
+                        <GitBranch className="w-8 h-8" />
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-[11px] font-bold text-indigo-400 uppercase tracking-wider">
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>Development Field</span>
+                        </div>
+                        <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                            GitHub Profile Not Connected
+                        </h3>
+                        <p className="text-sm text-neutral-400 leading-relaxed max-w-md">
+                            Connect your GitHub profile to automatically sync your repository contributions, commits, pull requests, issues, and live 365-day development heatmaps.
+                        </p>
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+                        <Link
+                            to="/onboarding"
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-indigo-500 hover:bg-indigo-400 text-white font-extrabold text-xs shadow-lg shadow-indigo-500/20 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                        >
+                            <span>Connect GitHub Platform</span>
+                            <ArrowRight className="w-4 h-4" />
+                        </Link>
+                        <Link
+                            to="/profile"
+                            className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white/[0.06] hover:bg-white/[0.1] text-neutral-300 font-bold text-xs border border-white/10 transition-all cursor-pointer"
+                        >
+                            <span>Manage Profile</span>
+                        </Link>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full rounded-3xl bg-[#0c1017] text-white p-6 sm:p-8 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
@@ -114,15 +165,15 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                     <div>
                         <div className="flex items-center gap-2.5">
                             <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-tight">
-                                Development Contributions Activity
+                                Development Activity
                             </h3>
                             <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-[10px] font-bold text-indigo-400 uppercase tracking-wider">
                                 <Sparkles className="w-3 h-3 text-indigo-400 animate-pulse" />
-                                <span>GitHub & Dev Sync</span>
+                                <span>GitHub Development</span>
                             </span>
                         </div>
                         <p className="text-xs text-neutral-400 font-medium mt-1">
-                            Merged development contributions & commits in the last 1 year (GitHub)
+                            Merged development contributions, repositories & commits from GitHub
                         </p>
                     </div>
                 </div>

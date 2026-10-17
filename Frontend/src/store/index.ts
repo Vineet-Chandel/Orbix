@@ -3,12 +3,14 @@ import { type TypedUseSelectorHook, useDispatch, useSelector } from "react-redux
 import userReducer from "./userSlice";
 import submissionsReducer from "./submissionsSlice";
 import developmentReducer from "./developmentSlice";
+import contestsReducer from "./contestsSlice";
 
 export const store = configureStore({
     reducer: {
         user: userReducer,
         submissions: submissionsReducer,
         development: developmentReducer,
+        contests: contestsReducer,
     },
 });
 
@@ -21,3 +23,4 @@ export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
 export * from "./userSlice";
 export * from "./submissionsSlice";
 export * from "./developmentSlice";
+export * from "./contestsSlice";

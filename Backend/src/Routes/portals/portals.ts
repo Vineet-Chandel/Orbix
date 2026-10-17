@@ -2,6 +2,7 @@ import express, { type Request, type Response } from "express";
 import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
 import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
+import { calculateUserContestPerformance } from "./contestAnalytics.js";
 
 const portalsRouter = express.Router();
 
@@ -1646,6 +1647,78 @@ portalsRouter.get("/development/unified", async (req: Request, res: Response) =>
         return res.status(500).json({
             success: false,
             message: "Failed to generate unified development contributions",
+        });
+    }
+});
+
+/**
+ * Unified Contest Performance endpoint:
+ * Consolidates contest ratings, chronological history points, and official rank tiers
+ * across all connected eligible contest platforms (Codeforces, LeetCode, CodeChef, AtCoder).
+ */
+const activeContestsRefreshes = new Set<string>();
+
+portalsRouter.get("/contests", async (req: Request, res: Response) => {
+    try {
+        const username = String(req.query.username || (req as any).user?.username || "").trim();
+        if (!username) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing username parameter",
+            });
+        }
+
+        const cacheKey = `user:contests:unified:${username}`;
+        const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
+
+        // Check Redis cache first for sub-millisecond response
+        if (!forceRefresh && redis && redis.status === "ready") {
+            try {
+                const cached = await redis.get(cacheKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    res.status(200).json(parsed);
+
+                    // Background revalidation if older than 3 minutes
+                    const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
+                    if (cacheAge > 3 * 60 * 1000 && !activeContestsRefreshes.has(username)) {
+                        activeContestsRefreshes.add(username);
+                        calculateUserContestPerformance(username)
+                            .then(async (fresh) => {
+                                if (redis && redis.status === "ready") {
+                                    await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
+                                }
+                            })
+                            .catch((err) => {
+                                console.error("Background contest re-verification error:", err);
+                            })
+                            .finally(() => {
+                                activeContestsRefreshes.delete(username);
+                            });
+                    }
+                    return;
+                }
+            } catch {
+                // Non-fatal, fallback to calculating
+            }
+        }
+
+        const responseData = await calculateUserContestPerformance(username);
+
+        if (redis && redis.status === "ready") {
+            try {
+                await redis.set(cacheKey, JSON.stringify(responseData), "EX", 1800);
+            } catch {
+                // Non-fatal
+            }
+        }
+
+        return res.status(200).json(responseData);
+    } catch (err: any) {
+        console.error("Unified contests endpoint error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to generate contest analytics",
         });
     }
 });

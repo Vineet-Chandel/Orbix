@@ -101,7 +101,7 @@ export const fetchUnifiedDevelopment = createAsyncThunk<
             const effectiveUser = username.trim() || "vineet_chandel";
             const state = getState().development;
             const isLoading = state?.loadingByUser?.[effectiveUser];
-            if (isLoading) return false;
+            if (!force && isLoading) return false;
             return true;
         },
     }

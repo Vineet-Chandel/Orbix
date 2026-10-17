@@ -36,7 +36,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
     topPlatforms,
     allConnectedPlatforms,
     githubStats,
-    includeGitHub,
+    includeGitHub: _includeGitHub,
     theme,
     face,
     publicProfileUrl,

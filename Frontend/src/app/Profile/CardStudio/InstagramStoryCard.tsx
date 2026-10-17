@@ -36,7 +36,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
     topPlatforms,
     allConnectedPlatforms,
     githubStats,
-    includeGitHub,
+    includeGitHub: _includeGitHub,
     theme,
     face,
     publicProfileUrl,
