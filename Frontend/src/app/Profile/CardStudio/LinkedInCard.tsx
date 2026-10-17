@@ -4,6 +4,7 @@ import { getPortalIcon } from "../../../utils/portalIcons";
 import { OrbixCardQR } from "./OrbixCardQR";
 import { CardBannerSVG } from "./CardBannerSVG";
 import { GitHubContributionTable } from "./GitHubContributionTable";
+import { CodingSubmissionsChart } from "./CodingSubmissionsChart";
 import type { CardThemeConfig } from "./types";
 import type {
     AggregatedCodingStats,
@@ -25,6 +26,7 @@ interface LinkedInCardProps {
     face: "front" | "back";
     publicProfileUrl: string;
     cardRef?: React.RefObject<HTMLDivElement | null>;
+    connectedPortals?: Record<string, any>;
 }
 
 export const LinkedInCard: React.FC<LinkedInCardProps> = ({
@@ -39,6 +41,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
     face,
     publicProfileUrl,
     cardRef,
+    connectedPortals,
 }) => {
     const displayName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "Developer";
     const username = user?.username || "developer";
@@ -64,6 +67,12 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
     });
 
     const displayUrl = publicProfileUrl.replace(/^https?:\/\//, "");
+
+    const isLightBanner = theme.id === "gold";
+    const bannerTextColor = isLightBanner ? "text-black" : "text-white";
+    const bannerSubtextColor = isLightBanner ? "text-black/75" : "text-white/80";
+    const bannerFill = isLightBanner ? "black" : "white";
+    const bannerStroke = isLightBanner ? "black" : "white";
 
     return (
         <div
@@ -263,30 +272,14 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
 
                         {/* Two Columns Dashboard Content - Full Height Rich Blocks */}
                         <div className="grid grid-cols-12 gap-5 mt-3 flex-1 items-stretch">
-                            {/* Left Column (7 cols): Coder Type + 4 Stats Tiles */}
+                            {/* Left Column (7 cols): Coding Submissions Heatmap + 4 Stats Tiles */}
                             <div className="col-span-7 flex flex-col justify-between space-y-3">
-                                {/* Coder Type Card */}
-                                <div className="rounded-2xl p-4.5 bg-gradient-to-br from-[#161f2e] via-[#121824] to-[#0e131d] border border-white/10 shadow-xl flex items-center gap-4 flex-1">
-                                    <div
-                                        className="w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 text-black font-black shadow-lg"
-                                        style={{ backgroundColor: coderType.badgeColor }}
-                                    >
-                                        <svg className="w-7 h-7 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                                        </svg>
-                                    </div>
-                                    <div className="min-w-0">
-                                        <span className="text-[11px] font-black tracking-widest uppercase text-amber-400 block">
-                                            CODER ARCHETYPE
-                                        </span>
-                                        <h3 className="text-xl font-black text-white tracking-tight leading-snug truncate mt-0.5">
-                                            {coderType.title}
-                                        </h3>
-                                        <p className="text-xs text-neutral-300 truncate mt-0.5 leading-relaxed">
-                                            {user?.bio || coderType.tagline}
-                                        </p>
-                                    </div>
-                                </div>
+                                {/* Coding Submissions Chart (4-Month Multi-Platform Submissions, excl. GitHub) */}
+                                <CodingSubmissionsChart
+                                    connectedPortals={connectedPortals || {}}
+                                    username={username}
+                                    variant="linkedin"
+                                />
 
                                 {/* 4 Key Stats Row */}
                                 <div className="grid grid-cols-4 gap-3">

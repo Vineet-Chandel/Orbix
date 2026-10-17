@@ -327,6 +327,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                                 theme={themeConfig}
                                 face={face}
                                 publicProfileUrl={publicProfileUrl}
+                                connectedPortals={connectedPortals}
                             />
                         ) : (
                             <InstagramStoryCard
@@ -340,6 +341,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                                 theme={themeConfig}
                                 face={face}
                                 publicProfileUrl={publicProfileUrl}
+                                connectedPortals={connectedPortals}
                             />
                         )}
                     </div>
@@ -398,6 +400,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                             theme={themeConfig}
                             face={face}
                             publicProfileUrl={publicProfileUrl}
+                            connectedPortals={connectedPortals}
                         />
                     ) : (
                         <InstagramStoryCard
@@ -411,6 +414,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                             theme={themeConfig}
                             face={face}
                             publicProfileUrl={publicProfileUrl}
+                            connectedPortals={connectedPortals}
                         />
                     )}
                 </div>

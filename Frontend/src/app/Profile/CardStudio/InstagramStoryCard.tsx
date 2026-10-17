@@ -4,6 +4,7 @@ import { getPortalIcon } from "../../../utils/portalIcons";
 import { OrbixCardQR } from "./OrbixCardQR";
 import { CardBannerSVG } from "./CardBannerSVG";
 import { GitHubContributionTable } from "./GitHubContributionTable";
+import { CodingSubmissionsChart } from "./CodingSubmissionsChart";
 import type { CardThemeConfig } from "./types";
 import type {
     AggregatedCodingStats,
@@ -25,6 +26,7 @@ interface InstagramStoryCardProps {
     face: "front" | "back";
     publicProfileUrl: string;
     cardRef?: React.RefObject<HTMLDivElement | null>;
+    connectedPortals?: Record<string, any>;
 }
 
 export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
@@ -39,6 +41,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
     face,
     publicProfileUrl,
     cardRef,
+    connectedPortals,
 }) => {
     const displayName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "Developer";
     const username = user?.username || "developer";
@@ -189,28 +192,12 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                             </div>
                         </div>
 
-                        {/* Coder Type Featured Banner */}
-                        <div className="rounded-3xl p-8 bg-gradient-to-r from-[#17202d] via-[#121822] to-[#17202d] border border-white/10 shadow-2xl flex items-center gap-7 relative overflow-hidden">
-                            <div
-                                className="w-20 h-20 rounded-2xl flex items-center justify-center flex-shrink-0 text-black font-black shadow-xl"
-                                style={{ backgroundColor: coderType.badgeColor }}
-                            >
-                                <svg className="w-10 h-10 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                                </svg>
-                            </div>
-                            <div className="min-w-0">
-                                <span className="text-sm font-black tracking-widest uppercase text-amber-400 block mb-0.5">
-                                    CODER ARCHETYPE
-                                </span>
-                                <h3 className="text-3xl font-black text-white tracking-tight leading-tight">
-                                    {coderType.title}
-                                </h3>
-                                <p className="text-xl text-neutral-300 mt-1 leading-relaxed">
-                                    {user?.bio || coderType.tagline}
-                                </p>
-                            </div>
-                        </div>
+                        {/* Coding Submissions Chart (4-Month Multi-Platform Submissions, excl. GitHub) */}
+                        <CodingSubmissionsChart
+                            connectedPortals={connectedPortals || {}}
+                            username={username}
+                            variant="story"
+                        />
 
                         {/* 4 Core Metrics Grid */}
                         <div className="grid grid-cols-4 gap-4.5">

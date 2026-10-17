@@ -599,6 +599,14 @@ export function getAllConnectedPlatforms(
         }
     }
 
+    // Sort platforms series from largest number of submissions/solved to lowest
+    list.sort((a, b) => {
+        const countA = a.solvedCount || 0;
+        const countB = b.solvedCount || 0;
+        if (countB !== countA) return countB - countA;
+        return a.name.localeCompare(b.name);
+    });
+
     return list;
 }
 

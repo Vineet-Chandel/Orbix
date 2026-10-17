@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAppDispatch, useAppSelector, clearUser, fetchUserProfile } from "../../store";
 import { Sidebar, type SidebarTab } from "./Sidebar";
 import { usePlatformSync } from "../../hooks/usePlatformSync";
+import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
+import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
 
 export default function Dashboard() {
     const location = useLocation();
@@ -326,6 +328,22 @@ export default function Dashboard() {
                                     <span>→</span>
                                 </Link>
                             </div>
+                        </div>
+
+                        {/* Unified Multi-Platform Coding Submissions Contribution Table (Excluding GitHub) */}
+                        <div className="w-full">
+                            <CodingSubmissionsTable
+                                connectedPortals={connectedPortals}
+                                username={user?.username || "vineet_chandel"}
+                            />
+                        </div>
+
+                        {/* Unified Development Contributions Table (GitHub & Development Platforms) */}
+                        <div className="w-full">
+                            <DevelopmentContributionsTable
+                                connectedPortals={connectedPortals}
+                                username={user?.username || "vineet_chandel"}
+                            />
                         </div>
 
                         {/* Quick Hub Navigation Card */}
