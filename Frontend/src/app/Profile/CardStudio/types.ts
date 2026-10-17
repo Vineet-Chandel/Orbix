@@ -1,6 +1,6 @@
 export type CardFormat = "linkedin" | "instagram";
 export type CardFace = "front" | "back";
-export type CardThemeId = "gold" | "indigo" | "emerald" | "ruby" | "slate";
+export type CardThemeId = "indigo" | "gold" | "emerald" | "ruby" | "slate";
 
 export interface CardThemeConfig {
     id: CardThemeId;
@@ -14,16 +14,6 @@ export interface CardThemeConfig {
 }
 
 export const CARD_THEMES: Record<CardThemeId, CardThemeConfig> = {
-    gold: {
-        id: "gold",
-        name: "Obsidian Gold",
-        bannerGradient: "from-amber-400 via-amber-500 to-yellow-600",
-        bannerPatternColor: "rgba(0,0,0,0.08)",
-        accentColor: "#F59E0B",
-        badgeBg: "rgba(245, 158, 11, 0.15)",
-        badgeText: "#FBBF24",
-        borderGlow: "rgba(245, 158, 11, 0.25)",
-    },
     indigo: {
         id: "indigo",
         name: "Midnight Indigo",
@@ -33,6 +23,16 @@ export const CARD_THEMES: Record<CardThemeId, CardThemeConfig> = {
         badgeBg: "rgba(99, 102, 241, 0.15)",
         badgeText: "#818CF8",
         borderGlow: "rgba(99, 102, 241, 0.25)",
+    },
+    gold: {
+        id: "gold",
+        name: "Obsidian Gold",
+        bannerGradient: "from-amber-400 via-amber-500 to-yellow-600",
+        bannerPatternColor: "rgba(0,0,0,0.08)",
+        accentColor: "#F59E0B",
+        badgeBg: "rgba(245, 158, 11, 0.15)",
+        badgeText: "#FBBF24",
+        borderGlow: "rgba(245, 158, 11, 0.25)",
     },
     emerald: {
         id: "emerald",
@@ -77,7 +77,7 @@ export interface CardCustomizationSettings {
 export const DEFAULT_CARD_SETTINGS: CardCustomizationSettings = {
     format: "linkedin",
     face: "front",
-    theme: "gold",
+    theme: "indigo",
     includeGitHub: false,
     selectedPlatforms: [],
 };

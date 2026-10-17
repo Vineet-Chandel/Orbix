@@ -1,6 +1,8 @@
 import React from "react";
 import { CARD_THEMES } from "./types";
 import type { CardFormat, CardFace, CardThemeId } from "./types";
+import type { RankedPlatform } from "../../../utils/cardStatsAggregator";
+import { getPortalIcon } from "../../../utils/portalIcons";
 
 interface CardCustomizerToolbarProps {
     format: CardFormat;
@@ -17,6 +19,17 @@ interface CardCustomizerToolbarProps {
     isExporting: boolean;
     onCopyLink: () => void;
     connectedPlatformCount: number;
+
+    // Dynamic Slot Customization Props
+    maxSlots: number;
+    availablePlatforms: RankedPlatform[];
+    currentSlotIds: string[];
+    onSlotChange: (slotIndex: number, platformId: string) => void;
+    onSwapSlots: (indexA: number, indexB: number) => void;
+    onRemoveSlot: (slotIndex: number) => void;
+    onTogglePlatform: (platformId: string) => void;
+    onResetSlots: () => void;
+    isCustomized: boolean;
 }
 
 export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
@@ -34,6 +47,15 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
     isExporting,
     onCopyLink,
     connectedPlatformCount,
+    maxSlots,
+    availablePlatforms,
+    currentSlotIds,
+    onSlotChange,
+    onSwapSlots,
+    onRemoveSlot,
+    onTogglePlatform,
+    onResetSlots,
+    isCustomized,
 }) => {
     return (
         <div className="space-y-4">
@@ -162,7 +184,7 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                         title={
                             !isGitHubConnected
                                 ? "Connect GitHub in the Platforms section below to include stats"
-                                : "Toggle GitHub stats on front card"
+                                : "Toggle GitHub stats on card"
                         }
                     >
                         <input
@@ -184,14 +206,184 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                 </div>
             </div>
 
+            {/* ========================================================================= */}
+            {/* DYNAMIC SHOWCASED PLATFORM SLOTS (User Customizer) */}
+            {/* ========================================================================= */}
+            <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200/70 space-y-3">
+                <div className="flex items-center justify-between pb-1">
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-neutral-900 uppercase tracking-wider">
+                                Showcased Platform Slots
+                            </span>
+                            {isCustomized ? (
+                                <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 border border-indigo-200">
+                                    Customized
+                                </span>
+                            ) : (
+                                <span className="text-[10px] font-medium text-neutral-500">
+                                    (Auto Top Ranked)
+                                </span>
+                            )}
+                        </div>
+                        <p className="text-[11px] text-neutral-500 mt-0.5">
+                            {format === "linkedin"
+                                ? "Customize which 3 platforms appear on your LinkedIn Card."
+                                : "Customize which 5 platforms appear on your Story Card."}
+                        </p>
+                    </div>
+
+                    {isCustomized && (
+                        <button
+                            type="button"
+                            onClick={onResetSlots}
+                            title="Reset platform slots back to auto-ranked top problem counts"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-100 border border-neutral-300 rounded-lg shadow-2xs transition-all cursor-pointer"
+                        >
+                            <svg className="w-3 h-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <span>Reset Auto</span>
+                        </button>
+                    )}
+                </div>
+
+                {/* Individual Slot Selectors */}
+                <div className="space-y-2">
+                    {Array.from({ length: maxSlots }).map((_, slotIdx) => {
+                        const currentId = currentSlotIds[slotIdx] || "";
+                        const selectedPlat = availablePlatforms.find((p) => p.id === currentId);
+
+                        return (
+                            <div
+                                key={slotIdx}
+                                className="flex items-center gap-2 bg-white p-2 rounded-lg border border-neutral-200 shadow-2xs"
+                            >
+                                {/* Slot Badge */}
+                                <div className="flex items-center gap-1.5 w-16 flex-shrink-0">
+                                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                                    <span className="text-[11px] font-black text-neutral-700 tracking-wider">
+                                        Slot {slotIdx + 1}
+                                    </span>
+                                </div>
+
+                                {/* Platform Dropdown Selector */}
+                                <div className="flex-1 min-w-0 relative">
+                                    <select
+                                        value={currentId}
+                                        onChange={(e) => onSlotChange(slotIdx, e.target.value)}
+                                        className="w-full text-xs font-semibold bg-neutral-50 hover:bg-neutral-100 focus:bg-white text-neutral-800 border border-neutral-200 focus:border-neutral-900 rounded-md py-1.5 pl-2.5 pr-7 outline-none cursor-pointer truncate transition-colors"
+                                    >
+                                        <option value="">— Empty / Select Platform —</option>
+                                        {availablePlatforms.map((plat) => {
+                                            const isSelectedElsewhere = currentSlotIds.some(
+                                                (id, idx) => idx !== slotIdx && id === plat.id
+                                            );
+                                            const label = plat.isGitHub
+                                                ? `GitHub (${plat.publicRepos ?? 0} repos, ${plat.contributionsOrCommits ?? 0} commits)`
+                                                : plat.solvedCount > 0
+                                                ? `${plat.name} (${plat.solvedCount} solved)`
+                                                : `${plat.name} (@${plat.username})`;
+
+                                            return (
+                                                <option key={plat.id} value={plat.id}>
+                                                    {label} {isSelectedElsewhere ? "(Swap)" : ""}
+                                                </option>
+                                            );
+                                        })}
+                                    </select>
+                                </div>
+
+                                {/* Reorder Controls: Move Up / Move Down */}
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                    <button
+                                        type="button"
+                                        disabled={slotIdx === 0}
+                                        onClick={() => onSwapSlots(slotIdx, slotIdx - 1)}
+                                        title="Move slot up"
+                                        className="w-6 h-6 flex items-center justify-center rounded text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                    >
+                                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        disabled={slotIdx === maxSlots - 1}
+                                        onClick={() => onSwapSlots(slotIdx, slotIdx + 1)}
+                                        title="Move slot down"
+                                        className="w-6 h-6 flex items-center justify-center rounded text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                    >
+                                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+
+                                    {/* Clear / Delete Slot Button */}
+                                    <button
+                                        type="button"
+                                        disabled={!currentId}
+                                        onClick={() => onRemoveSlot(slotIdx)}
+                                        title="Remove platform from this slot"
+                                        className="w-6 h-6 flex items-center justify-center rounded text-neutral-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                    >
+                                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* Quick 1-Click Platform Toggle Chips */}
+                <div className="pt-1">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                        Quick Add / Remove Platforms:
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        {availablePlatforms.map((plat) => {
+                            const isPresent = currentSlotIds.includes(plat.id);
+                            return (
+                                <button
+                                    key={plat.id}
+                                    type="button"
+                                    onClick={() => onTogglePlatform(plat.id)}
+                                    title={isPresent ? `Remove ${plat.name} from card` : `Add ${plat.name} to card`}
+                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                        isPresent
+                                            ? "bg-neutral-900 text-white shadow-2xs hover:bg-neutral-800"
+                                            : "bg-white text-neutral-700 hover:bg-neutral-100 border border-neutral-300 hover:border-neutral-400"
+                                    }`}
+                                >
+                                    <div className="w-3.5 h-3.5 flex items-center justify-center flex-shrink-0">
+                                        {getPortalIcon(plat.id, "w-full h-full object-contain")}
+                                    </div>
+                                    <span>{plat.name}</span>
+                                    {plat.solvedCount > 0 && !plat.isGitHub && (
+                                        <span className={`text-[10px] font-mono ${isPresent ? "text-neutral-300" : "text-neutral-500"}`}>
+                                            ({plat.solvedCount})
+                                        </span>
+                                    )}
+                                    <span className="text-[10px] font-bold">
+                                        {isPresent ? "✕" : "+"}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
             {/* Platform count info indicator */}
             <div className="flex items-center justify-between text-xs text-neutral-500 px-1">
                 <span>
-                    Showing{" "}
+                    Displaying{" "}
                     <strong className="text-neutral-800 font-bold">
-                        {Math.min(format === "linkedin" ? 3 : 5, connectedPlatformCount)}
+                        {currentSlotIds.filter(Boolean).length}
                     </strong>{" "}
-                    of {connectedPlatformCount} connected coding platforms
+                    of {availablePlatforms.length} connected platforms
                 </span>
                 <span className="text-[11px] text-neutral-400">
                     {format === "linkedin" ? "1200 × 627 px" : "1080 × 1920 px (9:16)"}

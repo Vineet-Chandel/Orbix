@@ -6,8 +6,10 @@ import type { CardFormat, CardFace, CardThemeId } from "./types";
 import {
     aggregateCodingStats,
     getCoderType,
-    rankTopCodingPlatforms,
+    getAvailableCardPlatforms,
+    resolveShowcasedPlatforms,
     extractGitHubStats,
+    getAllConnectedPlatforms,
 } from "../../../utils/cardStatsAggregator";
 import { LinkedInCard } from "./LinkedInCard";
 import { InstagramStoryCard } from "./InstagramStoryCard";
@@ -27,8 +29,9 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
     // Studio Customization State
     const [format, setFormat] = useState<CardFormat>("linkedin");
     const [face, setFace] = useState<CardFace>("front");
-    const [themeId, setThemeId] = useState<CardThemeId>("gold");
+    const [themeId, setThemeId] = useState<CardThemeId>("indigo");
     const [includeGitHub, setIncludeGitHub] = useState(false);
+    const [customSlots, setCustomSlots] = useState<string[]>([]);
     const [isExporting, setIsExporting] = useState(false);
 
     // Dynamic scale measurement for preview
@@ -62,17 +65,122 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
         };
     }, []);
 
+    const maxSlots = format === "linkedin" ? 3 : 5;
+
     // Multi-Platform Coding Analytics
+    const userFallback = user?.username || "Vineet-Chandel";
     const stats = useMemo(() => aggregateCodingStats(connectedPortals), [connectedPortals]);
     const coderType = useMemo(() => getCoderType(stats.totalSolved), [stats.totalSolved]);
-    const topPlatforms = useMemo(() => rankTopCodingPlatforms(connectedPortals), [connectedPortals]);
-    const githubStats = useMemo(() => extractGitHubStats(connectedPortals), [connectedPortals]);
+    const availablePlatforms = useMemo(() => getAvailableCardPlatforms(connectedPortals, userFallback), [connectedPortals, userFallback]);
+    const allConnectedPlatforms = useMemo(() => getAllConnectedPlatforms(connectedPortals), [connectedPortals]);
+    const githubStats = useMemo(() => extractGitHubStats(connectedPortals, userFallback), [connectedPortals, userFallback]);
 
     const isGitHubConnected = Boolean(
-        connectedPortals.github?.connected || connectedPortals.github?.username
+        connectedPortals.github?.connected || connectedPortals.github?.username || githubStats.connected
     );
 
-    const themeConfig = CARD_THEMES[themeId] || CARD_THEMES.gold;
+    // Dynamic Platform Slot Resolution
+    const showcasedPlatforms = useMemo(
+        () => resolveShowcasedPlatforms(connectedPortals, customSlots, maxSlots, includeGitHub, userFallback),
+        [connectedPortals, customSlots, maxSlots, includeGitHub, userFallback]
+    );
+
+    // The current slot IDs matching the showcased platforms
+    const currentSlotIds = useMemo(() => {
+        const ids: string[] = [];
+        for (let i = 0; i < maxSlots; i++) {
+            ids.push(showcasedPlatforms[i]?.id || "");
+        }
+        return ids;
+    }, [showcasedPlatforms, maxSlots]);
+
+    const isCustomized = customSlots.length > 0;
+
+    // Slot Management Handlers
+    const handleSlotChange = (slotIndex: number, newPlatformId: string) => {
+        const next = [...currentSlotIds];
+        if (newPlatformId) {
+            const existingIdx = next.indexOf(newPlatformId);
+            if (existingIdx !== -1 && existingIdx !== slotIndex) {
+                next[existingIdx] = next[slotIndex];
+            }
+            next[slotIndex] = newPlatformId;
+        } else {
+            next[slotIndex] = "";
+        }
+        const filtered = next.filter(Boolean);
+        setCustomSlots(filtered);
+
+        if (newPlatformId === "github") {
+            setIncludeGitHub(true);
+        } else if (currentSlotIds[slotIndex] === "github" && !filtered.includes("github")) {
+            setIncludeGitHub(false);
+        }
+    };
+
+    const handleSwapSlots = (indexA: number, indexB: number) => {
+        if (indexA < 0 || indexA >= maxSlots || indexB < 0 || indexB >= maxSlots) return;
+        const next = [...currentSlotIds];
+        const temp = next[indexA];
+        next[indexA] = next[indexB];
+        next[indexB] = temp;
+        setCustomSlots(next.filter(Boolean));
+    };
+
+    const handleRemoveSlot = (slotIndex: number) => {
+        const removedId = currentSlotIds[slotIndex];
+        const next = currentSlotIds.filter((_, idx) => idx !== slotIndex);
+        setCustomSlots(next.filter(Boolean));
+        if (removedId === "github") {
+            setIncludeGitHub(false);
+        }
+    };
+
+    const handleTogglePlatform = (platformId: string) => {
+        if (currentSlotIds.includes(platformId)) {
+            // Remove
+            const next = currentSlotIds.filter((id) => id !== platformId);
+            setCustomSlots(next);
+            if (platformId === "github") {
+                setIncludeGitHub(false);
+            }
+        } else {
+            // Add
+            const next = [...currentSlotIds.filter(Boolean)];
+            if (next.length < maxSlots) {
+                next.push(platformId);
+            } else {
+                next[maxSlots - 1] = platformId;
+            }
+            setCustomSlots(next);
+            if (platformId === "github") {
+                setIncludeGitHub(true);
+            }
+        }
+    };
+
+    const handleResetSlots = () => {
+        setCustomSlots([]);
+    };
+
+    const handleToggleGitHub = (checked: boolean) => {
+        setIncludeGitHub(checked);
+        if (customSlots.length > 0) {
+            if (checked && !customSlots.includes("github")) {
+                const next = [...customSlots];
+                if (next.length >= maxSlots) {
+                    next[maxSlots - 1] = "github";
+                } else {
+                    next.push("github");
+                }
+                setCustomSlots(next);
+            } else if (!checked && customSlots.includes("github")) {
+                setCustomSlots(customSlots.filter((id) => id !== "github"));
+            }
+        }
+    };
+
+    const themeConfig = CARD_THEMES[themeId] || CARD_THEMES.indigo;
     const publicProfileUrl = `${window.location.origin}/profile/${encodeURIComponent(user?.username || "")}`;
 
     // Flip handler
@@ -212,28 +320,26 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                                 user={user}
                                 stats={stats}
                                 coderType={coderType}
-                                topPlatforms={topPlatforms}
+                                topPlatforms={showcasedPlatforms}
+                                allConnectedPlatforms={allConnectedPlatforms}
                                 githubStats={githubStats}
                                 includeGitHub={includeGitHub}
                                 theme={themeConfig}
                                 face={face}
                                 publicProfileUrl={publicProfileUrl}
-                                onFlip={handleFlip}
-                                showFlipButton={true}
                             />
                         ) : (
                             <InstagramStoryCard
                                 user={user}
                                 stats={stats}
                                 coderType={coderType}
-                                topPlatforms={topPlatforms}
+                                topPlatforms={showcasedPlatforms}
+                                allConnectedPlatforms={allConnectedPlatforms}
                                 githubStats={githubStats}
                                 includeGitHub={includeGitHub}
                                 theme={themeConfig}
                                 face={face}
                                 publicProfileUrl={publicProfileUrl}
-                                onFlip={handleFlip}
-                                showFlipButton={true}
                             />
                         )}
                     </div>
@@ -250,12 +356,21 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                 themeId={themeId}
                 onThemeChange={setThemeId}
                 includeGitHub={includeGitHub}
-                onToggleGitHub={setIncludeGitHub}
+                onToggleGitHub={handleToggleGitHub}
                 isGitHubConnected={isGitHubConnected}
                 onDownload={handleDownload}
                 isExporting={isExporting}
                 onCopyLink={handleCopyLink}
-                connectedPlatformCount={topPlatforms.length}
+                connectedPlatformCount={availablePlatforms.length}
+                maxSlots={maxSlots}
+                availablePlatforms={availablePlatforms}
+                currentSlotIds={currentSlotIds}
+                onSlotChange={handleSlotChange}
+                onSwapSlots={handleSwapSlots}
+                onRemoveSlot={handleRemoveSlot}
+                onTogglePlatform={handleTogglePlatform}
+                onResetSlots={handleResetSlots}
+                isCustomized={isCustomized}
             />
 
             {/* Hidden Offscreen Node at Exact Native Dimensions for Clean High-Res Export */}
@@ -276,26 +391,26 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                             user={user}
                             stats={stats}
                             coderType={coderType}
-                            topPlatforms={topPlatforms}
+                            topPlatforms={showcasedPlatforms}
+                            allConnectedPlatforms={allConnectedPlatforms}
                             githubStats={githubStats}
                             includeGitHub={includeGitHub}
                             theme={themeConfig}
                             face={face}
                             publicProfileUrl={publicProfileUrl}
-                            showFlipButton={false}
                         />
                     ) : (
                         <InstagramStoryCard
                             user={user}
                             stats={stats}
                             coderType={coderType}
-                            topPlatforms={topPlatforms}
+                            topPlatforms={showcasedPlatforms}
+                            allConnectedPlatforms={allConnectedPlatforms}
                             githubStats={githubStats}
                             includeGitHub={includeGitHub}
                             theme={themeConfig}
                             face={face}
                             publicProfileUrl={publicProfileUrl}
-                            showFlipButton={false}
                         />
                     )}
                 </div>

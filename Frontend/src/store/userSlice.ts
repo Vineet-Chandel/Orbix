@@ -78,11 +78,17 @@ export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | voi
 
             for (const url of endpoints) {
                 try {
+                    const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
+                    const headers: Record<string, string> = {
+                        "Content-Type": "application/json",
+                    };
+                    if (token) {
+                        headers["Authorization"] = `Bearer ${token}`;
+                    }
+
                     const response = await fetch(url, {
                         method: "GET",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
+                        headers,
                         credentials: "include",
                     });
 

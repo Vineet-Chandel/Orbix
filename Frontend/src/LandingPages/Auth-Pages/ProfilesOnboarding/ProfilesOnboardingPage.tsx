@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../../utils/portalParser";
 import { PortalProfileInput } from "../PortalProfileInput";
@@ -6,6 +6,7 @@ import type { PortalProfileData } from "../PortalProfileCard";
 import { useAppDispatch, useAppSelector, setPortalProfiles } from "../../../store";
 import { useToast } from "../../../context/ToastContext";
 import { Sidebar } from "../../../app/Dashboard/Sidebar";
+import { disconnectPlatform } from "../../../utils/profileApi";
 
 type CategoryFilter = "all" | "cp" | "practice" | "dev";
 
@@ -60,16 +61,112 @@ export default function ProfilesOnboardingPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isMobileBucketOpen, setIsMobileBucketOpen] = useState(false);
 
+    // Refs for dirty state tracking (production-level change detection)
+    const initialConnectedProfilesRef = useRef<Record<string, PortalProfileData>>({ ...connectedProfiles });
+    const initialPortalValuesRef = useRef<Record<string, string>>({ ...portalValues });
+    const deletedPortalsRef = useRef<Set<string>>(new Set());
+    const userInteractedRef = useRef<boolean>(false);
+
+    // Fetch initial saved links from backend on mount if authenticated and user hasn't interacted
+    useEffect(() => {
+        let isMounted = true;
+        const loadSavedFromBackend = async () => {
+            try {
+                const token = localStorage.getItem("orbix_token") || "";
+                const headers: Record<string, string> = { "Content-Type": "application/json" };
+                if (token) headers["Authorization"] = `Bearer ${token}`;
+
+                const endpoints = ["/api/portals/save", "http://localhost:3000/api/portals/save"];
+                let serverLinks: any[] = [];
+
+                for (const url of endpoints) {
+                    try {
+                        const res = await fetch(url, {
+                            method: "GET",
+                            headers,
+                            credentials: "include",
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data && data.success && Array.isArray(data.links)) {
+                                serverLinks = data.links;
+                                break;
+                            }
+                        }
+                    } catch {
+                        // try next endpoint
+                    }
+                }
+
+                if (serverLinks.length > 0 && isMounted && !userInteractedRef.current) {
+                    const loadedProfiles: Record<string, PortalProfileData> = {};
+                    for (const link of serverLinks) {
+                        const pId = String(link.portal || "").toLowerCase();
+                        if (!pId) continue;
+
+                        let parsedStats: any[] = [];
+                        try {
+                            parsedStats = Array.isArray(link.stats)
+                                ? link.stats
+                                : JSON.parse(link.stats || "[]");
+                        } catch {
+                            parsedStats = [];
+                        }
+
+                        const pUsername = link.portal_username || link.username || "";
+                        const pName = link.display_name || pUsername;
+
+                        loadedProfiles[pId] = {
+                            success: true,
+                            portal: pId,
+                            username: pUsername,
+                            name: pName,
+                            avatar: link.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=0D8BD9&color=fff&size=80&bold=true`,
+                            stats: parsedStats,
+                            profileUrl: link.link || "",
+                            verified: link.verified !== false,
+                        };
+                    }
+
+                    if (Object.keys(loadedProfiles).length > 0) {
+                        setConnectedProfiles((prev) => {
+                            const merged = { ...loadedProfiles, ...prev };
+                            initialConnectedProfilesRef.current = { ...merged };
+                            try {
+                                localStorage.setItem("orbix_connected_portals", JSON.stringify(merged));
+                            } catch {
+                                // ignore
+                            }
+                            return merged;
+                        });
+                    }
+                }
+            } catch {
+                // Non-fatal fallback
+            }
+        };
+
+        loadSavedFromBackend();
+
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
     const handleInputChange = (portalId: string, raw: string, judgment: JudgmentResult) => {
+        userInteractedRef.current = true;
         setPortalValues((prev) => ({ ...prev, [portalId]: raw }));
         setJudgments((prev) => ({ ...prev, [portalId]: judgment }));
     };
 
     // When the user taps "Yes, connect":
-    // 1. Move the profile into the Connected Bucket
+    // 1. Move the profile into the Connected Bucket on the right
     // 2. Cache its profile data and retain its input link/username
-    // 3. Remove from the available portal list below
+    // 3. Remove from the available portal list on the left
     const handleConnectProfile = (portalId: string, data: PortalProfileData) => {
+        userInteractedRef.current = true;
+        deletedPortalsRef.current.delete(portalId);
+
         setRecentProfilesHistory((prev) => ({ ...prev, [portalId]: data }));
 
         const currentInput = portalValues[portalId]?.trim();
@@ -93,10 +190,16 @@ export default function ProfilesOnboardingPage() {
     };
 
     // When the user taps the cross (X) in the bucket:
-    // 1. Remove from connectedProfiles (bucket)
-    // 2. Return to the list below in the "disconnect stage" (with username/link shown and preview card with "Yes, connect" button)
-    // 3. The field DOES NOT vanish!
+    // 1. Remove from connectedProfiles (bucket on the right)
+    // 2. Return to the list on the left in the "disconnect stage"
+    // 3. Mark for backend deletion upon save if it was previously saved
     const handleDisconnectProfile = (portalId: string) => {
+        userInteractedRef.current = true;
+
+        if (initialConnectedProfilesRef.current[portalId]) {
+            deletedPortalsRef.current.add(portalId);
+        }
+
         const profile = connectedProfiles[portalId] || recentProfilesHistory[portalId];
         const existingInput = portalValues[portalId]?.trim();
         const restoredValue = existingInput || profile?.profileUrl || profile?.username || "";
@@ -143,7 +246,7 @@ export default function ProfilesOnboardingPage() {
         });
     }, [activeCategory, searchQuery]);
 
-    // Available portals: Portals that are NOT yet in the bucket (connected portals are removed from this list!)
+    // Available portals: Portals that are NOT yet in the bucket
     const availablePortalList = useMemo(() => {
         return portalList.filter((portal) => !connectedProfiles[portal.id]);
     }, [portalList, connectedProfiles]);
@@ -153,51 +256,101 @@ export default function ProfilesOnboardingPage() {
         return Object.keys(connectedProfiles).length;
     }, [connectedProfiles]);
 
-    const handleSave = async () => {
-        setIsSaving(true);
-        const resolvedProfiles: Record<string, { raw: string; username: string; url: string }> = {};
+    // Robust Dirty State Tracking:
+    // Returns true ONLY when an addition, edit, or deletion actually occurred
+    const isDirty = useMemo(() => {
+        // 1. Pending deletions
+        if (deletedPortalsRef.current.size > 0) return true;
 
-        // Merge connected profiles and valid inputs
-        for (const [key, profile] of Object.entries(connectedProfiles)) {
-            resolvedProfiles[key] = {
-                raw: profile.username,
-                username: profile.username,
-                url: profile.profileUrl,
-            };
+        // 2. Compare connected profiles against initial snapshot
+        const initial = initialConnectedProfilesRef.current;
+        const currentKeys = Object.keys(connectedProfiles);
+        const initialKeys = Object.keys(initial);
+
+        if (currentKeys.length !== initialKeys.length) return true;
+
+        for (const key of currentKeys) {
+            if (!initial[key]) return true;
+            if (initial[key].username !== connectedProfiles[key].username) return true;
         }
 
+        // 3. New valid unconnected inputs that differ from initial
         for (const [key, val] of Object.entries(portalValues)) {
-            if (val.trim() && !resolvedProfiles[key]) {
-                const judgment = judgments[key];
-                if (judgment && judgment.isValid) {
-                    resolvedProfiles[key] = {
-                        raw: val.trim(),
-                        username: judgment.username,
-                        url: judgment.normalizedUrl,
-                    };
-                }
+            const initialVal = initialPortalValuesRef.current[key] || "";
+            if (val.trim() && val.trim() !== initialVal.trim()) {
+                const j = judgments[key];
+                if (j && j.isValid) return true;
             }
         }
 
-        // Persist to Redux and LocalStorage
-        dispatch(setPortalProfiles(resolvedProfiles));
+        return false;
+    }, [connectedProfiles, portalValues, judgments]);
 
-        // Persist to Backend API with correct user_id, username, and auth headers
+    const handleSave = async () => {
+        // Production-level check:
+        // If there are NO additions, edits, or deletions, do NOT fire the API!
+        // Immediately navigate to the dashboard without network overhead.
+        if (!isDirty) {
+            navigate("/dashboard");
+            return;
+        }
+
+        setIsSaving(true);
+
         try {
+            const authToken = localStorage.getItem("orbix_token") || "";
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (authToken) {
+                headers["Authorization"] = `Bearer ${authToken}`;
+            }
+
+            // 1. Process pending platform deletions on the backend
+            if (deletedPortalsRef.current.size > 0) {
+                const portalsToDelete = Array.from(deletedPortalsRef.current);
+                await Promise.allSettled(
+                    portalsToDelete.map((p) => disconnectPlatform(p).catch(() => null))
+                );
+                deletedPortalsRef.current.clear();
+            }
+
+            // 2. Resolve final profiles to save
+            const resolvedProfiles: Record<string, { raw: string; username: string; url: string }> = {};
+
+            for (const [key, profile] of Object.entries(connectedProfiles)) {
+                resolvedProfiles[key] = {
+                    raw: profile.username,
+                    username: profile.username,
+                    url: profile.profileUrl,
+                };
+            }
+
+            for (const [key, val] of Object.entries(portalValues)) {
+                if (val.trim() && !resolvedProfiles[key]) {
+                    const judgment = judgments[key];
+                    if (judgment && judgment.isValid) {
+                        resolvedProfiles[key] = {
+                            raw: val.trim(),
+                            username: judgment.username,
+                            url: judgment.normalizedUrl,
+                        };
+                    }
+                }
+            }
+
+            // Persist to Redux and LocalStorage
+            dispatch(setPortalProfiles(resolvedProfiles));
+            localStorage.setItem("orbix_connected_portals", JSON.stringify(connectedProfiles));
+            window.dispatchEvent(new Event("orbix_portals_updated"));
+
+            // 3. Persist to Backend API with correct user_id, username, and auth headers
             const activeUser = user || (() => {
                 try {
                     const stored = localStorage.getItem("orbix_user");
                     return stored ? JSON.parse(stored) : null;
                 } catch {
                     return null;
-                }
-            })();
-
-            const authToken = (() => {
-                try {
-                    return localStorage.getItem("orbix_token") || "";
-                } catch {
-                    return "";
                 }
             })();
 
@@ -209,44 +362,53 @@ export default function ProfilesOnboardingPage() {
                 connectedProfiles,
             };
 
-            const headers: Record<string, string> = {
-                "Content-Type": "application/json",
-            };
-            if (authToken) {
-                headers["Authorization"] = `Bearer ${authToken}`;
+            // Call primary endpoint, fallback to secondary if needed
+            let saveSuccessful = false;
+            try {
+                const res = await fetch("/api/portals/save", {
+                    method: "POST",
+                    headers,
+                    credentials: "include",
+                    body: JSON.stringify(savePayload),
+                });
+                if (res.ok) saveSuccessful = true;
+            } catch {
+                // try fallback
             }
 
-            const endpoints = [
-                "/api/portals/save",
-                "/api/profile/save",
-                "http://localhost:3000/api/portals/save",
-                "http://localhost:3000/api/profile/save",
-            ];
-
-            await Promise.allSettled(
-                endpoints.map((url) =>
-                    fetch(url, {
+            if (!saveSuccessful) {
+                try {
+                    const fallbackRes = await fetch("http://localhost:3000/api/portals/save", {
                         method: "POST",
                         headers,
                         credentials: "include",
                         body: JSON.stringify(savePayload),
-                    })
-                )
+                    });
+                    if (fallbackRes.ok) saveSuccessful = true;
+                } catch {
+                    // Non-fatal offline fallback
+                }
+            }
+
+            // Reset dirty snapshot
+            initialConnectedProfilesRef.current = { ...connectedProfiles };
+            initialPortalValuesRef.current = { ...portalValues };
+
+            toast.success(
+                connectedCount > 0
+                    ? `${connectedCount} coding profiles saved! Redirecting to workspace...`
+                    : "Profile setup completed! Redirecting to workspace...",
+                { title: "Profiles Connected" }
             );
-        } catch {
-            // Non-fatal if offline
+        } catch (err: any) {
+            console.error("Save error:", err);
+            toast.error("Failed to save some profiles, but local state was preserved.");
+        } finally {
+            setIsSaving(false);
+            setTimeout(() => {
+                navigate("/dashboard");
+            }, 500);
         }
-
-        toast.success(
-            connectedCount > 0
-                ? `${connectedCount} coding profiles saved! Redirecting to workspace...`
-                : "Profile setup completed! Redirecting to workspace...",
-            { title: "Profiles Connected" }
-        );
-
-        setTimeout(() => {
-            navigate("/dashboard");
-        }, 600);
     };
 
     return (
@@ -267,7 +429,7 @@ export default function ProfilesOnboardingPage() {
 
             {/* Right Main Content Workspace */}
             <div className="flex-1 min-w-0 flex flex-col min-h-screen p-3 sm:p-4 lg:pl-0">
-                {/* Top Header Bar (No Orbix home button, No Skip button) */}
+                {/* Top Header Bar */}
                 <header className="h-16 w-full rounded-2xl bg-white border border-neutral-200/90 shadow-xs px-4 sm:px-6 flex items-center justify-between gap-4 mb-4 flex-shrink-0">
                     {/* Left: Mobile Toggle & Page Title */}
                     <div className="flex items-center gap-3">
@@ -313,7 +475,7 @@ export default function ProfilesOnboardingPage() {
                             title={connectedCount > 0 ? "Click to view connected bucket" : ""}
                         >
                             {connectedCount > 0 ? (
-                                <span className="h-2 w-2 rounded-full bg-black animate-pulse" />
+                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                             ) : (
                                 <span className="h-2 w-2 rounded-full bg-neutral-400" />
                             )}
@@ -325,248 +487,335 @@ export default function ProfilesOnboardingPage() {
 
                 {/* Main Scrollable Content Card */}
                 <div className="flex-1 w-full bg-white rounded-2xl border border-neutral-200/90 shadow-xs p-4 sm:p-6 lg:p-8 overflow-y-auto">
-                    {/* Central Form Container matching user screenshot aesthetic */}
-                    <div className="mx-auto w-full max-w-2xl my-2">
-                {/* Header */}
-                <div className="text-center mb-6">
-                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-neutral-950">
-                        Connect your coding profiles
-                    </h1>
-                    <p className="mt-2 text-xs sm:text-sm text-neutral-500 leading-relaxed max-w-md mx-auto">
-                        {user?.firstName ? `Hi ${user.firstName}! ` : ""}
-                        Paste your profile link or handle. As soon as you tap connect, profiles are gathered in your bucket ready to save to your dashboard.
-                    </p>
-                </div>
-
-                {/* Connected Accounts Bucket Section (Desktop / Tablet View) */}
-                <div className="mb-6 rounded-2xl border border-neutral-200/90 bg-neutral-50/80 p-4 transition-all">
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-neutral-900 text-white shadow-xs">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                </svg>
-                            </div>
+                    <div className="mx-auto w-full max-w-7xl my-1">
+                        {/* Page Header */}
+                        <div className="mb-6 lg:mb-8 pb-5 border-b border-neutral-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div>
-                                <h3 className="text-xs sm:text-sm font-bold text-neutral-900 flex items-center gap-2">
-                                    <span>Connected Accounts Bucket</span>
-                                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 border border-emerald-300 px-2 py-0.5 rounded-full">
-                                        {connectedCount} {connectedCount === 1 ? "account" : "accounts"}
-                                    </span>
-                                </h3>
-                                <p className="text-[11px] text-neutral-500 hidden sm:block">
-                                    Accounts added here will be saved when you click "Save & Continue to Dashboard".
+                                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-neutral-950">
+                                    Connect your coding profiles
+                                </h1>
+                                <p className="mt-1.5 text-xs sm:text-sm text-neutral-500 leading-relaxed max-w-2xl">
+                                    {user?.firstName ? `Hi ${user.firstName}! ` : ""}
+                                    Paste your profile link or handle on the left. As soon as you tap connect, profiles are gathered in your bucket on the right ready to save to your dashboard.
                                 </p>
+                            </div>
+                            <div className="flex items-center gap-2.5 flex-shrink-0 self-start md:self-center">
+                                <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xs ${
+                                    connectedCount > 0
+                                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                        : "bg-neutral-100 text-neutral-600 border border-neutral-200"
+                                }`}>
+                                    <span className={`w-2 h-2 rounded-full ${connectedCount > 0 ? "bg-emerald-500 animate-pulse" : "bg-neutral-400"}`} />
+                                    <span>{connectedCount} of 13 platforms connected</span>
+                                </span>
                             </div>
                         </div>
 
-                        {/* Mobile quick view button */}
-                        {connectedCount > 0 && (
-                            <button
-                                type="button"
-                                onClick={() => setIsMobileBucketOpen(true)}
-                                className="sm:hidden text-xs font-semibold text-neutral-900 bg-white border border-neutral-300 px-2.5 py-1 rounded-full shadow-xs active:scale-95 transition-all cursor-pointer"
-                            >
-                                View Bucket ({connectedCount}) ▾
-                            </button>
-                        )}
-                    </div>
+                        {/* Parallel 2-Column Grid Layout:
+                            - Left: Input fields for required platforms
+                            - Right: Connected Accounts Bucket (Sticky on desktop) */}
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+                            {/* Left Column: Input of required fields (7 cols) */}
+                            <div className="lg:col-span-7 space-y-5">
+                                {/* Search and Filter Control Bar */}
+                                <div className="bg-neutral-50/80 border border-neutral-200/90 rounded-2xl p-4 sm:p-5 space-y-3.5">
+                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                        <div>
+                                            <h2 className="text-xs sm:text-sm font-bold text-neutral-900 tracking-tight flex items-center gap-2">
+                                                <span>Available Platforms</span>
+                                                <span className="text-[11px] font-semibold text-neutral-600 bg-white border border-neutral-200 px-2 py-0.5 rounded-full shadow-2xs">
+                                                    {availablePortalList.length} unlinked
+                                                </span>
+                                            </h2>
+                                            <p className="text-[11px] text-neutral-500 mt-0.5">
+                                                Select a platform, enter your username or link, and verify
+                                            </p>
+                                        </div>
 
-                    {connectedCount > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
-                            {Object.entries(connectedProfiles).map(([pId, profile]) => {
-                                const portalConf = PORTALS[pId];
-                                const brandColor = portalConf?.brandColor || "#0D8BD9";
-                                return (
-                                    <div
-                                        key={pId}
-                                        className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl border border-neutral-200/80 bg-white shadow-xs hover:shadow-md transition-all group"
-                                    >
-                                        <div className="flex items-center gap-2.5 min-w-0">
-                                            <div className="relative flex-shrink-0">
-                                                <img
-                                                    src={profile.avatar}
-                                                    alt={profile.name}
-                                                    referrerPolicy="no-referrer"
-                                                    className="h-9 w-9 rounded-full object-cover border-2 p-0.5 bg-neutral-50 shadow-xs"
-                                                    style={{ borderColor: brandColor }}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                                            profile.name || profile.username
-                                                        )}&background=${brandColor.replace("#", "")}&color=fff&size=80&bold=true`;
-                                                    }}
-                                                />
-                                                <span
-                                                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white"
-                                                    style={{ backgroundColor: brandColor }}
-                                                />
+                                        {/* Category Tabs */}
+                                        <div className="flex flex-wrap items-center gap-1 p-1 bg-neutral-200/60 rounded-xl text-xs font-medium self-start sm:self-auto">
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveCategory("all")}
+                                                className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
+                                                    activeCategory === "all"
+                                                        ? "bg-white text-neutral-950 font-bold shadow-xs"
+                                                        : "text-neutral-600 hover:text-neutral-900"
+                                                }`}
+                                            >
+                                                All (13)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveCategory("cp")}
+                                                className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
+                                                    activeCategory === "cp"
+                                                        ? "bg-white text-neutral-950 font-bold shadow-xs"
+                                                        : "text-neutral-600 hover:text-neutral-900"
+                                                }`}
+                                            >
+                                                CP (6)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveCategory("practice")}
+                                                className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
+                                                    activeCategory === "practice"
+                                                        ? "bg-white text-neutral-950 font-bold shadow-xs"
+                                                        : "text-neutral-600 hover:text-neutral-900"
+                                                }`}
+                                            >
+                                                Practice (6)
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setActiveCategory("dev")}
+                                                className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
+                                                    activeCategory === "dev"
+                                                        ? "bg-white text-neutral-950 font-bold shadow-xs"
+                                                        : "text-neutral-600 hover:text-neutral-900"
+                                                }`}
+                                            >
+                                                Dev (1)
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Search input with clear button */}
+                                    <div className="relative w-full">
+                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                <circle cx="11" cy="11" r="8" />
+                                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                            </svg>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            placeholder="Filter platforms by name (e.g. LeetCode, GitHub, Codeforces)..."
+                                            className="w-full pl-10 pr-10 py-2.5 bg-white text-xs text-neutral-900 placeholder:text-neutral-400 rounded-xl border border-neutral-200 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors shadow-2xs"
+                                        />
+                                        {searchQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSearchQuery("")}
+                                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-400 hover:text-neutral-700 cursor-pointer"
+                                                title="Clear search"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                                    <line x1="18" y1="6" x2="6" y2="18" />
+                                                    <line x1="6" y1="6" x2="18" y2="18" />
+                                                </svg>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Portal Inputs List (Available portals) */}
+                                <div className="space-y-4">
+                                    {availablePortalList.map((portal) => (
+                                        <div
+                                            key={portal.id}
+                                            className="bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-2xl p-4 sm:p-5 shadow-2xs transition-all"
+                                        >
+                                            <PortalProfileInput
+                                                portalId={portal.id}
+                                                value={portalValues[portal.id] || ""}
+                                                isConnected={false}
+                                                connectedProfile={null}
+                                                recentProfile={recentProfilesHistory[portal.id] || null}
+                                                onChange={handleInputChange}
+                                                onConnectProfile={handleConnectProfile}
+                                                onDisconnectProfile={handleDisconnectProfile}
+                                            />
+                                        </div>
+                                    ))}
+
+                                    {/* Empty state when all portals in category or search are connected */}
+                                    {availablePortalList.length === 0 && (
+                                        <div className="py-12 text-center space-y-3 bg-neutral-50/70 border border-dashed border-neutral-200 rounded-2xl p-6">
+                                            <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-xs">
+                                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                                    <polyline points="20 6 9 17 4 12" />
+                                                </svg>
                                             </div>
-                                            <div className="min-w-0">
-                                                <div className="flex items-center gap-1.5">
-                                                    <span className="text-[11px] font-bold text-neutral-900 truncate">
-                                                        {portalConf?.name || pId}
-                                                    </span>
-                                                    <span className="text-[10px] text-emerald-600 font-semibold">✓</span>
-                                                </div>
-                                                <p className="text-[11px] text-neutral-500 font-mono truncate">
-                                                    @{profile.username}
+                                            <h4 className="text-sm font-bold text-neutral-900">
+                                                {connectedCount === 13
+                                                    ? "All 13 Platforms Connected!"
+                                                    : connectedCount > 0
+                                                    ? "All Filtered Platforms Connected!"
+                                                    : "No Platforms Match Your Search"}
+                                            </h4>
+                                            <p className="text-xs text-neutral-500 max-w-sm mx-auto leading-relaxed">
+                                                {connectedCount === 13
+                                                    ? "Every supported platform is already gathered in your bucket on the right. Tap 'Save & Continue to Dashboard' to persist."
+                                                    : connectedCount > 0
+                                                    ? `You have connected ${connectedCount} ${connectedCount === 1 ? "platform" : "platforms"} in your bucket. Adjust your filter or search above to link more.`
+                                                    : `No platform matches '${searchQuery}'. Try clearing your search query.`}
+                                            </p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Right Column: Connected Accounts Bucket (5 cols, sticky on desktop) */}
+                            <div className="lg:col-span-5 lg:sticky lg:top-4 space-y-4">
+                                <div className="rounded-2xl border border-neutral-200/90 bg-neutral-50/90 p-4 sm:p-5 shadow-xs transition-all">
+                                    {/* Bucket Header */}
+                                    <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-neutral-200/80">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-950 text-white shadow-xs">
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                </svg>
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm font-bold text-neutral-900 leading-tight">
+                                                    Connected Accounts Bucket
+                                                </h3>
+                                                <p className="text-[11px] text-neutral-500 mt-0.5">
+                                                    Accounts ready to save to your dashboard
                                                 </p>
                                             </div>
                                         </div>
 
+                                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border transition-all flex items-center gap-1.5 ${
+                                            connectedCount > 0
+                                                ? "text-emerald-800 bg-emerald-100/80 border-emerald-300 shadow-2xs"
+                                                : "text-neutral-500 bg-neutral-100 border-neutral-200"
+                                        }`}>
+                                            {connectedCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                                            {connectedCount} {connectedCount === 1 ? "account" : "accounts"}
+                                        </span>
+                                    </div>
+
+                                    {/* Connected Cards List */}
+                                    {connectedCount > 0 ? (
+                                        <div className="space-y-2.5 max-h-[calc(100vh-320px)] min-h-[160px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-neutral-400">
+                                            {Object.entries(connectedProfiles).map(([pId, profile]) => {
+                                                const portalConf = PORTALS[pId];
+                                                const brandColor = portalConf?.brandColor || "#0D8BD9";
+                                                return (
+                                                    <div
+                                                        key={pId}
+                                                        className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-xl border border-neutral-200/80 bg-white shadow-2xs hover:shadow-xs hover:border-neutral-300 transition-all group"
+                                                    >
+                                                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                                                            <div className="relative flex-shrink-0">
+                                                                <img
+                                                                    src={profile.avatar}
+                                                                    alt={profile.name}
+                                                                    referrerPolicy="no-referrer"
+                                                                    className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover border-2 p-0.5 bg-neutral-50 shadow-2xs"
+                                                                    style={{ borderColor: brandColor }}
+                                                                    onError={(e) => {
+                                                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                                                            profile.name || profile.username
+                                                                        )}&background=${brandColor.replace("#", "")}&color=fff&size=80&bold=true`;
+                                                                    }}
+                                                                />
+                                                                <span
+                                                                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white shadow-2xs"
+                                                                    style={{ backgroundColor: brandColor }}
+                                                                />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <span className="text-xs font-bold text-neutral-900 truncate">
+                                                                        {portalConf?.name || pId}
+                                                                    </span>
+                                                                    <span className="text-[11px] text-emerald-600 font-bold" title="Verified">✓</span>
+                                                                </div>
+                                                                <p className="text-[11px] text-neutral-500 font-mono truncate">
+                                                                    @{profile.username}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleDisconnectProfile(pId)}
+                                                            className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer group-hover:text-neutral-600"
+                                                            title={`Disconnect ${portalConf?.name || pId}`}
+                                                            aria-label={`Disconnect ${portalConf?.name || pId}`}
+                                                        >
+                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                            </svg>
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div className="py-10 px-4 text-center border border-dashed border-neutral-300/80 rounded-xl bg-white/70 space-y-2.5">
+                                            <div className="w-10 h-10 mx-auto rounded-full bg-neutral-100 flex items-center justify-center text-neutral-400">
+                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                </svg>
+                                            </div>
+                                            <h4 className="text-xs font-bold text-neutral-800">Your bucket is empty</h4>
+                                            <p className="text-[11px] text-neutral-500 max-w-xs mx-auto leading-relaxed">
+                                                Enter your profile link or handle on the left and tap <span className="font-semibold text-neutral-800">"Yes, connect"</span> to gather accounts here.
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Actions & Status inside right bucket */}
+                                    <div className="pt-4 mt-4 border-t border-neutral-200/80 space-y-3">
+                                        {/* Status indicator row */}
+                                        <div className="flex items-center justify-between text-xs px-1">
+                                            <span className="text-neutral-500 font-medium">Status</span>
+                                            {isDirty ? (
+                                                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                                                    Unsaved changes
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                                    Up to date
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* Save & Continue to Dashboard Button */}
                                         <button
                                             type="button"
-                                            onClick={() => handleDisconnectProfile(pId)}
-                                            className="p-1 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                                            title={`Disconnect ${portalConf?.name || pId}`}
+                                            onClick={handleSave}
+                                            disabled={isSaving}
+                                            className="w-full h-12 rounded-xl bg-neutral-950 hover:bg-neutral-800 active:scale-[0.99] text-white font-semibold text-xs sm:text-sm transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                                         >
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
+                                            {isSaving ? (
+                                                <>
+                                                    <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                                    <span>Saving Profiles...</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span>Save & Continue to Dashboard</span>
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                                    </svg>
+                                                </>
+                                            )}
                                         </button>
+
+                                        <p className="text-[11px] text-center text-neutral-400">
+                                            You can edit or update your public profile handles anytime from your Orbix Dashboard settings.
+                                        </p>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    ) : (
-                        <div className="py-3 px-2 text-center text-xs text-neutral-400 border border-dashed border-neutral-200 rounded-xl bg-white/60">
-                            Your bucket is empty. Type your handle below and click "Yes, connect" to add accounts here.
-                        </div>
-                    )}
-                </div>
-
-                {/* Filter and Search Bar */}
-                <div className="space-y-3 mb-6">
-                    {/* Category Tabs */}
-                    <div className="flex flex-wrap items-center justify-center gap-1.5 p-1 bg-neutral-100/80 rounded-full max-w-md mx-auto text-xs font-medium">
-                        <button
-                            type="button"
-                            onClick={() => setActiveCategory("all")}
-                            className={`px-3 py-1.5 rounded-full transition-all cursor-pointer ${
-                                activeCategory === "all"
-                                    ? "bg-white text-neutral-950 font-bold shadow-xs"
-                                    : "text-neutral-500 hover:text-neutral-800"
-                            }`}
-                        >
-                            All (13)
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveCategory("cp")}
-                            className={`px-3 py-1.5 rounded-full transition-all cursor-pointer ${
-                                activeCategory === "cp"
-                                    ? "bg-white text-neutral-950 font-bold shadow-xs"
-                                    : "text-neutral-500 hover:text-neutral-800"
-                            }`}
-                        >
-                            Competitive (6)
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveCategory("practice")}
-                            className={`px-3 py-1.5 rounded-full transition-all cursor-pointer ${
-                                activeCategory === "practice"
-                                    ? "bg-white text-neutral-950 font-bold shadow-xs"
-                                    : "text-neutral-500 hover:text-neutral-800"
-                            }`}
-                        >
-                            Practice (6)
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setActiveCategory("dev")}
-                            className={`px-3 py-1.5 rounded-full transition-all cursor-pointer ${
-                                activeCategory === "dev"
-                                    ? "bg-white text-neutral-950 font-bold shadow-xs"
-                                    : "text-neutral-500 hover:text-neutral-800"
-                            }`}
-                        >
-                            Dev (1)
-                        </button>
-                    </div>
-
-                    {/* Quick search input */}
-                    <div className="relative max-w-md mx-auto">
-                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                <circle cx="11" cy="11" r="8" />
-                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                            </svg>
-                        </div>
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Filter platforms by name..."
-                            className="w-full pl-10 pr-4 py-2 bg-neutral-50 hover:bg-neutral-100/60 focus:bg-white text-xs rounded-full border border-neutral-200 focus:outline-none focus:border-neutral-900 transition-colors"
-                        />
-                    </div>
-                </div>
-
-                {/* Portal Inputs List - shows only unconnected portals */}
-                <div className="space-y-5 bg-white rounded-2xl p-2 sm:p-4">
-                    {availablePortalList.map((portal) => (
-                        <PortalProfileInput
-                            key={portal.id}
-                            portalId={portal.id}
-                            value={portalValues[portal.id] || ""}
-                            isConnected={false}
-                            connectedProfile={null}
-                            recentProfile={recentProfilesHistory[portal.id] || null}
-                            onChange={handleInputChange}
-                            onConnectProfile={handleConnectProfile}
-                            onDisconnectProfile={handleDisconnectProfile}
-                        />
-                    ))}
-
-                    {availablePortalList.length === 0 && (
-                        <div className="py-10 text-center space-y-3 bg-neutral-50/70 border border-dashed border-neutral-200 rounded-2xl p-6 animate-fadeIn">
-                            <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-xs">
-                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <polyline points="20 6 9 17 4 12" />
-                                </svg>
+                                </div>
                             </div>
-                            <h4 className="text-sm font-bold text-neutral-900">
-                                {connectedCount > 0 ? "All Selected Platforms Connected!" : "No Platforms Match Your Filter"}
-                            </h4>
-                            <p className="text-xs text-neutral-500 max-w-sm mx-auto">
-                                {connectedCount > 0
-                                    ? `You have connected ${connectedCount} ${connectedCount === 1 ? "platform" : "platforms"} in your bucket above. Tap "Save & Continue" to persist to your workspace.`
-                                    : `Try adjusting your category filter or search query "${searchQuery}".`}
-                            </p>
                         </div>
-                    )}
-                </div>
-
-                {/* Actions: Save button matching screenshot design */}
-                <div className="mt-8 space-y-3 max-w-md mx-auto">
-                    <button
-                        type="button"
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="w-full h-12 rounded-full bg-neutral-900 hover:bg-neutral-800 active:scale-[0.99] text-white font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                    >
-                        {isSaving ? (
-                            <>
-                                <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                <span>Saving Profiles...</span>
-                            </>
-                        ) : (
-                            <span>Save & Continue to Dashboard</span>
-                        )}
-                    </button>
-                </div>
-
-                {/* Bottom Footer Info */}
-                <div className="mt-8 text-center py-4 text-xs text-neutral-400 border-t border-neutral-100">
-                    You can edit or update your public profile handles anytime from your Orbix Dashboard settings.
+                    </div>
                 </div>
             </div>
-        </div>
 
             {/* Mobile Floating Bucket Trigger Button for small screens */}
             {connectedCount > 0 && (
-                <div className="fixed bottom-5 right-4 z-40 sm:hidden animate-fadeIn">
+                <div className="fixed bottom-5 right-4 z-40 lg:hidden animate-fadeIn">
                     <button
                         type="button"
                         onClick={() => setIsMobileBucketOpen(true)}
@@ -705,8 +954,7 @@ export default function ProfilesOnboardingPage() {
                     </div>
                 </div>
             )}
-
-            </div>
         </div>
     );
 }
+

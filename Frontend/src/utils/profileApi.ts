@@ -46,6 +46,75 @@ export const invalidatePublicProfileClientCache = (username?: string) => {
 };
 
 /**
+ * Common helper to attach authentication tokens and JSON content headers
+ */
+function getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+    };
+    if (typeof window !== "undefined") {
+        const token = localStorage.getItem("orbix_token");
+        if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+        }
+    }
+    return headers;
+}
+
+/**
+ * Robust API fetch wrapper:
+ * - Uses Vite proxy path (/api/...) and direct backend fallback (http://localhost:3000/api/...)
+ * - Attaches auth credentials
+ * - Immediately returns or throws authoritative backend errors (401, 403, 429, 500) without masking
+ */
+async function apiFetch<T = any>(
+    path: string,
+    options: RequestInit = {}
+): Promise<T> {
+    const cleanPath = path.startsWith("/api") ? path : `/api${path}`;
+    const endpoints = [
+        cleanPath,
+        `http://localhost:3000${cleanPath}`,
+    ];
+
+    let lastError = "Request failed";
+
+    for (const url of endpoints) {
+        let response: Response;
+        try {
+            response = await fetch(url, {
+                ...options,
+                headers: {
+                    ...getAuthHeaders(),
+                    ...(options.headers || {}),
+                },
+                credentials: "include",
+            });
+        } catch (netErr: any) {
+            lastError = netErr?.message || "Network request failed";
+            continue; // Fall back to direct backend port if network/proxy failed
+        }
+
+        if (response.ok) {
+            const json = await response.json().catch(() => ({}));
+            return json as T;
+        }
+
+        // Authoritative server response: do NOT try subsequent endpoints and mask error
+        const errJson = await response.json().catch(() => null);
+        const errMsg =
+            errJson?.message ||
+            errJson?.error ||
+            (response.status === 401
+                ? "Authentication required. Please log in."
+                : `Server returned error (${response.status}): ${response.statusText}`);
+        throw new Error(errMsg);
+    }
+
+    throw new Error(lastError);
+}
+
+/**
  * Fetch public profile by username with client-side caching & request deduplication
  */
 export async function fetchPublicProfile(username: string, force = false): Promise<PublicProfileData> {
@@ -65,10 +134,10 @@ export async function fetchPublicProfile(username: string, force = false): Promi
     }
 
     const requestPromise = (async () => {
+        const encodedKey = encodeURIComponent(key);
         const endpoints = [
-            `/api/profile/public/${encodeURIComponent(key)}`,
-            `http://localhost:3000/api/profile/public/${encodeURIComponent(key)}`,
-            `/profile/public/${encodeURIComponent(key)}`,
+            `/api/profile/public/${encodedKey}`,
+            `http://localhost:3000/api/profile/public/${encodedKey}`,
         ];
 
         let lastError = "Unable to fetch profile";
@@ -77,7 +146,7 @@ export async function fetchPublicProfile(username: string, force = false): Promi
             try {
                 const response = await fetch(url, {
                     method: "GET",
-                    headers: { "Content-Type": "application/json" },
+                    headers: getAuthHeaders(),
                     credentials: "include",
                 });
 
@@ -91,6 +160,9 @@ export async function fetchPublicProfile(username: string, force = false): Promi
                 } else if (response.status === 404) {
                     const errJson = await response.json().catch(() => null);
                     throw new Error(errJson?.message || "Profile not found or is private.");
+                } else {
+                    const errJson = await response.json().catch(() => null);
+                    throw new Error(errJson?.message || `Error (${response.status})`);
                 }
             } catch (err: any) {
                 if (err.message.includes("not found") || err.message.includes("private")) {
@@ -128,96 +200,52 @@ export async function updateProfile(payload: {
     skills?: string[];
     isPublic?: boolean;
 }): Promise<any> {
-    const endpoints = ["/api/profile", "http://localhost:3000/api/profile"];
-    let lastError = "Failed to update profile";
-
-    for (const url of endpoints) {
-        try {
-            const response = await fetch(url, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify(payload),
-            });
-
-            if (response.ok) {
-                const json = await response.json();
-                invalidatePublicProfileClientCache();
-                return json.user;
-            } else {
-                const errJson = await response.json().catch(() => null);
-                throw new Error(errJson?.message || "Failed to update profile");
-            }
-        } catch (err: any) {
-            lastError = err.message || lastError;
-        }
-    }
-
-    throw new Error(lastError);
+    const json = await apiFetch<{ success: boolean; user: any }>("/api/profile", {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
+    invalidatePublicProfileClientCache();
+    return json.user;
 }
 
 /**
  * Disconnect a platform
  */
 export async function disconnectPlatform(portal: string): Promise<boolean> {
-    const endpoints = [
-        `/api/portals/${portal}`,
-        `http://localhost:3000/api/portals/${portal}`,
-        `/api/profile/platforms/${portal}`,
-        `http://localhost:3000/api/profile/platforms/${portal}`,
-    ];
-
-    for (const url of endpoints) {
-        try {
-            const response = await fetch(url, {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-
-            if (response.ok) {
-                invalidatePublicProfileClientCache();
-                return true;
-            }
-        } catch {
-            // continue
-        }
+    try {
+        await apiFetch(`/api/portals/${portal}`, {
+            method: "DELETE",
+        });
+        invalidatePublicProfileClientCache();
+        return true;
+    } catch {
+        await apiFetch(`/api/profile/platforms/${portal}`, {
+            method: "DELETE",
+        });
+        invalidatePublicProfileClientCache();
+        return true;
     }
-
-    throw new Error(`Failed to disconnect ${portal}`);
 }
 
 /**
  * Edit a platform handle / link
  */
 export async function editPlatformHandle(portal: string, handleOrLink: string): Promise<any> {
-    const endpoints = [
-        `/api/portals/${portal}`,
-        `http://localhost:3000/api/portals/${portal}`,
-        `/api/profile/platforms/${portal}`,
-        `http://localhost:3000/api/profile/platforms/${portal}`,
-    ];
-
-    for (const url of endpoints) {
-        try {
-            const response = await fetch(url, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ handle: handleOrLink }),
-            });
-
-            if (response.ok) {
-                const json = await response.json();
-                invalidatePublicProfileClientCache();
-                return json.platform;
-            }
-        } catch {
-            // continue
-        }
+    try {
+        const json = await apiFetch<{ platform: any }>(`/api/portals/${portal}`, {
+            method: "PUT",
+            body: JSON.stringify({ handle: handleOrLink }),
+        });
+        invalidatePublicProfileClientCache();
+        return json.platform;
+    } catch {
+        const json = await apiFetch<{ platform: any }>(`/api/profile/platforms/${portal}`, {
+            method: "PUT",
+            body: JSON.stringify({ handle: handleOrLink }),
+        });
+        invalidatePublicProfileClientCache();
+        return json.platform;
     }
-
-    throw new Error(`Failed to update ${portal}`);
 }
 
 /**
@@ -247,37 +275,18 @@ export interface PhotoOperationResult {
  * Step A: Request signed direct upload configuration from backend
  */
 export async function requestPhotoUploadSignature(): Promise<PhotoUploadConfig> {
-    const endpoints = [
+    const json = await apiFetch<{ success: boolean; uploadConfig: PhotoUploadConfig }>(
         "/api/profile/photo/upload-signature",
-        "http://localhost:3000/api/profile/photo/upload-signature",
-        "/profile/photo/upload-signature",
-    ];
-
-    let lastError = "Unable to request upload signature";
-
-    for (const url of endpoints) {
-        try {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-
-            if (response.ok) {
-                const json = await response.json();
-                if (json.success && json.uploadConfig) {
-                    return json.uploadConfig as PhotoUploadConfig;
-                }
-            } else {
-                const errJson = await response.json().catch(() => null);
-                lastError = errJson?.message || `Error (${response.status}): ${response.statusText}`;
-            }
-        } catch (err: any) {
-            lastError = err?.message || lastError;
+        {
+            method: "POST",
         }
+    );
+
+    if (!json.uploadConfig) {
+        throw new Error("Invalid signature response from server.");
     }
 
-    throw new Error(lastError);
+    return json.uploadConfig;
 }
 
 /**
@@ -313,7 +322,12 @@ export function uploadPhotoToCloudinary(
             } else {
                 try {
                     const errRes = JSON.parse(xhr.responseText);
-                    reject(new Error(errRes.error?.message || "Cloudinary direct upload failed."));
+                    const rawMsg = errRes.error?.message || `Upload failed with HTTP ${xhr.status}`;
+                    if (rawMsg.toLowerCase().includes("invalid signature")) {
+                        reject(new Error("Cloudinary API Secret mismatch. Please verify that CLOUDINARY_API_SECRET in Backend/.env matches your Cloudinary Console API Secret."));
+                    } else {
+                        reject(new Error(rawMsg));
+                    }
                 } catch {
                     reject(new Error(`Upload failed with HTTP ${xhr.status}`));
                 }
@@ -334,7 +348,9 @@ export function uploadPhotoToCloudinary(
         formData.append("timestamp", String(config.timestamp));
         formData.append("signature", config.signature);
         formData.append("public_id", config.publicId);
-        formData.append("folder", config.folder);
+        if (config.folder && !config.publicId.startsWith(`${config.folder}/`)) {
+            formData.append("folder", config.folder);
+        }
         formData.append("overwrite", "true");
 
         xhr.open("POST", config.uploadUrl, true);
@@ -346,108 +362,42 @@ export function uploadPhotoToCloudinary(
  * Step C: Confirm verified upload and persist to database
  */
 export async function confirmPhotoUpload(publicId: string, version?: number): Promise<PhotoOperationResult> {
-    const endpoints = [
+    const json = await apiFetch<PhotoOperationResult>(
         "/api/profile/photo/confirm",
-        "http://localhost:3000/api/profile/photo/confirm",
-        "/profile/photo/confirm",
-    ];
-
-    let lastError = "Unable to confirm photo update";
-
-    for (const url of endpoints) {
-        try {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ publicId, version }),
-            });
-
-            if (response.ok) {
-                const json = await response.json();
-                invalidatePublicProfileClientCache();
-                return json as PhotoOperationResult;
-            } else {
-                const errJson = await response.json().catch(() => null);
-                lastError = errJson?.message || `Server error (${response.status})`;
-            }
-        } catch (err: any) {
-            lastError = err?.message || lastError;
+        {
+            method: "POST",
+            body: JSON.stringify({ publicId, version }),
         }
-    }
-
-    throw new Error(lastError);
+    );
+    invalidatePublicProfileClientCache();
+    return json;
 }
 
 /**
  * Restore previous profile photo
  */
 export async function restorePreviousPhoto(): Promise<PhotoOperationResult> {
-    const endpoints = [
+    const json = await apiFetch<PhotoOperationResult>(
         "/api/profile/photo/restore",
-        "http://localhost:3000/api/profile/photo/restore",
-        "/profile/photo/restore",
-    ];
-
-    let lastError = "Unable to restore previous photo";
-
-    for (const url of endpoints) {
-        try {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-
-            if (response.ok) {
-                const json = await response.json();
-                invalidatePublicProfileClientCache();
-                return json as PhotoOperationResult;
-            } else {
-                const errJson = await response.json().catch(() => null);
-                lastError = errJson?.message || `Error (${response.status})`;
-            }
-        } catch (err: any) {
-            lastError = err?.message || lastError;
+        {
+            method: "POST",
         }
-    }
-
-    throw new Error(lastError);
+    );
+    invalidatePublicProfileClientCache();
+    return json;
 }
 
 /**
  * Reset to application default avatar
  */
 export async function useDefaultAvatar(): Promise<PhotoOperationResult> {
-    const endpoints = [
+    const json = await apiFetch<PhotoOperationResult>(
         "/api/profile/photo/default",
-        "http://localhost:3000/api/profile/photo/default",
-        "/profile/photo/default",
-    ];
-
-    let lastError = "Unable to set default avatar";
-
-    for (const url of endpoints) {
-        try {
-            const response = await fetch(url, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-            });
-
-            if (response.ok) {
-                const json = await response.json();
-                invalidatePublicProfileClientCache();
-                return json as PhotoOperationResult;
-            } else {
-                const errJson = await response.json().catch(() => null);
-                lastError = errJson?.message || `Error (${response.status})`;
-            }
-        } catch (err: any) {
-            lastError = err?.message || lastError;
+        {
+            method: "POST",
         }
-    }
-
-    throw new Error(lastError);
+    );
+    invalidatePublicProfileClientCache();
+    return json;
 }
 

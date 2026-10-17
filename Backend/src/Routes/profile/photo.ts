@@ -114,15 +114,21 @@ export const handleUploadSignature = async (req: Request, res: Response) => {
 
         const { cloudName, apiKey, apiSecret, folder, maxBytes } = assertCloudinaryConfigured();
 
-        // Server generates safe, unique Cloudinary public ID
+        if (apiSecret.length < 20) {
+            return res.status(500).json({
+                success: false,
+                message: `CLOUDINARY_API_SECRET in Backend/.env is invalid (length is ${apiSecret.length} chars). Cloudinary API secrets are 27 characters long. Please paste the full API Secret from Cloudinary Console.`,
+            });
+        }
+
+        // Server generates safe, unique Cloudinary public ID with folder prefix
         const timestamp = Math.round(Date.now() / 1000);
         const randomHex = crypto.randomBytes(6).toString("hex");
         const safeUserId = (authUser.id || authUser.username || "user").replace(/[^a-zA-Z0-9_-]/g, "");
         const publicId = `${folder}/u_${safeUserId}_${timestamp}_${randomHex}`;
 
-        // Parameters covered by the signature
+        // Parameters covered by the signature (omit separate folder param to prevent Cloudinary from duplicating the folder prefix)
         const paramsToSign: Record<string, any> = {
-            folder,
             overwrite: true,
             public_id: publicId,
             timestamp,
@@ -203,15 +209,20 @@ export const handleConfirmPhoto = async (req: Request, res: Response) => {
         }
 
         const cleanPublicId = publicId.trim();
+        const { folder, maxBytes } = assertCloudinaryConfigured();
+
+        // Normalize duplicated folder prefixes if present (e.g. "orbix/avatars/orbix/avatars/u_..." -> "orbix/avatars/u_...")
+        const strippedPublicId = cleanPublicId.replace(new RegExp(`^(${folder}/)+`), "");
+        const canonicalPublicId = `${folder}/${strippedPublicId}`;
 
         // 1. Verify that upload intent exists, belongs to this user, and is unconsumed/unexpired
         const intentResult = await query(
-            `SELECT id, status, expires_at
+            `SELECT id, status, expires_at, public_id
              FROM photo_upload_intents
-             WHERE public_id = $1
-               AND (username = $2 OR user_email = $3 OR user_id = $4)
+             WHERE (public_id = $1 OR public_id = $2 OR public_id = $3)
+               AND (username = $4 OR user_email = $5 OR user_id = $6)
              LIMIT 1;`,
-            [cleanPublicId, authUser.username, authUser.gmail, authUser.id || null]
+            [cleanPublicId, canonicalPublicId, strippedPublicId, authUser.username, authUser.gmail, authUser.id || null]
         );
 
         if (intentResult.rowCount === 0) {
@@ -251,25 +262,37 @@ export const handleConfirmPhoto = async (req: Request, res: Response) => {
         let resource: any;
         try {
             resource = await getCloudinaryAsset(cleanPublicId);
-        } catch (fetchErr: any) {
-            console.error("Cloudinary resource fetch failed:", fetchErr?.message || fetchErr);
-            return res.status(400).json({
-                success: false,
-                message: "Uploaded asset could not be verified on Cloudinary. Please try uploading again.",
-            });
+        } catch {
+            if (canonicalPublicId !== cleanPublicId) {
+                try {
+                    resource = await getCloudinaryAsset(canonicalPublicId);
+                } catch (fetchErr: any) {
+                    console.error("Cloudinary resource fetch failed:", fetchErr?.message || fetchErr);
+                    return res.status(400).json({
+                        success: false,
+                        message: "Uploaded asset could not be verified on Cloudinary. Please try uploading again.",
+                    });
+                }
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: "Uploaded asset could not be verified on Cloudinary. Please try uploading again.",
+                });
+            }
         }
 
+        const verifiedAssetPublicId = resource.public_id || cleanPublicId;
+
         if (!resource || resource.resource_type !== "image") {
-            await destroyCloudinaryAsset(cleanPublicId);
+            await destroyCloudinaryAsset(verifiedAssetPublicId);
             return res.status(400).json({
                 success: false,
                 message: "Uploaded resource is not a valid image.",
             });
         }
 
-        const { maxBytes } = assertCloudinaryConfigured();
         if (typeof resource.bytes === "number" && resource.bytes > maxBytes) {
-            await destroyCloudinaryAsset(cleanPublicId);
+            await destroyCloudinaryAsset(verifiedAssetPublicId);
             return res.status(400).json({
                 success: false,
                 message: `File size exceeds the allowed limit of ${(maxBytes / (1024 * 1024)).toFixed(1)} MB.`,
@@ -278,7 +301,7 @@ export const handleConfirmPhoto = async (req: Request, res: Response) => {
 
         const format = (resource.format || "").toLowerCase();
         if (!ALLOWED_PHOTO_FORMATS.includes(format as any)) {
-            await destroyCloudinaryAsset(cleanPublicId);
+            await destroyCloudinaryAsset(verifiedAssetPublicId);
             return res.status(400).json({
                 success: false,
                 message: `Unsupported file format '${format}'. Allowed formats: ${ALLOWED_PHOTO_FORMATS.join(", ")}.`,
@@ -286,7 +309,7 @@ export const handleConfirmPhoto = async (req: Request, res: Response) => {
         }
 
         // 3. Generate canonical transformed delivery URL
-        const canonicalPhotoUrl = getOptimizedAvatarUrl(cleanPublicId, version || resource.version);
+        const canonicalPhotoUrl = getOptimizedAvatarUrl(verifiedAssetPublicId, version || resource.version);
 
         // 4. Atomic database update
         const client = await pool.connect();
@@ -313,7 +336,7 @@ export const handleConfirmPhoto = async (req: Request, res: Response) => {
             const currentUser = currentUserRes.rows[0];
 
             // If user currently has an active custom photo, it becomes the previous photo
-            if (currentUser?.photoPublicId && currentUser.photoPublicId !== cleanPublicId) {
+            if (currentUser?.photoPublicId && currentUser.photoPublicId !== verifiedAssetPublicId) {
                 newPreviousPhotoUrl = currentUser.photoUrl;
                 newPreviousPhotoPublicId = currentUser.photoPublicId;
 
@@ -321,7 +344,7 @@ export const handleConfirmPhoto = async (req: Request, res: Response) => {
                 if (
                     currentUser.previousPhotoPublicId &&
                     currentUser.previousPhotoPublicId !== currentUser.photoPublicId &&
-                    currentUser.previousPhotoPublicId !== cleanPublicId
+                    currentUser.previousPhotoPublicId !== verifiedAssetPublicId
                 ) {
                     oldSupersededPublicId = currentUser.previousPhotoPublicId;
                 }
@@ -343,7 +366,7 @@ export const handleConfirmPhoto = async (req: Request, res: Response) => {
                  WHERE id = $5 OR email = $6;`,
                 [
                     canonicalPhotoUrl,
-                    cleanPublicId,
+                    verifiedAssetPublicId,
                     newPreviousPhotoUrl,
                     newPreviousPhotoPublicId,
                     authUser.id || null,
