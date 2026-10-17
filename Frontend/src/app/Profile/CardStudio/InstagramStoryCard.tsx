@@ -68,6 +68,12 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
 
     const displayUrl = publicProfileUrl.replace(/^https?:\/\//, "");
 
+    const isLightBanner = theme.id === "gold";
+    const bannerTextColor = isLightBanner ? "text-black" : "text-white";
+    const bannerSubtextColor = isLightBanner ? "text-black/75" : "text-white/80";
+    const bannerFill = isLightBanner ? "black" : "white";
+    const bannerStroke = isLightBanner ? "black" : "white";
+
     return (
         <div
             ref={cardRef}
@@ -79,21 +85,21 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
             {face === "front" ? (
                 /* ==================== INSTAGRAM FRONT FACE ==================== */
                 <>
-                    {/* Top Textured Accent Banner with Safe Margin */}
+                    {/* Top Textured Accent Banner with Safe Margin (Compact, Unstretched Height) */}
                     <div
-                        className={`relative h-[400px] w-full px-14 pt-16 flex items-start justify-between overflow-hidden flex-shrink-0 ${theme.id === "gold" ? "bg-[#ffc629]" : `bg-gradient-to-r ${theme.bannerGradient}`
+                        className={`relative h-[260px] w-full px-14 pt-12 flex items-start justify-between overflow-hidden flex-shrink-0 ${theme.id === "gold" ? "bg-[#ffc629]" : `bg-gradient-to-r ${theme.bannerGradient}`
                             }`}
                         style={{
                             backgroundColor: theme.id === "gold" ? "#ffc629" : undefined,
                         }}
                     >
-                        {/* Attached Full Width & Height Banner SVG with overflow-y hidden and relaxed height */}
+                        {/* Attached Full Width & Height Banner SVG with preserved circular aspect ratio */}
                         <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none" style={{ overflowY: "hidden" }}>
                             <CardBannerSVG
                                 idPrefix="ig-front"
                                 color={theme.id === "gold" ? "#f0b100" : (theme.bannerPatternColor || "rgba(255,255,255,0.22)")}
-                                className="w-full h-[120%] -top-[10%] relative"
-                                preserveAspectRatio="none"
+                                className="w-full h-full relative"
+                                preserveAspectRatio="xMidYMid slice"
                                 style={{
                                     overflow: "hidden",
                                     overflowY: "hidden",
@@ -102,40 +108,40 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                         </div>
 
                         {/* Top Left: Orbix Brand Star + Wordmark */}
-                        <div className="relative z-10 flex items-center gap-5">
-                            <div className="w-18 h-18 rounded-3xl bg-black/90 border border-white/20 flex items-center justify-center p-3.5 shadow-2xl backdrop-blur-md">
-                                <svg className="w-full h-full text-white" viewBox="0 0 271 270" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                    <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" fill="white" />
-                                    <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" fill="white" />
-                                    <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" fill="white" />
-                                    <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" fill="white" />
-                                    <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" fill="white" />
-                                    <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" stroke="white" />
-                                    <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" stroke="white" />
-                                    <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" stroke="white" />
-                                    <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" stroke="white" />
-                                    <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" stroke="white" />
+                        <div className="relative z-10 flex items-center gap-2">
+                            <div className="w-[84px] h-[84px] rounded-2xl flex items-center justify-center p-1">
+                                <svg className="w-full h-full" viewBox="0 0 271 270" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" fill={bannerFill} />
+                                    <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" fill={bannerFill} />
+                                    <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" fill={bannerFill} />
+                                    <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" fill={bannerFill} />
+                                    <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" fill={bannerFill} />
+                                    <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" stroke={bannerStroke} />
+                                    <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" stroke={bannerStroke} />
+                                    <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" stroke={bannerStroke} />
+                                    <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" stroke={bannerStroke} />
+                                    <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" stroke={bannerStroke} />
                                 </svg>
                             </div>
                             <div>
-                                <span className="text-4xl font-black text-black tracking-tight leading-none block">
+                                <span className={`text-4xl font-black ${bannerTextColor} tracking-tight leading-none block`}>
                                     Orbix
                                 </span>
-                                <span className="text-base font-extrabold text-black/75 tracking-widest uppercase mt-1 block">
+                                <span className={`text-base font-extrabold ${bannerSubtextColor} tracking-widest uppercase mt-1 block`}>
                                     Developer Story Card
                                 </span>
                             </div>
                         </div>
 
                         {/* Top Right: Verified Badge */}
-                        <div className="relative z-10 flex items-center gap-3 px-6 py-3 rounded-full bg-black/80 backdrop-blur-md border border-white/20 text-white shadow-xl">
+                        <div className={`relative z-10 flex items-center gap-3 px-6 py-2.5 rounded-full ${isLightBanner ? "bg-black text-white" : "bg-white/15 backdrop-blur-md text-white border border-white/20"} shadow-xl`}>
                             <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
                             <span className="text-base font-black tracking-wider uppercase">Verified</span>
                         </div>
                     </div>
 
                     {/* Main Content Area - Beautifully Proportioned to Fill Story Height */}
-                    <div className="px-14 flex-1 flex flex-col justify-around -mt-24 relative z-20 pb-8 space-y-6">
+                    <div className="px-14 flex-1 flex flex-col justify-around -mt-20 relative z-20 pb-6 space-y-5">
                         {/* Avatar & User Details */}
                         <div className="flex flex-col items-center text-center">
                             <div
@@ -308,48 +314,52 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                 })}
                             </div>
                         </div>
-                    </div>
 
-                    {/* Bottom Connected Platforms Dock (Image 2) & Footer */}
-                    <div className="h-28 bg-[#070a0e] border-t border-white/10 px-14 flex items-center justify-between flex-shrink-0">
-                        {/* Connected platform logos row matching Image 2 */}
-                        <div className="flex items-center gap-4 min-w-0">
-                            <span className="text-sm font-mono font-bold tracking-wider uppercase text-neutral-400 mr-1 hidden sm:inline-block">
-                                Connected:
-                            </span>
-                            <div className="flex items-center gap-3.5 overflow-x-auto py-1">
-                                {connectedList.length > 0 ? (
-                                    connectedList.map((plat) => (
+                        {/* All Connected Platforms Full Row in Sequence (Directly after Top Accounts) */}
+                        <div className="space-y-3.5">
+                            <div className="flex items-center justify-between text-base font-black text-neutral-400 px-3">
+                                <span className="uppercase tracking-wider">All Connected Platforms</span>
+                                <span className="text-base font-mono">{connectedList.length} verified</span>
+                            </div>
+
+                            <div className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 shadow-xl flex items-center justify-between gap-6">
+                                <div className="flex items-center gap-3 flex-shrink-0">
+                                    <span className="text-sm font-mono font-bold tracking-wider uppercase text-neutral-400">
+                                        Connected:
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-3.5 flex-wrap flex-1 justify-start">
+                                    {connectedList.map((plat) => (
                                         <div
                                             key={plat.id}
-                                            className="w-14 h-14 rounded-2xl bg-white shadow-xl flex items-center justify-center p-3 transition-transform hover:scale-105 cursor-pointer flex-shrink-0"
+                                            className="w-14 h-14 rounded-2xl bg-white shadow-xl flex items-center justify-center p-2.5 transition-transform hover:scale-110 cursor-pointer flex-shrink-0"
                                             title={`${plat.name} (@${plat.username})`}
                                         >
                                             {getPortalIcon(plat.id, "w-full h-full object-contain")}
                                         </div>
-                                    ))
-                                ) : (
-                                    <span className="text-base text-neutral-500 font-mono">No platforms linked</span>
-                                )}
+                                    ))}
+                                </div>
                             </div>
                         </div>
+                    </div>
 
-                        <div className="flex items-center gap-5 text-base text-neutral-400 flex-shrink-0">
-                            <span className="font-mono text-neutral-300 truncate max-w-sm flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="1.3em" height="1.3em" viewBox="0 0 24 24">
-                                    <path d="M0 0h24v24H0z" fill="none" />
-                                    <g fill="none">
-                                        <path fill="currentColor" d="M10.48 4.83a4.95 4.95 0 0 1 4.92 4.4h1.91a4.97 4.97 0 0 1 0 9.94h-3.77a4.97 4.97 0 0 1-4.94-4.44H6.67a4.95 4.95 0 1 1 0-9.9z" opacity=".2" />
-                                        <rect width="9.94" height="13.71" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" rx="4.97" transform="matrix(0 -1 -1 0 22.28 19.17)" />
-                                        <rect width="9.9" height="13.71" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" rx="4.95" transform="matrix(0 -1 -1 0 15.43 14.73)" />
-                                    </g>
-                                </svg>{displayUrl}
-                            </span>
-                            <span className="text-neutral-700">•</span>
-                            <div className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded-full bg-amber-400" />
-                                <span className="font-bold text-neutral-300">Live • {todayDate}</span>
-                            </div>
+                    {/* Bottom Clean Footer */}
+                    <div className="h-24 bg-[#070a0e] border-t border-white/10 px-14 flex items-center justify-between flex-shrink-0">
+                        <div className="flex items-center gap-4 text-base text-neutral-300 font-mono">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="1.3em" height="1.3em" viewBox="0 0 24 24">
+                                <path d="M0 0h24v24H0z" fill="none" />
+                                <g fill="none">
+                                    <path fill="currentColor" d="M10.48 4.83a4.95 4.95 0 0 1 4.92 4.4h1.91a4.97 4.97 0 0 1 0 9.94h-3.77a4.97 4.97 0 0 1-4.94-4.44H6.67a4.95 4.95 0 1 1 0-9.9z" opacity=".2" />
+                                    <rect width="9.94" height="13.71" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" rx="4.97" transform="matrix(0 -1 -1 0 22.28 19.17)" />
+                                    <rect width="9.9" height="13.71" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" rx="4.95" transform="matrix(0 -1 -1 0 15.43 14.73)" />
+                                </g>
+                            </svg>
+                            <span>{displayUrl}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 text-base text-neutral-400">
+                            <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
+                            <span className="font-bold text-neutral-300">Live • {todayDate}</span>
                         </div>
                     </div>
                 </>
@@ -357,9 +367,9 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                 /* ==================== INSTAGRAM BACK FACE ==================== */
                 <>
                     {/* Top Header */}
-                    <div className="h-[220px] w-full px-14 pt-16 flex items-center justify-between border-b border-white/10 bg-[#0e131b]">
+                    <div className="h-[160px] w-full px-14 pt-8 flex items-center justify-between border-b border-white/10 bg-[#0e131b]">
                         <div className="flex items-center gap-5">
-                            <div className="w-18 h-18 rounded-3xl bg-black border border-white/20 flex items-center justify-center p-3.5 shadow-2xl">
+                            <div className="w-11 h-11 rounded-2xl flex items-center justify-center">
                                 <svg className="w-full h-full text-white" viewBox="0 0 271 270" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" fill="white" />
                                     <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" fill="white" />
@@ -418,35 +428,22 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                         </div>
                     </div>
 
-                    {/* Bottom Connected Platforms Dock on Back Face */}
-                    <div className="h-28 bg-[#070a0e] border-t border-white/10 px-14 flex items-center justify-between flex-shrink-0">
-                        <div className="flex items-center gap-3.5 overflow-x-auto py-1">
-                            {connectedList.map((plat) => (
-                                <div
-                                    key={plat.id}
-                                    className="w-14 h-14 rounded-2xl bg-white shadow-xl flex items-center justify-center p-3 transition-transform hover:scale-105 cursor-pointer flex-shrink-0"
-                                    title={`${plat.name} (@${plat.username})`}
-                                >
-                                    {getPortalIcon(plat.id, "w-full h-full object-contain")}
-                                </div>
-                            ))}
+                    {/* Bottom Clean Footer on Back Face */}
+                    <div className="h-24 bg-[#070a0e] border-t border-white/10 px-14 flex items-center justify-between flex-shrink-0">
+                        <div className="flex items-center gap-4 text-base text-neutral-300 font-mono">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="1.3em" height="1.3em" viewBox="0 0 24 24">
+                                <path d="M0 0h24v24H0z" fill="none" />
+                                <g fill="none">
+                                    <path fill="currentColor" d="M10.48 4.83a4.95 4.95 0 0 1 4.92 4.4h1.91a4.97 4.97 0 0 1 0 9.94h-3.77a4.97 4.97 0 0 1-4.94-4.44H6.67a4.95 4.95 0 1 1 0-9.9z" opacity=".2" />
+                                    <rect width="9.94" height="13.71" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" rx="4.97" transform="matrix(0 -1 -1 0 22.28 19.17)" />
+                                    <rect width="9.9" height="13.71" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" rx="4.95" transform="matrix(0 -1 -1 0 15.43 14.73)" />
+                                </g>
+                            </svg>
+                            <span>{displayUrl}</span>
                         </div>
-                        <div className="flex items-center gap-5 text-base text-neutral-400 flex-shrink-0">
-                            <span className="font-mono text-neutral-300 truncate max-w-sm">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="1.3em" height="1.3em" viewBox="0 0 24 24">
-                                    <path d="M0 0h24v24H0z" fill="none" />
-                                    <g fill="none">
-                                        <path fill="currentColor" d="M10.48 4.83a4.95 4.95 0 0 1 4.92 4.4h1.91a4.97 4.97 0 0 1 0 9.94h-3.77a4.97 4.97 0 0 1-4.94-4.44H6.67a4.95 4.95 0 1 1 0-9.9z" opacity=".2" />
-                                        <rect width="9.94" height="13.71" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" rx="4.97" transform="matrix(0 -1 -1 0 22.28 19.17)" />
-                                        <rect width="9.9" height="13.71" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" rx="4.95" transform="matrix(0 -1 -1 0 15.43 14.73)" />
-                                    </g>
-                                </svg> {displayUrl}
-                            </span>
-                            <span className="text-neutral-700">•</span>
-                            <div className="flex items-center gap-2">
-                                <span className="w-3 h-3 rounded-full bg-amber-400" />
-                                <span className="font-bold text-neutral-300">Live • {todayDate}</span>
-                            </div>
+                        <div className="flex items-center gap-2.5 text-base text-neutral-400">
+                            <span className="w-3 h-3 rounded-full bg-amber-400" />
+                            <span className="font-bold text-neutral-300">Live • {todayDate}</span>
                         </div>
                     </div>
                 </>

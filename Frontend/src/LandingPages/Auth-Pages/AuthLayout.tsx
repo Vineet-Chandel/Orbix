@@ -24,7 +24,7 @@ export const AuthLayout = ({
     return (
         <div className="min-h-screen w-full bg-white flex flex-col lg:flex-row overflow-hidden text-neutral-900 font-sans selection:bg-neutral-900 selection:text-white">
             {/* Left Column: Clean White Form Panel */}
-            <div className="w-full lg:w-[55%] xl:w-[52%] min-h-[100svh] lg:h-screen overflow-y-auto relative flex flex-col justify-between p-6 sm:p-10 lg:p-14 order-1 custom-scrollbar bg-white">
+            <div className="w-full lg:w-[55%] xl:w-[52%] min-h-[100svh] lg:h-screen overflow-y-auto relative flex flex-col justify-between p-6 sm:p-10 lg:p-14 order-1 scrollbar-none bg-white">
                 {/* Top Nav: Back to Home on the left side */}
                 <div className="flex items-center mb-4 sm:mb-6">
                     <Link

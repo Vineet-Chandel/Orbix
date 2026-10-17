@@ -814,7 +814,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
             {isManageOpen && (
                 <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 animate-fadeIn">
                     {/* Category Filter Pills */}
-                    <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+                    <div className="flex items-center gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
                         <button
                             type="button"
                             onClick={() => setFilterCategory("all")}
@@ -1268,7 +1268,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                     onClick={() => setViewingPortalId(null)}
                 >
                     <div
-                        className="w-full max-w-lg bg-white rounded-2xl border border-neutral-200 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto"
+                        className="w-full max-w-lg bg-white rounded-2xl border border-neutral-200 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto scrollbar-none"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}

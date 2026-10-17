@@ -2,13 +2,60 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ==========================================================================
+   GLOBAL SCROLLBAR REMOVAL (Zero visible scrollbars across the entire web app)
+   Standard: scrollbar-width: none (Firefox, Chrome 121+, Safari 18.2+)
+   Legacy WebKit: ::-webkit-scrollbar { display: none; }
+   Legacy IE/Edge: -ms-overflow-style: none
+   ========================================================================== */
+
+html,
+body,
+#root,
+*,
+*::before,
+*::after {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
+/* Any element where overflow or scrollable container is applied */
+[class*="overflow-"],
+[style*="overflow"] {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+[class*="overflow-"]::-webkit-scrollbar,
+[style*="overflow"]::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+
 @layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
+  .no-scrollbar::-webkit-scrollbar,
+  .scrollbar-none::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    background: transparent !important;
   }
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  .no-scrollbar,
+  .scrollbar-none {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
   }
 }
 

@@ -182,7 +182,7 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
             </div>
 
             {/* Heatmap Area: Uncovered, Circular Curvy Green Dots with Spaces */}
-            <div className="py-4 relative z-10 overflow-x-auto">
+            <div className="py-4 relative z-10 overflow-x-auto scrollbar-none">
                 <div className="min-w-[700px] flex flex-col space-y-2">
                     {/* Month Labels Row aligned across columns */}
                     <div

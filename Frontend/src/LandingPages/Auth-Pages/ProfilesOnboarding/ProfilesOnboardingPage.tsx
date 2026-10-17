@@ -486,7 +486,7 @@ export default function ProfilesOnboardingPage() {
                 </header>
 
                 {/* Main Scrollable Content Card */}
-                <div className="flex-1 w-full bg-white rounded-2xl border border-neutral-200/90 shadow-xs p-4 sm:p-6 lg:p-8 overflow-y-auto">
+                <div className="flex-1 w-full bg-white rounded-2xl border border-neutral-200/90 shadow-xs p-4 sm:p-6 lg:p-8 overflow-y-auto scrollbar-none">
                     <div className="mx-auto w-full max-w-7xl my-1">
                         {/* Page Header */}
                         <div className="mb-6 lg:mb-8 pb-5 border-b border-neutral-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -692,7 +692,7 @@ export default function ProfilesOnboardingPage() {
 
                                     {/* Connected Cards List */}
                                     {connectedCount > 0 ? (
-                                        <div className="space-y-2.5 max-h-[calc(100vh-320px)] min-h-[160px] overflow-y-auto pr-1 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-300 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-neutral-400">
+                                        <div className="space-y-2.5 max-h-[calc(100vh-320px)] min-h-[160px] overflow-y-auto pr-1 scrollbar-none">
                                             {Object.entries(connectedProfiles).map(([pId, profile]) => {
                                                 const portalConf = PORTALS[pId];
                                                 const brandColor = portalConf?.brandColor || "#0D8BD9";
@@ -872,7 +872,7 @@ export default function ProfilesOnboardingPage() {
                         </div>
 
                         {/* Connected Accounts List */}
-                        <div className="overflow-y-auto py-3 space-y-3 flex-1 pr-1">
+                        <div className="overflow-y-auto scrollbar-none py-3 space-y-3 flex-1 pr-1">
                             {Object.entries(connectedProfiles).map(([pId, profile]) => {
                                 const portalConf = PORTALS[pId];
                                 const brandColor = portalConf?.brandColor || "#0D8BD9";
