@@ -6,7 +6,6 @@ import { Sidebar, type SidebarTab } from "./Sidebar";
 import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
 import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
 import { ContestPerformanceSection } from "./ContestPerformanceSection";
-import { BadgesCard } from "./BadgesCard";
 import { PracticeAnalyticsSection } from "./PracticeAnalytics/PracticeAnalyticsSection";
 
 export default function Dashboard() {
@@ -233,10 +232,6 @@ export default function Dashboard() {
                                     username={user?.username || ""}
                                 />
                                 <ContestPerformanceSection
-                                    connectedPortals={connectedPortals}
-                                    username={user?.username || ""}
-                                />
-                                <BadgesCard
                                     connectedPortals={connectedPortals}
                                     username={user?.username || ""}
                                 />

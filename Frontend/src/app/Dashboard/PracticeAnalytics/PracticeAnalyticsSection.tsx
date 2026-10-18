@@ -4,6 +4,7 @@ import { ProblemsSolvedCard } from "./ProblemsSolvedCard";
 import { RecentlySolvedCard } from "./RecentlySolvedCard";
 import { DsaTopicAnalysisCard } from "./DsaTopicAnalysisCard";
 import { TopicStrengthCard } from "./TopicStrengthCard";
+import { BadgesCard } from "../BadgesCard";
 
 interface PracticeAnalyticsSectionProps {
     connectedPortals?: Record<string, any>;
@@ -57,6 +58,18 @@ export const PracticeAnalyticsSection: React.FC<PracticeAnalyticsSectionProps> =
                     <div className="lg:col-span-4 flex flex-col justify-between lg:border-l lg:border-white/[0.08] lg:pl-8 pt-6 lg:pt-0 border-t lg:border-t-0 border-white/[0.08]">
                         <TopicStrengthCard data={data} isLoading={isLoading} />
                     </div>
+                </div>
+
+                {/* Horizontal divider between Row 2 and Row 3 (Badges) */}
+                <div className="w-full h-px bg-white/[0.08]" />
+
+                {/* Row 3: Badges Trophy Grid */}
+                <div className="w-full pt-1">
+                    <BadgesCard
+                        connectedPortals={connectedPortals}
+                        username={effectiveUser}
+                        embedded={true}
+                    />
                 </div>
             </div>
         </section>

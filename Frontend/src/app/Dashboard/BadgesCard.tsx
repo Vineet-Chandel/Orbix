@@ -6,6 +6,7 @@ import { getPortalIcon } from "../../utils/portalIcons";
 interface BadgesCardProps {
     connectedPortals?: Record<string, any>;
     username?: string;
+    embedded?: boolean;
 }
 
 function formatBadgeDate(dateStr?: string | null): string {
@@ -22,6 +23,7 @@ function formatBadgeDate(dateStr?: string | null): string {
 export const BadgesCard: React.FC<BadgesCardProps> = ({
     connectedPortals: _connectedPortals,
     username = "vineet_chandel",
+    embedded = false,
 }) => {
     const effectiveUser = (username || "vineet_chandel").trim();
     const dispatch = useAppDispatch();
@@ -66,20 +68,28 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
     return (
         <section
             aria-labelledby="badges-section-title"
-            className="w-full rounded-3xl bg-black text-white p-6 sm:p-7 border border-neutral-800 shadow-2xl relative overflow-hidden select-none flex flex-col justify-between"
+            className={
+                embedded
+                    ? "w-full text-white select-none flex flex-col justify-between"
+                    : "w-full rounded-3xl bg-black text-white p-6 sm:p-7 border border-neutral-800 shadow-2xl relative overflow-hidden select-none flex flex-col justify-between"
+            }
         >
-            {/* Subtle ambient glow */}
-            <div className="absolute -top-24 -right-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+            {!embedded && (
+                <>
+                    {/* Subtle ambient glow */}
+                    <div className="absolute -top-24 -right-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                    <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+                </>
+            )}
 
             <div>
                 {/* Header Row */}
                 <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] relative z-10">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-amber-400 shadow-sm">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-sm">
                             <Award className="w-4 h-4 text-amber-400" />
                         </div>
-                        <h3 id="badges-section-title" className="text-lg sm:text-xl font-black text-white tracking-tight">
+                        <h3 id="badges-section-title" className="text-base sm:text-lg font-extrabold text-white tracking-tight">
                             Badges
                         </h3>
                     </div>
