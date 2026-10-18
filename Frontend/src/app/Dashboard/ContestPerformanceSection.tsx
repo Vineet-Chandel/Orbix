@@ -40,9 +40,9 @@ export const CONTEST_ELIGIBLE_REGISTRY: Record<string, { name: string; exploreUr
 
 export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps> = ({
     connectedPortals,
-    username = "vineet_chandel",
+    username = "",
 }) => {
-    const effectiveUser = (username || "vineet_chandel").trim();
+    const effectiveUser = (username || "").trim();
     const dispatch = useAppDispatch();
 
     // Redux store state
@@ -59,7 +59,9 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     // Initial fetch passing connected portals from props
     useEffect(() => {
-        dispatch(fetchContestPerformance({ username: effectiveUser, portals: connectedPortals }));
+        if (effectiveUser) {
+            dispatch(fetchContestPerformance({ username: effectiveUser, portals: connectedPortals }));
+        }
     }, [effectiveUser, dispatch, connectedPortals]);
 
     // Discover eligible platforms dynamically - ONLY those where contest data can be extracted AND user is connected
@@ -333,7 +335,9 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     // Force re-sync handler
     const handleRefresh = () => {
-        dispatch(fetchContestPerformance({ username: effectiveUser, force: true, portals: connectedPortals }));
+        if (effectiveUser) {
+            dispatch(fetchContestPerformance({ username: effectiveUser, force: true, portals: connectedPortals }));
+        }
     };
 
     // Helper formatters

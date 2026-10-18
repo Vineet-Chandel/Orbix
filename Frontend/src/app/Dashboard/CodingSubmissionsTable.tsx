@@ -25,12 +25,12 @@ interface CodingSubmissionsTableProps {
 
 export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     connectedPortals,
-    username = "vineet_chandel",
+    username = "",
 }) => {
     const [selectedPortal, setSelectedPortal] = useState<string>("all");
     const [hoveredCell, setHoveredCell] = useState<DaySubmissionCell | null>(null);
 
-    const effectiveUser = (username || "vineet_chandel").trim();
+    const effectiveUser = (username || "").trim();
     const dispatch = useAppDispatch();
     const remoteData = useAppSelector((state) => state.submissions.dataByUser[effectiveUser]);
 
@@ -38,7 +38,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
 
     // Fetch unified submissions from backend only if not already cached in Redux
     useEffect(() => {
-        if (!remoteData) {
+        if (effectiveUser && !remoteData) {
             dispatch(fetchUnifiedSubmissions({ username: effectiveUser }));
         }
     }, [effectiveUser, remoteData, dispatch]);

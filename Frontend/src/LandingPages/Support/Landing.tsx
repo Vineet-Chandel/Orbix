@@ -152,7 +152,7 @@ export default function SupportPage() {
                                 <input
                                     type="email"
                                     required
-                                    placeholder="vineet@company.com"
+                                    placeholder="alex@company.com"
                                     value={ticket.email}
                                     onChange={(e) => setTicket({ ...ticket, email: e.target.value })}
                                     className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:bg-white transition-all"

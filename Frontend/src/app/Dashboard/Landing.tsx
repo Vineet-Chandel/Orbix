@@ -19,6 +19,7 @@ export default function Dashboard() {
         if (path.includes("/resume")) return "resume";
         if (path.includes("/projects")) return "projects";
         if (path.includes("/onboarding") || path.includes("/connect")) return "connect-platform";
+        if (path.includes("/leaderboard")) return "leaderboard";
         return "dashboard";
     };
 
@@ -216,16 +217,18 @@ export default function Dashboard() {
                             </div>
                         </div>
 
+
+
                         {/* Practice Field: Contest Performance & Multi-Platform Coding Submissions (Excluding GitHub) */}
                         {activeDashboardField === "practice" && (
                             <div className="w-full animate-fadeIn space-y-6">
                                 <ContestPerformanceSection
                                     connectedPortals={connectedPortals}
-                                    username={user?.username || "vineet_chandel"}
+                                    username={user?.username || ""}
                                 />
                                 <CodingSubmissionsTable
                                     connectedPortals={connectedPortals}
-                                    username={user?.username || "vineet_chandel"}
+                                    username={user?.username || ""}
                                 />
                             </div>
                         )}
@@ -235,7 +238,7 @@ export default function Dashboard() {
                             <div className="w-full animate-fadeIn">
                                 <DevelopmentContributionsTable
                                     connectedPortals={connectedPortals}
-                                    username={user?.username || "vineet_chandel"}
+                                    username={user?.username || ""}
                                 />
                             </div>
                         )}

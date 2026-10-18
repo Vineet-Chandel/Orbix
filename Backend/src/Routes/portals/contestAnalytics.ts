@@ -1,4 +1,10 @@
 import { query } from "../../database/client.js";
+import {
+    getCodeforcesTier as getCfTierOfficial,
+    getLeetCodeTier as getLtTierOfficial,
+    getCodeChefTier as getCcTierOfficial,
+    getAtCoderTier as getAcTierOfficial,
+} from "../../utils/ratingSystems.js";
 
 export interface ContestHistoryPoint {
     contestId: string | number;
@@ -57,339 +63,57 @@ export interface UnifiedContestResponse {
     };
 }
 
-// --- Official Platform Tier Definitions ---
+// --- Official Platform Tier Definitions (Delegating to ratingSystems.ts) ---
 
 export function getCodeforcesTier(rating: number): PlatformTierInfo {
-    if (rating < 1200) {
-        const next = 1200;
-        return {
-            name: "Newbie",
-            color: "#808080",
-            nextTierName: "Pupil",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round((rating / next) * 100))),
-            description: "Entry rating tier on Codeforces (< 1200)",
-        };
-    }
-    if (rating < 1400) {
-        const min = 1200;
-        const next = 1400;
-        return {
-            name: "Pupil",
-            color: "#008000",
-            nextTierName: "Specialist",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Green division tier on Codeforces (1200 - 1399)",
-        };
-    }
-    if (rating < 1600) {
-        const min = 1400;
-        const next = 1600;
-        return {
-            name: "Specialist",
-            color: "#03a89e",
-            nextTierName: "Expert",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Cyan division tier on Codeforces (1400 - 1599)",
-        };
-    }
-    if (rating < 1900) {
-        const min = 1600;
-        const next = 1900;
-        return {
-            name: "Expert",
-            color: "#3b82f6",
-            nextTierName: "Candidate Master",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Blue division tier on Codeforces (1600 - 1899)",
-        };
-    }
-    if (rating < 2200) {
-        const min = 1900;
-        const next = 2200;
-        return {
-            name: "Candidate Master",
-            color: "#ea3943",
-            nextTierName: "Master",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Purple / Red division tier on Codeforces (1900 - 2199)",
-        };
-    }
-    if (rating < 2300) {
-        const min = 2200;
-        const next = 2300;
-        return {
-            name: "Master",
-            color: "#f59e0b",
-            nextTierName: "International Master",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Yellow / Orange division tier on Codeforces (2200 - 2299)",
-        };
-    }
-    if (rating < 2400) {
-        const min = 2300;
-        const next = 2400;
-        return {
-            name: "International Master",
-            color: "#f59e0b",
-            nextTierName: "Grandmaster",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Orange tier on Codeforces (2300 - 2399)",
-        };
-    }
-    if (rating < 2600) {
-        const min = 2400;
-        const next = 2600;
-        return {
-            name: "Grandmaster",
-            color: "#ef4444",
-            nextTierName: "International Grandmaster",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Red grandmaster tier on Codeforces (2400 - 2599)",
-        };
-    }
-    if (rating < 3000) {
-        const min = 2600;
-        const next = 3000;
-        return {
-            name: "International Grandmaster",
-            color: "#ef4444",
-            nextTierName: "Legendary Grandmaster",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Red elite tier on Codeforces (2600 - 2999)",
-        };
-    }
+    const tier = getCfTierOfficial(rating);
     return {
-        name: "Legendary Grandmaster",
-        color: "#ef4444",
-        nextTierName: null,
-        pointsToNextTier: 0,
-        progressPercent: 100,
-        description: "Peak international tier on Codeforces (>= 3000)",
+        name: tier.name,
+        color: tier.color,
+        badgeBg: tier.badgeBg,
+        description: tier.description,
+        nextTierName: tier.nextTierName,
+        pointsToNextTier: tier.pointsToNextTier,
+        progressPercent: tier.progressPercent,
     };
 }
 
 export function getLeetCodeTier(rating: number, badgeName?: string | null | undefined): PlatformTierInfo {
-    const isGuardian = badgeName?.toLowerCase() === "guardian" || rating >= 2200;
-    const isKnight = badgeName?.toLowerCase() === "knight" || (rating >= 1850 && rating < 2200);
-
-    if (isGuardian) {
-        return {
-            name: "Guardian",
-            color: "#8b5cf6",
-            badgeBg: "#7c3aed",
-            nextTierName: null,
-            pointsToNextTier: 0,
-            progressPercent: 100,
-            description: "Top 5% of all contest participants globally (>= 2200 rating)",
-        };
-    }
-    if (isKnight) {
-        const min = 1850;
-        const next = 2200;
-        return {
-            name: "Knight",
-            color: "#06b6d4",
-            badgeBg: "#0891b2",
-            nextTierName: "Guardian",
-            pointsToNextTier: Math.max(0, next - Math.round(rating)),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Top 25% of all contest participants globally (1850 - 2199 rating)",
-        };
-    }
-    const next = 1850;
+    const tier = getLtTierOfficial(rating, badgeName);
     return {
-        name: "Contestant",
-        color: "#94a3b8",
-        badgeBg: "#64748b",
-        nextTierName: "Knight",
-        pointsToNextTier: Math.max(0, next - Math.round(rating || 1500)),
-        progressPercent: Math.min(100, Math.max(0, Math.round((Math.max(0, rating || 1500) / next) * 100))),
-        description: "Active LeetCode weekly & bi-weekly contest participant (< 1850 rating)",
+        name: tier.name,
+        color: tier.color,
+        badgeBg: tier.badgeBg,
+        description: tier.description,
+        nextTierName: tier.nextTierName,
+        pointsToNextTier: tier.pointsToNextTier,
+        progressPercent: tier.progressPercent,
     };
 }
 
 export function getCodeChefTier(rating: number): PlatformTierInfo {
-    if (rating < 1400) {
-        const next = 1400;
-        return {
-            name: "1★",
-            color: "#94a3b8",
-            nextTierName: "2★",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round((rating / next) * 100))),
-            description: "1-Star division tier on CodeChef (< 1400)",
-        };
-    }
-    if (rating < 1600) {
-        const min = 1400;
-        const next = 1600;
-        return {
-            name: "2★",
-            color: "#22c55e",
-            nextTierName: "3★",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "2-Star division tier on CodeChef (1400 - 1599)",
-        };
-    }
-    if (rating < 1800) {
-        const min = 1600;
-        const next = 1800;
-        return {
-            name: "3★",
-            color: "#3b82f6",
-            nextTierName: "4★",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "3-Star division tier on CodeChef (1600 - 1799)",
-        };
-    }
-    if (rating < 2000) {
-        const min = 1800;
-        const next = 2000;
-        return {
-            name: "4★",
-            color: "#a855f7",
-            nextTierName: "5★",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "4-Star division tier on CodeChef (1800 - 1999)",
-        };
-    }
-    if (rating < 2200) {
-        const min = 2000;
-        const next = 2200;
-        return {
-            name: "5★",
-            color: "#eab308",
-            nextTierName: "6★",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "5-Star division tier on CodeChef (2000 - 2199)",
-        };
-    }
-    if (rating < 2500) {
-        const min = 2200;
-        const next = 2500;
-        return {
-            name: "6★",
-            color: "#f97316",
-            nextTierName: "7★",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "6-Star master tier on CodeChef (2200 - 2499)",
-        };
-    }
+    const tier = getCcTierOfficial(rating);
     return {
-        name: "7★",
-        color: "#ef4444",
-        nextTierName: null,
-        pointsToNextTier: 0,
-        progressPercent: 100,
-        description: "7-Star grandmaster tier on CodeChef (>= 2500)",
+        name: tier.name,
+        color: tier.color,
+        badgeBg: tier.badgeBg,
+        description: tier.description,
+        nextTierName: tier.nextTierName,
+        pointsToNextTier: tier.pointsToNextTier,
+        progressPercent: tier.progressPercent,
     };
 }
 
 export function getAtCoderTier(rating: number): PlatformTierInfo {
-    if (rating < 400) {
-        const next = 400;
-        return {
-            name: "Gray",
-            color: "#94a3b8",
-            nextTierName: "Brown",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round((rating / next) * 100))),
-            description: "Gray rating tier on AtCoder (< 400)",
-        };
-    }
-    if (rating < 800) {
-        const min = 400;
-        const next = 800;
-        return {
-            name: "Brown",
-            color: "#a16207",
-            nextTierName: "Green",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Brown rating tier on AtCoder (400 - 799)",
-        };
-    }
-    if (rating < 1200) {
-        const min = 800;
-        const next = 1200;
-        return {
-            name: "Green",
-            color: "#22c55e",
-            nextTierName: "Cyan",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Green rating tier on AtCoder (800 - 1199)",
-        };
-    }
-    if (rating < 1600) {
-        const min = 1200;
-        const next = 1600;
-        return {
-            name: "Cyan",
-            color: "#06b6d4",
-            nextTierName: "Blue",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Cyan rating tier on AtCoder (1200 - 1599)",
-        };
-    }
-    if (rating < 2000) {
-        const min = 1600;
-        const next = 2000;
-        return {
-            name: "Blue",
-            color: "#2563eb",
-            nextTierName: "Yellow",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Blue rating tier on AtCoder (1600 - 1999)",
-        };
-    }
-    if (rating < 2400) {
-        const min = 2000;
-        const next = 2400;
-        return {
-            name: "Yellow",
-            color: "#eab308",
-            nextTierName: "Orange",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Yellow master tier on AtCoder (2000 - 2399)",
-        };
-    }
-    if (rating < 2800) {
-        const min = 2400;
-        const next = 2800;
-        return {
-            name: "Orange",
-            color: "#f97316",
-            nextTierName: "Red",
-            pointsToNextTier: Math.max(0, next - rating),
-            progressPercent: Math.min(100, Math.max(0, Math.round(((rating - min) / (next - min)) * 100))),
-            description: "Orange grandmaster tier on AtCoder (2400 - 2799)",
-        };
-    }
+    const tier = getAcTierOfficial(rating);
     return {
-        name: "Red",
-        color: "#ef4444",
-        nextTierName: null,
-        pointsToNextTier: 0,
-        progressPercent: 100,
-        description: "Red legendary tier on AtCoder (>= 2800)",
+        name: tier.name,
+        color: tier.color,
+        badgeBg: tier.badgeBg,
+        description: tier.description,
+        nextTierName: tier.nextTierName,
+        pointsToNextTier: tier.pointsToNextTier,
+        progressPercent: tier.progressPercent,
     };
 }
 
@@ -819,8 +543,10 @@ export async function fetchLeetCodeContests(username: string): Promise<{
 
         if (Array.isArray(rawHistory)) {
             const attendedList = rawHistory.filter((item: any) => item.attended && item.rating > 0);
-            let prevRating: number | null = null;
+            // Strictly sort chronologically ascending before calculating delta and beforeRating
+            attendedList.sort((a: any, b: any) => (a.contest?.startTime || 0) - (b.contest?.startTime || 0));
 
+            let prevRating: number | null = null;
             history = attendedList.map((item: any) => {
                 const ts = (item.contest?.startTime || 0) * 1000;
                 const date = ts ? new Date(ts).toISOString().split("T")[0] || "" : "";
@@ -845,9 +571,6 @@ export async function fetchLeetCodeContests(username: string): Promise<{
                 };
             });
         }
-
-        // Sort chronologically ascending
-        history.sort((a, b) => a.timestamp - b.timestamp);
 
         // Derive accurate peak rating from all attended contests
         const peakRating = history.length > 0 ? Math.max(...history.map((h) => h.rating)) : currentRating;
@@ -903,13 +626,7 @@ export async function fetchCodeChefContests(username: string): Promise<{
             try {
                 const parsed = JSON.parse(ccRatingsMatch[1]);
                 if (Array.isArray(parsed)) {
-                    let prevRating: number | null = null;
-                    history = parsed.map((item: any) => {
-                        const r = parseInt(item.rating, 10);
-                        if (!isNaN(r) && (peakRating === null || r > peakRating)) {
-                            peakRating = r;
-                        }
-
+                    const validItems = parsed.map((item: any) => {
                         let ts = 0;
                         let date = "";
                         if (item.end_date) {
@@ -919,6 +636,18 @@ export async function fetchCodeChefContests(username: string): Promise<{
                             const d = new Date(parseInt(item.getyear, 10), parseInt(item.getmonth, 10) - 1, parseInt(item.getday, 10));
                             ts = d.getTime();
                             date = d.toISOString().split("T")[0] || "";
+                        }
+                        return { ...item, _ts: ts, _date: date };
+                    }).filter((item: any) => item._ts > 0 && !isNaN(parseInt(item.rating, 10)));
+
+                    // Strictly sort chronologically ascending before calculating delta and beforeRating
+                    validItems.sort((a: any, b: any) => a._ts - b._ts);
+
+                    let prevRating: number | null = null;
+                    history = validItems.map((item: any) => {
+                        const r = parseInt(item.rating, 10);
+                        if (!isNaN(r) && (peakRating === null || r > peakRating)) {
+                            peakRating = r;
                         }
 
                         const rankNum = item.rank ? parseInt(item.rank, 10) : null;
@@ -933,10 +662,10 @@ export async function fetchCodeChefContests(username: string): Promise<{
                         }
 
                         return {
-                            contestId: item.code || `cc-${ts}`,
+                            contestId: item.code || `cc-${item._ts}`,
                             contestName: item.name || "CodeChef Contest",
-                            date,
-                            timestamp: ts,
+                            date: item._date,
+                            timestamp: item._ts,
                             rating: r,
                             ratingBefore: ratingBefore ?? null,
                             ratingChange,
@@ -949,9 +678,6 @@ export async function fetchCodeChefContests(username: string): Promise<{
                 // Ignore parse error
             }
         }
-
-        // Sort chronologically ascending
-        history.sort((a, b) => a.timestamp - b.timestamp);
 
         return {
             history,
@@ -1382,47 +1108,12 @@ export const ELIGIBLE_CONTEST_PLATFORMS: Record<string, EligiblePlatformConfig> 
         fetcher: fetchAtCoderContests,
         getTier: (r) => getAtCoderTier(r),
     },
-    hackerrank: {
-        name: "HackerRank",
-        exploreContestsUrl: "https://www.hackerrank.com/contests",
-        buildProfileUrl: (u) => `https://www.hackerrank.com/profile/${u}`,
-        fetcher: fetchHackerRankContests,
-        getTier: (r) => getHackerRankTier(r),
-    },
     topcoder: {
         name: "TopCoder",
         exploreContestsUrl: "https://www.topcoder.com/community/single-round-match",
         buildProfileUrl: (u) => `https://profiles.topcoder.com/${u}`,
         fetcher: fetchTopCoderContests,
         getTier: (r) => getTopCoderTier(r),
-    },
-    geeksforgeeks: {
-        name: "GeeksforGeeks",
-        exploreContestsUrl: "https://practice.geeksforgeeks.org/events/rec/gfg-weekly-coding-contest",
-        buildProfileUrl: (u) => `https://www.geeksforgeeks.org/user/${u}`,
-        fetcher: fetchGeeksforGeeksContests,
-        getTier: (r) => getGeeksforGeeksTier(r),
-    },
-    hackerearth: {
-        name: "HackerEarth",
-        exploreContestsUrl: "https://www.hackerearth.com/challenges/",
-        buildProfileUrl: (u) => `https://www.hackerearth.com/@${u}`,
-        fetcher: fetchHackerEarthContests,
-        getTier: (r) => getHackerEarthTier(r),
-    },
-    interviewbit: {
-        name: "InterviewBit",
-        exploreContestsUrl: "https://www.interviewbit.com/contest/",
-        buildProfileUrl: (u) => `https://www.interviewbit.com/profile/${u}`,
-        fetcher: fetchInterviewBitContests,
-        getTier: (r) => getInterviewBitTier(r),
-    },
-    code360: {
-        name: "Code360",
-        exploreContestsUrl: "https://www.naukri.com/code360/contests",
-        buildProfileUrl: (u) => `https://www.naukri.com/code360/profile/${u}`,
-        fetcher: fetchCode360Contests,
-        getTier: (r) => getCode360Tier(r),
     },
 };
 
@@ -1578,7 +1269,19 @@ export async function calculateUserContestPerformance(
                     };
                 }
 
-                const history: ContestHistoryPoint[] = fetchResult.history || [];
+                const rawHistory: ContestHistoryPoint[] = fetchResult.history || [];
+                // Deduplicate history by unique contestId or timestamp
+                const seenKeys = new Set<string>();
+                const history: ContestHistoryPoint[] = [];
+                for (const h of rawHistory) {
+                    const key = `${portalKey}-${h.contestId || h.timestamp}`;
+                    if (!seenKeys.has(key)) {
+                        seenKeys.add(key);
+                        history.push(h);
+                    }
+                }
+                history.sort((a, b) => a.timestamp - b.timestamp);
+
                 const lastHistoryPoint = history.length > 0 ? history[history.length - 1] : undefined;
                 const currentRating = fetchResult.currentRating ?? (lastHistoryPoint ? lastHistoryPoint.rating : null);
                 const peakRating = fetchResult.peakRating ?? (history.length > 0 ? Math.max(...history.map((h) => h.rating)) : currentRating);

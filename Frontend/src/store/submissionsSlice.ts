@@ -53,7 +53,10 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
 >(
     "submissions/fetchUnified",
     async ({ username, force = false }, { getState, rejectWithValue }) => {
-        const effectiveUser = username.trim() || "vineet_chandel";
+        const effectiveUser = username.trim();
+        if (!effectiveUser) {
+            return rejectWithValue("Username is required to fetch unified submissions");
+        }
         const state = getState().submissions;
         const existing = state.dataByUser[effectiveUser];
         const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
@@ -96,7 +99,8 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
     {
         // Prevent duplicate network calls: only fetch if not loading and not fresh
         condition: ({ username, force = false }, { getState }) => {
-            const effectiveUser = username.trim() || "vineet_chandel";
+            const effectiveUser = username.trim();
+            if (!effectiveUser) return false;
             const state = getState().submissions;
             if (state.loadingByUser[effectiveUser]) {
                 return false;
@@ -132,21 +136,27 @@ export const submissionsSlice = createSlice({
     extraReducers: (builder) => {
         builder
             .addCase(fetchUnifiedSubmissions.pending, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = true;
-                state.errorByUser[user] = null;
+                const user = (action.meta.arg.username || "").trim();
+                if (user) {
+                    state.loadingByUser[user] = true;
+                    state.errorByUser[user] = null;
+                }
             })
             .addCase(fetchUnifiedSubmissions.fulfilled, (state, action) => {
                 const user = action.payload.username;
-                state.loadingByUser[user] = false;
-                state.dataByUser[user] = action.payload;
-                state.lastFetchedAtByUser[user] = Date.now();
-                saveStoredSubmissions(state.dataByUser);
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.dataByUser[user] = action.payload;
+                    state.lastFetchedAtByUser[user] = Date.now();
+                    saveStoredSubmissions(state.dataByUser);
+                }
             })
             .addCase(fetchUnifiedSubmissions.rejected, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = false;
-                state.errorByUser[user] = (action.payload as string) || "Failed to load submissions";
+                const user = (action.meta.arg.username || "").trim();
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.errorByUser[user] = (action.payload as string) || "Failed to load submissions";
+                }
             });
     },
 });

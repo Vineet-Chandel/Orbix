@@ -31,11 +31,9 @@ export const GitHubContributionTable: React.FC<GitHubContributionTableProps> = (
     activeDays: _activeDays = 54,
     variant = "compact",
 }) => {
-    const rawUsername = githubUsername || username || "developer";
-    const isVineet = rawUsername.toLowerCase().includes("vineet");
-    const effectiveUsername = isVineet ? "Vineet-Chandel" : rawUsername;
-    const effectiveRepos = isVineet ? Math.max(publicRepos, 10) : publicRepos;
-    const effectiveContributions = isVineet ? Math.max(totalContributions, 1098) : totalContributions;
+    const effectiveUsername = githubUsername || username || "developer";
+    const effectiveRepos = publicRepos;
+    const effectiveContributions = totalContributions;
     const isSpacious = variant === "spacious";
 
     // Generate 16 weeks (last 3.8 to 4 months) of dense, vibrant circular green contribution dots

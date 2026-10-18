@@ -95,10 +95,6 @@ export function extractPlatformSolved(profile: any, portalId: string): number {
     // 3. Guard against legacy CodeChef bug where 0-problem accounts matched template 'padding:3px' as '3 solved'
     const stats: Array<{ label?: string; value?: string }> = Array.isArray(profile.stats) ? profile.stats : [];
     if (lowerId === "codechef") {
-        const uname = (profile.username || "").toLowerCase().trim();
-        if (uname === "able_shell_61") {
-            return 0;
-        }
         const hasRatingOrStars = stats.some((s) => {
             const l = (s.label || "").toLowerCase();
             const v = (s.value || "").toLowerCase();
@@ -147,7 +143,7 @@ export function extractPlatformSolved(profile: any, portalId: string): number {
 export function extractPlatformDifficulty(
     profile: any,
     portalId: string,
-    knownSolved?: number
+    _knownSolved?: number
 ): { easy: number; medium: number; hard: number; hasBreakdown: boolean } {
     if (!profile) {
         return { easy: 0, medium: 0, hard: 0, hasBreakdown: false };
@@ -156,8 +152,6 @@ export function extractPlatformDifficulty(
     if (NON_PROBLEM_PORTALS.has(lowerId)) {
         return { easy: 0, medium: 0, hard: 0, hasBreakdown: false };
     }
-
-    const solved = typeof knownSolved === "number" ? knownSolved : extractPlatformSolved(profile, lowerId);
 
     // 1. Check explicit difficulty object
     if (profile.difficulty && (
@@ -215,32 +209,7 @@ export function extractPlatformDifficulty(
         }
     }
 
-    // 4. Exact match for LeetCode total 33 from user screenshot (26 easy, 6 medium, 1 hard)
-    if (lowerId === "leetcode" && solved === 33) {
-        return { easy: 26, medium: 6, hard: 1, hasBreakdown: true };
-    }
-
-    // 5. Dynamic realistic classification across ALL connected platforms when only total solved is available
-    if (solved > 0) {
-        if (solved === 1) {
-            return { easy: 1, medium: 0, hard: 0, hasBreakdown: true };
-        }
-        if (solved === 2) {
-            return { easy: 2, medium: 0, hard: 0, hasBreakdown: true };
-        }
-        if (solved === 3) {
-            return { easy: 2, medium: 1, hard: 0, hasBreakdown: true };
-        }
-        if (solved === 4) {
-            return { easy: 3, medium: 1, hard: 0, hasBreakdown: true };
-        }
-        // Standard competitive programming ratio: Easy ~60%, Medium ~30%, Hard ~10%
-        const easy = Math.max(1, Math.round(solved * 0.60));
-        const medium = Math.round(solved * 0.30);
-        const hard = Math.max(0, solved - easy - medium);
-        return { easy, medium, hard, hasBreakdown: true };
-    }
-
+    // When no platform-verified difficulty breakdown is supplied, report breakdown as unavailable
     return { easy: 0, medium: 0, hard: 0, hasBreakdown: false };
 }
 
@@ -318,21 +287,6 @@ export function aggregateCodingStats(connectedPortals: Record<string, any>): Agg
                 }
             }
         }
-    }
-
-    // Fail-safe: if totalSolved > 0 but easy, medium, hard are still 0 (e.g. edge-case data shape)
-    if (totalSolved > 0 && easy === 0 && medium === 0 && hard === 0) {
-        easy = Math.max(1, Math.round(totalSolved * 0.60));
-        medium = Math.round(totalSolved * 0.30);
-        hard = Math.max(0, totalSolved - easy - medium);
-    }
-
-    // Default streak/active days deterministic estimation if provider doesn't report raw calendar dates
-    if (maxActiveDays === 0 && totalSolved > 0) {
-        maxActiveDays = Math.max(1, Math.min(Math.round(totalSolved * 1.5), 365));
-    }
-    if (maxDayStreak === 0 && totalSolved > 0) {
-        maxDayStreak = Math.min(Math.max(1, Math.round(totalSolved * 0.2)), 30);
     }
 
     const qualificationNote =
@@ -478,25 +432,7 @@ export function extractGitHubStats(
     connectedPortals: Record<string, any>,
     fallbackUsername?: string
 ): GitHubCardStats {
-    let gh = connectedPortals?.github;
-
-    // Detect if Vineet-Chandel is the active user
-    const checkUser = (fallbackUsername || gh?.portal_username || gh?.username || "").toLowerCase().replace(/_/g, "-").trim();
-    const isVineet = checkUser.includes("vineet-chandel") || checkUser.includes("vineetchandel") || checkUser.includes("vineet") ||
-        Object.values(connectedPortals || {}).some((p: any) => {
-            const u = (p?.portal_username || p?.username || "").toLowerCase().replace(/_/g, "-");
-            return u.includes("vineet-chandel") || u.includes("vineetchandel") || u.includes("vineet");
-        });
-
-    if (!gh && isVineet) {
-        gh = {
-            connected: true,
-            username: "Vineet-Chandel",
-            name: "Vineet Chandel",
-            publicRepos: 10,
-            contributions: 1098,
-        };
-    }
+    const gh = connectedPortals?.github;
 
     if (!gh) {
         return {
@@ -511,11 +447,10 @@ export function extractGitHubStats(
         };
     }
 
-    const rawUsername = gh.portal_username || gh.username || "";
-    const username = (isVineet || rawUsername.toLowerCase().includes("vineet")) ? "Vineet-Chandel" : rawUsername;
-    const name = (isVineet || username === "Vineet-Chandel") ? "Vineet Chandel" : (gh.name || username);
-    const avatarUrl = gh.avatar || gh.avatar_url || `https://github.com/${username}.png`;
-    const profileUrl = gh.profileUrl || gh.url || gh.link || `https://github.com/${username}`;
+    const username = gh.portal_username || gh.username || fallbackUsername || "";
+    const name = gh.name || gh.display_name || username || "GitHub";
+    const avatarUrl = gh.avatar || gh.avatar_url || (username ? `https://github.com/${username}.png` : "");
+    const profileUrl = gh.profileUrl || gh.url || gh.link || (username ? `https://github.com/${username}` : "");
 
     let publicRepos = typeof gh.public_repos === "number" ? gh.public_repos : (typeof gh.publicRepos === "number" ? gh.publicRepos : 0);
     let followers = typeof gh.followers === "number" ? gh.followers : 0;
@@ -539,22 +474,10 @@ export function extractGitHubStats(
         }
     }
 
-    // Exact verified metrics for user Vineet-Chandel
-    const cleanUsername = (username || "").toLowerCase().replace(/_/g, "-").trim();
-    if (cleanUsername.includes("vineet-chandel") || cleanUsername.includes("vineetchandel") || cleanUsername.includes("vineet") || isVineet) {
-        publicRepos = Math.max(publicRepos, 10);
-        commitsOrContributions = Math.max(commitsOrContributions, 1098);
-    }
-
-    // Fallback commits estimate if exact API search was not run yet
-    if (commitsOrContributions === 0 && publicRepos > 0) {
-        commitsOrContributions = Math.max(publicRepos * 12, 24);
-    }
-
     return {
         connected: true,
-        username: username || "Vineet-Chandel",
-        name: name || "Vineet Chandel",
+        username,
+        name,
         avatarUrl,
         publicRepos,
         contributionsOrCommits: commitsOrContributions,

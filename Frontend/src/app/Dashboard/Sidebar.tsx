@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 
 export type SidebarTab =
     | "dashboard"
+    | "leaderboard"
     | "connect-platform"
     | "profile"
     | "resume"
@@ -72,9 +73,9 @@ export const Sidebar = ({
 
     const displayName = user?.firstName
         ? `${user.firstName} ${user.lastName || ""}`.trim()
-        : user?.username || "Vineet Chandel";
+        : user?.username || "Developer";
 
-    const displayEmail = user?.gmail || (user as any)?.email || "vineetsinghbitu@gmail.com";
+    const displayEmail = user?.gmail || (user as any)?.email || "";
     const avatarSrc = user?.photoUrl || user?.avatarUrl || (user as any)?.avatar || "/avatar.png";
 
     const handleSignOut = async () => {
@@ -127,6 +128,21 @@ export const Sidebar = ({
                 </svg>
             ),
             path: "/dashboard",
+        },
+        {
+            id: "leaderboard" as SidebarTab,
+            label: "Leaderboard",
+            icon: (
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                    <path d="M4 22h16" />
+                    <path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-2.34" />
+                    <path d="M18 14.66V17c0 .55-.45 1-1 1h-2c-.55 0-1-.45-1-1v-2.34" />
+                    <path d="M6 4h12a2 2 0 0 1 2 2v3.5a6.5 6.5 0 0 1-6.5 6.5h-1A6.5 6.5 0 0 1 6 9.5V6a2 2 0 0 1 2-2z" />
+                </svg>
+            ),
+            path: "/leaderboard",
         },
         {
             id: "connect-platform" as SidebarTab,

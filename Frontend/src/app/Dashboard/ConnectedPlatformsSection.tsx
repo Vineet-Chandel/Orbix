@@ -348,50 +348,16 @@ export function getPlatformDifficulty(
     const statDisplay = getPlatformProblemStats(profile, portalId);
     const total = parseInt(statDisplay.count.replace(/,/g, ""), 10) || 0;
 
-    if (total === 0) {
-        return {
-            easy: 0,
-            medium: 0,
-            hard: 0,
-            total: 0,
-            easyTotal: meta.easyTotal,
-            mediumTotal: meta.mediumTotal,
-            hardTotal: meta.hardTotal,
-            totalQuestions: meta.totalQuestions,
-            attempting: 0,
-        };
-    }
-
-    // Exact match for LeetCode total 33 from user screenshot:
-    if (portalId === "leetcode" && total === 33) {
-        return {
-            easy: 26,
-            medium: 6,
-            hard: 1,
-            total: 33,
-            easyTotal: meta.easyTotal,
-            mediumTotal: meta.mediumTotal,
-            hardTotal: meta.hardTotal,
-            totalQuestions: meta.totalQuestions,
-            attempting: 1,
-        };
-    }
-
-    // Proportional distribution for competitive programming profiles (Easy: ~60%, Medium: ~30%, Hard: ~10%):
-    const easy = Math.max(1, Math.round(total * 0.60));
-    const medium = Math.round(total * 0.30);
-    const hard = Math.max(0, total - easy - medium);
-
     return {
-        easy,
-        medium,
-        hard,
+        easy: easyFound ?? 0,
+        medium: mediumFound ?? 0,
+        hard: hardFound ?? 0,
         total,
-        easyTotal: Math.max(easy, meta.easyTotal),
-        mediumTotal: Math.max(medium, meta.mediumTotal),
-        hardTotal: Math.max(hard, meta.hardTotal),
-        totalQuestions: Math.max(total, meta.totalQuestions),
-        attempting: total > 0 ? 1 : 0,
+        easyTotal: meta.easyTotal,
+        mediumTotal: meta.mediumTotal,
+        hardTotal: meta.hardTotal,
+        totalQuestions: meta.totalQuestions,
+        attempting: 0,
     };
 }
 

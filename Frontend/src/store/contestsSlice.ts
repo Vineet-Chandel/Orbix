@@ -97,7 +97,10 @@ export const fetchContestPerformance = createAsyncThunk<
 >(
     "contests/fetchUnified",
     async ({ username, force = false, portals }, { getState, rejectWithValue }) => {
-        const effectiveUser = username.trim() || "vineet_chandel";
+        const effectiveUser = username.trim();
+        if (!effectiveUser) {
+            return rejectWithValue("Username is required to fetch contest performance");
+        }
         const state = getState().contests;
         const existing = state.dataByUser[effectiveUser];
         const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
@@ -185,22 +188,28 @@ export const contestsSlice = createSlice({
     extraReducers: (builder) => {
         builder
             .addCase(fetchContestPerformance.pending, (state, action) => {
-                const user = (action.meta.arg.username || "vineet_chandel").trim();
-                state.loadingByUser[user] = true;
-                state.errorByUser[user] = null;
+                const user = (action.meta.arg.username || "").trim();
+                if (user) {
+                    state.loadingByUser[user] = true;
+                    state.errorByUser[user] = null;
+                }
             })
             .addCase(fetchContestPerformance.fulfilled, (state, action) => {
                 const user = action.payload.username;
-                state.loadingByUser[user] = false;
-                state.dataByUser[user] = action.payload;
-                state.lastFetchedAtByUser[user] = Date.now();
-                state.errorByUser[user] = null;
-                saveStoredContests(state.dataByUser);
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.dataByUser[user] = action.payload;
+                    state.lastFetchedAtByUser[user] = Date.now();
+                    state.errorByUser[user] = null;
+                    saveStoredContests(state.dataByUser);
+                }
             })
             .addCase(fetchContestPerformance.rejected, (state, action) => {
-                const user = (action.meta.arg.username || "vineet_chandel").trim();
-                state.loadingByUser[user] = false;
-                state.errorByUser[user] = action.payload || "Failed to load contest performance";
+                const user = (action.meta.arg.username || "").trim();
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.errorByUser[user] = action.payload || "Failed to load contest performance";
+                }
             });
     },
 });

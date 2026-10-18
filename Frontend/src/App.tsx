@@ -11,6 +11,7 @@ import Dashboard from "./app/Dashboard/Landing";
 import ProfileManager from "./app/Profile/ProfileManager";
 import PublicProfilePage from "./app/Profile/PublicProfilePage";
 import ProfilesOnboardingPage from "./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage";
+import LeaderboardPage from "./app/Leaderboard/LeaderboardPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
@@ -39,6 +40,7 @@ const App = () => {
           <Route path="/support" element={<SupportPage />} />
           <Route path="/platform" element={<PlatformPage />} />
           <Route path="/demo" element={<SupportPage />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
 
           {/* Public Shareable Profile Showcase Route */}
           <Route path="/profile/:username" element={<PublicProfilePage />} />

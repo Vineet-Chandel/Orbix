@@ -13,12 +13,12 @@ interface CodingSubmissionsChartProps {
 
 export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = ({
     connectedPortals,
-    username = "vineet_chandel",
+    username = "",
     variant = "linkedin",
 }) => {
     const isStory = variant === "story";
     const weeksCount = 28; // 28 weeks of contributions
-    const effectiveUser = (username || "vineet_chandel").trim();
+    const effectiveUser = (username || "").trim();
 
     const dispatch = useAppDispatch();
     // Read cached unified submissions from Redux store (hydrated instantly from localStorage)
@@ -26,7 +26,7 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = ({
 
     // Fetch unified submissions only if data is not already present in Redux
     useEffect(() => {
-        if (!cachedData) {
+        if (effectiveUser && !cachedData) {
             dispatch(fetchUnifiedSubmissions({ username: effectiveUser }));
         }
     }, [effectiveUser, cachedData, dispatch]);

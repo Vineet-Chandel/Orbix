@@ -25,12 +25,12 @@ interface DevelopmentContributionsTableProps {
 
 export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTableProps> = ({
     connectedPortals,
-    username = "vineet_chandel",
+    username = "",
 }) => {
     const [selectedPortal, setSelectedPortal] = useState<string>("all");
     const [hoveredCell, setHoveredCell] = useState<DaySubmissionCell | null>(null);
 
-    const effectiveUser = (username || "vineet_chandel").trim();
+    const effectiveUser = (username || "").trim();
     const dispatch = useAppDispatch();
     const remoteData = useAppSelector((state) => state.development.dataByUser[effectiveUser]);
 
@@ -38,7 +38,7 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
 
     // Fetch unified development contributions from backend only if not already cached in Redux
     useEffect(() => {
-        if (!remoteData) {
+        if (effectiveUser && !remoteData) {
             dispatch(fetchUnifiedDevelopment({ username: effectiveUser }));
         }
     }, [effectiveUser, remoteData, dispatch]);

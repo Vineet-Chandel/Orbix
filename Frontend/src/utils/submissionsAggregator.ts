@@ -198,21 +198,6 @@ export function aggregateClientPortalsSubmissions(
     const sumPlatform = Object.values(platformBreakdown).reduce((acc, p) => acc + p.submissions, 0);
     totalSubmissions = Math.max(sumDaily, sumPlatform);
 
-    // If dailyMap is empty but user has solved problems across platforms,
-    // deterministic distribution seeded by user handle
-    if (Object.keys(dailyMap).length === 0 && totalSubmissions > 0) {
-        const today = new Date();
-        const daysToDistribute = Math.min(Math.max(totalSubmissions, 15), 180);
-        for (let i = 0; i < daysToDistribute; i++) {
-            const step = Math.floor((i * 365) / daysToDistribute);
-            const d = new Date(today);
-            d.setDate(today.getDate() - step);
-            const dateStr = d.toISOString().split("T")[0] || "";
-            const count = 1 + (i % 5);
-            dailyMap[dateStr] = { count, platforms: Object.keys(platformBreakdown).slice(0, 2) };
-        }
-    }
-
     // Calculate streak
     const today = new Date();
     let dayStreak = 0;
@@ -233,7 +218,7 @@ export function aggregateClientPortalsSubmissions(
     return {
         totalSubmissions,
         activeDays: Object.keys(dailyMap).length,
-        dayStreak: Math.max(dayStreak, 1),
+        dayStreak,
         connectedPlatformsCount: Object.keys(platformBreakdown).length,
         platformBreakdown,
         weeks,
@@ -262,7 +247,7 @@ export function aggregateClientDevelopmentContributions(
         if (lowerId !== "github" && lowerId !== "gitlab") continue;
 
         const profile = rawProfile;
-        const username = profile.username || profile.portal_username || "Vineet-Chandel";
+        const username = profile.username || profile.portal_username || "";
         const name = profile.name || profile.display_name || username || "GitHub";
 
         let contributions = 0;
@@ -275,10 +260,6 @@ export function aggregateClientDevelopmentContributions(
                 const m = (s.value || "").match(/([\d,]+)/);
                 if (m) contributions = parseInt(m[1].replace(/,/g, ""), 10) || contributions;
             }
-        }
-
-        if (contributions === 0) {
-            contributions = 1095;
         }
 
         if (profile.submissionCalendar && typeof profile.submissionCalendar === "object") {
@@ -305,39 +286,14 @@ export function aggregateClientDevelopmentContributions(
             username,
             solved: contributions,
             submissions: contributions,
-            activeDays: Object.keys(dailyMap).length || 1,
+            activeDays: Object.keys(dailyMap).length,
             brandColor: BRAND_COLORS[lowerId] || "#24292E",
-        };
-    }
-
-    if (Object.keys(platformBreakdown).length === 0) {
-        platformBreakdown["github"] = {
-            name: "GitHub",
-            portal: "github",
-            username: "Vineet-Chandel",
-            solved: 1095,
-            submissions: 1095,
-            activeDays: 240,
-            brandColor: "#24292E",
         };
     }
 
     const sumDaily = Object.values(dailyMap).reduce((acc, d) => acc + d.count, 0);
     const sumPlatform = Object.values(platformBreakdown).reduce((acc, p) => acc + p.submissions, 0);
-    totalSubmissions = Math.max(sumDaily, sumPlatform, 1095);
-
-    if (Object.keys(dailyMap).length === 0 && totalSubmissions > 0) {
-        const today = new Date();
-        const daysToDistribute = 240;
-        for (let i = 0; i < daysToDistribute; i++) {
-            const step = Math.floor((i * 365) / daysToDistribute);
-            const d = new Date(today);
-            d.setDate(today.getDate() - step);
-            const dateStr = d.toISOString().split("T")[0] || "";
-            const count = 1 + (i % 6);
-            dailyMap[dateStr] = { count, platforms: ["github"] };
-        }
-    }
+    totalSubmissions = Math.max(sumDaily, sumPlatform);
 
     const today = new Date();
     let dayStreak = 0;
@@ -357,8 +313,8 @@ export function aggregateClientDevelopmentContributions(
 
     return {
         totalSubmissions,
-        activeDays: Object.keys(dailyMap).length || 240,
-        dayStreak: Math.max(dayStreak, 3),
+        activeDays: Object.keys(dailyMap).length,
+        dayStreak,
         connectedPlatformsCount: Object.keys(platformBreakdown).length,
         platformBreakdown,
         weeks,

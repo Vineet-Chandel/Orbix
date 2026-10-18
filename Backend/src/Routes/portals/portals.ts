@@ -3,6 +3,16 @@ import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
 import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
 import { calculateUserContestPerformance } from "./contestAnalytics.js";
+import {
+    getCodeforcesTier,
+    getLeetCodeTier,
+    getCodeChefTier,
+    getCodeChefDivision,
+    getAtCoderTier,
+    getHackerRankProblemSolvingStars,
+    classifyCodeforcesRating,
+    normalizeGeeksforGeeksDifficulty,
+} from "../../utils/ratingSystems.js";
 
 const portalsRouter = express.Router();
 
@@ -191,6 +201,16 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
                             submissionCalendar
                         }
                     }
+                    userContestRanking(username: $username) {
+                        attendedContestsCount
+                        rating
+                        globalRanking
+                        totalParticipants
+                        topPercentage
+                        badge {
+                            name
+                        }
+                    }
                     recentAcSubmissionList(username: $username, limit: 30) {
                         id
                         title
@@ -211,6 +231,7 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
         const name = user.profile?.realName || user.username;
         const avatar = user.profile?.userAvatar || getFallbackAvatar(username);
         const ranking = user.profile?.ranking;
+        const contestRanking = data?.data?.userContestRanking;
 
         const allQuestions = data?.data?.allQuestionsCount || [];
         const acSubmissions = user.submitStatsGlobal?.acSubmissionNum || [];
@@ -270,6 +291,21 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
         const stats: Array<{ label: string; value: string }> = [
             { label: "solved", value: `${totalSolved} solved` },
         ];
+        if (contestRanking?.rating) {
+            const contestRating = Math.round(contestRanking.rating);
+            stats.push({ label: "rating", value: `${contestRating} rating` });
+            if (contestRanking.badge?.name) {
+                stats.push({ label: "badge", value: contestRanking.badge.name });
+            } else {
+                const tier = getLeetCodeTier(contestRating);
+                if (tier.isOfficialBadge) {
+                    stats.push({ label: "badge", value: tier.name });
+                }
+            }
+        }
+        if (contestRanking?.attendedContestsCount) {
+            stats.push({ label: "contests", value: `${contestRanking.attendedContestsCount} contests` });
+        }
         if (totalCalendarSubs > 0) {
             stats.push({ label: "submissions", value: `${totalCalendarSubs} submissions` });
         }
@@ -363,9 +399,10 @@ async function fetchCodeforces(username: string): Promise<PortalProfileData | nu
                             if (!solvedSet.has(key)) {
                                 solvedSet.add(key);
                                 const rating = sub.problem.rating;
-                                if (!rating || rating <= 1200) {
+                                const diff = classifyCodeforcesRating(rating);
+                                if (diff === "Easy") {
                                     easyCount++;
-                                } else if (rating <= 1800) {
+                                } else if (diff === "Medium") {
                                     medCount++;
                                 } else {
                                     hardCount++;
@@ -391,12 +428,8 @@ async function fetchCodeforces(username: string): Promise<PortalProfileData | nu
                             if (!seenCf.has(key)) {
                                 seenCf.add(key);
                                 const rating = sub.problem.rating;
-                                let diff: "Easy" | "Medium" | "Hard" | null = null;
-                                if (typeof rating === "number") {
-                                    if (rating <= 1200) diff = "Easy";
-                                    else if (rating <= 1800) diff = "Medium";
-                                    else diff = "Hard";
-                                }
+                                const rawDiff = classifyCodeforcesRating(rating);
+                                const diff: "Easy" | "Medium" | "Hard" | null = rawDiff === "Unknown" ? null : rawDiff;
                                 const ts = sub.creationTimeSeconds || Math.floor(Date.now() / 1000);
                                 recentSubmissions.push({
                                     id: `codeforces-${sub.id || key}`,
@@ -444,8 +477,9 @@ async function fetchCodeforces(username: string): Promise<PortalProfileData | nu
 
         if (user.rating !== undefined) {
             stats.push({ label: "rating", value: `${user.rating} rating` });
-        }
-        if (user.rank) {
+            const cfTier = getCodeforcesTier(user.rating);
+            stats.push({ label: "rank", value: cfTier.name });
+        } else if (user.rank) {
             stats.push({ label: "rank", value: user.rank });
         }
         if (user.maxRating) {
@@ -529,15 +563,7 @@ async function fetchGitHub(username: string): Promise<PortalProfileData | null> 
             // non-blocking
         }
 
-        const cleanUsername = (username || "").toLowerCase().replace(/_/g, "-").trim();
-        if ((cleanUsername === "vineet-chandel" || cleanUsername === "vineetchandel") && contributions < 1095) {
-            contributions = 1095;
-        }
-
-        let repos = user.public_repos ?? 0;
-        if ((cleanUsername === "vineet-chandel" || cleanUsername === "vineetchandel") && repos < 10) {
-            repos = 10;
-        }
+        const repos = user.public_repos ?? 0;
 
         const stats: Array<{ label: string; value: string }> = [
             { label: "repos", value: `${repos} repos` },
@@ -654,26 +680,35 @@ async function fetchCodeChef(username: string): Promise<PortalProfileData | null
             { label: "solved", value: `${solvedCount} solved` },
         ];
 
-        if (ratingMatch && ratingMatch[1]) {
-            stats.push({ label: "rating", value: `${ratingMatch[1]} rating` });
+        const numericRating = ratingMatch && ratingMatch[1] ? parseInt(ratingMatch[1], 10) : null;
+        if (numericRating !== null) {
+            stats.push({ label: "rating", value: `${numericRating} rating` });
+            const ccTier = getCodeChefTier(numericRating);
+            const ccDiv = getCodeChefDivision(numericRating);
+            stats.push({ label: "division", value: ccDiv.division });
+            if (starCount === 0 && ccTier.name) {
+                stats.push({ label: "stars", value: ccTier.name });
+            }
         }
         if (starCount > 0) {
             stats.push({ label: "stars", value: `${starCount}★` });
         }
+
+        const peakMatch = html.match(/<small>\s*\(Highest Rating\s*(\d+)\)\s*<\/small>/i) ||
+                          html.match(/Highest Rating\s*(\d+)/i);
+        if (peakMatch && peakMatch[1]) {
+            const peakVal = parseInt(peakMatch[1], 10);
+            if (!numericRating || peakVal > numericRating) {
+                stats.push({ label: "maxRating", value: `max ${peakVal}` });
+            }
+        }
+
         if (globalRankMatch && globalRankMatch[1]) {
             stats.push({ label: "rank", value: formatRank(parseInt(globalRankMatch[1], 10)) });
         }
 
-        const easy = solvedCount > 0 ? Math.max(1, Math.round(solvedCount * 0.60)) : 0;
-        const medium = solvedCount > 0 ? Math.round(solvedCount * 0.30) : 0;
-        const hard = solvedCount > 0 ? Math.max(0, solvedCount - easy - medium) : 0;
-
-        const difficulty: DifficultyBreakdown = {
-            easy,
-            medium,
-            hard,
-            total: solvedCount,
-        };
+        // CodeChef does not natively provide an Easy/Medium/Hard classification
+        const difficulty: DifficultyBreakdown | undefined = undefined;
 
         let ccCalendar: Record<string, number> = {};
         const ccStatsMatch = html.match(/var\s+userDailySubmissionsStats\s*=\s*(\[[^\]]*\])/i);
@@ -754,30 +789,107 @@ async function fetchGeeksforGeeks(username: string): Promise<PortalProfileData |
 
         if (!html) return null;
 
-        const problemsMatch = html.match(/total_problems_solved[^\d]*(\d+)/i);
-        const scoreMatch = html.match(/score[^\d]*(\d+)/i);
-        const rankMatch = html.match(/institute_rank\\*":\\*"([^\\"]+)\\"/i);
-        const nameMatch = html.match(/articleCount[^\}]*?name\\*":\\*"([^\\"]+)\\"/i) || html.match(/"name":\s*\\"([^\\"]+)\\"/i);
-        const avatarMatch = html.match(/articleCount[^\}]*?profile_image_url\\*":\\*"([^\\"]+)\\"/i) || html.match(/"profile_image_url":\s*\\"([^\\"]+)\\"/i);
+        let totalSolved = 0;
+        let codingScore = 0;
+        let instituteRank: string | null = null;
+        let monthlyScore = 0;
+        let potdStreak = 0;
+        let schoolCount = 0;
+        let basicCount = 0;
+        let easyCount = 0;
+        let medCount = 0;
+        let hardCount = 0;
 
-        const totalSolved = problemsMatch && problemsMatch[1] ? parseInt(problemsMatch[1], 10) : 0;
-        const codingScore = scoreMatch && scoreMatch[1] ? parseInt(scoreMatch[1], 10) : 0;
-        const name = (nameMatch && nameMatch[1] && nameMatch[1] !== "null" && nameMatch[1] !== "undefined")
-            ? nameMatch[1]
-            : cleanUsername;
-        const avatar = (avatarMatch && avatarMatch[1] && avatarMatch[1] !== "null")
-            ? avatarMatch[1]
-            : getFallbackAvatar(cleanUsername);
+        let name = cleanUsername;
+        let avatar = getFallbackAvatar(cleanUsername);
+
+        // 1. Try parsing structured Next.js data
+        const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/i);
+        if (nextDataMatch && nextDataMatch[1]) {
+            try {
+                const nextData = JSON.parse(nextDataMatch[1]);
+                const pageProps = nextData?.props?.pageProps;
+                const userInfo = pageProps?.userInfo || pageProps?.userProfile || pageProps?.initialState?.userProfile;
+                if (userInfo) {
+                    if (userInfo.name) name = userInfo.name;
+                    if (userInfo.profile_image_url && userInfo.profile_image_url !== "null") avatar = userInfo.profile_image_url;
+                    if (userInfo.total_problems_solved) totalSolved = parseInt(userInfo.total_problems_solved, 10) || 0;
+                    if (userInfo.score || userInfo.coding_score) codingScore = parseInt(userInfo.score || userInfo.coding_score, 10) || 0;
+                    if (userInfo.institute_rank) instituteRank = String(userInfo.institute_rank);
+                    if (userInfo.monthly_score) monthlyScore = parseInt(userInfo.monthly_score, 10) || 0;
+                    if (userInfo.pod_streak || userInfo.potd_streak) potdStreak = parseInt(userInfo.pod_streak || userInfo.potd_streak, 10) || 0;
+
+                    const diffObj = userInfo.difficulty_wise_problems || userInfo.difficultyWiseProblems;
+                    if (diffObj && typeof diffObj === "object") {
+                        schoolCount = parseInt(diffObj.school || diffObj.School || 0, 10) || 0;
+                        basicCount = parseInt(diffObj.basic || diffObj.Basic || 0, 10) || 0;
+                        easyCount = parseInt(diffObj.easy || diffObj.Easy || 0, 10) || 0;
+                        medCount = parseInt(diffObj.medium || diffObj.Medium || 0, 10) || 0;
+                        hardCount = parseInt(diffObj.hard || diffObj.Hard || 0, 10) || 0;
+                    }
+                }
+            } catch {
+                // fall through to regex
+            }
+        }
+
+        // 2. Regex fallbacks for fields not captured in __NEXT_DATA__
+        if (totalSolved === 0) {
+            const problemsMatch = html.match(/total_problems_solved[^\d]*(\d+)/i);
+            if (problemsMatch && problemsMatch[1]) totalSolved = parseInt(problemsMatch[1], 10);
+        }
+        if (codingScore === 0) {
+            const scoreMatch = html.match(/score[^\d]*(\d+)/i);
+            if (scoreMatch && scoreMatch[1]) codingScore = parseInt(scoreMatch[1], 10);
+        }
+        if (!instituteRank) {
+            const rankMatch = html.match(/institute_rank\\*":\\*"([^\\"]+)\\"/i) || html.match(/"institute_rank":\s*"([^"]+)"/i);
+            if (rankMatch && rankMatch[1]) instituteRank = rankMatch[1];
+        }
+        if (name === cleanUsername) {
+            const nameMatch = html.match(/articleCount[^\}]*?name\\*":\\*"([^\\"]+)\\"/i) || html.match(/"name":\s*\\"([^\\"]+)\\"/i);
+            if (nameMatch && nameMatch[1] && nameMatch[1] !== "null" && nameMatch[1] !== "undefined") name = nameMatch[1];
+        }
+        if (avatar === getFallbackAvatar(cleanUsername)) {
+            const avatarMatch = html.match(/articleCount[^\}]*?profile_image_url\\*":\\*"([^\\"]+)\\"/i) || html.match(/"profile_image_url":\s*\\"([^\\"]+)\\"/i);
+            if (avatarMatch && avatarMatch[1] && avatarMatch[1] !== "null") avatar = avatarMatch[1];
+        }
 
         const stats: Array<{ label: string; value: string }> = [
             { label: "solved", value: `${totalSolved} solved` },
             { label: "score", value: `${codingScore} score` },
         ];
 
-        if (rankMatch && rankMatch[1]) {
-            stats.push({ label: "rank", value: `#${rankMatch[1]} rank` });
-        } else {
-            stats.push({ label: "portal", value: "GeeksforGeeks" });
+        if (instituteRank) {
+            stats.push({ label: "instituteRank", value: `#${instituteRank} institute rank` });
+        }
+        if (monthlyScore > 0) {
+            stats.push({ label: "monthlyScore", value: `${monthlyScore} monthly score` });
+        }
+        if (potdStreak > 0) {
+            stats.push({ label: "streak", value: `${potdStreak} day POTD streak` });
+        }
+
+        let difficulty: DifficultyBreakdown | undefined = undefined;
+        if (schoolCount > 0 || basicCount > 0 || easyCount > 0 || medCount > 0 || hardCount > 0) {
+            const norm = normalizeGeeksforGeeksDifficulty({
+                school: schoolCount,
+                basic: basicCount,
+                easy: easyCount,
+                medium: medCount,
+                hard: hardCount,
+            });
+            difficulty = {
+                easy: norm.easy,
+                medium: norm.medium,
+                hard: norm.hard,
+                total: norm.total,
+                easyTotal: 1000,
+                mediumTotal: 1200,
+                hardTotal: 500,
+                totalQuestions: 2700,
+                attempting: norm.total > 0 ? 1 : 0,
+            };
         }
 
         return {
@@ -787,8 +899,10 @@ async function fetchGeeksforGeeks(username: string): Promise<PortalProfileData |
             name,
             avatar,
             stats,
+            difficulty,
             profileUrl: `https://www.geeksforgeeks.org/user/${cleanUsername}`,
             verified: true,
+            streak: potdStreak || undefined,
         };
     } catch {
         return null;
@@ -824,11 +938,29 @@ async function fetchHackerRank(username: string): Promise<PortalProfileData | nu
                 const badgeData = (await badgesRes.json()) as any;
                 if (badgeData?.models && Array.isArray(badgeData.models)) {
                     let totalSolved = 0;
+                    let totalStars = 0;
                     for (const b of badgeData.models) {
-                        if (typeof b.solved === "number") totalSolved += b.solved;
+                        const domainName = b.badge_name || b.name || "";
+                        const stars = typeof b.stars === "number" ? b.stars : 0;
+                        const solved = typeof b.solved === "number" ? b.solved : 0;
+                        const points = typeof b.current_points === "number" ? b.current_points : 0;
+                        totalSolved += solved;
+                        totalStars += stars;
+
+                        if (domainName.toLowerCase().includes("problem solving")) {
+                            const calculatedStars = stars > 0 ? stars : getHackerRankProblemSolvingStars(points);
+                            if (calculatedStars > 0) {
+                                stats.push({ label: "badge", value: `${calculatedStars}★ Problem Solving` });
+                            }
+                        } else if (stars > 0) {
+                            stats.push({ label: `badge_${domainName.toLowerCase().replace(/[^a-z0-9]/g, "_")}`, value: `${stars}★ ${domainName}` });
+                        }
                     }
                     if (totalSolved > 0) {
                         stats.push({ label: "solved", value: `${totalSolved} solved` });
+                    }
+                    if (totalStars > 0) {
+                        stats.push({ label: "stars", value: `${totalStars}★ total` });
                     }
                 }
             }
@@ -909,6 +1041,21 @@ async function fetchAtCoder(username: string): Promise<PortalProfileData | null>
 
         const stats: Array<{ label: string; value: string }> = [];
 
+        // Parse official AtCoder contest rating from user profile table
+        const ratingMatch = html.match(/Rating<\/th>\s*<td[^>]*>(?:<span[^>]*class=['"]user-[a-z]+['"][^>]*>)?(\d+)(?:<\/span>)?/i);
+        const highestMatch = html.match(/Highest\s*Rating<\/th>\s*<td[^>]*>(?:<span[^>]*class=['"]user-[a-z]+['"][^>]*>)?(\d+)(?:<\/span>)?/i);
+        const currentRating = ratingMatch && ratingMatch[1] ? parseInt(ratingMatch[1], 10) : null;
+        const highestRating = highestMatch && highestMatch[1] ? parseInt(highestMatch[1], 10) : currentRating;
+
+        if (currentRating !== null) {
+            const acTier = getAtCoderTier(currentRating);
+            stats.push({ label: "rating", value: `${currentRating} rating` });
+            stats.push({ label: "color", value: acTier.name });
+        }
+        if (highestRating !== null && (currentRating === null || highestRating > currentRating)) {
+            stats.push({ label: "maxRating", value: `max ${highestRating}` });
+        }
+
         try {
             const acRes = await fetch(`https://kenkoooo.com/atcoder/atcoder-api/v3/user/ac_rank?user=${encodeURIComponent(username)}`, {
                 headers: { "User-Agent": "Orbix" },
@@ -918,6 +1065,9 @@ async function fetchAtCoder(username: string): Promise<PortalProfileData | null>
                 const acData = (await acRes.json()) as any;
                 if (acData && typeof acData.count === "number") {
                     stats.push({ label: "solved", value: `${acData.count} solved` });
+                }
+                if (acData && typeof acData.rank === "number") {
+                    stats.push({ label: "rank", value: formatRank(acData.rank) });
                 }
             }
         } catch {
@@ -1831,7 +1981,10 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
  */
 const activeDevelopmentRefreshes = new Set<string>();
 
-export async function calculateUnifiedDevelopmentContributions(username: string) {
+export async function calculateUnifiedDevelopmentContributions(
+    username: string,
+    clientPortals?: Record<string, string>
+) {
     let ghHandle = "";
     let displayName = "GitHub";
 
@@ -1852,23 +2005,20 @@ export async function calculateUnifiedDevelopmentContributions(username: string)
         // non-blocking
     }
 
-    if (!ghHandle) {
-        const clean = (username || "").toLowerCase();
-        if (clean.includes("vineet")) {
-            ghHandle = "Vineet-Chandel";
-        } else {
-            ghHandle = username;
-        }
+    if (!ghHandle && clientPortals?.github) {
+        ghHandle = clientPortals.github;
     }
 
     let profileData: any = null;
-    try {
-        profileData = await Promise.race([
-            fetchGitHub(ghHandle),
-            new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 6000)),
-        ]);
-    } catch {
-        profileData = null;
+    if (ghHandle) {
+        try {
+            profileData = await Promise.race([
+                fetchGitHub(ghHandle),
+                new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 6000)),
+            ]);
+        } catch {
+            profileData = null;
+        }
     }
 
     const dailyMerged: Record<string, { count: number; platforms: string[] }> = {};
@@ -1907,19 +2057,20 @@ export async function calculateUnifiedDevelopmentContributions(username: string)
         }
     }
 
-    const platformBreakdown: Record<string, any> = {
-        github: {
+    const platformBreakdown: Record<string, any> = {};
+    if (ghHandle && profileData) {
+        platformBreakdown.github = {
             name: profileData?.name || displayName || "GitHub",
             portal: "github",
             username: ghHandle,
             solved: totalContributions,
             submissions: totalContributions,
             contributions: totalContributions,
-            activeDays: activeDays || 1,
+            activeDays: activeDays || (totalContributions > 0 ? 1 : 0),
             avatar: profileData?.avatar || null,
             profileUrl: profileData?.profileUrl || `https://github.com/${ghHandle}`,
-        },
-    };
+        };
+    }
 
     return {
         success: true,
@@ -1946,6 +2097,20 @@ portalsRouter.get("/development/unified", async (req: Request, res: Response) =>
             });
         }
 
+        let clientPortals: Record<string, string> | undefined = undefined;
+        if (req.query.portals) {
+            try {
+                clientPortals = JSON.parse(String(req.query.portals));
+            } catch {
+                clientPortals = {};
+                const parts = String(req.query.portals).split(",");
+                for (const p of parts) {
+                    const [k, v] = p.split(":");
+                    if (k && v) clientPortals[k.trim().toLowerCase()] = v.trim();
+                }
+            }
+        }
+
         const cacheKey = `user:development:unified:${username}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
 
@@ -1961,7 +2126,7 @@ portalsRouter.get("/development/unified", async (req: Request, res: Response) =>
                     const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
                     if (cacheAge > 3 * 60 * 1000 && !activeDevelopmentRefreshes.has(username)) {
                         activeDevelopmentRefreshes.add(username);
-                        calculateUnifiedDevelopmentContributions(username)
+                        calculateUnifiedDevelopmentContributions(username, clientPortals)
                             .then(async (fresh) => {
                                 if (
                                     fresh.totalContributions !== parsed.totalContributions ||
@@ -1987,7 +2152,7 @@ portalsRouter.get("/development/unified", async (req: Request, res: Response) =>
             }
         }
 
-        const responseData = await calculateUnifiedDevelopmentContributions(username);
+        const responseData = await calculateUnifiedDevelopmentContributions(username, clientPortals);
 
         if (redis && redis.status === "ready") {
             try {
@@ -2387,17 +2552,16 @@ export const handleSavePortals = async (req: Request, res: Response) => {
             }
         }
 
-        // User identity from req.user (populated by authenticate middleware) with payload fallbacks
+        // User identity from req.user (strictly authenticated)
         const authUser = (req as any).user;
-        const userId = authUser?.id || body.user_id || body.userId || null;
-        const userIdentifier = authUser?.username || body.username || authUser?.gmail || null;
-
-        if (!userIdentifier) {
+        if (!authUser || (!authUser.username && !authUser.gmail)) {
             return res.status(401).json({
                 success: false,
-                message: "Authentication required: user identifier not found",
+                message: "Authentication required: valid session token needed to link or modify accounts",
             });
         }
+        const userId = authUser.id || null;
+        const userIdentifier = authUser.username || authUser.gmail;
 
         // Save to Database (PostgreSQL)
         let dbSaved = false;
@@ -2460,6 +2624,7 @@ export const handleSavePortals = async (req: Request, res: Response) => {
                     redis.del(`profile:public:${userIdentifier}`),
                     redis.del(`user:submissions:unified:${userIdentifier}`),
                     redis.del(`user:development:unified:${userIdentifier}`),
+                    redis.del(`user:contests:unified:${userIdentifier}`),
                 ]);
             }
         } catch {
@@ -2832,6 +2997,7 @@ portalsRouter.delete("/:portal", authenticate, async (req: Request, res: Respons
                 redis.del(`user:portals:${authUser.username}`),
                 redis.del(`user:submissions:unified:${authUser.username}`),
                 redis.del(`user:development:unified:${authUser.username}`),
+                redis.del(`user:contests:unified:${authUser.username}`),
             ]);
         }
 
@@ -2893,6 +3059,7 @@ portalsRouter.put("/:portal", authenticate, async (req: Request, res: Response) 
                 redis.del(`user:portals:${authUser.username}`),
                 redis.del(`user:submissions:unified:${authUser.username}`),
                 redis.del(`user:development:unified:${authUser.username}`),
+                redis.del(`user:contests:unified:${authUser.username}`),
             ]);
         }
 

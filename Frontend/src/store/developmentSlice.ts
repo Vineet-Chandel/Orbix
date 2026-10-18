@@ -54,7 +54,10 @@ export const fetchUnifiedDevelopment = createAsyncThunk<
 >(
     "development/fetchUnified",
     async ({ username, force = false }, { getState, rejectWithValue }) => {
-        const effectiveUser = username.trim() || "vineet_chandel";
+        const effectiveUser = username.trim();
+        if (!effectiveUser) {
+            return rejectWithValue("Username is required to fetch unified development contributions");
+        }
         const state = getState().development;
         const existing = state.dataByUser[effectiveUser];
         const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
@@ -98,7 +101,8 @@ export const fetchUnifiedDevelopment = createAsyncThunk<
     {
         // Prevent duplicate network calls
         condition: ({ username, force = false }, { getState }) => {
-            const effectiveUser = username.trim() || "vineet_chandel";
+            const effectiveUser = username.trim();
+            if (!effectiveUser) return false;
             const state = getState().development;
             const isLoading = state?.loadingByUser?.[effectiveUser];
             if (!force && isLoading) return false;
@@ -139,22 +143,28 @@ export const developmentSlice = createSlice({
     extraReducers: (builder) => {
         builder
             .addCase(fetchUnifiedDevelopment.pending, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = true;
-                state.errorByUser[user] = null;
+                const user = (action.meta.arg.username || "").trim();
+                if (user) {
+                    state.loadingByUser[user] = true;
+                    state.errorByUser[user] = null;
+                }
             })
             .addCase(fetchUnifiedDevelopment.fulfilled, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = false;
-                state.dataByUser[user] = action.payload;
-                state.lastFetchedAtByUser[user] = Date.now();
-                state.errorByUser[user] = null;
-                saveStoredDevelopment(state.dataByUser);
+                const user = action.payload.username;
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.dataByUser[user] = action.payload;
+                    state.lastFetchedAtByUser[user] = Date.now();
+                    state.errorByUser[user] = null;
+                    saveStoredDevelopment(state.dataByUser);
+                }
             })
             .addCase(fetchUnifiedDevelopment.rejected, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = false;
-                state.errorByUser[user] = action.payload || "Failed to load development contributions";
+                const user = (action.meta.arg.username || "").trim();
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.errorByUser[user] = action.payload || "Failed to load development contributions";
+                }
             });
     },
 });

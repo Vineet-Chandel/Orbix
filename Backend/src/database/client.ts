@@ -69,8 +69,12 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE user_links ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;
             ALTER TABLE user_links ADD COLUMN IF NOT EXISTS last_sync_status VARCHAR(50) DEFAULT 'valid';
             ALTER TABLE user_links ADD COLUMN IF NOT EXISTS last_sync_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+            ALTER TABLE user_links ADD COLUMN IF NOT EXISTS last_error TEXT NULL;
+            ALTER TABLE user_links ADD COLUMN IF NOT EXISTS snapshot JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE user_links ADD COLUMN IF NOT EXISTS retry_count INT DEFAULT 0;
             CREATE INDEX IF NOT EXISTS idx_user_links_username ON user_links(username);
             CREATE INDEX IF NOT EXISTS idx_user_links_portal ON user_links(portal);
+            CREATE INDEX IF NOT EXISTS idx_user_links_portal_handle ON user_links(portal, portal_username);
 
             -- Ensure user profile extension columns exist on users table
             ALTER TABLE users ADD COLUMN IF NOT EXISTS headline VARCHAR(255);
@@ -85,7 +89,42 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_public_id TEXT NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS previous_photo_url TEXT NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS previous_photo_public_id TEXT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS college VARCHAR(255) DEFAULT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS orbix_score INT DEFAULT 0;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS orbix_score_breakdown JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS orbix_score_version VARCHAR(20) DEFAULT 'v1.0.0';
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS orbix_score_updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS is_verified_coder BOOLEAN DEFAULT false;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS streak INT DEFAULT 0;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS total_solved INT DEFAULT 0;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS total_contests INT DEFAULT 0;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS platform_ratings JSONB DEFAULT '{}'::jsonb;
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+            CREATE INDEX IF NOT EXISTS idx_users_orbix_score ON users(orbix_score DESC, username ASC);
+            CREATE INDEX IF NOT EXISTS idx_users_is_public ON users(is_public);
+
+            -- Ensure leaderboard_entries precomputed projection table exists
+            CREATE TABLE IF NOT EXISTS leaderboard_entries (
+                user_id UUID PRIMARY KEY,
+                username VARCHAR(100) NOT NULL UNIQUE,
+                display_name VARCHAR(150) NOT NULL,
+                avatar_url TEXT NULL,
+                college VARCHAR(255) NULL,
+                is_verified BOOLEAN DEFAULT false,
+                score INT NOT NULL DEFAULT 0,
+                score_breakdown JSONB NOT NULL DEFAULT '{}'::jsonb,
+                total_solved INT NOT NULL DEFAULT 0,
+                total_contests INT NOT NULL DEFAULT 0,
+                platform_ratings JSONB NOT NULL DEFAULT '{}'::jsonb,
+                streak INT NOT NULL DEFAULT 0,
+                global_rank INT DEFAULT NULL,
+                is_public BOOLEAN DEFAULT true,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_leaderboard_score_rank ON leaderboard_entries(score DESC, total_solved DESC, username ASC);
+            CREATE INDEX IF NOT EXISTS idx_leaderboard_username ON leaderboard_entries(username);
+            CREATE INDEX IF NOT EXISTS idx_leaderboard_global_rank ON leaderboard_entries(global_rank);
+            CREATE INDEX IF NOT EXISTS idx_leaderboard_is_public ON leaderboard_entries(is_public);
 
             -- Ensure photo_upload_intents table exists for signed upload tracking and replay protection
             CREATE TABLE IF NOT EXISTS photo_upload_intents (
@@ -118,7 +157,7 @@ export const testDatabaseConnection = async () => {
             );
             CREATE INDEX IF NOT EXISTS idx_photo_cleanup_queue_status ON photo_cleanup_queue(status);
         `);
-        console.log("✅ Database schema verified for users & user_links profile and photo columns");
+        console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");
     } catch (error) {
         console.error(
             "❌ Supabase PostgreSQL connection failed:",
