@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from "react";
-import { useAppDispatch, useAppSelector, fetchUnifiedSubmissions } from "../../../store";
+import React, { useEffect, useMemo, useRef } from "react";
+import { useAppDispatch, useAppSelector, fetchUnifiedSubmissions, invalidateSubmissions } from "../../../store";
 import {
     aggregateClientPortalsSubmissions,
     buildWeeklySubmissionColumns,
@@ -21,32 +21,102 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = ({
     const effectiveUser = (username || "").trim();
 
     const dispatch = useAppDispatch();
-    // Read cached unified submissions from Redux store (hydrated instantly from localStorage)
     const cachedData = useAppSelector((state) => state.submissions.dataByUser[effectiveUser]);
 
-    // Fetch unified submissions only if data is not already present in Redux
-    useEffect(() => {
-        if (effectiveUser && !cachedData) {
-            dispatch(fetchUnifiedSubmissions({ username: effectiveUser }));
+    // Active connected platforms map (excluding GitHub)
+    const activePortalsMap = useMemo(() => {
+        const map = new Map<string, string>();
+        if (connectedPortals && typeof connectedPortals === "object") {
+            for (const [k, v] of Object.entries(connectedPortals)) {
+                const lk = k.toLowerCase().trim();
+                if (lk === "github" || lk.startsWith("_") || lk === "theme") continue;
+                const handle = (v?.username || v?.portal_username || "").trim().toLowerCase();
+                if (handle) map.set(lk, handle);
+            }
         }
-    }, [effectiveUser, cachedData, dispatch]);
+        return map;
+    }, [connectedPortals]);
+
+    const portalsFingerprint = useMemo(() => {
+        return Array.from(activePortalsMap.entries())
+            .map(([portal, handle]) => `${portal}:${handle}`)
+            .sort()
+            .join(",");
+    }, [activePortalsMap]);
+
+    const prevFingerprintRef = useRef<string | null>(null);
+
+    // Fetch unified submissions dynamically when portals change
+    useEffect(() => {
+        if (!effectiveUser) return;
+        if (prevFingerprintRef.current === null) {
+            prevFingerprintRef.current = portalsFingerprint;
+            dispatch(fetchUnifiedSubmissions({ username: effectiveUser, portals: connectedPortals }));
+        } else if (prevFingerprintRef.current !== portalsFingerprint) {
+            prevFingerprintRef.current = portalsFingerprint;
+            dispatch(invalidateSubmissions(effectiveUser));
+            dispatch(fetchUnifiedSubmissions({ username: effectiveUser, force: true, portals: connectedPortals }));
+        }
+    }, [effectiveUser, portalsFingerprint, connectedPortals, dispatch]);
 
     // Client-side fallback aggregation (strictly excludes GitHub)
     const clientAgg = useMemo(() => {
         return aggregateClientPortalsSubmissions(connectedPortals, weeksCount);
     }, [connectedPortals, weeksCount]);
 
-    // Build weeks from dailyMerged in Redux if available, otherwise fallback
-    const { weeks } = useMemo(() => {
+    // Build weeks from dailyMerged in Redux filtered strictly to active connected platforms
+    const { weeks, totalLifetimeSubmissions } = useMemo(() => {
         const rawMap = cachedData?.dailyMerged || {};
-        if (Object.keys(rawMap).length > 0) {
-            return buildWeeklySubmissionColumns(rawMap, weeksCount);
-        }
-        return { weeks: clientAgg.weeks, monthNames: clientAgg.monthNames };
-    }, [cachedData, weeksCount, clientAgg]);
+        const activePortalsSet = new Set(Array.from(activePortalsMap.keys()));
 
-    // Total lifetime submissions count across all connected platforms (excl. GitHub)
-    const totalLifetimeSubmissions = cachedData?.totalSubmissions || clientAgg.totalSubmissions;
+        const sanitizedMap: Record<string, { count: number; platforms: string[] }> = {};
+        let totalCount = 0;
+
+        if (Object.keys(rawMap).length > 0) {
+            for (const [dateStr, entry] of Object.entries(rawMap)) {
+                const filteredPlatforms = (entry.platforms || []).filter((p) => activePortalsSet.has(p.toLowerCase()));
+                if (filteredPlatforms.length === 0) continue;
+
+                let cellCount = entry.count;
+                if ((entry as any).platformCounts) {
+                    cellCount = filteredPlatforms.reduce(
+                        (sum, p) => sum + ((entry as any).platformCounts[p] || 0),
+                        0
+                    );
+                }
+                if (cellCount <= 0) cellCount = 1;
+
+                sanitizedMap[dateStr] = {
+                    count: cellCount,
+                    platforms: filteredPlatforms,
+                };
+                totalCount += cellCount;
+            }
+        } else {
+            for (const [dateStr, cell] of clientAgg.weeks.flat().map((c) => [c.dateStr, c] as const)) {
+                if (cell.count <= 0) continue;
+                const filteredPlatforms = cell.platforms.filter((p) => activePortalsSet.has(p.toLowerCase()));
+                if (filteredPlatforms.length === 0) continue;
+                sanitizedMap[dateStr] = {
+                    count: cell.count,
+                    platforms: filteredPlatforms,
+                };
+                totalCount += cell.count;
+            }
+        }
+
+        const built = buildWeeklySubmissionColumns(sanitizedMap, weeksCount);
+        const sumPlatform = Object.entries(cachedData?.platformBreakdown || {})
+            .filter(([k]) => activePortalsSet.has(k.toLowerCase()))
+            .reduce((acc, [_, p]) => acc + Math.max(p.submissions || 0, p.solved || 0), 0);
+
+        const finalTotal = Math.max(totalCount, sumPlatform || clientAgg.totalSubmissions);
+
+        return {
+            weeks: built.weeks,
+            totalLifetimeSubmissions: finalTotal,
+        };
+    }, [cachedData, weeksCount, clientAgg, activePortalsMap]);
 
     // Calculate exact time period (e.g. "Apr – Oct 2026")
     const timePeriodStr = useMemo(() => {

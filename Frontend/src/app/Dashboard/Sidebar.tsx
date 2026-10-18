@@ -242,7 +242,7 @@ export const Sidebar = ({
                 setIsHovered(false);
                 setIsProfileMenuOpen(false);
             }}
-            className={`h-[calc(100vh-1.5rem)] sm:h-[calc(100vh-2rem)] flex flex-col justify-between rounded-[32px] bg-[#0c1017] border border-white/[0.08] text-white p-3.5 select-none transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-3 sm:top-4 left-3 sm:left-4 z-50 overflow-x-hidden will-change-[width] ${
+            className={`h-[calc(100vh-1.5rem)] sm:h-[calc(100vh-2rem)] flex flex-col justify-between rounded-[32px] bg-black border border-neutral-800 text-white p-3.5 select-none transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-3 sm:top-4 left-3 sm:left-4 z-50 overflow-x-hidden will-change-[width] ${
                 isExpanded
                     ? "w-64 sm:w-[264px] shadow-2xl shadow-black/80 ring-1 ring-white/10"
                     : "w-[72px] shadow-lg shadow-black/40"
@@ -366,7 +366,7 @@ export const Sidebar = ({
 
                                 {/* Small badge dot in collapsed rail */}
                                 {item.badge && !isExpanded && (item as any).badgeVariant === "danger" && (
-                                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 animate-pulse ring-2 ring-[#0c1017]" />
+                                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 animate-pulse ring-2 ring-black" />
                                 )}
                             </Link>
                         );
@@ -490,7 +490,7 @@ export const Sidebar = ({
                 {/* Profile Popup Menu */}
                 {isProfileMenuOpen && (
                     <div
-                        className={`absolute bottom-full mb-2 p-1.5 rounded-2xl bg-[#111622] border border-white/[0.1] shadow-2xl z-50 animate-fadeIn text-xs ${
+                        className={`absolute bottom-full mb-2 p-1.5 rounded-2xl bg-black border border-neutral-800 shadow-2xl z-50 animate-fadeIn text-xs ${
                             isExpanded ? "left-0 right-0" : "left-0 w-52"
                         }`}
                     >

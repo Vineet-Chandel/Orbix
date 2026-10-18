@@ -46,10 +46,28 @@ export interface PlatformContestAnalytics {
     exploreContestsUrl: string;
 }
 
+export interface UnifiedRecentContestItem {
+    portal: string;
+    portalName: string;
+    contestId: string;
+    contestName: string;
+    contestUrl: string;
+    date: string;
+    timestamp: number;
+    rank: number | null;
+    rating: number;
+    ratingBefore?: number | null;
+    ratingChange?: number | null;
+    division?: string | null;
+    problemsSolved?: number | null;
+    totalProblems?: number | null;
+}
+
 export interface UnifiedContestData {
     username: string;
     timestamp: string;
     platforms: PlatformContestAnalytics[];
+    recentContests?: UnifiedRecentContestItem[];
     summary: {
         totalRatedContests: number;
         platformContestCounts: Record<string, number>;
@@ -102,20 +120,36 @@ export const fetchContestPerformance = createAsyncThunk<
             return rejectWithValue("Username is required to fetch contest performance");
         }
         const state = getState().contests;
-        const existing = state.dataByUser[effectiveUser];
-        const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
+        const existing = state.dataByUser[effectiveUser] || state.dataByUser[effectiveUser.toLowerCase()];
+        const lastFetched = state.lastFetchedAtByUser[effectiveUser] || state.lastFetchedAtByUser[effectiveUser.toLowerCase()] || 0;
         const now = Date.now();
 
-        // Check if any connected portal in client portals is missing from existing platforms
-        const hasMissingConnected = portals && Object.entries(portals).some(([k, v]) => {
-            const u = typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "");
-            return Boolean(u) && !existing?.platforms?.some((p) => p.portal === k && p.connected);
-        });
+        // Check if client portals differ from existing cached platforms (platforms added, removed, or handles edited)
+        let portalsMismatched = false;
+        if (portals && typeof portals === "object") {
+            const clientActive = Object.entries(portals)
+                .map(([k, v]) => [k.toLowerCase().trim(), (typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "")).trim()] as const)
+                .filter(([k, u]) => k !== "github" && !k.startsWith("_") && k !== "theme" && Boolean(u));
+
+            const existingActive = (existing?.platforms || []).filter((p) => p.connected && p.portalUsername);
+
+            if (clientActive.length !== existingActive.length) {
+                portalsMismatched = true;
+            } else {
+                for (const [k, u] of clientActive) {
+                    const match = existingActive.find((p) => p.portal.toLowerCase() === k);
+                    if (!match || match.portalUsername.toLowerCase() !== u.toLowerCase()) {
+                        portalsMismatched = true;
+                        break;
+                    }
+                }
+            }
+        }
 
         // Invalidate old cache if it contained unconnected platforms
         const hasUnconnectedInCache = existing?.platforms?.some((p) => !p.connected || p.status === "not_connected");
 
-        if (existing && !force && !hasUnconnectedInCache && !hasMissingConnected && now - lastFetched < 10 * 60 * 1000) {
+        if (existing && !force && !portalsMismatched && !hasUnconnectedInCache && now - lastFetched < 10 * 60 * 1000) {
             return existing;
         }
 
@@ -124,23 +158,27 @@ export const fetchContestPerformance = createAsyncThunk<
             const simplified: Record<string, string> = {};
             for (const [k, v] of Object.entries(portals)) {
                 const u = typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "");
-                if (u) simplified[k] = u;
+                if (u && k !== "github" && !k.startsWith("_") && k !== "theme") simplified[k.toLowerCase().trim()] = u.trim();
             }
             if (Object.keys(simplified).length > 0) {
                 portalsQuery = `&portals=${encodeURIComponent(JSON.stringify(simplified))}`;
             }
         }
 
+        const token = localStorage.getItem("orbix_token") || localStorage.getItem("token") || "";
+        const reqHeaders: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) reqHeaders["Authorization"] = `Bearer ${token}`;
+
         const endpoints = [
-            `/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}${portalsQuery}`,
-            `http://localhost:3000/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}${portalsQuery}`,
+            `/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force || portalsMismatched ? "&refresh=true" : ""}${portalsQuery}`,
+            `http://localhost:3000/api/portals/contests?username=${encodeURIComponent(effectiveUser)}${force || portalsMismatched ? "&refresh=true" : ""}${portalsQuery}`,
         ];
 
         let lastError = "Failed to fetch contest performance";
         for (const url of endpoints) {
             try {
                 const res = await fetch(url, {
-                    headers: { "Content-Type": "application/json" },
+                    headers: reqHeaders,
                     signal: AbortSignal.timeout(10000),
                 });
                 if (res.ok) {
@@ -150,6 +188,7 @@ export const fetchContestPerformance = createAsyncThunk<
                             username: effectiveUser,
                             timestamp: data.timestamp || new Date().toISOString(),
                             platforms: data.platforms || [],
+                            recentContests: data.recentContests || [],
                             summary: data.summary || {
                                 totalRatedContests: 0,
                                 platformContestCounts: {},
@@ -172,11 +211,14 @@ export const contestsSlice = createSlice({
     initialState,
     reducers: {
         clearContestsCache: (state, action: PayloadAction<string | undefined>) => {
-            const user = action.payload;
+            const user = action.payload?.trim();
             if (user) {
                 delete state.dataByUser[user];
+                delete state.dataByUser[user.toLowerCase()];
                 delete state.lastFetchedAtByUser[user];
+                delete state.lastFetchedAtByUser[user.toLowerCase()];
                 delete state.errorByUser[user];
+                delete state.errorByUser[user.toLowerCase()];
             } else {
                 state.dataByUser = {};
                 state.lastFetchedAtByUser = {};

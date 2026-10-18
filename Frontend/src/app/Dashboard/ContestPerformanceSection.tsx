@@ -57,21 +57,55 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
     const [isTierModalOpen, setIsTierModalOpen] = useState<boolean>(false);
     const chartContainerRef = useRef<HTMLDivElement>(null);
 
-    // Initial fetch passing connected portals from props
-    useEffect(() => {
-        if (effectiveUser) {
-            dispatch(fetchContestPerformance({ username: effectiveUser, portals: connectedPortals }));
+    const activePortalsMap = useMemo(() => {
+        const map = new Map<string, string>();
+        if (!connectedPortals || typeof connectedPortals !== "object") return map;
+        for (const [k, v] of Object.entries(connectedPortals)) {
+            const portalKey = k.toLowerCase().trim();
+            const rawUser = typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "");
+            const cleanUser = rawUser.trim();
+            if (cleanUser && portalKey !== "github" && !portalKey.startsWith("_") && portalKey !== "theme") {
+                map.set(portalKey, cleanUser);
+            }
         }
-    }, [effectiveUser, dispatch, connectedPortals]);
+        return map;
+    }, [connectedPortals]);
+
+    const portalsFingerprint = useMemo(() => {
+        return Array.from(activePortalsMap.entries())
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([k, v]) => `${k}:${v}`)
+            .join("|");
+    }, [activePortalsMap]);
+
+    const prevFingerprintRef = useRef<string | null>(null);
+
+    // Initial and dynamic sync whenever connected portals change
+    useEffect(() => {
+        if (!effectiveUser) return;
+        const isInitial = prevFingerprintRef.current === null;
+        const hasChanged = prevFingerprintRef.current !== portalsFingerprint;
+        prevFingerprintRef.current = portalsFingerprint;
+
+        dispatch(fetchContestPerformance({
+            username: effectiveUser,
+            portals: connectedPortals,
+            force: !isInitial && hasChanged
+        }));
+    }, [effectiveUser, dispatch, connectedPortals, portalsFingerprint]);
 
     // Discover eligible platforms dynamically - ONLY those where contest data can be extracted AND user is connected
     const platformsList: PlatformContestAnalytics[] = useMemo(() => {
         if (contestData?.platforms && contestData.platforms.length > 0) {
-            // Filter strictly to platforms that are connected with a username and where contest data can be extracted
+            // Filter strictly to platforms that are currently active in activePortalsMap (if available) and where contest data can be extracted
             const filtered = contestData.platforms.filter((p) => {
+                const portalKey = p.portal.toLowerCase();
+                if (activePortalsMap.size > 0 && !activePortalsMap.has(portalKey)) {
+                    return false;
+                }
                 const isConn = Boolean(p.connected && p.portalUsername);
                 const isExtractable = p.status === "valid" || p.status === "no_contests" || p.status === "syncing";
-                const isEligible = Boolean(CONTEST_ELIGIBLE_REGISTRY[p.portal]);
+                const isEligible = Boolean(CONTEST_ELIGIBLE_REGISTRY[portalKey]);
                 return isConn && isExtractable && isEligible;
             });
 
@@ -91,12 +125,13 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
         if (connectedPortals && typeof connectedPortals === "object") {
             const list: PlatformContestAnalytics[] = [];
             for (const [k, v] of Object.entries(connectedPortals)) {
-                if (CONTEST_ELIGIBLE_REGISTRY[k]) {
+                const portalKey = k.toLowerCase().trim();
+                if (CONTEST_ELIGIBLE_REGISTRY[portalKey]) {
                     const pUser = typeof v === "object" ? v?.username || v?.portalUsername || "" : String(v || "");
                     if (pUser) {
-                        const cfg = CONTEST_ELIGIBLE_REGISTRY[k]!;
+                        const cfg = CONTEST_ELIGIBLE_REGISTRY[portalKey]!;
                         list.push({
-                            portal: k,
+                            portal: portalKey,
                             portalName: cfg.name,
                             portalUsername: pUser,
                             profileUrl: "",
@@ -122,7 +157,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
         }
 
         return [];
-    }, [contestData, connectedPortals]);
+    }, [contestData, connectedPortals, activePortalsMap]);
 
     // Default select the first connected platform that has contests or is connected
     useEffect(() => {
@@ -358,19 +393,22 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
     };
 
     return (
-        <section className="w-full space-y-6 select-none font-sans" aria-label="Contest Performance Module">
-            {/* ========================================================================= */}
-            {/* SECTION 1 — Contest Performance (Primary Line Chart, Summary & Controls) */}
-            {/* ========================================================================= */}
-            <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-                {/* Primary Column: Rating & Progression Graph (8 of 12 cols on desktop) */}
-                <div className="lg:col-span-8 flex flex-col rounded-3xl bg-[#0c1017] border border-neutral-800/80 p-5 sm:p-7 shadow-2xl relative overflow-hidden">
-                    {/* Subtle ambient lighting */}
-                    <div className="absolute -top-24 -left-24 w-80 h-80 bg-amber-500/[0.04] rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-blue-500/[0.04] rounded-full blur-3xl pointer-events-none" />
+        <section
+            className="w-full rounded-3xl bg-black border border-neutral-800 text-white p-6 sm:p-8 shadow-2xl relative overflow-hidden select-none font-sans"
+            aria-label="Contest Performance Module"
+        >
+            {/* Ambient Lighting Glows */}
+            <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-500/[0.04] rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-blue-500/[0.04] rounded-full blur-3xl pointer-events-none" />
 
+            {/* ========================================================================= */}
+            {/* TOP ROW — Contest Rating Graph (Left) & Total Contests Summary (Right)    */}
+            {/* ========================================================================= */}
+            <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch relative z-10">
+                {/* Primary Column: Rating & Progression Graph (8 of 12 cols on desktop) */}
+                <div className="lg:col-span-8 flex flex-col justify-between">
                     {/* Section Header & Platform Selector */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-neutral-800/80 relative z-10">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-neutral-800/80">
                         {/* Title & Icon */}
                         <div className="flex items-center gap-3">
                             <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-sm">
@@ -802,8 +840,8 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                     </div>
                 </div>
 
-                {/* Secondary Column: Contests Total Summary Card (4 of 12 cols on desktop) */}
-                <div className="lg:col-span-4 flex flex-col justify-between rounded-3xl bg-[#0c1017] border border-neutral-800/80 p-5 sm:p-7 shadow-2xl relative overflow-hidden">
+                {/* Secondary Column: Contests Total Summary (4 of 12 cols on desktop) */}
+                <div className="lg:col-span-4 flex flex-col justify-between lg:border-l lg:border-white/[0.08] lg:pl-8 pt-6 lg:pt-0 border-t lg:border-t-0 border-white/[0.08]">
                     <div className="space-y-6">
                         {/* Card Header: Trophy icon + Contests */}
                         <div className="flex items-center gap-2.5">
@@ -832,7 +870,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                     key={item.portal}
                                     type="button"
                                     onClick={() => setSelectedPortal(item.portal)}
-                                    className="w-full flex flex-col gap-1.5 p-2 rounded-xl hover:bg-white/[0.03] transition-colors cursor-pointer group text-left"
+                                    className="w-full flex flex-col gap-1.5 p-2 rounded-xl hover:bg-white/[0.05] transition-colors cursor-pointer group text-left"
                                 >
                                     <div className="flex items-center justify-between text-xs">
                                         <div className="flex items-center gap-2 font-bold text-neutral-300 group-hover:text-white transition-colors">
@@ -847,7 +885,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                     </div>
 
                                     {/* Horizontal Bar */}
-                                    <div className="w-full h-2 rounded-full bg-[#1c2436] overflow-hidden">
+                                    <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
                                         <div
                                             style={{ width: `${item.percentage}%` }}
                                             className="h-full bg-amber-400 rounded-full transition-all duration-500 group-hover:bg-amber-300"
@@ -859,7 +897,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                     </div>
 
                     {/* Footer synchronization note */}
-                    <div className="pt-4 mt-6 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500">
+                    <div className="pt-4 mt-6 border-t border-white/[0.08] flex items-center justify-between text-[11px] text-neutral-500">
                         <span>Dynamic Multi-Platform Sync</span>
                         <button
                             type="button"
@@ -875,12 +913,17 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
             </div>
 
             {/* ========================================================================= */}
+            {/* HORIZONTAL DIVIDER                                                        */}
+            {/* ========================================================================= */}
+            <div className="w-full h-px bg-white/[0.08] my-7 relative z-10" />
+
+            {/* ========================================================================= */}
             {/* SECTION 2 — Contest Platforms Overview (Platform Ranks Grid)              */}
             {/* ========================================================================= */}
-            <div className="w-full rounded-3xl bg-[#0c1017] border border-neutral-800/80 p-5 sm:p-7 shadow-2xl relative overflow-hidden">
+            <div className="w-full relative z-10">
                 {/* Header: Trophy/Award icon + Platform ranks */}
                 <div className="flex items-center gap-3 pb-5">
-                    <div className="w-8 h-8 rounded-xl bg-neutral-800/80 border border-neutral-700/80 flex items-center justify-center text-amber-400">
+                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
                         <Award className="w-4 h-4" />
                     </div>
                     <div>
@@ -913,7 +956,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                     className={`flex flex-col justify-between p-5 rounded-2xl transition-all cursor-pointer text-left relative overflow-hidden border ${
                                         isSelected
                                             ? "bg-[#141b28] border-amber-500/50 shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30"
-                                            : "bg-[#0f141f] border-neutral-800/90 hover:border-neutral-700 hover:bg-[#121825]"
+                                            : "bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06]"
                                     }`}
                                 >
                                     {/* Top: Platform Icon + Name + Verified Badge */}
@@ -1007,7 +1050,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                         })}
                     </div>
                 ) : (
-                    <div className="w-full p-8 rounded-2xl bg-[#0f141f] border border-dashed border-neutral-800 flex flex-col items-center justify-center text-center space-y-3">
+                    <div className="w-full p-8 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-3">
                         <Award className="w-8 h-8 text-neutral-500" />
                         <div className="space-y-1">
                             <h4 className="text-sm font-bold text-white">No platform ranks to display</h4>
@@ -1027,7 +1070,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                     aria-labelledby="tier-modal-title"
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
                 >
-                    <div className="w-full max-w-md rounded-3xl bg-[#0c1017] border border-neutral-700 shadow-2xl p-6 sm:p-7 space-y-5 text-white relative">
+                    <div className="w-full max-w-md rounded-3xl bg-black border border-neutral-800 shadow-2xl p-6 sm:p-7 space-y-5 text-white relative">
                         {/* Close button */}
                         <button
                             type="button"

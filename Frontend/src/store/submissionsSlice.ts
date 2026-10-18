@@ -48,11 +48,11 @@ const initialState: SubmissionsState = {
 
 export const fetchUnifiedSubmissions = createAsyncThunk<
     UnifiedSubmissionsData,
-    { username: string; force?: boolean },
+    { username: string; force?: boolean; portals?: Record<string, any> },
     { state: { submissions: SubmissionsState }; rejectValue: string }
 >(
     "submissions/fetchUnified",
-    async ({ username, force = false }, { getState, rejectWithValue }) => {
+    async ({ username, force = false, portals }, { getState, rejectWithValue }) => {
         const effectiveUser = username.trim();
         if (!effectiveUser) {
             return rejectWithValue("Username is required to fetch unified submissions");
@@ -62,53 +62,127 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
         const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
         const now = Date.now();
 
-        // If existing data is present and not force-refreshing and fetched within 15 minutes, return existing
-        if (existing && !force && now - lastFetched < 15 * 60 * 1000) {
+        // Extract simplified map of connected non-github portals
+        const clientPortalsRecord: Record<string, string> = {};
+        if (portals && typeof portals === "object") {
+            for (const [k, v] of Object.entries(portals)) {
+                const lk = k.toLowerCase().trim();
+                if (lk === "github" || lk.startsWith("_") || lk === "theme") continue;
+                const u = typeof v === "object" ? (v?.username || v?.portal_username || "") : String(v || "");
+                if (u.trim()) clientPortalsRecord[lk] = u.trim();
+            }
+        }
+
+        // Check if there is any mismatch between connected client platforms and cached data
+        let hasPortalMismatch = false;
+        if (portals && typeof portals === "object") {
+            const clientKeys = Object.keys(clientPortalsRecord);
+            const cachedKeys = Object.keys(existing?.platformBreakdown || {}).filter((k) => k !== "github");
+
+            const hasMissing = clientKeys.some(
+                (k) => !cachedKeys.includes(k) || (existing?.platformBreakdown?.[k]?.username?.toLowerCase() !== clientPortalsRecord[k].toLowerCase())
+            );
+            const hasRemoved = cachedKeys.some((k) => !clientKeys.includes(k));
+
+            if (hasMissing || hasRemoved) {
+                hasPortalMismatch = true;
+            }
+        }
+
+        // If existing data is present, not force-refreshing, no portal mismatch, and fresh within 15 minutes, return existing
+        if (existing && !force && !hasPortalMismatch && now - lastFetched < 15 * 60 * 1000) {
             return existing;
         }
 
-        try {
-            const res = await fetch(
-                `http://localhost:3000/api/portals/submissions/unified?username=${encodeURIComponent(
-                    effectiveUser
-                )}${force ? "&refresh=true" : ""}`
-            );
-            if (!res.ok) {
-                return rejectWithValue(`HTTP error ${res.status}`);
-            }
-            const data = await res.json();
-            if (!data.success) {
-                return rejectWithValue(data.message || "Failed to fetch unified submissions");
-            }
-            return {
-                username: effectiveUser,
-                totalSubmissions: data.totalSubmissions || 0,
-                activeDays: data.activeDays || 0,
-                dayStreak: data.dayStreak || 0,
-                platformBreakdown: data.platformBreakdown || {},
-                dailyMerged: data.dailyMerged || {},
-                connectedPlatformsCount:
-                    data.connectedPlatformsCount ||
-                    Object.keys(data.platformBreakdown || {}).length,
-                timestamp: data.timestamp || new Date().toISOString(),
-            };
-        } catch (err: any) {
-            return rejectWithValue(err.message || "Network error fetching submissions");
+        let portalsQuery = "";
+        if (Object.keys(clientPortalsRecord).length > 0) {
+            const str = Object.entries(clientPortalsRecord).map(([k, v]) => `${k}:${v}`).join(",");
+            portalsQuery = `&portals=${encodeURIComponent(str)}`;
         }
+
+        const isRefreshing = force || hasPortalMismatch;
+        const endpoints = [
+            `/api/portals/submissions/unified?username=${encodeURIComponent(effectiveUser)}${isRefreshing ? "&refresh=true" : ""}${portalsQuery}`,
+            `http://localhost:3000/api/portals/submissions/unified?username=${encodeURIComponent(effectiveUser)}${isRefreshing ? "&refresh=true" : ""}${portalsQuery}`,
+        ];
+
+        let authToken = "";
+        try {
+            authToken = localStorage.getItem("orbix_token") || "";
+        } catch {
+            // ignore
+        }
+
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
+        let lastError = "Failed to fetch unified submissions";
+
+        for (const url of endpoints) {
+            try {
+                const res = await fetch(url, {
+                    headers,
+                    credentials: "include",
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.success) {
+                        return {
+                            username: effectiveUser,
+                            totalSubmissions: data.totalSubmissions || 0,
+                            activeDays: data.activeDays || 0,
+                            dayStreak: data.dayStreak || 0,
+                            platformBreakdown: data.platformBreakdown || {},
+                            dailyMerged: data.dailyMerged || {},
+                            connectedPlatformsCount:
+                                data.connectedPlatformsCount ||
+                                Object.keys(data.platformBreakdown || {}).length,
+                            timestamp: data.timestamp || new Date().toISOString(),
+                        };
+                    }
+                }
+            } catch (err: any) {
+                lastError = err?.message || lastError;
+            }
+        }
+
+        return rejectWithValue(lastError);
     },
     {
-        // Prevent duplicate network calls: only fetch if not loading and not fresh
-        condition: ({ username, force = false }, { getState }) => {
+        // Allow fetch if force or portal mismatch detected; prevent infinite duplicate requests
+        condition: ({ username, force = false, portals }, { getState }) => {
             const effectiveUser = username.trim();
             if (!effectiveUser) return false;
             const state = getState().submissions;
             if (state.loadingByUser[effectiveUser]) {
                 return false;
             }
+            if (force) return true;
+
             const existing = state.dataByUser[effectiveUser];
             const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
             const now = Date.now();
-            if (existing && !force && now - lastFetched < 15 * 60 * 1000) {
+
+            if (portals && typeof portals === "object") {
+                const clientPortalsRecord: Record<string, string> = {};
+                for (const [k, v] of Object.entries(portals)) {
+                    const lk = k.toLowerCase().trim();
+                    if (lk === "github" || lk.startsWith("_") || lk === "theme") continue;
+                    const u = typeof v === "object" ? (v?.username || v?.portal_username || "") : String(v || "");
+                    if (u.trim()) clientPortalsRecord[lk] = u.trim();
+                }
+                const clientKeys = Object.keys(clientPortalsRecord);
+                const cachedKeys = Object.keys(existing?.platformBreakdown || {}).filter((k) => k !== "github");
+                const hasMissing = clientKeys.some(
+                    (k) => !cachedKeys.includes(k) || (existing?.platformBreakdown?.[k]?.username?.toLowerCase() !== clientPortalsRecord[k].toLowerCase())
+                );
+                const hasRemoved = cachedKeys.some((k) => !clientKeys.includes(k));
+                if (hasMissing || hasRemoved) {
+                    return true;
+                }
+            }
+
+            if (existing && now - lastFetched < 15 * 60 * 1000) {
                 return false;
             }
             return true;
@@ -126,10 +200,19 @@ export const submissionsSlice = createSlice({
             state.lastFetchedAtByUser[user] = Date.now();
             saveStoredSubmissions(state.dataByUser);
         },
-        invalidateSubmissions: (state, action: PayloadAction<string>) => {
-            const user = action.payload;
-            delete state.dataByUser[user];
-            delete state.lastFetchedAtByUser[user];
+        invalidateSubmissions: (state, action: PayloadAction<string | undefined>) => {
+            if (action.payload) {
+                const user = action.payload;
+                delete state.dataByUser[user];
+                delete state.lastFetchedAtByUser[user];
+                delete state.loadingByUser[user];
+                delete state.errorByUser[user];
+            } else {
+                state.dataByUser = {};
+                state.lastFetchedAtByUser = {};
+                state.loadingByUser = {};
+                state.errorByUser = {};
+            }
             saveStoredSubmissions(state.dataByUser);
         },
     },

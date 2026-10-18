@@ -10,12 +10,13 @@ import {
     CheckCircle2,
     ArrowRight,
 } from "lucide-react";
-import { useAppDispatch, useAppSelector, fetchUnifiedSubmissions } from "../../store";
+import { useAppDispatch, useAppSelector, fetchUnifiedSubmissions, invalidateSubmissions } from "../../store";
 import { getPortalIcon } from "../../utils/portalIcons";
 import {
     aggregateClientPortalsSubmissions,
     buildWeeklySubmissionColumns,
     type DaySubmissionCell,
+    type PlatformSubmissionStat,
 } from "../../utils/submissionsAggregator";
 
 interface CodingSubmissionsTableProps {
@@ -36,43 +37,189 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
 
     const weeksCount = 52; // Full 1 Year activity heatmap
 
-    // Fetch unified submissions from backend only if not already cached in Redux
-    useEffect(() => {
-        if (effectiveUser && !remoteData) {
-            dispatch(fetchUnifiedSubmissions({ username: effectiveUser }));
+    // Map of currently active connected portals and usernames (strictly excluding GitHub)
+    const activePortalsMap = useMemo(() => {
+        const map = new Map<string, string>();
+        if (connectedPortals && typeof connectedPortals === "object") {
+            for (const [k, v] of Object.entries(connectedPortals)) {
+                const lk = k.toLowerCase().trim();
+                if (lk === "github" || lk.startsWith("_") || lk === "theme") continue;
+                const handle = (v?.username || v?.portal_username || "").trim().toLowerCase();
+                if (handle) map.set(lk, handle);
+            }
         }
-    }, [effectiveUser, remoteData, dispatch]);
+        return map;
+    }, [connectedPortals]);
 
-    // Compute fallback client aggregation
+    // Unique fingerprint of currently connected non-github portals
+    const portalsFingerprint = useMemo(() => {
+        if (!connectedPortals) return "";
+        return Array.from(activePortalsMap.entries())
+            .map(([portal, handle]) => `${portal}:${handle}`)
+            .sort()
+            .join(",");
+    }, [activePortalsMap]);
+
+    // Track platform changes dynamically: whenever connected accounts change, re-sync immediately
+    const prevFingerprintRef = React.useRef<string | null>(null);
+
+    useEffect(() => {
+        if (!effectiveUser) return;
+
+        if (prevFingerprintRef.current === null) {
+            prevFingerprintRef.current = portalsFingerprint;
+            dispatch(fetchUnifiedSubmissions({ username: effectiveUser, portals: connectedPortals }));
+        } else if (prevFingerprintRef.current !== portalsFingerprint) {
+            prevFingerprintRef.current = portalsFingerprint;
+            // Platforms were added, changed, or removed: immediately invalidate cache and force fresh data
+            dispatch(invalidateSubmissions(effectiveUser));
+            dispatch(fetchUnifiedSubmissions({ username: effectiveUser, force: true, portals: connectedPortals }));
+        }
+    }, [effectiveUser, portalsFingerprint, connectedPortals, dispatch]);
+
+    // Compute instant fallback client aggregation
     const clientAgg = useMemo(() => {
         return aggregateClientPortalsSubmissions(connectedPortals, weeksCount);
     }, [connectedPortals, weeksCount]);
 
-    // Active combined data
-    const totalSubmissions = remoteData ? remoteData.totalSubmissions : clientAgg.totalSubmissions;
-    const activeDays = remoteData ? remoteData.activeDays : clientAgg.activeDays;
-    const dayStreak = remoteData ? remoteData.dayStreak : clientAgg.dayStreak;
-    const platformBreakdown = remoteData && Object.keys(remoteData.platformBreakdown).length > 0
-        ? remoteData.platformBreakdown
-        : clientAgg.platformBreakdown;
+    // Dynamically filtered platform breakdown: ONLY contains currently connected platforms
+    const platformBreakdown = useMemo(() => {
+        const source = remoteData && Object.keys(remoteData.platformBreakdown).length > 0
+            ? remoteData.platformBreakdown
+            : clientAgg.platformBreakdown;
 
-    // Build weeks from dailyMerged if remoteData is available, filtered by selected portal
-    const { weeks, monthNames } = useMemo(() => {
-        const rawMap = remoteData?.dailyMerged || {};
-        if (Object.keys(rawMap).length > 0) {
-            let filteredMap = rawMap;
-            if (selectedPortal !== "all") {
-                filteredMap = {};
-                for (const [d, entry] of Object.entries(rawMap)) {
-                    if (entry.platforms.includes(selectedPortal)) {
-                        filteredMap[d] = entry;
-                    }
-                }
-            }
-            return buildWeeklySubmissionColumns(filteredMap, weeksCount);
+        const result: Record<string, PlatformSubmissionStat> = {};
+
+        // 1. Include server platform stats ONLY if the platform is currently connected
+        for (const [portal, stat] of Object.entries(source)) {
+            const lk = portal.toLowerCase().trim();
+            if (lk === "github") continue;
+            if (!activePortalsMap.has(lk)) continue; // STRICTLY PRUNE REMOVED PLATFORMS
+
+            const activeHandle = activePortalsMap.get(lk);
+            if (stat.username && stat.username.toLowerCase().trim() !== activeHandle) continue;
+
+            result[lk] = stat;
         }
-        return { weeks: clientAgg.weeks, monthNames: clientAgg.monthNames };
-    }, [remoteData, selectedPortal, weeksCount, clientAgg]);
+
+        // 2. Include any newly added client platforms that might not be in remoteData yet
+        for (const [portal, stat] of Object.entries(clientAgg.platformBreakdown)) {
+            const lk = portal.toLowerCase().trim();
+            if (lk === "github") continue;
+            if (activePortalsMap.has(lk) && !result[lk]) {
+                result[lk] = stat;
+            }
+        }
+
+        return result;
+    }, [remoteData, clientAgg, activePortalsMap]);
+
+    // Series of platforms sorted strictly from largest number of submissions to lowest
+    // ONLY display platforms that the user is currently connected to and count > 0
+    const connectedPlatformsList = useMemo(() => {
+        return Object.values(platformBreakdown)
+            .filter((p) => {
+                if (p.portal === "github") return false;
+                const count = Math.max(p.submissions || 0, p.solved || 0);
+                return count > 0;
+            })
+            .sort((a, b) => {
+                const countA = Math.max(a.submissions || 0, a.solved || 0);
+                const countB = Math.max(b.submissions || 0, b.solved || 0);
+                if (countB !== countA) return countB - countA;
+                return a.portal.localeCompare(b.portal);
+            });
+    }, [platformBreakdown]);
+
+    // Reset selected portal back to "all" if the currently selected portal is no longer in the list
+    useEffect(() => {
+        if (selectedPortal !== "all" && !connectedPlatformsList.some((p) => p.portal === selectedPortal)) {
+            setSelectedPortal("all");
+        }
+    }, [selectedPortal, connectedPlatformsList]);
+
+    // Build weeks, daily counts, and totals from sanitized data (strictly excluding removed platforms)
+    const { weeks, monthNames, totalSubmissions, activeDays, dayStreak } = useMemo(() => {
+        const rawMap = remoteData?.dailyMerged || {};
+        const activePortalsSet = new Set(Object.keys(platformBreakdown));
+
+        const sanitizedMap: Record<string, { count: number; platforms: string[] }> = {};
+        let totalCount = 0;
+
+        if (Object.keys(rawMap).length > 0) {
+            for (const [dateStr, entry] of Object.entries(rawMap)) {
+                const filteredPlatforms = (entry.platforms || []).filter((p) => activePortalsSet.has(p.toLowerCase()));
+                if (filteredPlatforms.length === 0) continue;
+
+                if (selectedPortal !== "all" && !filteredPlatforms.includes(selectedPortal)) {
+                    continue;
+                }
+
+                let cellCount = entry.count;
+                if ((entry as any).platformCounts) {
+                    cellCount = filteredPlatforms.reduce(
+                        (sum, p) => sum + ((entry as any).platformCounts[p] || 0),
+                        0
+                    );
+                }
+                if (cellCount <= 0) cellCount = 1;
+
+                sanitizedMap[dateStr] = {
+                    count: cellCount,
+                    platforms: filteredPlatforms,
+                };
+                totalCount += cellCount;
+            }
+        } else {
+            // Instant client fallback
+            for (const [dateStr, cell] of clientAgg.weeks.flat().map((c) => [c.dateStr, c] as const)) {
+                if (cell.count <= 0) continue;
+                const filteredPlatforms = cell.platforms.filter((p) => activePortalsSet.has(p.toLowerCase()));
+                if (filteredPlatforms.length === 0) continue;
+                if (selectedPortal !== "all" && !filteredPlatforms.includes(selectedPortal)) continue;
+
+                sanitizedMap[dateStr] = {
+                    count: cell.count,
+                    platforms: filteredPlatforms,
+                };
+                totalCount += cell.count;
+            }
+        }
+
+        const built = buildWeeklySubmissionColumns(sanitizedMap, weeksCount);
+        const daysCount = Object.keys(sanitizedMap).length;
+
+        const sumPlatform = Object.values(platformBreakdown).reduce(
+            (acc, p) => acc + Math.max(p.submissions || 0, p.solved || 0),
+            0
+        );
+
+        const finalTotal = selectedPortal === "all"
+            ? Math.max(totalCount, sumPlatform)
+            : (platformBreakdown[selectedPortal]?.submissions || totalCount);
+
+        let streak = 0;
+        const today = new Date();
+        for (let i = 0; i < 365; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            const dateStr = d.toISOString().split("T")[0] || "";
+            const entry = sanitizedMap[dateStr];
+            if (entry && entry.count > 0) {
+                streak++;
+            } else if (i > 0) {
+                break;
+            }
+        }
+
+        return {
+            weeks: built.weeks,
+            monthNames: built.monthNames,
+            totalSubmissions: finalTotal,
+            activeDays: daysCount || (finalTotal > 0 ? 1 : 0),
+            dayStreak: Math.max(streak, finalTotal > 0 ? 1 : 0),
+        };
+    }, [remoteData, clientAgg, platformBreakdown, selectedPortal, weeksCount]);
 
     // Circular Curvy Green Shader mapping
     const getCellColor = (level: 0 | 1 | 2 | 3 | 4) => {
@@ -91,52 +238,13 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
         }
     };
 
-    // Series of platforms sorted strictly from largest number of submissions to lowest
-    // ONLY display platforms that the user is connected to AND whose question/submission data can be extracted (count > 0)
-    const connectedPlatformsList = useMemo(() => {
-        return Object.values(platformBreakdown)
-            .filter((p) => {
-                if (p.portal === "github") return false;
-                const count = Math.max(p.submissions || 0, p.solved || 0);
-                const hasConnectedHandle = Boolean(
-                    p.username ||
-                    (connectedPortals && (connectedPortals[p.portal]?.username || connectedPortals[p.portal]?.portal_username))
-                );
-                return hasConnectedHandle && count > 0;
-            })
-            .sort((a, b) => {
-                const countA = Math.max(a.submissions || 0, a.solved || 0);
-                const countB = Math.max(b.submissions || 0, b.solved || 0);
-                if (countB !== countA) return countB - countA;
-                return a.portal.localeCompare(b.portal);
-            });
-    }, [platformBreakdown, connectedPortals]);
-
-    // Reset selected portal back to "all" if the currently selected portal is no longer in the list
-    useEffect(() => {
-        if (selectedPortal !== "all" && !connectedPlatformsList.some((p) => p.portal === selectedPortal)) {
-            setSelectedPortal("all");
-        }
-    }, [selectedPortal, connectedPlatformsList]);
-
     const hasConnectedPlatforms = useMemo(() => {
-        if (connectedPlatformsList.length > 0) return true;
-        if (
-            connectedPortals &&
-            Object.entries(connectedPortals).some(([k, profile]) => {
-                const lower = k.toLowerCase().trim();
-                if (lower === "github" || lower.startsWith("_") || lower === "theme") return false;
-                return Boolean(profile?.username || profile?.portal_username);
-            })
-        ) {
-            return true;
-        }
-        return false;
-    }, [connectedPlatformsList, connectedPortals]);
+        return activePortalsMap.size > 0;
+    }, [activePortalsMap]);
 
     if (!hasConnectedPlatforms) {
         return (
-            <div className="w-full rounded-3xl bg-[#0c1017] text-white p-8 sm:p-12 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
+            <div className="w-full rounded-3xl bg-black text-white p-8 sm:p-12 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
                 <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
                 <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -179,7 +287,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     }
 
     return (
-        <div className="w-full rounded-3xl bg-[#0c1017] text-white p-6 sm:p-8 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
+        <div className="w-full rounded-3xl bg-black text-white p-6 sm:p-8 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
             {/* Ambient background glow */}
             <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />

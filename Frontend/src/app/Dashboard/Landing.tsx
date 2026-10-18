@@ -6,6 +6,8 @@ import { Sidebar, type SidebarTab } from "./Sidebar";
 import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
 import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
 import { ContestPerformanceSection } from "./ContestPerformanceSection";
+import { BadgesCard } from "./BadgesCard";
+import { RecentContestsCard } from "./RecentContestsCard";
 
 export default function Dashboard() {
     const location = useLocation();
@@ -219,17 +221,27 @@ export default function Dashboard() {
 
 
 
-                        {/* Practice Field: Contest Performance & Multi-Platform Coding Submissions (Excluding GitHub) */}
+                        {/* Practice Field: Multi-Platform Coding Submissions (Excluding GitHub) & Contest Performance */}
                         {activeDashboardField === "practice" && (
                             <div className="w-full animate-fadeIn space-y-6">
-                                <ContestPerformanceSection
-                                    connectedPortals={connectedPortals}
-                                    username={user?.username || ""}
-                                />
                                 <CodingSubmissionsTable
                                     connectedPortals={connectedPortals}
                                     username={user?.username || ""}
                                 />
+                                <ContestPerformanceSection
+                                    connectedPortals={connectedPortals}
+                                    username={user?.username || ""}
+                                />
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                                    <BadgesCard
+                                        connectedPortals={connectedPortals}
+                                        username={user?.username || ""}
+                                    />
+                                    <RecentContestsCard
+                                        connectedPortals={connectedPortals}
+                                        username={user?.username || ""}
+                                    />
+                                </div>
                             </div>
                         )}
 

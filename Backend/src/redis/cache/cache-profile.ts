@@ -100,17 +100,34 @@ export const invalidateAllUserCaches = async (user: { id?: string; username?: st
     try {
         if (!redis || redis.status !== "ready") return;
         const promises: Promise<any>[] = [];
-        if (user.username) {
-            promises.push(redis.del(`profile:public:${user.username.toLowerCase().trim()}`));
-            promises.push(redis.del(`user:portals:${user.username.toLowerCase().trim()}`));
+        const identifiers = [user.username, user.gmail].filter(Boolean) as string[];
+
+        for (const ident of identifiers) {
+            const raw = ident.trim();
+            const lower = raw.toLowerCase();
+            const variants = Array.from(new Set([raw, lower]));
+
+            for (const keyVar of variants) {
+                promises.push(redis.del(`profile:public:${keyVar}`));
+                promises.push(redis.del(`user:portals:${keyVar}`));
+                promises.push(redis.del(`user:submissions:unified:${keyVar}`));
+                promises.push(redis.del(`user:development:unified:${keyVar}`));
+                promises.push(redis.del(`user:contests:unified:${keyVar}`));
+            }
         }
+
         if (user.id) {
             promises.push(redis.del(`profile:private:${user.id}`));
+            promises.push(redis.del(`user:portals:${user.id}`));
+            promises.push(redis.del(`user:submissions:unified:${user.id}`));
+            promises.push(redis.del(`user:development:unified:${user.id}`));
+            promises.push(redis.del(`user:contests:unified:${user.id}`));
         }
+
         if (user.gmail) {
-            promises.push(redis.del(`user:portals:${user.gmail.toLowerCase().trim()}`));
             promises.push(redis.del(`auth:user:gmail:${user.gmail.toLowerCase().trim()}`));
         }
+
         await Promise.allSettled(promises);
     } catch {
         // Safe fallback

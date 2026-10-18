@@ -6,6 +6,8 @@ import { useToast } from "../../context/ToastContext";
 import { usePlatformSync, type UsePlatformSyncReturn } from "../../hooks/usePlatformSync";
 import { editPlatformHandle } from "../../utils/profileApi";
 import { PlatformDifficultyGauge, type DifficultyBreakdown } from "./PlatformDifficultyGauge";
+import { useAppDispatch, useAppSelector } from "../../store";
+import { invalidateConnectedPlatformCaches } from "../../utils/cacheManager";
 
 export interface PortalProfileData {
     success: boolean;
@@ -373,6 +375,8 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
     syncState,
 }) => {
     const toast = useToast();
+    const dispatch = useAppDispatch();
+    const user = useAppSelector((state) => state.user.user);
     const internalSync = usePlatformSync();
     const activeSync = syncState || internalSync;
 
@@ -433,6 +437,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
             // Broadcast to other components (Sidebar, etc.)
             window.dispatchEvent(new Event("orbix_portals_updated"));
             window.dispatchEvent(new Event("storage"));
+            invalidateConnectedPlatformCaches(dispatch, user?.username);
         } catch (e) {
             console.error("Failed to persist connected portals:", e);
         }

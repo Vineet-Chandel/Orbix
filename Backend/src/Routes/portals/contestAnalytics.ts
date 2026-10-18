@@ -52,11 +52,54 @@ export interface PlatformContestAnalytics {
     exploreContestsUrl: string;
 }
 
+export interface UnifiedRecentContestItem {
+    portal: string;
+    portalName: string;
+    contestId: string;
+    contestName: string;
+    contestUrl: string;
+    date: string;
+    timestamp: number;
+    rank: number | null;
+    rating: number;
+    ratingBefore: number | null;
+    ratingChange: number | null;
+    division?: string | null;
+    problemsSolved?: number | null;
+    totalProblems?: number | null;
+}
+
+export function getContestUrl(portal: string, contestId: string | number, contestName?: string): string {
+    const p = portal.toLowerCase().trim();
+    const id = String(contestId || "").trim();
+    if (p === "codeforces") {
+        return /^\d+$/.test(id) ? `https://codeforces.com/contest/${id}` : `https://codeforces.com/contests`;
+    }
+    if (p === "leetcode") {
+        if (contestName) {
+            const slug = contestName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            return `https://leetcode.com/contest/${slug}`;
+        }
+        return `https://leetcode.com/contest/`;
+    }
+    if (p === "codechef") {
+        return id ? `https://www.codechef.com/${id}` : `https://www.codechef.com/contests`;
+    }
+    if (p === "atcoder") {
+        return id ? `https://atcoder.jp/contests/${id}` : `https://atcoder.jp/contests/`;
+    }
+    if (p === "hackerrank") {
+        return id ? `https://www.hackerrank.com/contests/${id}` : `https://www.hackerrank.com/contests`;
+    }
+    return `https://${portal}.com`;
+}
+
 export interface UnifiedContestResponse {
     success: boolean;
     username: string;
     timestamp: string;
     platforms: PlatformContestAnalytics[];
+    recentContests?: UnifiedRecentContestItem[];
     summary: {
         totalRatedContests: number;
         platformContestCounts: Record<string, number>;
@@ -1163,7 +1206,11 @@ export async function calculateUserContestPerformance(
         const result = await query(
             `SELECT portal, portal_username, verified, display_name
              FROM user_links
-             WHERE (username = $1 OR username = (SELECT email FROM users WHERE username = $1 LIMIT 1))
+             WHERE (
+                LOWER(username) = LOWER($1)
+                OR LOWER(username) = (SELECT LOWER(email) FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1)
+                OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1) LIMIT 1)
+             )
              ORDER BY portal ASC;`,
             [cleanUsername]
         );
@@ -1173,21 +1220,21 @@ export async function calculateUserContestPerformance(
     }
 
     const connectedMap = new Map<string, string>();
-    for (const row of rows) {
-        const portal = (row.portal || "").toLowerCase().trim();
-        const portalUsername = (row.portal_username || "").trim();
-        if (portal && portalUsername) {
-            connectedMap.set(portal, portalUsername);
-        }
-    }
-
-    // Merge any client-supplied portals (e.g. from localStorage or active state)
-    if (clientPortals && typeof clientPortals === "object") {
+    if (clientPortals && Object.keys(clientPortals).length > 0) {
+        // Client-driven dynamic set: ONLY query and return platforms the client is currently connected to
         for (const [k, v] of Object.entries(clientPortals)) {
             const portalKey = k.toLowerCase().trim();
             const portalUsername = (typeof v === "string" ? v : (v as any)?.username || (v as any)?.portalUsername || "").trim();
-            if (portalKey && portalUsername && !connectedMap.has(portalKey)) {
+            if (portalKey && portalUsername && portalKey !== "github" && !portalKey.startsWith("_") && portalKey !== "theme") {
                 connectedMap.set(portalKey, portalUsername);
+            }
+        }
+    } else {
+        for (const row of rows) {
+            const portal = (row.portal || "").toLowerCase().trim();
+            const portalUsername = (row.portal_username || "").trim();
+            if (portal && portalUsername) {
+                connectedMap.set(portal, portalUsername);
             }
         }
     }
@@ -1379,11 +1426,38 @@ export async function calculateUserContestPerformance(
         return a.portalName.localeCompare(b.portalName);
     });
 
+    // Unified chronological recent contests feed
+    const recentContests: UnifiedRecentContestItem[] = [];
+    for (const p of platforms) {
+        if (!p.connected || !p.history) continue;
+        for (const h of p.history) {
+            recentContests.push({
+                portal: p.portal,
+                portalName: p.portalName,
+                contestId: String(h.contestId),
+                contestName: h.contestName,
+                contestUrl: getContestUrl(p.portal, h.contestId, h.contestName),
+                date: h.date,
+                timestamp: h.timestamp,
+                rank: h.rank ?? null,
+                rating: h.rating,
+                ratingBefore: h.ratingBefore ?? null,
+                ratingChange: h.ratingChange ?? null,
+                division: h.division ?? null,
+                problemsSolved: h.problemsSolved ?? null,
+                totalProblems: h.totalProblems ?? null,
+            });
+        }
+    }
+    // Strictly chronological descending (newest first)
+    recentContests.sort((a, b) => b.timestamp - a.timestamp);
+
     return {
         success: true,
         username: cleanUsername,
         timestamp: new Date().toISOString(),
         platforms,
+        recentContests,
         summary: {
             totalRatedContests,
             platformContestCounts,

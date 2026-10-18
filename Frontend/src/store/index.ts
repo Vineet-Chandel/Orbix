@@ -4,6 +4,7 @@ import userReducer from "./userSlice";
 import submissionsReducer from "./submissionsSlice";
 import developmentReducer from "./developmentSlice";
 import contestsReducer from "./contestsSlice";
+import badgesReducer from "./badgesSlice";
 
 export const store = configureStore({
     reducer: {
@@ -11,6 +12,7 @@ export const store = configureStore({
         submissions: submissionsReducer,
         development: developmentReducer,
         contests: contestsReducer,
+        badges: badgesReducer,
     },
 });
 
@@ -24,3 +26,4 @@ export * from "./userSlice";
 export * from "./submissionsSlice";
 export * from "./developmentSlice";
 export * from "./contestsSlice";
+export * from "./badgesSlice";

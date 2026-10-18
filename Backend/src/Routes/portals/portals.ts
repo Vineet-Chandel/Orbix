@@ -2,7 +2,9 @@ import express, { type Request, type Response } from "express";
 import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
 import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
+import { invalidateAllUserCaches } from "../../redis/cache/cache-profile.js";
 import { calculateUserContestPerformance } from "./contestAnalytics.js";
+import { calculateUserBadges } from "./badgesAnalytics.js";
 import {
     getCodeforcesTier,
     getLeetCodeTier,
@@ -1562,18 +1564,54 @@ portalsRouter.get("/fetch", async (req: Request, res: Response) => {
  */
 const activeSubmissionsRefreshes = new Set<string>();
 
-export async function calculateUnifiedSubmissions(username: string) {
-    // Query Postgres for user's connected platforms excluding github
+export async function calculateUnifiedSubmissions(
+    username: string,
+    clientPortals?: Record<string, string>
+) {
+    // Query Postgres for user's connected platforms excluding github using case-insensitive matching
     const result = await query(
         `SELECT portal, portal_username, verified, display_name, stats
          FROM user_links
-         WHERE (username = $1 OR username = (SELECT email FROM users WHERE username = $1 LIMIT 1))
-           AND portal != 'github'
+         WHERE (
+            LOWER(username) = LOWER($1)
+            OR LOWER(username) = (SELECT LOWER(email) FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1)
+            OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1) LIMIT 1)
+         )
+           AND LOWER(portal) != 'github'
          ORDER BY portal ASC;`,
         [username]
     );
 
     const rows = result.rows || [];
+    let effectiveRows: any[] = [];
+
+    if (clientPortals && Object.keys(clientPortals).length > 0) {
+        // Dynamic client-driven set: ONLY include platforms that client is currently connected to
+        const clientEntries = Object.entries(clientPortals)
+            .map(([p, u]) => [p.toLowerCase().trim(), String(u || "").trim()] as const)
+            .filter(([p, u]) => p !== "github" && !p.startsWith("_") && p !== "theme" && Boolean(u));
+
+        for (const [p, u] of clientEntries) {
+            const dbMatch = rows.find((r: any) => (r.portal || "").toLowerCase() === p);
+            if (dbMatch) {
+                effectiveRows.push({
+                    ...dbMatch,
+                    portal_username: u || dbMatch.portal_username,
+                });
+            } else {
+                effectiveRows.push({
+                    portal: p,
+                    portal_username: u,
+                    verified: true,
+                    display_name: p,
+                    stats: [],
+                });
+            }
+        }
+    } else {
+        effectiveRows = rows;
+    }
+
     const platformBreakdown: Record<string, {
         name: string;
         portal: string;
@@ -1589,7 +1627,7 @@ export async function calculateUnifiedSubmissions(username: string) {
 
     // Process all platforms in parallel with 3.5s timeout guard per platform
     await Promise.allSettled(
-        rows.map(async (row: any) => {
+        effectiveRows.map(async (row: any) => {
             const portal = (row.portal || "").toLowerCase().trim();
             const portalUsername = (row.portal_username || "").trim();
             if (!portal || !portalUsername) return;
@@ -1907,8 +1945,35 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
             });
         }
 
-        const cacheKey = `user:submissions:unified:${username}`;
+        const cleanUser = username.toLowerCase().trim();
+        const cacheKey = `user:submissions:unified:${cleanUser}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
+
+        // Parse clientPortals if provided
+        const clientPortals: Record<string, string> = {};
+        if (req.query.portals && typeof req.query.portals === "string") {
+            const rawPortals = req.query.portals.trim();
+            if (rawPortals.startsWith("{")) {
+                try {
+                    const parsed = JSON.parse(rawPortals);
+                    for (const [k, v] of Object.entries(parsed)) {
+                        const lk = k.toLowerCase().trim();
+                        const val = typeof v === "object" ? (v as any)?.username || (v as any)?.portal_username || "" : String(v || "");
+                        if (lk && val.trim()) clientPortals[lk] = val.trim();
+                    }
+                } catch {
+                    // ignore JSON parse error
+                }
+            } else {
+                const pairs = rawPortals.split(",");
+                for (const p of pairs) {
+                    if (p.includes(":")) {
+                        const [k, v] = p.split(":");
+                        if (k && v) clientPortals[k.trim().toLowerCase()] = v.trim();
+                    }
+                }
+            }
+        }
 
         // Check Redis cache first for lightning-fast sub-millisecond response
         if (!forceRefresh && redis && redis.status === "ready") {
@@ -1916,43 +1981,59 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
                 const cached = await redis.get(cacheKey);
                 if (cached) {
                     const parsed = JSON.parse(cached);
-                    // Fast return immediately!
-                    res.status(200).json(parsed);
 
-                    // Background revalidation: if cached response is older than 3 minutes, re-verify in background
-                    const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
-                    if (cacheAge > 3 * 60 * 1000 && !activeSubmissionsRefreshes.has(username)) {
-                        activeSubmissionsRefreshes.add(username);
-                        calculateUnifiedSubmissions(username)
-                            .then(async (fresh) => {
-                                // Update Redis cache if any submission counts or stats changed
-                                if (
-                                    fresh.totalSubmissions !== parsed.totalSubmissions ||
-                                    fresh.activeDays !== parsed.activeDays ||
-                                    fresh.dayStreak !== parsed.dayStreak ||
-                                    Object.keys(fresh.dailyMerged).length !== Object.keys(parsed.dailyMerged).length
-                                ) {
-                                    if (redis && redis.status === "ready") {
-                                        await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
-                                    }
-                                }
-                            })
-                            .catch((err) => {
-                                console.error("Background submissions re-verification error:", err);
-                            })
-                            .finally(() => {
-                                activeSubmissionsRefreshes.delete(username);
-                            });
+                    // Check if clientPortals has mismatched platforms compared to cached response
+                    let cacheMismatched = false;
+                    const clientPortalKeys = Object.keys(clientPortals).filter((k) => k !== "github");
+                    if (clientPortalKeys.length > 0) {
+                        const cachedKeys = Object.keys(parsed.platformBreakdown || {}).filter((k) => k !== "github");
+                        const hasMissing = clientPortalKeys.some((k) => !cachedKeys.includes(k) || (parsed.platformBreakdown?.[k]?.username?.toLowerCase() !== clientPortals[k]?.toLowerCase()));
+                        const hasExtra = cachedKeys.some((k) => !clientPortalKeys.includes(k));
+                        if (hasMissing || hasExtra) {
+                            cacheMismatched = true;
+                        }
                     }
-                    return;
+
+                    if (!cacheMismatched) {
+                        res.status(200).json(parsed);
+
+                        // Background revalidation: if cached response is older than 3 minutes, re-verify in background
+                        const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
+                        if (cacheAge > 3 * 60 * 1000 && !activeSubmissionsRefreshes.has(cleanUser)) {
+                            activeSubmissionsRefreshes.add(cleanUser);
+                            calculateUnifiedSubmissions(username, Object.keys(clientPortals).length > 0 ? clientPortals : undefined)
+                                .then(async (fresh) => {
+                                    if (
+                                        fresh.totalSubmissions !== parsed.totalSubmissions ||
+                                        fresh.activeDays !== parsed.activeDays ||
+                                        fresh.dayStreak !== parsed.dayStreak ||
+                                        Object.keys(fresh.dailyMerged).length !== Object.keys(parsed.dailyMerged).length
+                                    ) {
+                                        if (redis && redis.status === "ready") {
+                                            await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
+                                        }
+                                    }
+                                })
+                                .catch((err) => {
+                                    console.error("Background submissions re-verification error:", err);
+                                })
+                                .finally(() => {
+                                    activeSubmissionsRefreshes.delete(cleanUser);
+                                });
+                        }
+                        return;
+                    }
                 }
             } catch {
                 // Non-fatal, fallback to calculating
             }
         }
 
-        // Cache miss or force refresh
-        const responseData = await calculateUnifiedSubmissions(username);
+        // Cache miss or force refresh or platform set changed
+        const responseData = await calculateUnifiedSubmissions(
+            username,
+            Object.keys(clientPortals).length > 0 ? clientPortals : undefined
+        );
 
         // Cache in Redis for 30 minutes (1800s)
         if (redis && redis.status === "ready") {
@@ -1988,25 +2069,32 @@ export async function calculateUnifiedDevelopmentContributions(
     let ghHandle = "";
     let displayName = "GitHub";
 
-    try {
-        const result = await query(
-            `SELECT portal, portal_username, verified, display_name, stats
-             FROM user_links
-             WHERE (username = $1 OR username = (SELECT email FROM users WHERE username = $1 LIMIT 1))
-               AND portal = 'github'
-             LIMIT 1;`,
-            [username]
-        );
-        if (result && result.rows.length > 0) {
-            ghHandle = result.rows[0].portal_username || "";
-            displayName = result.rows[0].display_name || "GitHub";
-        }
-    } catch {
-        // non-blocking
+    // If clientPortals was explicitly supplied, prioritize client-linked github handle
+    if (clientPortals && typeof clientPortals === "object") {
+        ghHandle = (clientPortals.github || "").trim();
     }
 
-    if (!ghHandle && clientPortals?.github) {
-        ghHandle = clientPortals.github;
+    if (!ghHandle && clientPortals === undefined) {
+        try {
+            const result = await query(
+                `SELECT portal, portal_username, verified, display_name, stats
+                 FROM user_links
+                 WHERE (
+                    LOWER(username) = LOWER($1)
+                    OR LOWER(username) = (SELECT LOWER(email) FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1)
+                    OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1) LIMIT 1)
+                 )
+                   AND LOWER(portal) = 'github'
+                 LIMIT 1;`,
+                [username]
+            );
+            if (result && result.rows.length > 0) {
+                ghHandle = result.rows[0].portal_username || "";
+                displayName = result.rows[0].display_name || "GitHub";
+            }
+        } catch {
+            // non-blocking
+        }
     }
 
     let profileData: any = null;
@@ -2111,7 +2199,8 @@ portalsRouter.get("/development/unified", async (req: Request, res: Response) =>
             }
         }
 
-        const cacheKey = `user:development:unified:${username}`;
+        const cleanUser = username.toLowerCase().trim();
+        const cacheKey = `user:development:unified:${cleanUser}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
 
         // Check Redis cache first for sub-millisecond response
@@ -2120,32 +2209,45 @@ portalsRouter.get("/development/unified", async (req: Request, res: Response) =>
                 const cached = await redis.get(cacheKey);
                 if (cached) {
                     const parsed = JSON.parse(cached);
-                    res.status(200).json(parsed);
 
-                    // Background revalidation
-                    const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
-                    if (cacheAge > 3 * 60 * 1000 && !activeDevelopmentRefreshes.has(username)) {
-                        activeDevelopmentRefreshes.add(username);
-                        calculateUnifiedDevelopmentContributions(username, clientPortals)
-                            .then(async (fresh) => {
-                                if (
-                                    fresh.totalContributions !== parsed.totalContributions ||
-                                    fresh.activeDays !== parsed.activeDays ||
-                                    fresh.dayStreak !== parsed.dayStreak
-                                ) {
-                                    if (redis && redis.status === "ready") {
-                                        await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
-                                    }
-                                }
-                            })
-                            .catch((err) => {
-                                console.error("Background development contributions re-verification error:", err);
-                            })
-                            .finally(() => {
-                                activeDevelopmentRefreshes.delete(username);
-                            });
+                    // Check if client github changed
+                    let isMismatched = false;
+                    if (clientPortals && clientPortals.github !== undefined) {
+                        const clientGh = (clientPortals.github || "").toLowerCase().trim();
+                        const cachedGh = (parsed.platformBreakdown?.github?.username || "").toLowerCase().trim();
+                        if (clientGh !== cachedGh) {
+                            isMismatched = true;
+                        }
                     }
-                    return;
+
+                    if (!isMismatched) {
+                        res.status(200).json(parsed);
+
+                        // Background revalidation
+                        const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
+                        if (cacheAge > 3 * 60 * 1000 && !activeDevelopmentRefreshes.has(cleanUser)) {
+                            activeDevelopmentRefreshes.add(cleanUser);
+                            calculateUnifiedDevelopmentContributions(username, clientPortals)
+                                .then(async (fresh) => {
+                                    if (
+                                        fresh.totalContributions !== parsed.totalContributions ||
+                                        fresh.activeDays !== parsed.activeDays ||
+                                        fresh.dayStreak !== parsed.dayStreak
+                                    ) {
+                                        if (redis && redis.status === "ready") {
+                                            await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
+                                        }
+                                    }
+                                })
+                                .catch((err) => {
+                                    console.error("Background development contributions re-verification error:", err);
+                                })
+                                .finally(() => {
+                                    activeDevelopmentRefreshes.delete(cleanUser);
+                                });
+                        }
+                        return;
+                    }
                 }
             } catch {
                 // Non-fatal, fallback to calculating
@@ -2203,7 +2305,8 @@ portalsRouter.get("/contests", async (req: Request, res: Response) => {
             }
         }
 
-        const cacheKey = `user:contests:unified:${username}`;
+        const cleanUser = username.toLowerCase().trim();
+        const cacheKey = `user:contests:unified:${cleanUser}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
 
         // Check Redis cache first for sub-millisecond response
@@ -2212,26 +2315,42 @@ portalsRouter.get("/contests", async (req: Request, res: Response) => {
                 const cached = await redis.get(cacheKey);
                 if (cached) {
                     const parsed = JSON.parse(cached);
-                    res.status(200).json(parsed);
 
-                    // Background revalidation if older than 3 minutes
-                    const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
-                    if (cacheAge > 3 * 60 * 1000 && !activeContestsRefreshes.has(username)) {
-                        activeContestsRefreshes.add(username);
-                        calculateUserContestPerformance(username, clientPortals)
-                            .then(async (fresh) => {
-                                if (redis && redis.status === "ready") {
-                                    await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
-                                }
-                            })
-                            .catch((err) => {
-                                console.error("Background contest re-verification error:", err);
-                            })
-                            .finally(() => {
-                                activeContestsRefreshes.delete(username);
-                            });
+                    // Check if clientPortals has mismatched platforms compared to cached response
+                    let cacheMismatched = false;
+                    if (clientPortals && Object.keys(clientPortals).length > 0) {
+                        const clientPortalKeys = Object.keys(clientPortals).filter((k) => k !== "github" && !k.startsWith("_") && k !== "theme");
+                        const cachedPlatforms = (parsed.platforms || []).filter((p: any) => p.connected && p.portalUsername);
+                        const cachedKeys = cachedPlatforms.map((p: any) => p.portal.toLowerCase());
+                        const hasMissing = clientPortalKeys.some((k) => !cachedKeys.includes(k) || (cachedPlatforms.find((p: any) => p.portal.toLowerCase() === k)?.portalUsername?.toLowerCase() !== clientPortals[k]?.toLowerCase()));
+                        const hasExtra = cachedKeys.some((k: string) => !clientPortalKeys.includes(k));
+                        if (hasMissing || hasExtra) {
+                            cacheMismatched = true;
+                        }
                     }
-                    return;
+
+                    if (!cacheMismatched) {
+                        res.status(200).json(parsed);
+
+                        // Background revalidation if older than 3 minutes
+                        const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
+                        if (cacheAge > 3 * 60 * 1000 && !activeContestsRefreshes.has(cleanUser)) {
+                            activeContestsRefreshes.add(cleanUser);
+                            calculateUserContestPerformance(username, clientPortals)
+                                .then(async (fresh) => {
+                                    if (redis && redis.status === "ready") {
+                                        await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
+                                    }
+                                })
+                                .catch((err) => {
+                                    console.error("Background contest re-verification error:", err);
+                                })
+                                .finally(() => {
+                                    activeContestsRefreshes.delete(cleanUser);
+                                });
+                        }
+                        return;
+                    }
                 }
             } catch {
                 // Non-fatal, fallback to calculating
@@ -2254,6 +2373,75 @@ portalsRouter.get("/contests", async (req: Request, res: Response) => {
         return res.status(500).json({
             success: false,
             message: "Failed to generate contest analytics",
+        });
+    }
+});
+
+portalsRouter.get(["/badges", "/badges/unified"], async (req: Request, res: Response) => {
+    try {
+        const username = String(req.query.username || (req as any).user?.username || "").trim();
+        if (!username) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing username parameter",
+            });
+        }
+
+        const cacheKey = `user:badges:unified:${username}`;
+        const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
+
+        let clientPortals: Record<string, string> | undefined = undefined;
+        if (req.query.clientPortals) {
+            try {
+                clientPortals = JSON.parse(String(req.query.clientPortals));
+            } catch {
+                // Ignore parse error
+            }
+        }
+
+        if (!forceRefresh && redis && redis.status === "ready") {
+            try {
+                const cached = await redis.get(cacheKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    res.status(200).json(parsed);
+
+                    // Background revalidation if older than 5 minutes
+                    const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
+                    if (cacheAge > 5 * 60 * 1000) {
+                        calculateUserBadges(username, clientPortals)
+                            .then(async (fresh) => {
+                                if (redis && redis.status === "ready") {
+                                    await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
+                                }
+                            })
+                            .catch((err) => {
+                                console.error("Background badges re-verification error:", err);
+                            });
+                    }
+                    return;
+                }
+            } catch {
+                // Non-fatal, fallback to calculation
+            }
+        }
+
+        const responseData = await calculateUserBadges(username, clientPortals);
+
+        if (redis && redis.status === "ready") {
+            try {
+                await redis.set(cacheKey, JSON.stringify(responseData), "EX", 1800);
+            } catch {
+                // Non-fatal
+            }
+        }
+
+        return res.status(200).json(responseData);
+    } catch (err: any) {
+        console.error("Unified badges endpoint error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to generate badges data",
         });
     }
 });
@@ -2566,6 +2754,43 @@ export const handleSavePortals = async (req: Request, res: Response) => {
         // Save to Database (PostgreSQL)
         let dbSaved = false;
         try {
+            // 1. Explicitly prune any portals marked for deletion
+            if (Array.isArray(body.deletedPortals) && body.deletedPortals.length > 0) {
+                for (const dp of body.deletedPortals) {
+                    const cleanDp = String(dp || "").trim().toLowerCase();
+                    if (cleanDp) {
+                        await query(
+                            `DELETE FROM user_links
+                             WHERE (LOWER(username) = LOWER($1) OR LOWER(username) = LOWER($2) OR user_id = $3)
+                               AND LOWER(portal) = LOWER($4);`,
+                            [authUser.username, authUser.gmail, userId, cleanDp]
+                        ).catch(() => null);
+                    }
+                }
+            }
+
+            // 2. If complete bucket payload was sent, synchronize database to remove any disconnected platforms
+            if (body.connectedProfiles && typeof body.connectedProfiles === "object") {
+                const incomingPortals = new Set(itemsToSave.map((it) => it.portal.toLowerCase()));
+                const existingLinks = await query(
+                    `SELECT portal FROM user_links
+                     WHERE (LOWER(username) = LOWER($1) OR LOWER(username) = LOWER($2) OR user_id = $3);`,
+                    [authUser.username, authUser.gmail, userId]
+                );
+                for (const row of existingLinks.rows || []) {
+                    const ep = (row.portal || "").toLowerCase().trim();
+                    if (ep && !incomingPortals.has(ep) && !body.connectedProfiles[ep]) {
+                        await query(
+                            `DELETE FROM user_links
+                             WHERE (LOWER(username) = LOWER($1) OR LOWER(username) = LOWER($2) OR user_id = $3)
+                               AND LOWER(portal) = LOWER($4);`,
+                            [authUser.username, authUser.gmail, userId, ep]
+                        ).catch(() => null);
+                    }
+                }
+            }
+
+            // 3. Upsert current active accounts
             for (const item of itemsToSave) {
                 await query(
                     `INSERT INTO user_links (
@@ -2611,21 +2836,29 @@ export const handleSavePortals = async (req: Request, res: Response) => {
             console.warn("Database storage warning (non-fatal):", dbErr.message || dbErr);
         }
 
-        // Cache in Redis
+        // Completely invalidate all platform and submission caches in Redis
         try {
+            await invalidateAllUserCaches({
+                id: userId,
+                username: authUser.username,
+                gmail: authUser.gmail,
+            });
+
             if (redis && redis.status === "ready") {
-                await Promise.allSettled([
-                    redis.set(
-                        `user:portals:${userIdentifier}`,
+                const cacheNames = Array.from(new Set([
+                    userIdentifier,
+                    authUser.username,
+                    authUser.gmail,
+                ].filter(Boolean))).map((s) => s.toLowerCase().trim());
+
+                for (const u of cacheNames) {
+                    await redis.set(
+                        `user:portals:${u}`,
                         JSON.stringify(itemsToSave),
                         "EX",
                         60 * 60 * 24 * 7
-                    ),
-                    redis.del(`profile:public:${userIdentifier}`),
-                    redis.del(`user:submissions:unified:${userIdentifier}`),
-                    redis.del(`user:development:unified:${userIdentifier}`),
-                    redis.del(`user:contests:unified:${userIdentifier}`),
-                ]);
+                    );
+                }
             }
         } catch {
             // Redis cache non-fatal
@@ -2982,24 +3215,24 @@ portalsRouter.delete("/:portal", authenticate, async (req: Request, res: Respons
 
         const result = await query(
             `DELETE FROM user_links
-             WHERE (username = $1 OR username = $2) AND LOWER(portal) = $3
+             WHERE (
+                LOWER(username) = LOWER($1)
+                OR LOWER(username) = LOWER($2)
+                OR user_id = $3
+             ) AND LOWER(portal) = $4
              RETURNING id, portal;`,
-            [authUser.username, authUser.gmail, portal]
+            [authUser.username, authUser.gmail, authUser.id, portal]
         );
 
         if (result.rowCount === 0) {
             return res.status(404).json({ success: false, message: `Platform connection '${portal}' not found` });
         }
 
-        if (redis && redis.status === "ready") {
-            await Promise.allSettled([
-                redis.del(`profile:public:${authUser.username}`),
-                redis.del(`user:portals:${authUser.username}`),
-                redis.del(`user:submissions:unified:${authUser.username}`),
-                redis.del(`user:development:unified:${authUser.username}`),
-                redis.del(`user:contests:unified:${authUser.username}`),
-            ]);
-        }
+        await invalidateAllUserCaches({
+            id: authUser.id,
+            username: authUser.username,
+            gmail: authUser.gmail,
+        });
 
         return res.status(200).json({
             success: true,
@@ -3053,15 +3286,11 @@ portalsRouter.put("/:portal", authenticate, async (req: Request, res: Response) 
             return res.status(404).json({ success: false, message: `Platform connection '${portal}' not found` });
         }
 
-        if (redis && redis.status === "ready") {
-            await Promise.allSettled([
-                redis.del(`profile:public:${authUser.username}`),
-                redis.del(`user:portals:${authUser.username}`),
-                redis.del(`user:submissions:unified:${authUser.username}`),
-                redis.del(`user:development:unified:${authUser.username}`),
-                redis.del(`user:contests:unified:${authUser.username}`),
-            ]);
-        }
+        await invalidateAllUserCaches({
+            id: authUser.id,
+            username: authUser.username,
+            gmail: authUser.gmail,
+        });
 
         return res.status(200).json({
             success: true,

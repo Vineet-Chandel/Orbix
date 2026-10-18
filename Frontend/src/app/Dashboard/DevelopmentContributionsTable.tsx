@@ -10,7 +10,7 @@ import {
     CheckCircle2,
     ArrowRight,
 } from "lucide-react";
-import { useAppDispatch, useAppSelector, fetchUnifiedDevelopment } from "../../store";
+import { useAppDispatch, useAppSelector, fetchUnifiedDevelopment, clearDevelopmentCache } from "../../store";
 import { getPortalIcon } from "../../utils/portalIcons";
 import {
     aggregateClientDevelopmentContributions,
@@ -36,12 +36,23 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
 
     const weeksCount = 52; // Full 1 Year activity heatmap
 
-    // Fetch unified development contributions from backend only if not already cached in Redux
+    const gh = connectedPortals?.github || connectedPortals?.["GitHub"] || connectedPortals?.["Github"];
+    const githubHandle = (typeof gh === "object" ? gh?.username || gh?.portal_username || "" : String(gh || "")).trim().toLowerCase();
+
+    const prevGhRef = React.useRef<string | null>(null);
+
+    // Fetch unified development contributions dynamically when github connection changes
     useEffect(() => {
-        if (effectiveUser && !remoteData) {
-            dispatch(fetchUnifiedDevelopment({ username: effectiveUser }));
+        if (!effectiveUser) return;
+        if (prevGhRef.current === null) {
+            prevGhRef.current = githubHandle;
+            dispatch(fetchUnifiedDevelopment({ username: effectiveUser, portals: connectedPortals }));
+        } else if (prevGhRef.current !== githubHandle) {
+            prevGhRef.current = githubHandle;
+            dispatch(clearDevelopmentCache(effectiveUser));
+            dispatch(fetchUnifiedDevelopment({ username: effectiveUser, force: true, portals: connectedPortals }));
         }
-    }, [effectiveUser, remoteData, dispatch]);
+    }, [effectiveUser, githubHandle, connectedPortals, dispatch]);
 
     // Compute fallback client development aggregation
     const clientAgg = useMemo(() => {
@@ -113,15 +124,14 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
             setSelectedPortal("all");
         }
     }, [selectedPortal, connectedPlatformsList]);
+
     const isGitHubConnected = useMemo(() => {
-        if (platformBreakdown["github"]) return true;
-        if (connectedPortals && (connectedPortals.github || connectedPortals["GitHub"] || connectedPortals["Github"])) return true;
-        return false;
-    }, [platformBreakdown, connectedPortals]);
+        return Boolean(githubHandle);
+    }, [githubHandle]);
 
     if (!isGitHubConnected) {
         return (
-            <div className="w-full rounded-3xl bg-[#0c1017] text-white p-8 sm:p-12 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
+            <div className="w-full rounded-3xl bg-black text-white p-8 sm:p-12 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
                 <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
                 <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -164,7 +174,7 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
     }
 
     return (
-        <div className="w-full rounded-3xl bg-[#0c1017] text-white p-6 sm:p-8 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
+        <div className="w-full rounded-3xl bg-black text-white p-6 sm:p-8 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
             {/* Ambient background glow */}
             <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />

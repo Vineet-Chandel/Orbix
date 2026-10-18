@@ -68,7 +68,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
     const maxSlots = format === "linkedin" ? 3 : 5;
 
     // Multi-Platform Coding Analytics
-    const userFallback = user?.username || "Vineet-Chandel";
+    const userFallback = user?.username || user?.firstName || "developer";
     const stats = useMemo(() => aggregateCodingStats(connectedPortals), [connectedPortals]);
     const coderType = useMemo(() => getCoderType(stats.totalSolved), [stats.totalSolved]);
     const availablePlatforms = useMemo(() => getAvailableCardPlatforms(connectedPortals, userFallback), [connectedPortals, userFallback]);

@@ -49,11 +49,11 @@ const initialState: DevelopmentState = {
 
 export const fetchUnifiedDevelopment = createAsyncThunk<
     UnifiedDevelopmentData,
-    { username: string; force?: boolean },
+    { username: string; force?: boolean; portals?: Record<string, any> },
     { state: { development: DevelopmentState }; rejectValue: string }
 >(
     "development/fetchUnified",
-    async ({ username, force = false }, { getState, rejectWithValue }) => {
+    async ({ username, force = false, portals }, { getState, rejectWithValue }) => {
         const effectiveUser = username.trim();
         if (!effectiveUser) {
             return rejectWithValue("Username is required to fetch unified development contributions");
@@ -63,49 +63,96 @@ export const fetchUnifiedDevelopment = createAsyncThunk<
         const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
         const now = Date.now();
 
-        // If existing data is present and not force-refreshing and fetched within 15 minutes, return existing
-        if (existing && !force && now - lastFetched < 15 * 60 * 1000) {
+        let clientGhHandle = "";
+        let portalsQuery = "";
+        if (portals && typeof portals === "object") {
+            const gh = portals.github;
+            clientGhHandle = typeof gh === "object" ? (gh?.username || gh?.portal_username || "") : String(gh || "");
+            clientGhHandle = clientGhHandle.trim();
+            portalsQuery = `&portals=${encodeURIComponent(JSON.stringify({ github: clientGhHandle }))}`;
+        }
+
+        const existingGh = (existing?.platformBreakdown?.github?.username || "").trim();
+        const hasGhMismatch = Boolean(portals && clientGhHandle.toLowerCase() !== existingGh.toLowerCase());
+
+        // If existing data is present and not force-refreshing and no mismatch and fetched within 15 minutes, return existing
+        if (existing && !force && !hasGhMismatch && now - lastFetched < 15 * 60 * 1000) {
             return existing;
         }
 
+        const isRefreshing = force || hasGhMismatch;
+        const endpoints = [
+            `/api/portals/development/unified?username=${encodeURIComponent(effectiveUser)}${isRefreshing ? "&refresh=true" : ""}${portalsQuery}`,
+            `http://localhost:3000/api/portals/development/unified?username=${encodeURIComponent(effectiveUser)}${isRefreshing ? "&refresh=true" : ""}${portalsQuery}`,
+        ];
+
+        let authToken = "";
         try {
-            const res = await fetch(
-                `http://localhost:3000/api/portals/development/unified?username=${encodeURIComponent(
-                    effectiveUser
-                )}${force ? "&refresh=true" : ""}`
-            );
-            if (!res.ok) {
-                return rejectWithValue(`HTTP error ${res.status}`);
-            }
-            const data = await res.json();
-            if (!data.success) {
-                return rejectWithValue(data.message || "Failed to fetch unified development contributions");
-            }
-            return {
-                username: effectiveUser,
-                totalContributions: data.totalContributions || data.totalSubmissions || 0,
-                totalSubmissions: data.totalSubmissions || data.totalContributions || 0,
-                activeDays: data.activeDays || 0,
-                dayStreak: data.dayStreak || 0,
-                platformBreakdown: data.platformBreakdown || {},
-                dailyMerged: data.dailyMerged || {},
-                connectedPlatformsCount:
-                    data.connectedPlatformsCount ||
-                    Object.keys(data.platformBreakdown || {}).length,
-                timestamp: data.timestamp || new Date().toISOString(),
-            };
-        } catch (err: any) {
-            return rejectWithValue(err.message || "Network error fetching development contributions");
+            authToken = localStorage.getItem("orbix_token") || "";
+        } catch {
+            // ignore
         }
+
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+
+        let lastError = "Failed to fetch development contributions";
+
+        for (const url of endpoints) {
+            try {
+                const res = await fetch(url, {
+                    headers,
+                    credentials: "include",
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.success) {
+                        return {
+                            username: effectiveUser,
+                            totalContributions: data.totalContributions || data.totalSubmissions || 0,
+                            totalSubmissions: data.totalSubmissions || data.totalContributions || 0,
+                            activeDays: data.activeDays || 0,
+                            dayStreak: data.dayStreak || 0,
+                            platformBreakdown: data.platformBreakdown || {},
+                            dailyMerged: data.dailyMerged || {},
+                            connectedPlatformsCount:
+                                data.connectedPlatformsCount ||
+                                Object.keys(data.platformBreakdown || {}).length,
+                            timestamp: data.timestamp || new Date().toISOString(),
+                        };
+                    }
+                }
+            } catch (err: any) {
+                lastError = err?.message || lastError;
+            }
+        }
+
+        return rejectWithValue(lastError);
     },
     {
         // Prevent duplicate network calls
-        condition: ({ username, force = false }, { getState }) => {
+        condition: ({ username, force = false, portals }, { getState }) => {
             const effectiveUser = username.trim();
             if (!effectiveUser) return false;
             const state = getState().development;
             const isLoading = state?.loadingByUser?.[effectiveUser];
-            if (!force && isLoading) return false;
+            if (isLoading) return false;
+            if (force) return true;
+
+            const existing = state.dataByUser[effectiveUser];
+            if (portals && typeof portals === "object") {
+                const gh = portals.github;
+                const clientGhHandle = (typeof gh === "object" ? (gh?.username || gh?.portal_username || "") : String(gh || "")).trim();
+                const existingGh = (existing?.platformBreakdown?.github?.username || "").trim();
+                if (clientGhHandle.toLowerCase() !== existingGh.toLowerCase()) {
+                    return true;
+                }
+            }
+
+            const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
+            if (existing && Date.now() - lastFetched < 15 * 60 * 1000) {
+                return false;
+            }
             return true;
         },
     }

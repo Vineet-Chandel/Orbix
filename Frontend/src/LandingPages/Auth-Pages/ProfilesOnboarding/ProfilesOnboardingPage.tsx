@@ -7,6 +7,7 @@ import { useAppDispatch, useAppSelector, setPortalProfiles } from "../../../stor
 import { useToast } from "../../../context/ToastContext";
 import { Sidebar } from "../../../app/Dashboard/Sidebar";
 import { disconnectPlatform } from "../../../utils/profileApi";
+import { invalidateConnectedPlatformCaches } from "../../../utils/cacheManager";
 
 type CategoryFilter = "all" | "cp" | "practice" | "dev";
 
@@ -231,6 +232,7 @@ export default function ProfilesOnboardingPage() {
             return next;
         });
 
+        invalidateConnectedPlatformCaches(dispatch, user?.username);
         toast.info(`Disconnected ${PORTALS[portalId]?.name || portalId} profile. Returned to edit stage.`);
     };
 
@@ -306,9 +308,9 @@ export default function ProfilesOnboardingPage() {
                 headers["Authorization"] = `Bearer ${authToken}`;
             }
 
+            const portalsToDelete = Array.from(deletedPortalsRef.current);
             // 1. Process pending platform deletions on the backend
-            if (deletedPortalsRef.current.size > 0) {
-                const portalsToDelete = Array.from(deletedPortalsRef.current);
+            if (portalsToDelete.length > 0) {
                 await Promise.allSettled(
                     portalsToDelete.map((p) => disconnectPlatform(p).catch(() => null))
                 );
@@ -342,9 +344,8 @@ export default function ProfilesOnboardingPage() {
             // Persist to Redux and LocalStorage
             dispatch(setPortalProfiles(resolvedProfiles));
             localStorage.setItem("orbix_connected_portals", JSON.stringify(connectedProfiles));
-            window.dispatchEvent(new Event("orbix_portals_updated"));
-
-            // 3. Persist to Backend API with correct user_id, username, and auth headers
+            
+            // Invalidate all platform caches so Dashboard and Profile charts update immediately
             const activeUser = user || (() => {
                 try {
                     const stored = localStorage.getItem("orbix_user");
@@ -354,12 +355,17 @@ export default function ProfilesOnboardingPage() {
                 }
             })();
 
+            invalidateConnectedPlatformCaches(dispatch, activeUser?.username);
+
+            // 3. Persist to Backend API with correct user_id, username, and auth headers
             const savePayload = {
                 user_id: activeUser?.id,
                 userId: activeUser?.id,
                 username: activeUser?.username,
                 portals: resolvedProfiles,
                 connectedProfiles,
+                deletedPortals: portalsToDelete,
+                syncMode: "exact",
             };
 
             // Call primary endpoint, fallback to secondary if needed

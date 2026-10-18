@@ -447,16 +447,30 @@ export function extractGitHubStats(
         };
     }
 
-    const username = gh.portal_username || gh.username || fallbackUsername || "";
-    const name = gh.name || gh.display_name || username || "GitHub";
-    const avatarUrl = gh.avatar || gh.avatar_url || (username ? `https://github.com/${username}.png` : "");
-    const profileUrl = gh.profileUrl || gh.url || gh.link || (username ? `https://github.com/${username}` : "");
+    const rawUser = typeof gh === "string" ? gh : (gh.portal_username || gh.username || fallbackUsername || "");
+    const username = (rawUser || "").trim();
+    if (!username) {
+        return {
+            connected: false,
+            username: "",
+            name: "",
+            avatarUrl: "",
+            publicRepos: 0,
+            contributionsOrCommits: 0,
+            followers: 0,
+            profileUrl: "",
+        };
+    }
 
-    let publicRepos = typeof gh.public_repos === "number" ? gh.public_repos : (typeof gh.publicRepos === "number" ? gh.publicRepos : 0);
-    let followers = typeof gh.followers === "number" ? gh.followers : 0;
-    let commitsOrContributions = typeof gh.contributions === "number" ? gh.contributions : (typeof gh.commits === "number" ? gh.commits : 0);
+    const name = (typeof gh === "object" ? gh.name || gh.display_name : "") || username || "GitHub";
+    const avatarUrl = (typeof gh === "object" ? gh.avatar || gh.avatar_url : "") || (username ? `https://github.com/${username}.png` : "");
+    const profileUrl = (typeof gh === "object" ? gh.profileUrl || gh.url || gh.link : "") || (username ? `https://github.com/${username}` : "");
 
-    const stats = Array.isArray(gh.stats) ? gh.stats : [];
+    let publicRepos = typeof gh === "object" && typeof gh.public_repos === "number" ? gh.public_repos : (typeof gh === "object" && typeof gh.publicRepos === "number" ? gh.publicRepos : 0);
+    let followers = typeof gh === "object" && typeof gh.followers === "number" ? gh.followers : 0;
+    let commitsOrContributions = typeof gh === "object" && typeof gh.contributions === "number" ? gh.contributions : (typeof gh === "object" && typeof gh.commits === "number" ? gh.commits : 0);
+
+    const stats = typeof gh === "object" && Array.isArray(gh.stats) ? gh.stats : [];
     for (const s of stats) {
         const lbl = (s.label || "").toLowerCase();
         const val = (s.value || "").toLowerCase();
@@ -503,13 +517,13 @@ export function getAllConnectedPlatforms(
 
         const regDef = PLATFORM_REGISTRY.find((p) => p.id === lowerId);
         const name = regDef?.name || PORTALS[lowerId]?.name || profile.name || (lowerId.charAt(0).toUpperCase() + lowerId.slice(1));
-        const username = profile.username || profile.portal_username || "";
-        const profileUrl = profile.profileUrl || profile.url || profile.link || regDef?.buildUrl(username) || "";
+        const username = (typeof profile === "string" ? profile : profile.username || profile.portal_username || "").trim();
+        const profileUrl = (typeof profile === "object" ? profile.profileUrl || profile.url || profile.link : "") || regDef?.buildUrl(username) || "";
         const brandColor = regDef?.brandColor || "#10B981";
         const solvedCount = extractPlatformSolved(profile, lowerId);
 
         // A platform is connected if it has a username, isVerified, or profileUrl
-        if (username || profile.verified || profileUrl || profile.connected) {
+        if (username || (typeof profile === "object" && (profile.verified || profile.connected)) || profileUrl) {
             list.push({
                 id: lowerId,
                 name,
@@ -517,7 +531,7 @@ export function getAllConnectedPlatforms(
                 profileUrl,
                 brandColor,
                 solvedCount,
-                isVerified: profile.verified !== false && profile.syncStatus !== "broken",
+                isVerified: typeof profile === "object" ? profile.verified !== false && profile.syncStatus !== "broken" : true,
             });
         }
     }
@@ -553,9 +567,9 @@ export function getAvailableCardPlatforms(
         if (lowerId.startsWith("_") || lowerId === "theme" || lowerId === "github") continue;
         if (NON_PROBLEM_PORTALS.has(lowerId)) continue;
 
-        const username = profile.username || profile.portal_username || "";
-        const profileUrl = profile.profileUrl || profile.url || profile.link || "";
-        if (!username && !profile.verified && !profileUrl && !profile.connected) continue;
+        const username = (typeof profile === "string" ? profile : profile.username || profile.portal_username || "").trim();
+        const profileUrl = typeof profile === "object" ? profile.profileUrl || profile.url || profile.link || "" : "";
+        if (!username && !(typeof profile === "object" && (profile.verified || profile.connected)) && !profileUrl) continue;
 
         const regDef = PLATFORM_REGISTRY.find((p) => p.id === lowerId);
         const name = regDef?.name || PORTALS[lowerId]?.name || profile.name || (lowerId.charAt(0).toUpperCase() + lowerId.slice(1));
@@ -594,8 +608,8 @@ export function getAvailableCardPlatforms(
         list.push({
             id: "github",
             name: "GitHub",
-            username: ghStats.username || "Vineet-Chandel",
-            profileUrl: ghStats.profileUrl || `https://github.com/${ghStats.username || "Vineet-Chandel"}`,
+            username: ghStats.username || fallbackUsername || "developer",
+            profileUrl: ghStats.profileUrl || `https://github.com/${ghStats.username || fallbackUsername || "developer"}`,
             brandColor: "#ffffff",
             solvedCount: 0,
             isVerified: true,

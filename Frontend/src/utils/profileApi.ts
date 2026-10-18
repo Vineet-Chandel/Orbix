@@ -209,6 +209,23 @@ export async function updateProfile(payload: {
 }
 
 /**
+ * Helper to purge local cache buckets on platform changes
+ */
+function purgeLocalPlatformCaches() {
+    try {
+        localStorage.removeItem("orbix_unified_submissions");
+        localStorage.removeItem("orbix_unified_development");
+        localStorage.removeItem("orbix_unified_contests");
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("orbix_portals_updated"));
+            window.dispatchEvent(new Event("storage"));
+        }
+    } catch {
+        // Safe fallback
+    }
+}
+
+/**
  * Disconnect a platform
  */
 export async function disconnectPlatform(portal: string): Promise<boolean> {
@@ -217,12 +234,14 @@ export async function disconnectPlatform(portal: string): Promise<boolean> {
             method: "DELETE",
         });
         invalidatePublicProfileClientCache();
+        purgeLocalPlatformCaches();
         return true;
     } catch {
         await apiFetch(`/api/profile/platforms/${portal}`, {
             method: "DELETE",
         });
         invalidatePublicProfileClientCache();
+        purgeLocalPlatformCaches();
         return true;
     }
 }
@@ -237,6 +256,7 @@ export async function editPlatformHandle(portal: string, handleOrLink: string): 
             body: JSON.stringify({ handle: handleOrLink }),
         });
         invalidatePublicProfileClientCache();
+        purgeLocalPlatformCaches();
         return json.platform;
     } catch {
         const json = await apiFetch<{ platform: any }>(`/api/profile/platforms/${portal}`, {
@@ -244,6 +264,7 @@ export async function editPlatformHandle(portal: string, handleOrLink: string): 
             body: JSON.stringify({ handle: handleOrLink }),
         });
         invalidatePublicProfileClientCache();
+        purgeLocalPlatformCaches();
         return json.platform;
     }
 }
