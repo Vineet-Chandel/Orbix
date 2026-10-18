@@ -6,6 +6,7 @@ import { invalidateAllUserCaches } from "../../redis/cache/cache-profile.js";
 import { calculateUserContestPerformance } from "./contestAnalytics.js";
 import { calculateUserBadges } from "./badgesAnalytics.js";
 import { calculateUserPracticeAnalytics } from "./practiceAnalytics.js";
+import { calculateUserDevelopmentAnalytics } from "./developmentAnalytics.js";
 import {
     getCodeforcesTier,
     getLeetCodeTier,
@@ -2447,9 +2448,9 @@ portalsRouter.get(["/badges", "/badges/unified"], async (req: Request, res: Resp
     }
 });
 
-portalsRouter.get(["/practice/analytics", "/problems/analytics"], async (req: Request, res: Response) => {
+const handlePracticeAnalytics = async (req: Request, res: Response) => {
     try {
-        const username = String(req.query.username || (req as any).user?.username || "").trim();
+        const username = String(req.query.username || req.body?.username || (req as any).user?.username || "").trim();
         if (!username) {
             return res.status(400).json({
                 success: false,
@@ -2458,12 +2459,13 @@ portalsRouter.get(["/practice/analytics", "/problems/analytics"], async (req: Re
         }
 
         const cacheKey = `user:practice:analytics:${username}`;
-        const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
+        const forceRefresh = req.query.refresh === "true" || req.query.force === "true" || req.body?.refresh === true || req.body?.force === true;
 
         let clientPortals: Record<string, string> | undefined = undefined;
-        if (req.query.clientPortals) {
+        const rawPortals = req.body?.clientPortals || req.query.clientPortals;
+        if (rawPortals) {
             try {
-                clientPortals = JSON.parse(String(req.query.clientPortals));
+                clientPortals = typeof rawPortals === "object" ? rawPortals : JSON.parse(String(rawPortals));
             } catch {
                 // Ignore parse error
             }
@@ -2514,7 +2516,84 @@ portalsRouter.get(["/practice/analytics", "/problems/analytics"], async (req: Re
             message: "Failed to generate practice problem analytics",
         });
     }
-});
+};
+
+portalsRouter.get(["/practice/analytics", "/problems/analytics"], handlePracticeAnalytics);
+portalsRouter.post(["/practice/analytics", "/problems/analytics"], handlePracticeAnalytics);
+
+const handleDevelopmentAnalytics = async (req: Request, res: Response) => {
+    try {
+        const username = String(req.query.username || req.body?.username || (req as any).user?.username || "").trim();
+        if (!username) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing username parameter",
+            });
+        }
+
+        const directHandle = String(req.query.githubHandle || req.query.handle || req.body?.githubHandle || req.body?.handle || "").trim();
+        const cacheKey = `user:development:analytics:${username}${directHandle ? `:${directHandle}` : ""}`;
+        const forceRefresh = req.query.refresh === "true" || req.query.force === "true" || req.body?.refresh === true || req.body?.force === true;
+
+        let clientPortals: Record<string, string> | undefined = undefined;
+        const rawPortals = req.body?.clientPortals || req.query.clientPortals;
+        if (rawPortals) {
+            try {
+                clientPortals = typeof rawPortals === "object" ? rawPortals : JSON.parse(String(rawPortals));
+            } catch {
+                // Ignore parse error
+            }
+        }
+
+        if (!forceRefresh && redis && redis.status === "ready") {
+            try {
+                const cached = await redis.get(cacheKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    res.status(200).json(parsed);
+
+                    // Background revalidation if older than 5 minutes
+                    const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
+                    if (cacheAge > 5 * 60 * 1000) {
+                        calculateUserDevelopmentAnalytics(username, clientPortals, directHandle)
+                            .then(async (fresh) => {
+                                if (redis && redis.status === "ready") {
+                                    await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
+                                }
+                            })
+                            .catch((err) => {
+                                console.error("Background development analytics re-verification error:", err);
+                            });
+                    }
+                    return;
+                }
+            } catch {
+                // Fallback to calculation
+            }
+        }
+
+        const responseData = await calculateUserDevelopmentAnalytics(username, clientPortals, directHandle);
+
+        if (redis && redis.status === "ready") {
+            try {
+                await redis.set(cacheKey, JSON.stringify(responseData), "EX", 1800);
+            } catch {
+                // Non-fatal
+            }
+        }
+
+        return res.status(200).json(responseData);
+    } catch (err: any) {
+        console.error("Development analytics endpoint error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to generate development analytics",
+        });
+    }
+};
+
+portalsRouter.get(["/development/analytics", "/github/analytics"], handleDevelopmentAnalytics);
+portalsRouter.post(["/development/analytics", "/github/analytics"], handleDevelopmentAnalytics);
 
 export interface SavedPortalLink {
     portal: string;

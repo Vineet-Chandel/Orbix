@@ -7,6 +7,7 @@ import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
 import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
 import { ContestPerformanceSection } from "./ContestPerformanceSection";
 import { PracticeAnalyticsSection } from "./PracticeAnalytics/PracticeAnalyticsSection";
+import { DevelopmentAnalyticsSection } from "./DevelopmentAnalytics/DevelopmentAnalyticsSection";
 
 export default function Dashboard() {
     const location = useLocation();
@@ -238,9 +239,13 @@ export default function Dashboard() {
                             </div>
                         )}
 
-                        {/* Development Field: Development Contributions (GitHub) */}
+                        {/* Development Field: Development Metrics, Languages & Contributions (GitHub) */}
                         {activeDashboardField === "development" && (
-                            <div className="w-full animate-fadeIn">
+                            <div className="w-full animate-fadeIn space-y-6">
+                                <DevelopmentAnalyticsSection
+                                    connectedPortals={connectedPortals}
+                                    username={user?.username || ""}
+                                />
                                 <DevelopmentContributionsTable
                                     connectedPortals={connectedPortals}
                                     username={user?.username || ""}

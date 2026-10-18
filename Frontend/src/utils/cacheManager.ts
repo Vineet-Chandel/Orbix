@@ -3,6 +3,7 @@ import { clearDevelopmentCache } from "../store/developmentSlice";
 import { clearContestsCache } from "../store/contestsSlice";
 import { clearBadgesCache } from "../store/badgesSlice";
 import { clearPracticeAnalyticsCache } from "../store/practiceAnalyticsSlice";
+import { clearDevelopmentAnalyticsCache } from "../store/developmentAnalyticsSlice";
 import { invalidatePublicProfileClientCache } from "./profileApi";
 
 /**
@@ -24,6 +25,7 @@ export function invalidateConnectedPlatformCaches(dispatch?: any, username?: str
                 "orbix_unified_contests",
                 "orbix_unified_badges",
                 "orbix_practice_analytics",
+                "orbix_development_analytics",
             ]) {
                 try {
                     const raw = localStorage.getItem(key);
@@ -44,6 +46,7 @@ export function invalidateConnectedPlatformCaches(dispatch?: any, username?: str
             localStorage.removeItem("orbix_unified_contests");
             localStorage.removeItem("orbix_unified_badges");
             localStorage.removeItem("orbix_practice_analytics");
+            localStorage.removeItem("orbix_development_analytics");
         }
     } catch {
         // Safe fallback
@@ -60,6 +63,7 @@ export function invalidateConnectedPlatformCaches(dispatch?: any, username?: str
             dispatch(clearContestsCache(cleanUser));
             dispatch(clearBadgesCache(cleanUser));
             dispatch(clearPracticeAnalyticsCache(cleanUser));
+            dispatch(clearDevelopmentAnalyticsCache(cleanUser));
         } catch {
             // Safe fallback
         }

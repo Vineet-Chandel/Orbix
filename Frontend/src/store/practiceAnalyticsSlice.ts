@@ -105,11 +105,20 @@ export const fetchPracticeAnalytics = createAsyncThunk<
         if (token) reqHeaders["Authorization"] = `Bearer ${token}`;
 
         let portalsParam = "";
+        const simplifiedPortals: Record<string, string> = {};
         if (portals && typeof portals === "object") {
-            try {
-                portalsParam = `&clientPortals=${encodeURIComponent(JSON.stringify(portals))}`;
-            } catch {
-                // Ignore
+            for (const [k, v] of Object.entries(portals)) {
+                const u = typeof v === "object" ? v?.username || v?.portalUsername || v?.portal_username || "" : String(v || "");
+                if (u && k !== "github" && !k.startsWith("_") && k !== "theme") {
+                    simplifiedPortals[k.toLowerCase().trim()] = u.trim();
+                }
+            }
+            if (Object.keys(simplifiedPortals).length > 0) {
+                try {
+                    portalsParam = `&clientPortals=${encodeURIComponent(JSON.stringify(simplifiedPortals))}`;
+                } catch {
+                    // Ignore
+                }
             }
         }
 
