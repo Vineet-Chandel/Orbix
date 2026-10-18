@@ -8,6 +8,7 @@ import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
 import { ContestPerformanceSection } from "./ContestPerformanceSection";
 import { BadgesCard } from "./BadgesCard";
 import { RecentContestsCard } from "./RecentContestsCard";
+import { PracticeAnalyticsSection } from "./PracticeAnalytics/PracticeAnalyticsSection";
 
 export default function Dashboard() {
     const location = useLocation();
@@ -225,6 +226,10 @@ export default function Dashboard() {
                         {activeDashboardField === "practice" && (
                             <div className="w-full animate-fadeIn space-y-6">
                                 <CodingSubmissionsTable
+                                    connectedPortals={connectedPortals}
+                                    username={user?.username || ""}
+                                />
+                                <PracticeAnalyticsSection
                                     connectedPortals={connectedPortals}
                                     username={user?.username || ""}
                                 />

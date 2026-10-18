@@ -5,6 +5,7 @@ import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middl
 import { invalidateAllUserCaches } from "../../redis/cache/cache-profile.js";
 import { calculateUserContestPerformance } from "./contestAnalytics.js";
 import { calculateUserBadges } from "./badgesAnalytics.js";
+import { calculateUserPracticeAnalytics } from "./practiceAnalytics.js";
 import {
     getCodeforcesTier,
     getLeetCodeTier,
@@ -2442,6 +2443,75 @@ portalsRouter.get(["/badges", "/badges/unified"], async (req: Request, res: Resp
         return res.status(500).json({
             success: false,
             message: "Failed to generate badges data",
+        });
+    }
+});
+
+portalsRouter.get(["/practice/analytics", "/problems/analytics"], async (req: Request, res: Response) => {
+    try {
+        const username = String(req.query.username || (req as any).user?.username || "").trim();
+        if (!username) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing username parameter",
+            });
+        }
+
+        const cacheKey = `user:practice:analytics:${username}`;
+        const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
+
+        let clientPortals: Record<string, string> | undefined = undefined;
+        if (req.query.clientPortals) {
+            try {
+                clientPortals = JSON.parse(String(req.query.clientPortals));
+            } catch {
+                // Ignore parse error
+            }
+        }
+
+        if (!forceRefresh && redis && redis.status === "ready") {
+            try {
+                const cached = await redis.get(cacheKey);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    res.status(200).json(parsed);
+
+                    // Background revalidation if older than 5 minutes
+                    const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
+                    if (cacheAge > 5 * 60 * 1000) {
+                        calculateUserPracticeAnalytics(username, clientPortals)
+                            .then(async (fresh) => {
+                                if (redis && redis.status === "ready") {
+                                    await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
+                                }
+                            })
+                            .catch((err) => {
+                                console.error("Background practice analytics re-verification error:", err);
+                            });
+                    }
+                    return;
+                }
+            } catch {
+                // Non-fatal, fallback to calculation
+            }
+        }
+
+        const responseData = await calculateUserPracticeAnalytics(username, clientPortals);
+
+        if (redis && redis.status === "ready") {
+            try {
+                await redis.set(cacheKey, JSON.stringify(responseData), "EX", 1800);
+            } catch {
+                // Non-fatal
+            }
+        }
+
+        return res.status(200).json(responseData);
+    } catch (err: any) {
+        console.error("Practice analytics endpoint error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to generate practice problem analytics",
         });
     }
 });
