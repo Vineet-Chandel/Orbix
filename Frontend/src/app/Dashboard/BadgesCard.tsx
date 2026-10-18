@@ -52,8 +52,8 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
         return badges.filter((b) => b.platform.toLowerCase() === selectedPlatform.toLowerCase());
     }, [badges, selectedPlatform]);
 
-    // Initial visible slice: 28 badges (7 rows of 4) unless expanded
-    const INITIAL_LIMIT = 28;
+    // Initial visible slice: 32 badges unless expanded
+    const INITIAL_LIMIT = 32;
     const displayedBadges = useMemo(() => {
         if (isExpanded || filteredBadges.length <= INITIAL_LIMIT) {
             return filteredBadges;
@@ -66,7 +66,7 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
     return (
         <section
             aria-labelledby="badges-section-title"
-            className="w-full rounded-3xl bg-[#0c1017] text-white p-6 sm:p-7 border border-neutral-800 shadow-2xl relative overflow-hidden select-none flex flex-col justify-between"
+            className="w-full rounded-3xl bg-black text-white p-6 sm:p-7 border border-neutral-800 shadow-2xl relative overflow-hidden select-none flex flex-col justify-between"
         >
             {/* Subtle ambient glow */}
             <div className="absolute -top-24 -right-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -130,7 +130,7 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
                 <div className="pt-4 relative z-10 min-h-[460px]">
                     {isLoading && badges.length === 0 ? (
                         /* Skeleton Loading Grid */
-                        <div className="grid grid-cols-4 gap-x-2 gap-y-4 sm:gap-x-4 sm:gap-y-6">
+                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-x-2 gap-y-4 sm:gap-x-4 sm:gap-y-6">
                             {Array.from({ length: 16 }).map((_, idx) => (
                                 <div key={idx} className="flex flex-col items-center space-y-2 animate-pulse">
                                     <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/[0.05] border border-white/[0.05]" />
@@ -150,8 +150,8 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
                             </p>
                         </div>
                     ) : (
-                        /* Responsive 4-Column Badge Grid */
-                        <div className="grid grid-cols-4 gap-x-2 gap-y-4 sm:gap-x-3 sm:gap-y-5">
+                        /* Responsive Multi-Column Badge Grid */
+                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-x-2 gap-y-4 sm:gap-x-3 sm:gap-y-5">
                             {displayedBadges.map((badge) => (
                                 <div
                                     key={badge.id}

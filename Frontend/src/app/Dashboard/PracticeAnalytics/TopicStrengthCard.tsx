@@ -81,13 +81,10 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
     }, [rawAxes]);
 
     return (
-        <section
+        <div
             aria-labelledby="topic-strength-title"
-            className="w-full rounded-3xl bg-[#0c1017] text-white p-6 sm:p-7 border border-neutral-800 shadow-2xl relative overflow-hidden select-none flex flex-col justify-between"
+            className="w-full text-white select-none flex flex-col justify-between h-full"
         >
-            {/* Ambient glow */}
-            <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
             <div>
                 {/* Header Row */}
                 <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] relative z-10">
@@ -153,7 +150,7 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
                                         cy={pt.y}
                                         r="3.5"
                                         fill="#facc15"
-                                        stroke="#0c1017"
+                                        stroke="#000000"
                                         strokeWidth="1.5"
                                         className="transition-all duration-700"
                                     />
@@ -176,7 +173,7 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
                     )}
                 </div>
             </div>
-        </section>
+        </div>
     );
 };
 

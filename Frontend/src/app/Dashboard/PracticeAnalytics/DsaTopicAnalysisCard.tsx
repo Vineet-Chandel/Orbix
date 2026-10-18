@@ -12,13 +12,10 @@ export const DsaTopicAnalysisCard: React.FC<DsaTopicAnalysisCardProps> = ({ data
     const maxCount = topics.length > 0 ? Math.max(...topics.map((t) => t.count)) : 1145;
 
     return (
-        <section
+        <div
             aria-labelledby="dsa-topic-analysis-title"
-            className="w-full rounded-3xl bg-[#0c1017] text-white p-6 sm:p-7 border border-neutral-800 shadow-2xl relative overflow-hidden select-none flex flex-col justify-between"
+            className="w-full text-white select-none flex flex-col justify-between h-full"
         >
-            {/* Ambient glow */}
-            <div className="absolute -top-24 -left-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-
             <div>
                 {/* Header Row */}
                 <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] relative z-10">
@@ -55,7 +52,7 @@ export const DsaTopicAnalysisCard: React.FC<DsaTopicAnalysisCardProps> = ({ data
                                     </span>
 
                                     {/* Bar Track */}
-                                    <div className="flex-1 h-5 sm:h-5.5 bg-[#141b25] border border-white/[0.04] rounded-md overflow-hidden relative flex items-center">
+                                    <div className="flex-1 h-5 sm:h-5.5 bg-neutral-900 border border-neutral-800 rounded-md overflow-hidden relative flex items-center">
                                         {/* Yellow Filled Bar */}
                                         <div
                                             className="h-full bg-[#facc15] rounded-md flex items-center justify-end px-2 transition-all duration-700 select-none shadow-xs"
@@ -72,7 +69,7 @@ export const DsaTopicAnalysisCard: React.FC<DsaTopicAnalysisCardProps> = ({ data
                     )}
                 </div>
             </div>
-        </section>
+        </div>
     );
 };
 

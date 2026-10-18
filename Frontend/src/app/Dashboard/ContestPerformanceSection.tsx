@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchContestPerformance, type PlatformContestAnalytics, type ContestHistoryPoint } from "../../store";
 import { getPortalIcon } from "../../utils/portalIcons";
+import { RecentContestsCard } from "./RecentContestsCard";
 
 interface ContestPerformanceSectionProps {
     connectedPortals: Record<string, any>;
@@ -918,146 +919,158 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
             <div className="w-full h-px bg-white/[0.08] my-7 relative z-10" />
 
             {/* ========================================================================= */}
-            {/* SECTION 2 — Contest Platforms Overview (Platform Ranks Grid)              */}
+            {/* SECTION 2 — Platform Ranks and Recent Contests (Parallel in same block)   */}
             {/* ========================================================================= */}
-            <div className="w-full relative z-10">
-                {/* Header: Trophy/Award icon + Platform ranks */}
-                <div className="flex items-center gap-3 pb-5">
-                    <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                        <Award className="w-4 h-4" />
-                    </div>
-                    <div>
-                        <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
-                            Platform ranks
-                        </h3>
-                        <p className="text-[11px] text-neutral-400">
-                            Current contest standings and rank progress across eligible platforms
-                        </p>
-                    </div>
-                </div>
-
-                {/* Responsive Multi-Platform Grid */}
-                {platformsList.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {platformsList.map((platform) => {
-                            const isSelected = platform.portal === selectedPortal;
-                            const hasContests = platform.ratedContestsCount > 0;
-                            const hasRating = platform.currentRating !== null && platform.currentRating !== undefined;
-
-                            return (
-                                <button
-                                    key={platform.portal}
-                                    type="button"
-                                    onClick={() => {
-                                        setSelectedPortal(platform.portal);
-                                        setHasUserSelected(true);
-                                        chartContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-                                    }}
-                                    className={`flex flex-col justify-between p-5 rounded-2xl transition-all cursor-pointer text-left relative overflow-hidden border ${
-                                        isSelected
-                                            ? "bg-[#141b28] border-amber-500/50 shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30"
-                                            : "bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06]"
-                                    }`}
-                                >
-                                    {/* Top: Platform Icon + Name + Verified Badge */}
-                                    <div className="space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2.5">
-                                                <div className="w-7 h-7 rounded-lg bg-white/[0.06] border border-white/10 flex items-center justify-center">
-                                                    {getPortalIcon(platform.portal, "w-4 h-4")}
-                                                </div>
-                                                <span className="font-extrabold text-sm text-white">
-                                                    {platform.portalName}
-                                                </span>
-                                            </div>
-
-                                            {platform.connected && (
-                                                <div
-                                                    className="w-4 h-4 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center"
-                                                    title="Verified Connected Profile"
-                                                >
-                                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Middle: Rating & Tier Badge */}
-                                        <div className="flex items-baseline gap-2 pt-1">
-                                            <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-                                                {hasRating ? platform.currentRating : "—"}
-                                            </span>
-
-                                            {platform.tier && (
-                                                <span
-                                                    style={{
-                                                        backgroundColor: platform.tierColor || "#ea3943",
-                                                    }}
-                                                    className="px-2 py-0.5 rounded text-[11px] font-black text-white uppercase tracking-wider"
-                                                >
-                                                    {platform.tier}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    {/* Bottom: Tier Progress or Platform Rank Milestone */}
-                                    <div className="pt-4 space-y-1.5 border-t border-neutral-800/60 mt-3">
-                                        {platform.tierInfo?.nextTierName && typeof platform.tierInfo.pointsToNextTier === "number" ? (
-                                            <>
-                                                {/* Progress Bar */}
-                                                <div className="w-full h-1.5 rounded-full bg-[#1c2436] overflow-hidden">
-                                                    <div
-                                                        style={{
-                                                            width: `${platform.tierInfo.progressPercent || 0}%`,
-                                                            backgroundColor: platform.tierColor || "#f59e0b",
-                                                        }}
-                                                        className="h-full rounded-full transition-all duration-500"
-                                                    />
-                                                </div>
-                                                <div className="text-[11px] text-neutral-400 flex items-center gap-1 font-medium">
-                                                    <span>{platform.tierInfo.pointsToNextTier} to</span>
-                                                    <strong className="text-white font-bold">
-                                                        {platform.tierInfo.nextTierName}
-                                                    </strong>
-                                                </div>
-                                            </>
-                                        ) : platform.officialRank ? (
-                                            <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
-                                                <span>Rank #{formatNumber(platform.officialRank)}</span>
-                                                {platform.peakRating && (
-                                                    <>
-                                                        <span className="w-1 h-1 rounded-full bg-neutral-600" />
-                                                        <span>max {platform.peakRating}</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                        ) : hasContests ? (
-                                            <div className="text-[11px] text-neutral-400">
-                                                {platform.ratedContestsCount} contests attended
-                                            </div>
-                                        ) : platform.connected ? (
-                                            <div className="text-[11px] text-neutral-500 italic">
-                                                Attend a contest to get started
-                                            </div>
-                                        ) : (
-                                            <div className="text-[11px] text-amber-400/90 font-medium">
-                                                Connect platform
-                                            </div>
-                                        )}
-                                    </div>
-                                </button>
-                            );
-                        })}
-                    </div>
-                ) : (
-                    <div className="w-full p-8 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-3">
-                        <Award className="w-8 h-8 text-neutral-500" />
-                        <div className="space-y-1">
-                            <h4 className="text-sm font-bold text-white">No platform ranks to display</h4>
-                            <p className="text-xs text-neutral-400">Connect your contest accounts in your profile to see your official standings here.</p>
+            <div className="w-full relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                {/* Left Side: Platform ranks */}
+                <div className="space-y-4">
+                    {/* Header: Trophy/Award icon + Platform ranks */}
+                    <div className="flex items-center gap-3 pb-3 border-b border-white/[0.08]">
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                            <Award className="w-4 h-4" />
+                        </div>
+                        <div>
+                            <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
+                                Platform ranks
+                            </h3>
+                            <p className="text-[11px] text-neutral-400">
+                                Current contest standings and rank progress across eligible platforms
+                            </p>
                         </div>
                     </div>
-                )}
+
+                    {/* Responsive Multi-Platform Grid */}
+                    {platformsList.length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                            {platformsList.map((platform) => {
+                                const isSelected = platform.portal === selectedPortal;
+                                const hasContests = platform.ratedContestsCount > 0;
+                                const hasRating = platform.currentRating !== null && platform.currentRating !== undefined;
+
+                                return (
+                                    <button
+                                        key={platform.portal}
+                                        type="button"
+                                        onClick={() => {
+                                            setSelectedPortal(platform.portal);
+                                            setHasUserSelected(true);
+                                            chartContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                                        }}
+                                        className={`flex flex-col justify-between p-4 sm:p-5 rounded-2xl transition-all cursor-pointer text-left relative overflow-hidden border ${
+                                            isSelected
+                                                ? "bg-[#141b28] border-amber-500/50 shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30"
+                                                : "bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06]"
+                                        }`}
+                                    >
+                                        {/* Top: Platform Icon + Name + Verified Badge */}
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className="w-7 h-7 rounded-lg bg-white/[0.06] border border-white/10 flex items-center justify-center">
+                                                        {getPortalIcon(platform.portal, "w-4 h-4")}
+                                                    </div>
+                                                    <span className="font-extrabold text-sm text-white">
+                                                        {platform.portalName}
+                                                    </span>
+                                                </div>
+
+                                                {platform.connected && (
+                                                    <div
+                                                        className="w-4 h-4 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center"
+                                                        title="Verified Connected Profile"
+                                                    >
+                                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Middle: Rating & Tier Badge */}
+                                            <div className="flex items-baseline gap-2 pt-1">
+                                                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                                                    {hasRating ? platform.currentRating : "—"}
+                                                </span>
+
+                                                {platform.tier && (
+                                                    <span
+                                                        style={{
+                                                            backgroundColor: platform.tierColor || "#ea3943",
+                                                        }}
+                                                        className="px-2 py-0.5 rounded text-[11px] font-black text-white uppercase tracking-wider"
+                                                    >
+                                                        {platform.tier}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Bottom: Tier Progress or Platform Rank Milestone */}
+                                        <div className="pt-4 space-y-1.5 border-t border-neutral-800/60 mt-3">
+                                            {platform.tierInfo?.nextTierName && typeof platform.tierInfo.pointsToNextTier === "number" ? (
+                                                <>
+                                                    {/* Progress Bar */}
+                                                    <div className="w-full h-1.5 rounded-full bg-[#1c2436] overflow-hidden">
+                                                        <div
+                                                            style={{
+                                                                width: `${platform.tierInfo.progressPercent || 0}%`,
+                                                                backgroundColor: platform.tierColor || "#f59e0b",
+                                                            }}
+                                                            className="h-full rounded-full transition-all duration-500"
+                                                        />
+                                                    </div>
+                                                    <div className="text-[11px] text-neutral-400 flex items-center gap-1 font-medium">
+                                                        <span>{platform.tierInfo.pointsToNextTier} to</span>
+                                                        <strong className="text-white font-bold">
+                                                            {platform.tierInfo.nextTierName}
+                                                        </strong>
+                                                    </div>
+                                                </>
+                                            ) : platform.officialRank ? (
+                                                <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
+                                                    <span>Rank #{formatNumber(platform.officialRank)}</span>
+                                                    {platform.peakRating && (
+                                                        <>
+                                                            <span className="w-1 h-1 rounded-full bg-neutral-600" />
+                                                            <span>max {platform.peakRating}</span>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            ) : hasContests ? (
+                                                <div className="text-[11px] text-neutral-400">
+                                                    {platform.ratedContestsCount} contests attended
+                                                </div>
+                                            ) : platform.connected ? (
+                                                <div className="text-[11px] text-neutral-500 italic">
+                                                    Attend a contest to get started
+                                                </div>
+                                            ) : (
+                                                <div className="text-[11px] text-amber-400/90 font-medium">
+                                                    Connect platform
+                                                </div>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="w-full p-8 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-3">
+                            <Award className="w-8 h-8 text-neutral-500" />
+                            <div className="space-y-1">
+                                <h4 className="text-sm font-bold text-white">No platform ranks to display</h4>
+                                <p className="text-xs text-neutral-400">Connect your contest accounts in your profile to see your official standings here.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Right Side: Recent Contests */}
+                <div className="w-full">
+                    <RecentContestsCard
+                        connectedPortals={connectedPortals}
+                        username={effectiveUser}
+                        embedded={true}
+                    />
+                </div>
             </div>
 
             {/* ========================================================================= */}

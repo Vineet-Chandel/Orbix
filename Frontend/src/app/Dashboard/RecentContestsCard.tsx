@@ -6,6 +6,7 @@ import { getPortalIcon } from "../../utils/portalIcons";
 interface RecentContestsCardProps {
     connectedPortals?: Record<string, any>;
     username?: string;
+    embedded?: boolean;
 }
 
 function formatRecentContestDate(dateStr: string, timestamp?: number): string {
@@ -23,6 +24,7 @@ function formatRecentContestDate(dateStr: string, timestamp?: number): string {
 export const RecentContestsCard: React.FC<RecentContestsCardProps> = ({
     connectedPortals: _connectedPortals,
     username = "vineet_chandel",
+    embedded = false,
 }) => {
     const effectiveUser = (username || "vineet_chandel").trim();
     const remoteData = useAppSelector((state) => state.contests.dataByUser[effectiveUser]);
@@ -96,22 +98,35 @@ export const RecentContestsCard: React.FC<RecentContestsCardProps> = ({
     return (
         <section
             aria-labelledby="recent-contests-title"
-            className="w-full rounded-3xl bg-[#0c1017] text-white p-6 sm:p-7 border border-neutral-800 shadow-2xl relative overflow-hidden select-none flex flex-col justify-between"
+            className={
+                embedded
+                    ? "w-full text-white select-none flex flex-col justify-between"
+                    : "w-full rounded-3xl bg-black text-white p-6 sm:p-7 border border-neutral-800 shadow-2xl relative overflow-hidden select-none flex flex-col justify-between"
+            }
         >
-            {/* Subtle ambient glow */}
-            <div className="absolute -top-24 -right-24 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            {!embedded && (
+                <>
+                    {/* Subtle ambient glow */}
+                    <div className="absolute -top-24 -right-24 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+                    <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                </>
+            )}
 
             <div>
                 {/* Header Row */}
-                <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] relative z-10">
+                <div className="flex items-center justify-between pb-3 border-b border-white/[0.08] relative z-10">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-indigo-400 shadow-sm">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-sm">
                             <Calendar className="w-4 h-4 text-indigo-400" />
                         </div>
-                        <h3 id="recent-contests-title" className="text-lg sm:text-xl font-black text-white tracking-tight">
-                            Recent contests
-                        </h3>
+                        <div>
+                            <h3 id="recent-contests-title" className="text-base sm:text-lg font-extrabold text-white tracking-tight">
+                                Recent contests
+                            </h3>
+                            <p className="text-[11px] text-neutral-400">
+                                Unified chronological contest participation and rating changes
+                            </p>
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-2">

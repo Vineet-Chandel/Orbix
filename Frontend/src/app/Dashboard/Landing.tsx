@@ -7,7 +7,6 @@ import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
 import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
 import { ContestPerformanceSection } from "./ContestPerformanceSection";
 import { BadgesCard } from "./BadgesCard";
-import { RecentContestsCard } from "./RecentContestsCard";
 import { PracticeAnalyticsSection } from "./PracticeAnalytics/PracticeAnalyticsSection";
 
 export default function Dashboard() {
@@ -237,16 +236,10 @@ export default function Dashboard() {
                                     connectedPortals={connectedPortals}
                                     username={user?.username || ""}
                                 />
-                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                                    <BadgesCard
-                                        connectedPortals={connectedPortals}
-                                        username={user?.username || ""}
-                                    />
-                                    <RecentContestsCard
-                                        connectedPortals={connectedPortals}
-                                        username={user?.username || ""}
-                                    />
-                                </div>
+                                <BadgesCard
+                                    connectedPortals={connectedPortals}
+                                    username={user?.username || ""}
+                                />
                             </div>
                         )}
 

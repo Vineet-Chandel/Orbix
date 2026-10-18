@@ -18,14 +18,10 @@ export const RecentlySolvedCard: React.FC<RecentlySolvedCardProps> = ({ data, is
     };
 
     return (
-        <section
+        <div
             aria-labelledby="recently-solved-title"
-            className="w-full rounded-3xl bg-[#0c1017] text-white p-6 sm:p-7 border border-neutral-800 shadow-2xl relative overflow-hidden select-none flex flex-col justify-between"
+            className="w-full text-white select-none flex flex-col justify-between h-full"
         >
-            {/* Subtle ambient glow */}
-            <div className="absolute -top-24 -right-24 w-80 h-80 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-24 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
             <div>
                 {/* Header Row */}
                 <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] relative z-10">
@@ -88,7 +84,7 @@ export const RecentlySolvedCard: React.FC<RecentlySolvedCardProps> = ({ data, is
                     )}
                 </div>
             </div>
-        </section>
+        </div>
     );
 };
 
