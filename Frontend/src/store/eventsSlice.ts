@@ -41,7 +41,7 @@ export interface EventsState {
     lastFetched: number | null;
 }
 
-const LOCAL_STORAGE_KEY = "orbix_events_state_cache_v1";
+const LOCAL_STORAGE_KEY = "orbix_events_state_cache_v2";
 const REMINDERS_STORAGE_KEY = "orbix_events_reminders_v1";
 
 // Safely load initial cache from localStorage for instant zero-latency render
