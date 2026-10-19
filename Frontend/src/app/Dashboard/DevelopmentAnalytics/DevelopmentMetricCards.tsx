@@ -35,26 +35,23 @@ export const DevelopmentMetricCards: React.FC<DevelopmentMetricCardsProps> = ({
     ];
 
     return (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-white/[0.08] w-full">
             {metrics.map((metric, idx) => (
                 <div
                     key={idx}
-                    className="relative group rounded-2xl bg-black border border-neutral-800 hover:border-neutral-700 p-5 sm:p-6 flex flex-col items-center justify-center text-center transition-all duration-200 hover:shadow-[0_4px_20px_rgba(0,0,0,0.5)] select-none"
+                    className="flex flex-col items-center justify-center text-center py-2 px-4 select-none"
                 >
-                    {/* Subtle top surface highlight */}
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent pointer-events-none" />
-
                     {isLoading && !data ? (
                         <div className="animate-pulse space-y-2 flex flex-col items-center w-full">
-                            <div className="h-8 w-16 bg-[#161b22] rounded-lg" />
-                            <div className="h-3.5 w-20 bg-[#161b22] rounded" />
+                            <div className="h-8 w-16 bg-white/[0.08] rounded-lg" />
+                            <div className="h-3.5 w-20 bg-white/[0.06] rounded" />
                         </div>
                     ) : (
                         <>
-                            <span className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white tracking-tight font-sans block leading-none">
+                            <span className="text-3xl sm:text-4xl md:text-5xl font-black text-white tracking-tight font-sans block leading-none">
                                 {metric.value}
                             </span>
-                            <span className="text-xs sm:text-sm font-medium text-neutral-400 mt-2 sm:mt-2.5 tracking-normal">
+                            <span className="text-xs sm:text-sm font-semibold text-neutral-400 mt-2 sm:mt-2.5 tracking-normal">
                                 {metric.label}
                             </span>
                         </>

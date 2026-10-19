@@ -133,13 +133,10 @@ export const Sidebar = ({
             id: "leaderboard" as SidebarTab,
             label: "Leaderboard",
             icon: (
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
-                    <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
-                    <path d="M4 22h16" />
-                    <path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-2.34" />
-                    <path d="M18 14.66V17c0 .55-.45 1-1 1h-2c-.55 0-1-.45-1-1v-2.34" />
-                    <path d="M6 4h12a2 2 0 0 1 2 2v3.5a6.5 6.5 0 0 1-6.5 6.5h-1A6.5 6.5 0 0 1 6 9.5V6a2 2 0 0 1 2-2z" />
+
+
+                <svg className="w-5 h-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 1024 1024">
+                    <path fill="currentColor" d="M868 160h-92v-40c0-4.4-3.6-8-8-8H256c-4.4 0-8 3.6-8 8v40h-92a44 44 0 0 0-44 44v148c0 81.7 60 149.6 138.2 162C265.7 630.2 359 721.7 476 734.5v105.2H280c-17.7 0-32 14.3-32 32V904c0 4.4 3.6 8 8 8h512c4.4 0 8-3.6 8-8v-32.3c0-17.7-14.3-32-32-32H548V734.5C665 721.7 758.3 630.2 773.8 514C852 501.6 912 433.7 912 352V204a44 44 0 0 0-44-44M184 352V232h64v207.6a91.99 91.99 0 0 1-64-87.6m520 128c0 49.1-19.1 95.4-53.9 130.1c-34.8 34.8-81 53.9-130.1 53.9h-16c-49.1 0-95.4-19.1-130.1-53.9c-34.8-34.8-53.9-81-53.9-130.1V184h384zm136-128c0 41-26.9 75.8-64 87.6V232h64z"></path>
                 </svg>
             ),
             path: "/leaderboard",
@@ -242,11 +239,10 @@ export const Sidebar = ({
                 setIsHovered(false);
                 setIsProfileMenuOpen(false);
             }}
-            className={`h-[calc(100vh-1.5rem)] sm:h-[calc(100vh-2rem)] flex flex-col justify-between rounded-[32px] bg-black border border-neutral-800 text-white p-3.5 select-none transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-3 sm:top-4 left-3 sm:left-4 z-50 overflow-x-hidden will-change-[width] ${
-                isExpanded
-                    ? "w-64 sm:w-[264px] shadow-2xl shadow-black/80 ring-1 ring-white/10"
-                    : "w-[72px] shadow-lg shadow-black/40"
-            }`}
+            className={`h-[calc(100vh-1.5rem)] sm:h-[calc(100vh-2rem)] flex flex-col justify-between rounded-[32px] bg-black border border-neutral-800 text-white p-3.5 select-none transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-3 sm:top-4 left-3 sm:left-4 z-50 overflow-x-hidden will-change-[width] ${isExpanded
+                ? "w-64 sm:w-[264px] shadow-2xl shadow-black/80 ring-1 ring-white/10"
+                : "w-[72px] shadow-lg shadow-black/40"
+                }`}
         >
             {/* Top Brand Header without border or bg around logo */}
             <div className="overflow-x-hidden flex-shrink-0">
@@ -314,29 +310,26 @@ export const Sidebar = ({
                                 key={item.id}
                                 to={item.path}
                                 onClick={() => handleItemClick(item.id)}
-                                className={`flex items-center h-11 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 group cursor-pointer overflow-x-hidden relative w-full ${
-                                    isCurrentActive
-                                        ? "bg-white/[0.1] text-white"
-                                        : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
-                                }`}
+                                className={`flex items-center h-11 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 group cursor-pointer overflow-x-hidden relative w-full ${isCurrentActive
+                                    ? "bg-white/[0.1] text-white"
+                                    : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
+                                    }`}
                                 title={!isExpanded ? item.label : undefined}
                             >
                                 {/* Active vertical accent bar */}
                                 <span
-                                    className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-200 ${
-                                        isCurrentActive && isExpanded ? "bg-white opacity-100" : "bg-transparent opacity-0"
-                                    }`}
+                                    className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-200 ${isCurrentActive && isExpanded ? "bg-white opacity-100" : "bg-transparent opacity-0"
+                                        }`}
                                 />
 
                                 <div className="flex items-center overflow-x-hidden w-full">
                                     {/* SVG Icon: DEAD-CENTER in 44px container */}
                                     <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
                                         <span
-                                            className={`w-5 h-5 flex items-center justify-center transition-colors ${
-                                                isCurrentActive
-                                                    ? "text-white"
-                                                    : "text-neutral-400 group-hover:text-white"
-                                            }`}
+                                            className={`w-5 h-5 flex items-center justify-center transition-colors ${isCurrentActive
+                                                ? "text-white"
+                                                : "text-neutral-400 group-hover:text-white"
+                                                }`}
                                         >
                                             {item.icon}
                                         </span>
@@ -352,13 +345,12 @@ export const Sidebar = ({
 
                                 {item.badge && isExpanded && (
                                     <span
-                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors flex-shrink-0 whitespace-nowrap ml-2 ${
-                                            (item as any).badgeVariant === "danger"
-                                                ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse"
-                                                : isCurrentActive
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors flex-shrink-0 whitespace-nowrap ml-2 ${(item as any).badgeVariant === "danger"
+                                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse"
+                                            : isCurrentActive
                                                 ? "bg-white/20 text-white"
                                                 : "bg-white/[0.06] text-neutral-400 group-hover:text-neutral-200"
-                                        }`}
+                                            }`}
                                     >
                                         {item.badge}
                                     </span>
@@ -398,11 +390,10 @@ export const Sidebar = ({
                                     handleItemClick(item.id);
                                     handleWorkspaceRedirection(item.name, item.url);
                                 }}
-                                className={`flex items-center h-11 rounded-2xl text-xs sm:text-sm font-medium transition-all duration-200 group cursor-pointer text-left overflow-x-hidden relative w-full ${
-                                    isCurrentActive
-                                        ? "bg-white/[0.1] text-white"
-                                        : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
-                                }`}
+                                className={`flex items-center h-11 rounded-2xl text-xs sm:text-sm font-medium transition-all duration-200 group cursor-pointer text-left overflow-x-hidden relative w-full ${isCurrentActive
+                                    ? "bg-white/[0.1] text-white"
+                                    : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
+                                    }`}
                                 title={!isExpanded ? `${item.name} Workspace` : `Redirect to ${item.name} Workspace`}
                             >
                                 <div className="flex items-center overflow-x-hidden w-full">
@@ -490,9 +481,8 @@ export const Sidebar = ({
                 {/* Profile Popup Menu */}
                 {isProfileMenuOpen && (
                     <div
-                        className={`absolute bottom-full mb-2 p-1.5 rounded-2xl bg-black border border-neutral-800 shadow-2xl z-50 animate-fadeIn text-xs ${
-                            isExpanded ? "left-0 right-0" : "left-0 w-52"
-                        }`}
+                        className={`absolute bottom-full mb-2 p-1.5 rounded-2xl bg-black border border-neutral-800 shadow-2xl z-50 animate-fadeIn text-xs ${isExpanded ? "left-0 right-0" : "left-0 w-52"
+                            }`}
                     >
                         <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
                             <p className="font-bold text-white truncate">{displayName}</p>

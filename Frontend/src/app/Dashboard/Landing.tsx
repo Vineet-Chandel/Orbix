@@ -242,11 +242,11 @@ export default function Dashboard() {
                         {/* Development Field: Development Metrics, Languages & Contributions (GitHub) */}
                         {activeDashboardField === "development" && (
                             <div className="w-full animate-fadeIn space-y-6">
-                                <DevelopmentAnalyticsSection
+                                <DevelopmentContributionsTable
                                     connectedPortals={connectedPortals}
                                     username={user?.username || ""}
                                 />
-                                <DevelopmentContributionsTable
+                                <DevelopmentAnalyticsSection
                                     connectedPortals={connectedPortals}
                                     username={user?.username || ""}
                                 />

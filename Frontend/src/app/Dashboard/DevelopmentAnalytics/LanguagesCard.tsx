@@ -47,7 +47,7 @@ export const LanguagesCard: React.FC<LanguagesCardProps> = ({
     });
 
     return (
-        <div className="w-full rounded-3xl bg-black border border-neutral-800 p-6 sm:p-7 shadow-xl relative overflow-hidden flex flex-col justify-between select-none">
+        <div className="w-full text-white select-none flex flex-col justify-between h-full">
             {/* Top Header */}
             <div className="flex items-center justify-between pb-1">
                 <div className="flex items-center gap-3">
