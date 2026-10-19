@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { toPng } from "html-to-image";
 import { useToast } from "../../../context/ToastContext";
+import { useAppDispatch, useAppSelector, fetchContestPerformance } from "../../../store";
 import { CARD_THEMES } from "./types";
 import type { CardFormat, CardFace, CardThemeId } from "./types";
 import {
@@ -10,6 +11,8 @@ import {
     resolveShowcasedPlatforms,
     extractGitHubStats,
     getAllConnectedPlatforms,
+    getAvailableContestPlatforms,
+    resolveShowcasedContests,
 } from "../../../utils/cardStatsAggregator";
 import { LinkedInCard } from "./LinkedInCard";
 import { InstagramStoryCard } from "./InstagramStoryCard";
@@ -25,6 +28,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
     connectedPortals,
 }) => {
     const toast = useToast();
+    const dispatch = useAppDispatch();
 
     // Studio Customization State
     const [format, setFormat] = useState<CardFormat>("linkedin");
@@ -32,6 +36,8 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
     const [themeId, setThemeId] = useState<CardThemeId>("indigo");
     const [includeGitHub, setIncludeGitHub] = useState(false);
     const [customSlots, setCustomSlots] = useState<string[]>([]);
+    const [showcaseMode, setShowcaseMode] = useState<"problems" | "contests">("problems");
+    const [customContestSlots, setCustomContestSlots] = useState<string[]>([]);
     const [isExporting, setIsExporting] = useState(false);
 
     // Dynamic scale measurement for preview
@@ -178,6 +184,84 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                 setCustomSlots(customSlots.filter((id) => id !== "github"));
             }
         }
+    };
+
+    // Unified Redux Contests Performance Fetching
+    const effectiveUser = (user?.username || user?.firstName || "").trim();
+    const contestData = useAppSelector((state) => state.contests.dataByUser[effectiveUser]);
+
+    useEffect(() => {
+        if (effectiveUser) {
+            dispatch(fetchContestPerformance({ username: effectiveUser, portals: connectedPortals }));
+        }
+    }, [dispatch, effectiveUser, connectedPortals]);
+
+    // Contest Platforms & Dynamic Slot Resolution
+    const availableContests = useMemo(
+        () => getAvailableContestPlatforms(contestData?.platforms, connectedPortals, userFallback),
+        [contestData?.platforms, connectedPortals, userFallback]
+    );
+
+    const showcasedContests = useMemo(
+        () => resolveShowcasedContests(contestData?.platforms, connectedPortals, customContestSlots, maxSlots, userFallback),
+        [contestData?.platforms, connectedPortals, customContestSlots, maxSlots, userFallback]
+    );
+
+    const currentContestSlotIds = useMemo(() => {
+        const ids: string[] = [];
+        for (let i = 0; i < maxSlots; i++) {
+            ids.push(showcasedContests[i]?.id || "");
+        }
+        return ids;
+    }, [showcasedContests, maxSlots]);
+
+    const isContestCustomized = customContestSlots.length > 0;
+
+    // Contest Slot Handlers
+    const handleContestSlotChange = (slotIndex: number, newPlatformId: string) => {
+        const next = [...currentContestSlotIds];
+        if (newPlatformId) {
+            const existingIdx = next.indexOf(newPlatformId);
+            if (existingIdx !== -1 && existingIdx !== slotIndex) {
+                next[existingIdx] = next[slotIndex];
+            }
+            next[slotIndex] = newPlatformId;
+        } else {
+            next[slotIndex] = "";
+        }
+        setCustomContestSlots(next.filter(Boolean));
+    };
+
+    const handleSwapContestSlots = (indexA: number, indexB: number) => {
+        if (indexA < 0 || indexA >= maxSlots || indexB < 0 || indexB >= maxSlots) return;
+        const next = [...currentContestSlotIds];
+        const temp = next[indexA];
+        next[indexA] = next[indexB];
+        next[indexB] = temp;
+        setCustomContestSlots(next.filter(Boolean));
+    };
+
+    const handleRemoveContestSlot = (slotIndex: number) => {
+        const next = currentContestSlotIds.filter((_, idx) => idx !== slotIndex);
+        setCustomContestSlots(next.filter(Boolean));
+    };
+
+    const handleToggleContestPlatform = (platformId: string) => {
+        if (currentContestSlotIds.includes(platformId)) {
+            setCustomContestSlots(currentContestSlotIds.filter((id) => id !== platformId));
+        } else {
+            const next = [...currentContestSlotIds.filter(Boolean)];
+            if (next.length < maxSlots) {
+                next.push(platformId);
+            } else {
+                next[maxSlots - 1] = platformId;
+            }
+            setCustomContestSlots(next);
+        }
+    };
+
+    const handleResetContestSlots = () => {
+        setCustomContestSlots([]);
     };
 
     const themeConfig = CARD_THEMES[themeId] || CARD_THEMES.indigo;
@@ -328,6 +412,8 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                                 face={face}
                                 publicProfileUrl={publicProfileUrl}
                                 connectedPortals={connectedPortals}
+                                showcaseMode={showcaseMode}
+                                topContests={showcasedContests}
                             />
                         ) : (
                             <InstagramStoryCard
@@ -342,6 +428,8 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                                 face={face}
                                 publicProfileUrl={publicProfileUrl}
                                 connectedPortals={connectedPortals}
+                                showcaseMode={showcaseMode}
+                                topContests={showcasedContests}
                             />
                         )}
                     </div>
@@ -373,6 +461,16 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                 onTogglePlatform={handleTogglePlatform}
                 onResetSlots={handleResetSlots}
                 isCustomized={isCustomized}
+                showcaseMode={showcaseMode}
+                onShowcaseModeChange={setShowcaseMode}
+                availableContests={availableContests}
+                currentContestSlotIds={currentContestSlotIds}
+                onContestSlotChange={handleContestSlotChange}
+                onSwapContestSlots={handleSwapContestSlots}
+                onRemoveContestSlot={handleRemoveContestSlot}
+                onToggleContestPlatform={handleToggleContestPlatform}
+                onResetContestSlots={handleResetContestSlots}
+                isContestCustomized={isContestCustomized}
             />
 
             {/* Hidden Offscreen Node at Exact Native Dimensions for Clean High-Res Export */}
@@ -401,6 +499,8 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                             face={face}
                             publicProfileUrl={publicProfileUrl}
                             connectedPortals={connectedPortals}
+                            showcaseMode={showcaseMode}
+                            topContests={showcasedContests}
                         />
                     ) : (
                         <InstagramStoryCard
@@ -415,6 +515,8 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                             face={face}
                             publicProfileUrl={publicProfileUrl}
                             connectedPortals={connectedPortals}
+                            showcaseMode={showcaseMode}
+                            topContests={showcasedContests}
                         />
                     )}
                 </div>

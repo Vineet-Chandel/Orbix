@@ -1,7 +1,8 @@
 import React from "react";
+import { Trophy, Code2 } from "lucide-react";
 import { CARD_THEMES } from "./types";
 import type { CardFormat, CardFace, CardThemeId } from "./types";
-import type { RankedPlatform } from "../../../utils/cardStatsAggregator";
+import type { RankedPlatform, RankedContestPlatform } from "../../../utils/cardStatsAggregator";
 import { getPortalIcon } from "../../../utils/portalIcons";
 
 interface CardCustomizerToolbarProps {
@@ -20,7 +21,7 @@ interface CardCustomizerToolbarProps {
     onCopyLink: () => void;
     connectedPlatformCount: number;
 
-    // Dynamic Slot Customization Props
+    // Dynamic Slot Customization Props (Problems)
     maxSlots: number;
     availablePlatforms: RankedPlatform[];
     currentSlotIds: string[];
@@ -30,6 +31,20 @@ interface CardCustomizerToolbarProps {
     onTogglePlatform: (platformId: string) => void;
     onResetSlots: () => void;
     isCustomized: boolean;
+
+    // Showcase Mode (Problems vs Contests)
+    showcaseMode: "problems" | "contests";
+    onShowcaseModeChange: (mode: "problems" | "contests") => void;
+
+    // Dynamic Contest Slot Customization Props
+    availableContests: RankedContestPlatform[];
+    currentContestSlotIds: string[];
+    onContestSlotChange: (slotIndex: number, platformId: string) => void;
+    onSwapContestSlots: (indexA: number, indexB: number) => void;
+    onRemoveContestSlot: (slotIndex: number) => void;
+    onToggleContestPlatform: (platformId: string) => void;
+    onResetContestSlots: () => void;
+    isContestCustomized: boolean;
 }
 
 export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
@@ -56,6 +71,16 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
     onTogglePlatform,
     onResetSlots,
     isCustomized,
+    showcaseMode,
+    onShowcaseModeChange,
+    availableContests,
+    currentContestSlotIds,
+    onContestSlotChange,
+    onSwapContestSlots,
+    onRemoveContestSlot,
+    onToggleContestPlatform,
+    onResetContestSlots,
+    isContestCustomized,
 }) => {
     return (
         <div className="space-y-4">
@@ -207,16 +232,17 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
             </div>
 
             {/* ========================================================================= */}
-            {/* DYNAMIC SHOWCASED PLATFORM SLOTS (User Customizer) */}
+            {/* SHOWCASED PLATFORM / CONTEST SLOTS SECTION */}
             {/* ========================================================================= */}
-            <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200/70 space-y-3">
-                <div className="flex items-center justify-between pb-1">
+            <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200/70 space-y-3.5">
+                {/* Mode Selector Segmented Tabs */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-neutral-200/80">
                     <div>
                         <div className="flex items-center gap-2">
                             <span className="text-[11px] font-bold text-neutral-900 uppercase tracking-wider">
                                 Showcased Platform Slots
                             </span>
-                            {isCustomized ? (
+                            {(showcaseMode === "problems" ? isCustomized : isContestCustomized) ? (
                                 <span className="text-[10px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-700 border border-indigo-200">
                                     Customized
                                 </span>
@@ -227,18 +253,55 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                             )}
                         </div>
                         <p className="text-[11px] text-neutral-500 mt-0.5">
-                            {format === "linkedin"
-                                ? "Customize which 3 platforms appear on your LinkedIn Card."
-                                : "Customize which 5 platforms appear on your Story Card."}
+                            {showcaseMode === "problems"
+                                ? "Showcase problem solving statistics and public repositories."
+                                : "Showcase competitive programming ratings, tier badges, and contest ranks."}
                         </p>
                     </div>
 
-                    {isCustomized && (
+                    {/* Mode Switcher Buttons */}
+                    <div className="bg-neutral-200/80 p-0.5 rounded-xl flex items-center flex-shrink-0">
                         <button
                             type="button"
-                            onClick={onResetSlots}
-                            title="Reset platform slots back to auto-ranked top problem counts"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-100 border border-neutral-300 rounded-lg shadow-2xs transition-all cursor-pointer"
+                            onClick={() => onShowcaseModeChange("problems")}
+                            className={`flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                showcaseMode === "problems"
+                                    ? "bg-white text-neutral-900 shadow-2xs"
+                                    : "text-neutral-600 hover:text-neutral-900"
+                            }`}
+                        >
+                            <Code2 className="w-3.5 h-3.5" />
+                            <span>Problems Solved</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => onShowcaseModeChange("contests")}
+                            className={`flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                showcaseMode === "contests"
+                                    ? "bg-white text-neutral-900 shadow-2xs"
+                                    : "text-neutral-600 hover:text-neutral-900"
+                            }`}
+                        >
+                            <Trophy className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Contest Standings</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Reset Auto Button Header if customized */}
+                <div className="flex items-center justify-between text-xs text-neutral-500">
+                    <span className="text-[11px]">
+                        {format === "linkedin"
+                            ? `Displaying ${showcaseMode === "problems" ? currentSlotIds.filter(Boolean).length : currentContestSlotIds.filter(Boolean).length} of 3 slots on LinkedIn Card`
+                            : `Displaying ${showcaseMode === "problems" ? currentSlotIds.filter(Boolean).length : currentContestSlotIds.filter(Boolean).length} of 5 slots on Story Card`}
+                    </span>
+
+                    {(showcaseMode === "problems" ? isCustomized : isContestCustomized) && (
+                        <button
+                            type="button"
+                            onClick={showcaseMode === "problems" ? onResetSlots : onResetContestSlots}
+                            title="Reset slots back to auto-ranked order"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-100 border border-neutral-300 rounded-md shadow-2xs transition-all cursor-pointer"
                         >
                             <svg className="w-3 h-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -248,131 +311,292 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                     )}
                 </div>
 
-                {/* Individual Slot Selectors */}
-                <div className="space-y-2">
-                    {Array.from({ length: maxSlots }).map((_, slotIdx) => {
-                        const currentId = currentSlotIds[slotIdx] || "";
+                {/* ----------------------------------------------------------------- */}
+                {/* CASE 1: PROBLEMS SOLVED MODE */}
+                {/* ----------------------------------------------------------------- */}
+                {showcaseMode === "problems" && (
+                    <>
+                        {/* Individual Slot Selectors */}
+                        <div className="space-y-2">
+                            {Array.from({ length: maxSlots }).map((_, slotIdx) => {
+                                const currentId = currentSlotIds[slotIdx] || "";
 
-                        return (
-                            <div
-                                key={slotIdx}
-                                className="flex items-center gap-2 bg-white p-2 rounded-lg border border-neutral-200 shadow-2xs"
-                            >
-                                {/* Slot Badge */}
-                                <div className="flex items-center gap-1.5 w-16 flex-shrink-0">
-                                    <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                                    <span className="text-[11px] font-black text-neutral-700 tracking-wider">
-                                        Slot {slotIdx + 1}
-                                    </span>
+                                return (
+                                    <div
+                                        key={slotIdx}
+                                        className="flex items-center gap-2 bg-white p-2 rounded-lg border border-neutral-200 shadow-2xs"
+                                    >
+                                        {/* Slot Badge */}
+                                        <div className="flex items-center gap-1.5 w-16 flex-shrink-0">
+                                            <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                                            <span className="text-[11px] font-black text-neutral-700 tracking-wider">
+                                                Slot {slotIdx + 1}
+                                            </span>
+                                        </div>
+
+                                        {/* Platform Dropdown Selector */}
+                                        <div className="flex-1 min-w-0 relative">
+                                            <select
+                                                value={currentId}
+                                                onChange={(e) => onSlotChange(slotIdx, e.target.value)}
+                                                className="w-full text-xs font-semibold bg-neutral-50 hover:bg-neutral-100 focus:bg-white text-neutral-800 border border-neutral-200 focus:border-neutral-900 rounded-md py-1.5 pl-2.5 pr-7 outline-none cursor-pointer truncate transition-colors"
+                                            >
+                                                <option value="">— Empty / Select Platform —</option>
+                                                {availablePlatforms.map((plat) => {
+                                                    const isSelectedElsewhere = currentSlotIds.some(
+                                                        (id, idx) => idx !== slotIdx && id === plat.id
+                                                    );
+                                                    const label = plat.isGitHub
+                                                        ? `GitHub (${plat.publicRepos ?? 0} repos, ${plat.contributionsOrCommits ?? 0} commits)`
+                                                        : plat.solvedCount > 0
+                                                        ? `${plat.name} (${plat.solvedCount} solved)`
+                                                        : `${plat.name} (@${plat.username})`;
+
+                                                    return (
+                                                        <option key={plat.id} value={plat.id}>
+                                                            {label} {isSelectedElsewhere ? "(Swap)" : ""}
+                                                        </option>
+                                                    );
+                                                })}
+                                            </select>
+                                        </div>
+
+                                        {/* Reorder Controls */}
+                                        <div className="flex items-center gap-1 flex-shrink-0">
+                                            <button
+                                                type="button"
+                                                disabled={slotIdx === 0}
+                                                onClick={() => onSwapSlots(slotIdx, slotIdx - 1)}
+                                                title="Move slot up"
+                                                className="w-6 h-6 flex items-center justify-center rounded text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                            >
+                                                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                                                </svg>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                disabled={slotIdx === maxSlots - 1}
+                                                onClick={() => onSwapSlots(slotIdx, slotIdx + 1)}
+                                                title="Move slot down"
+                                                className="w-6 h-6 flex items-center justify-center rounded text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                            >
+                                                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                </svg>
+                                            </button>
+
+                                            {/* Clear / Delete Slot Button */}
+                                            <button
+                                                type="button"
+                                                disabled={!currentId}
+                                                onClick={() => onRemoveSlot(slotIdx)}
+                                                title="Remove platform from this slot"
+                                                className="w-6 h-6 flex items-center justify-center rounded text-neutral-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                            >
+                                                <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                </svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Quick 1-Click Platform Toggle Chips */}
+                        <div className="pt-1">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                                Quick Add / Remove Platforms:
+                            </span>
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {availablePlatforms.map((plat) => {
+                                    const isPresent = currentSlotIds.includes(plat.id);
+                                    return (
+                                        <button
+                                            key={plat.id}
+                                            type="button"
+                                            onClick={() => onTogglePlatform(plat.id)}
+                                            title={isPresent ? `Remove ${plat.name} from card` : `Add ${plat.name} to card`}
+                                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                                isPresent
+                                                    ? "bg-neutral-900 text-white shadow-2xs hover:bg-neutral-800"
+                                                    : "bg-white text-neutral-700 hover:bg-neutral-100 border border-neutral-300 hover:border-neutral-400"
+                                            }`}
+                                        >
+                                            <div className="w-3.5 h-3.5 flex items-center justify-center flex-shrink-0">
+                                                {getPortalIcon(plat.id, "w-full h-full object-contain")}
+                                            </div>
+                                            <span>{plat.name}</span>
+                                            {plat.solvedCount > 0 && !plat.isGitHub && (
+                                                <span className={`text-[10px] font-mono ${isPresent ? "text-neutral-300" : "text-neutral-500"}`}>
+                                                    ({plat.solvedCount})
+                                                </span>
+                                            )}
+                                            <span className="text-[10px] font-bold">
+                                                {isPresent ? "✕" : "+"}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </>
+                )}
+
+                {/* ----------------------------------------------------------------- */}
+                {/* CASE 2: CONTEST STANDINGS MODE */}
+                {/* ----------------------------------------------------------------- */}
+                {showcaseMode === "contests" && (
+                    <>
+                        {availableContests.length === 0 ? (
+                            <div className="bg-white p-4 rounded-xl border border-neutral-200 text-center">
+                                <Trophy className="w-6 h-6 text-neutral-400 mx-auto mb-1.5" />
+                                <p className="text-xs font-bold text-neutral-700">No contest platforms connected yet.</p>
+                                <p className="text-[11px] text-neutral-400 mt-0.5">
+                                    Connect LeetCode, Codeforces, CodeChef, or AtCoder in your profile settings.
+                                </p>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Individual Contest Slot Selectors */}
+                                <div className="space-y-2">
+                                    {Array.from({ length: maxSlots }).map((_, slotIdx) => {
+                                        const currentId = currentContestSlotIds[slotIdx] || "";
+                                        const currentPlat = availableContests.find((c) => c.id === currentId);
+
+                                        return (
+                                            <div
+                                                key={slotIdx}
+                                                className="flex items-center gap-2 bg-white p-2 rounded-lg border border-neutral-200 shadow-2xs"
+                                            >
+                                                {/* Slot Badge */}
+                                                <div className="flex items-center gap-1.5 w-16 flex-shrink-0">
+                                                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                                    <span className="text-[11px] font-black text-neutral-700 tracking-wider">
+                                                        Slot {slotIdx + 1}
+                                                    </span>
+                                                </div>
+
+                                                {/* Contest Platform Dropdown Selector */}
+                                                <div className="flex-1 min-w-0 relative">
+                                                    <select
+                                                        value={currentId}
+                                                        onChange={(e) => onContestSlotChange(slotIdx, e.target.value)}
+                                                        className="w-full text-xs font-semibold bg-neutral-50 hover:bg-neutral-100 focus:bg-white text-neutral-800 border border-neutral-200 focus:border-neutral-900 rounded-md py-1.5 pl-2.5 pr-7 outline-none cursor-pointer truncate transition-colors"
+                                                    >
+                                                        <option value="">— Empty / Select Contest Platform —</option>
+                                                        {availableContests.map((contest) => {
+                                                            const isSelectedElsewhere = currentContestSlotIds.some(
+                                                                (id, idx) => idx !== slotIdx && id === contest.id
+                                                            );
+                                                            const ratingStr = contest.rating ? `${contest.rating.toLocaleString()}` : "Unrated";
+                                                            const tierStr = contest.tier ? ` • ${contest.tier}` : "";
+                                                            const label = `${contest.name} (${ratingStr}${tierStr})`;
+
+                                                            return (
+                                                                <option key={contest.id} value={contest.id}>
+                                                                    {label} {isSelectedElsewhere ? "(Swap)" : ""}
+                                                                </option>
+                                                            );
+                                                        })}
+                                                    </select>
+                                                </div>
+
+                                                {/* Contest Tier Badge Preview (if platform selected) */}
+                                                {currentPlat?.tier && (
+                                                    <span
+                                                        style={{ backgroundColor: currentPlat.tierColor || "#ea3943" }}
+                                                        className="px-2 py-0.5 rounded text-[10px] font-black text-white uppercase tracking-wider hidden sm:inline-block flex-shrink-0"
+                                                    >
+                                                        {currentPlat.tier}
+                                                    </span>
+                                                )}
+
+                                                {/* Reorder Controls */}
+                                                <div className="flex items-center gap-1 flex-shrink-0">
+                                                    <button
+                                                        type="button"
+                                                        disabled={slotIdx === 0}
+                                                        onClick={() => onSwapContestSlots(slotIdx, slotIdx - 1)}
+                                                        title="Move contest slot up"
+                                                        className="w-6 h-6 flex items-center justify-center rounded text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                                    >
+                                                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
+                                                        </svg>
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        disabled={slotIdx === maxSlots - 1}
+                                                        onClick={() => onSwapContestSlots(slotIdx, slotIdx + 1)}
+                                                        title="Move contest slot down"
+                                                        className="w-6 h-6 flex items-center justify-center rounded text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                                    >
+                                                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                        </svg>
+                                                    </button>
+
+                                                    {/* Clear / Delete Slot Button */}
+                                                    <button
+                                                        type="button"
+                                                        disabled={!currentId}
+                                                        onClick={() => onRemoveContestSlot(slotIdx)}
+                                                        title="Remove contest platform from this slot"
+                                                        className="w-6 h-6 flex items-center justify-center rounded text-neutral-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                                    >
+                                                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
 
-                                {/* Platform Dropdown Selector */}
-                                <div className="flex-1 min-w-0 relative">
-                                    <select
-                                        value={currentId}
-                                        onChange={(e) => onSlotChange(slotIdx, e.target.value)}
-                                        className="w-full text-xs font-semibold bg-neutral-50 hover:bg-neutral-100 focus:bg-white text-neutral-800 border border-neutral-200 focus:border-neutral-900 rounded-md py-1.5 pl-2.5 pr-7 outline-none cursor-pointer truncate transition-colors"
-                                    >
-                                        <option value="">— Empty / Select Platform —</option>
-                                        {availablePlatforms.map((plat) => {
-                                            const isSelectedElsewhere = currentSlotIds.some(
-                                                (id, idx) => idx !== slotIdx && id === plat.id
-                                            );
-                                            const label = plat.isGitHub
-                                                ? `GitHub (${plat.publicRepos ?? 0} repos, ${plat.contributionsOrCommits ?? 0} commits)`
-                                                : plat.solvedCount > 0
-                                                ? `${plat.name} (${plat.solvedCount} solved)`
-                                                : `${plat.name} (@${plat.username})`;
-
+                                {/* Quick 1-Click Contest Platform Toggle Chips */}
+                                <div className="pt-1">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
+                                        Quick Add / Remove Contest Platforms:
+                                    </span>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        {availableContests.map((contest) => {
+                                            const isPresent = currentContestSlotIds.includes(contest.id);
                                             return (
-                                                <option key={plat.id} value={plat.id}>
-                                                    {label} {isSelectedElsewhere ? "(Swap)" : ""}
-                                                </option>
+                                                <button
+                                                    key={contest.id}
+                                                    type="button"
+                                                    onClick={() => onToggleContestPlatform(contest.id)}
+                                                    title={isPresent ? `Remove ${contest.name} from contest slots` : `Add ${contest.name} to contest slots`}
+                                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                                        isPresent
+                                                            ? "bg-neutral-900 text-white shadow-2xs hover:bg-neutral-800"
+                                                            : "bg-white text-neutral-700 hover:bg-neutral-100 border border-neutral-300 hover:border-neutral-400"
+                                                    }`}
+                                                >
+                                                    <div className="w-3.5 h-3.5 flex items-center justify-center flex-shrink-0">
+                                                        {getPortalIcon(contest.id, "w-full h-full object-contain")}
+                                                    </div>
+                                                    <span>{contest.name}</span>
+                                                    {contest.rating && (
+                                                        <span className={`text-[10px] font-mono ${isPresent ? "text-amber-300" : "text-neutral-500"}`}>
+                                                            ({contest.rating})
+                                                        </span>
+                                                    )}
+                                                    <span className="text-[10px] font-bold">
+                                                        {isPresent ? "✕" : "+"}
+                                                    </span>
+                                                </button>
                                             );
                                         })}
-                                    </select>
-                                </div>
-
-                                {/* Reorder Controls: Move Up / Move Down */}
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                    <button
-                                        type="button"
-                                        disabled={slotIdx === 0}
-                                        onClick={() => onSwapSlots(slotIdx, slotIdx - 1)}
-                                        title="Move slot up"
-                                        className="w-6 h-6 flex items-center justify-center rounded text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                                    >
-                                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        disabled={slotIdx === maxSlots - 1}
-                                        onClick={() => onSwapSlots(slotIdx, slotIdx + 1)}
-                                        title="Move slot down"
-                                        className="w-6 h-6 flex items-center justify-center rounded text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                                    >
-                                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                                        </svg>
-                                    </button>
-
-                                    {/* Clear / Delete Slot Button */}
-                                    <button
-                                        type="button"
-                                        disabled={!currentId}
-                                        onClick={() => onRemoveSlot(slotIdx)}
-                                        title="Remove platform from this slot"
-                                        className="w-6 h-6 flex items-center justify-center rounded text-neutral-400 hover:text-rose-600 hover:bg-rose-50 disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer transition-colors"
-                                    >
-                                        <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                        </svg>
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-
-                {/* Quick 1-Click Platform Toggle Chips */}
-                <div className="pt-1">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400 block mb-1.5">
-                        Quick Add / Remove Platforms:
-                    </span>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                        {availablePlatforms.map((plat) => {
-                            const isPresent = currentSlotIds.includes(plat.id);
-                            return (
-                                <button
-                                    key={plat.id}
-                                    type="button"
-                                    onClick={() => onTogglePlatform(plat.id)}
-                                    title={isPresent ? `Remove ${plat.name} from card` : `Add ${plat.name} to card`}
-                                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                                        isPresent
-                                            ? "bg-neutral-900 text-white shadow-2xs hover:bg-neutral-800"
-                                            : "bg-white text-neutral-700 hover:bg-neutral-100 border border-neutral-300 hover:border-neutral-400"
-                                    }`}
-                                >
-                                    <div className="w-3.5 h-3.5 flex items-center justify-center flex-shrink-0">
-                                        {getPortalIcon(plat.id, "w-full h-full object-contain")}
                                     </div>
-                                    <span>{plat.name}</span>
-                                    {plat.solvedCount > 0 && !plat.isGitHub && (
-                                        <span className={`text-[10px] font-mono ${isPresent ? "text-neutral-300" : "text-neutral-500"}`}>
-                                            ({plat.solvedCount})
-                                        </span>
-                                    )}
-                                    <span className="text-[10px] font-bold">
-                                        {isPresent ? "✕" : "+"}
-                                    </span>
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
+                                </div>
+                            </>
+                        )}
+                    </>
+                )}
             </div>
 
             {/* Platform count info indicator */}

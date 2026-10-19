@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { Repeat } from "lucide-react";
+import { Repeat, Code2, GitBranch } from "lucide-react";
 import { fetchPublicProfile, type PublicProfileData } from "../../utils/profileApi";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { useToast } from "../../context/ToastContext";
@@ -10,9 +10,16 @@ import {
     aggregateCodingStats,
     getCoderType,
     resolveShowcasedPlatforms,
+    resolveShowcasedContests,
     getAllConnectedPlatforms,
     extractGitHubStats,
 } from "../../utils/cardStatsAggregator";
+import { CodingSubmissionsTable } from "../Dashboard/CodingSubmissionsTable";
+import { PracticeMonthlyStatsCards } from "../Dashboard/PracticeMonthlyStatsCards";
+import { PracticeAnalyticsSection } from "../Dashboard/PracticeAnalytics/PracticeAnalyticsSection";
+import { ContestPerformanceSection } from "../Dashboard/ContestPerformanceSection";
+import { DevelopmentContributionsTable } from "../Dashboard/DevelopmentContributionsTable";
+import { DevelopmentAnalyticsSection } from "../Dashboard/DevelopmentAnalytics/DevelopmentAnalyticsSection";
 
 export default function PublicProfilePage() {
     const { username } = useParams<{ username: string }>();
@@ -23,6 +30,7 @@ export default function PublicProfilePage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [cardFace, setCardFace] = useState<"front" | "back">("front");
+    const [activeField, setActiveField] = useState<"practice" | "development">("practice");
 
     // Dynamic scale measurement for responsive LinkedInCard rendering
     const cardContainerRef = useRef<HTMLDivElement>(null);
@@ -112,6 +120,10 @@ export default function PublicProfilePage() {
     const coderType = useMemo(() => getCoderType(stats.totalSolved), [stats.totalSolved]);
     const showcasedPlatforms = useMemo(
         () => resolveShowcasedPlatforms(connectedPortals, [], 3, false, userFallback),
+        [connectedPortals, userFallback]
+    );
+    const showcasedContests = useMemo(
+        () => resolveShowcasedContests([], connectedPortals, [], 3, userFallback),
         [connectedPortals, userFallback]
     );
     const allConnectedPlatforms = useMemo(() => getAllConnectedPlatforms(connectedPortals), [connectedPortals]);
@@ -317,6 +329,7 @@ export default function PublicProfilePage() {
                                 face={cardFace}
                                 publicProfileUrl={window.location.href}
                                 connectedPortals={connectedPortals}
+                                topContests={showcasedContests}
                             />
                         </div>
                     </div>
@@ -356,6 +369,87 @@ export default function PublicProfilePage() {
                         </div>
                     </div>
                 )}
+
+                {/* ========================================================================= */}
+                {/* PRACTICE & DEVELOPMENT ACTIVITY & PERFORMANCE SECTION */}
+                {/* ========================================================================= */}
+                <section className="space-y-6 mb-12">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
+                        <div>
+                            <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
+                                <span>Activity & Performance</span>
+                            </h2>
+                            <p className="text-xs text-neutral-500 font-medium">
+                                Multi-platform coding submissions, contest performance, and developer contributions.
+                            </p>
+                        </div>
+
+                        {/* Two Dashboard Fields Switcher: Practice & Development */}
+                        <div className="inline-flex items-center p-1 rounded-2xl bg-white border border-neutral-200/90 shadow-xs self-start sm:self-auto">
+                            <button
+                                type="button"
+                                onClick={() => setActiveField("practice")}
+                                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                    activeField === "practice"
+                                        ? "bg-black text-white shadow-sm"
+                                        : "text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80"
+                                }`}
+                            >
+                                <Code2 className="w-3.5 h-3.5 text-emerald-400" />
+                                <span>Practice</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setActiveField("development")}
+                                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                                    activeField === "development"
+                                        ? "bg-black text-white shadow-sm"
+                                        : "text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80"
+                                }`}
+                            >
+                                <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
+                                <span>Development</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Practice Field: Multi-Platform Coding Submissions (Excluding GitHub), Monthly Stats, DSA & Topic Analytics, and Contest Performance */}
+                    {activeField === "practice" && (
+                        <div className="w-full animate-fadeIn space-y-6">
+                            <CodingSubmissionsTable
+                                connectedPortals={connectedPortals}
+                                username={profile.username}
+                            />
+                            <PracticeMonthlyStatsCards
+                                connectedPortals={connectedPortals}
+                                username={profile.username}
+                            />
+                            <PracticeAnalyticsSection
+                                connectedPortals={connectedPortals}
+                                username={profile.username}
+                            />
+                            <ContestPerformanceSection
+                                connectedPortals={connectedPortals}
+                                username={profile.username}
+                            />
+                        </div>
+                    )}
+
+                    {/* Development Field: Development Metrics, Languages & Contributions (GitHub) */}
+                    {activeField === "development" && (
+                        <div className="w-full animate-fadeIn space-y-6">
+                            <DevelopmentContributionsTable
+                                connectedPortals={connectedPortals}
+                                username={profile.username}
+                            />
+                            <DevelopmentAnalyticsSection
+                                connectedPortals={connectedPortals}
+                                username={profile.username}
+                            />
+                        </div>
+                    )}
+                </section>
 
                 {/* Platforms Showcase Section */}
                 <section className="space-y-4">
