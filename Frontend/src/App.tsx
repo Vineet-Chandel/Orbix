@@ -12,6 +12,7 @@ import ProfileManager from "./app/Profile/ProfileManager";
 import PublicProfilePage from "./app/Profile/PublicProfilePage";
 import ProfilesOnboardingPage from "./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage";
 import LeaderboardPage from "./app/Leaderboard/LeaderboardPage";
+import EventTrackerPage from "./app/Events/EventTrackerPage";
 import ProtectedRoute from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
@@ -41,6 +42,7 @@ const App = () => {
           <Route path="/platform" element={<PlatformPage />} />
           <Route path="/demo" element={<SupportPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/events" element={<EventTrackerPage />} />
 
           {/* Public Shareable Profile Showcase Route */}
           <Route path="/profile/:username" element={<PublicProfilePage />} />

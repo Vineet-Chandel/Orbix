@@ -36,10 +36,7 @@ export const ALL_16_PLATFORMS = [
     { id: "interviewbit", name: "InterviewBit", color: "#0D8BD9", defaultType: "contest" },
     { id: "cses", name: "CSES", color: "#214478", defaultType: "contest" },
     { id: "spoj", name: "SPOJ", color: "#1B6AC9", defaultType: "contest" },
-    { id: "github", name: "GitHub", color: "#24292E", defaultType: "hackathon" },
     { id: "algorithmxlr8", name: "AlgorithmXlr8", color: "#0284C7", defaultType: "contest" },
-    { id: "medium", name: "Medium", color: "#12100E", defaultType: "hackathon" },
-    { id: "substack", name: "Substack", color: "#FF6719", defaultType: "hackathon" },
 ];
 
 // Helper: Format duration
@@ -675,81 +672,6 @@ function generateScheduledEventsForWindow(
                     });
                 }
             }
-
-            // GitHub: Open Source Hackathons (3rd Weekend)
-            if (dayOfWeek === 6 && day >= 15 && day <= 21) {
-                const start = new Date(y, m, day, 10, 0, 0).getTime();
-                const duration = 172800; // 48 hours
-                const end = start + duration * 1000;
-                if (start >= startMs && start <= endMs) {
-                    items.push({
-                        id: `gh-hackathon-${y}-${m}-${day}`,
-                        platform: "github",
-                        platformName: "GitHub",
-                        title: `GitHub Global Hackathon: ${m === 9 ? "Hacktoberfest Sprint" : "Open Source Builders Week"}`,
-                        url: "https://github.com",
-                        startTime: new Date(start).toISOString(),
-                        endTime: new Date(end).toISOString(),
-                        startTimestamp: start,
-                        endTimestamp: end,
-                        durationSeconds: duration,
-                        durationFormatted: "48h",
-                        type: "hackathon",
-                        status: now > end ? "FINISHED" : now >= start ? "LIVE" : "UPCOMING",
-                        rated: false,
-                    });
-                }
-            }
-
-            // Medium: Dev Story Hackathon / Writeathon (1st Weekend)
-            if (dayOfWeek === 6 && day <= 7) {
-                const start = new Date(y, m, day, 10, 0, 0).getTime();
-                const duration = 86400; // 24 hours
-                const end = start + duration * 1000;
-                if (start >= startMs && start <= endMs) {
-                    items.push({
-                        id: `med-${y}-${m}-${day}`,
-                        platform: "medium",
-                        platformName: "Medium",
-                        title: `Medium Tech Writers Hackathon: Engineering Deep-Dives`,
-                        url: "https://medium.com",
-                        startTime: new Date(start).toISOString(),
-                        endTime: new Date(end).toISOString(),
-                        startTimestamp: start,
-                        endTimestamp: end,
-                        durationSeconds: duration,
-                        durationFormatted: "24h",
-                        type: "hackathon",
-                        status: now > end ? "FINISHED" : now >= start ? "LIVE" : "UPCOMING",
-                        rated: false,
-                    });
-                }
-            }
-
-            // Substack: Open Source Tech Writing Sprint (Last Weekend)
-            if (dayOfWeek === 6 && day >= daysInMonth - 6) {
-                const start = new Date(y, m, day, 12, 0, 0).getTime();
-                const duration = 86400;
-                const end = start + duration * 1000;
-                if (start >= startMs && start <= endMs) {
-                    items.push({
-                        id: `sub-${y}-${m}-${day}`,
-                        platform: "substack",
-                        platformName: "Substack",
-                        title: `Substack Engineering Digest Sprints`,
-                        url: "https://substack.com",
-                        startTime: new Date(start).toISOString(),
-                        endTime: new Date(end).toISOString(),
-                        startTimestamp: start,
-                        endTimestamp: end,
-                        durationSeconds: duration,
-                        durationFormatted: "24h",
-                        type: "hackathon",
-                        status: now > end ? "FINISHED" : now >= start ? "LIVE" : "UPCOMING",
-                        rated: false,
-                    });
-                }
-            }
         }
     }
 
@@ -762,7 +684,7 @@ function generateScheduledEventsForWindow(
 export async function getUnifiedEvents(referenceDate: Date = new Date(), forceRefresh = false) {
     const window = getThreeMonthWindow(referenceDate);
     const now = referenceDate.getTime();
-    const redisCacheKey = `orbix:events:3months:${window.currentMonthStr}`;
+    const redisCacheKey = `orbix:events:3months:v2:${window.currentMonthStr}`;
 
     // 1. Check in-memory cache
     if (!forceRefresh && inMemoryEventsCache && (now - inMemoryEventsCache.timestamp < CACHE_TTL_MS)) {
