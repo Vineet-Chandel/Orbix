@@ -6,6 +6,7 @@ import authRouter from './Routes/auth/auth.js';
 import portalsRouter from './Routes/portals/portals.js';
 import profileRouter from './Routes/profile/profile.js';
 import leaderboardRouter from './Routes/leaderboard/leaderboard.js';
+import eventsRouter from './Routes/events/events.js';
 import { testDatabaseConnection } from './database/client.js';
 import redis from './redis/client.js';
 
@@ -42,6 +43,7 @@ app.use('/api', authRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/portals', portalsRouter);
 app.use('/api/leaderboard', leaderboardRouter);
+app.use('/api/events', eventsRouter);
 app.use('/profile', profileRouter);
 app.get('/', (req: Request, res: Response) => {
     res.send('Hello World!');

@@ -1,8 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { Repeat, Code2, GitBranch } from "lucide-react";
 import { fetchPublicProfile, type PublicProfileData } from "../../utils/profileApi";
-import { useToast } from "../../context/ToastContext";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
 import { CARD_THEMES } from "./CardStudio/types";
 import {
@@ -22,8 +21,6 @@ import { DevelopmentAnalyticsSection } from "../Dashboard/DevelopmentAnalytics/D
 
 export default function PublicProfilePage() {
     const { username } = useParams<{ username: string }>();
-    const navigate = useNavigate();
-    const toast = useToast();
 
     const [profile, setProfile] = useState<PublicProfileData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -128,29 +125,6 @@ export default function PublicProfilePage() {
     const allConnectedPlatforms = useMemo(() => getAllConnectedPlatforms(connectedPortals), [connectedPortals]);
     const githubStats = useMemo(() => extractGitHubStats(connectedPortals, userFallback), [connectedPortals, userFallback]);
 
-    const handleCopyLink = () => {
-        navigator.clipboard.writeText(window.location.href).then(
-            () => toast.success("Profile link copied to clipboard!", { title: "Copied" }),
-            () => toast.error("Failed to copy link", { title: "Error" })
-        );
-    };
-
-    const handleShare = async () => {
-        if (navigator.share && profile) {
-            try {
-                await navigator.share({
-                    title: `${profile.displayName} (@${profile.username}) — Orbix Profile`,
-                    text: profile.headline || `Check out ${profile.displayName}'s developer showcase on Orbix!`,
-                    url: window.location.href,
-                });
-            } catch {
-                // dismissed
-            }
-        } else {
-            handleCopyLink();
-        }
-    };
-
     // Loading Skeleton
     if (loading) {
         return (
@@ -204,43 +178,21 @@ export default function PublicProfilePage() {
 
     return (
         <div className="min-h-screen bg-[#F0F2F6] text-neutral-900 font-sans antialiased selection:bg-neutral-900 selection:text-white pb-16">
-            {/* Top Navigation Bar */}
-            <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-neutral-200/80 px-4 sm:px-8 py-3.5 flex items-center justify-between">
-                <Link to="/" className="flex items-center gap-2 group cursor-pointer">
-                    <div className="w-7 h-7 rounded-xl bg-black flex items-center justify-center text-white font-black text-sm">
+            {/* Minimal Orbix Button Only — Navigates to "/" */}
+            <div className="w-full px-4 sm:px-8 pt-4 pb-2 flex items-center">
+                <Link
+                    to="/"
+                    className="inline-flex items-center gap-2 group cursor-pointer select-none"
+                    title="Orbix — Home"
+                >
+                    <div className="w-7 h-7 rounded-xl bg-black flex items-center justify-center text-white font-black text-sm shadow-xs transition-transform group-hover:scale-105">
                         O
                     </div>
-                    <span className="font-extrabold text-neutral-900 text-base tracking-tight">
+                    <span className="font-extrabold text-neutral-900 text-base tracking-tight group-hover:text-black transition-colors">
                         Orbix
                     </span>
                 </Link>
-
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={handleShare}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold transition-colors cursor-pointer"
-                    >
-                        <svg className="w-3.5 h-3.5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                        </svg>
-                        <span>Share</span>
-                    </button>
-
-                    {profile.isOwner && (
-                        <button
-                            type="button"
-                            onClick={() => navigate("/profile")}
-                            className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-black hover:bg-neutral-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
-                        >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                            </svg>
-                            <span>Edit Profile</span>
-                        </button>
-                    )}
-                </div>
-            </header>
+            </div>
 
             {/* Profile Showcase Container - Full Width */}
             <main className="w-full px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16 min-w-0">

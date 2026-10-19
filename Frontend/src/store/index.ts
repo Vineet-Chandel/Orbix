@@ -7,6 +7,7 @@ import contestsReducer from "./contestsSlice";
 import badgesReducer from "./badgesSlice";
 import practiceAnalyticsReducer from "./practiceAnalyticsSlice";
 import developmentAnalyticsReducer from "./developmentAnalyticsSlice";
+import eventsReducer from "./eventsSlice";
 
 export const store = configureStore({
     reducer: {
@@ -17,6 +18,7 @@ export const store = configureStore({
         badges: badgesReducer,
         practiceAnalytics: practiceAnalyticsReducer,
         developmentAnalytics: developmentAnalyticsReducer,
+        events: eventsReducer,
     },
 });
 
@@ -33,3 +35,4 @@ export * from "./contestsSlice";
 export * from "./badgesSlice";
 export * from "./practiceAnalyticsSlice";
 export * from "./developmentAnalyticsSlice";
+export * from "./eventsSlice";
