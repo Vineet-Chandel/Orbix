@@ -12,6 +12,7 @@ import type {
     GitHubCardStats,
     RankedPlatform,
     ConnectedPlatformBadge,
+    RankedContestPlatform,
 } from "../../../utils/cardStatsAggregator";
 
 interface LinkedInCardProps {
@@ -28,7 +29,7 @@ interface LinkedInCardProps {
     cardRef?: React.RefObject<HTMLDivElement | null>;
     connectedPortals?: Record<string, any>;
     showcaseMode?: "problems" | "contests";
-    topContests?: any[];
+    topContests?: RankedContestPlatform[];
 }
 
 export const LinkedInCard: React.FC<LinkedInCardProps> = ({

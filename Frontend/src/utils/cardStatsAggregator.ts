@@ -700,3 +700,252 @@ export function resolveShowcasedPlatforms(
     return codingPlatforms.slice(0, maxSlots);
 }
 
+// ============================================================================
+// CONTEST STANDINGS PLATFORMS & SLOTS
+// ============================================================================
+
+export interface RankedContestPlatform {
+    id: string;
+    name: string;
+    username: string;
+    profileUrl?: string;
+    brandColor?: string;
+    rating: number | null;
+    peakRating: number | null;
+    tier: string | null;
+    tierColor: string | null;
+    tierInfo?: {
+        name?: string;
+        color?: string;
+        nextTierName?: string | null;
+        pointsToNextTier?: number | null;
+        progressPercent?: number | null;
+    } | null;
+    officialRank: number | null;
+    ratedContestsCount: number;
+    isVerified: boolean;
+}
+
+export const CONTEST_ELIGIBLE_PORTALS = new Set([
+    "codeforces",
+    "leetcode",
+    "codechef",
+    "atcoder",
+    "hackerrank",
+    "topcoder",
+    "geeksforgeeks",
+    "hackerearth",
+    "interviewbit",
+    "code360",
+]);
+
+export function getPlatformTierColor(portal: string, tier: string | null, rating: number | null): string {
+    const p = portal.toLowerCase();
+    const t = (tier || "").toLowerCase();
+
+    if (p === "leetcode") {
+        if (t.includes("guardian") || (rating && rating >= 2150)) return "#8a2be2"; // Guardian Purple
+        if (t.includes("knight") || (rating && rating >= 1850)) return "#f59e0b"; // Knight Amber/Gold
+        return "#6366f1";
+    }
+
+    if (p === "codeforces") {
+        if (t.includes("legendary") || (rating && rating >= 3000)) return "#ff0000";
+        if (t.includes("grandmaster") || (rating && rating >= 2400)) return "#ff0000";
+        if (t.includes("master") || (rating && rating >= 2100)) return "#ff8c00";
+        if (t.includes("candidate") || (rating && rating >= 1900)) return "#aa00aa";
+        if (t.includes("expert") || (rating && rating >= 1600)) return "#0000ff";
+        if (t.includes("specialist") || (rating && rating >= 1400)) return "#03a89e";
+        if (t.includes("pupil") || (rating && rating >= 1200)) return "#5cb85c";
+        if (t.includes("newbie") || (rating && rating > 0)) return "#cccccc";
+        return "#6366f1";
+    }
+
+    if (p === "codechef") {
+        if (t.includes("7") || (rating && rating >= 2500)) return "#d0011b";
+        if (t.includes("6") || (rating && rating >= 2200)) return "#ff7f00";
+        if (t.includes("5") || (rating && rating >= 2000)) return "#fed813";
+        if (t.includes("4") || (rating && rating >= 1800)) return "#684273";
+        if (t.includes("3") || (rating && rating >= 1600)) return "#3375be";
+        if (t.includes("2") || (rating && rating >= 1400)) return "#1e7d34";
+        if (t.includes("1") || (rating && rating > 0)) return "#666666";
+        return "#3375be";
+    }
+
+    if (p === "atcoder") {
+        if (rating && rating >= 2800) return "#ff0000";
+        if (rating && rating >= 2400) return "#ff8000";
+        if (rating && rating >= 2000) return "#c0c000";
+        if (rating && rating >= 1600) return "#0000ff";
+        if (rating && rating >= 1200) return "#00c0c0";
+        if (rating && rating >= 800) return "#008000";
+        if (rating && rating >= 400) return "#804000";
+        return "#808080";
+    }
+
+    return "#6366f1";
+}
+
+export function getFallbackTier(portal: string, rating: number | null): string | null {
+    if (!rating || rating <= 0) return null;
+    const p = portal.toLowerCase();
+    if (p === "leetcode") {
+        if (rating >= 2150) return "GUARDIAN";
+        if (rating >= 1850) return "KNIGHT";
+        return null;
+    }
+    if (p === "codeforces") {
+        if (rating >= 2400) return "GRANDMASTER";
+        if (rating >= 2100) return "MASTER";
+        if (rating >= 1900) return "CANDIDATE MASTER";
+        if (rating >= 1600) return "EXPERT";
+        if (rating >= 1400) return "SPECIALIST";
+        if (rating >= 1200) return "PUPIL";
+        return "NEWBIE";
+    }
+    if (p === "codechef") {
+        if (rating >= 2500) return "7★";
+        if (rating >= 2200) return "6★";
+        if (rating >= 2000) return "5★";
+        if (rating >= 1800) return "4★";
+        if (rating >= 1600) return "3★";
+        if (rating >= 1400) return "2★";
+        return "1★";
+    }
+    return null;
+}
+
+/**
+ * Returns available contest platforms discovered either through the unified contests Redux cache
+ * or local connectedPortals configuration.
+ */
+export function getAvailableContestPlatforms(
+    contestPlatforms?: any[],
+    connectedPortals?: Record<string, any>,
+    fallbackUsername?: string
+): RankedContestPlatform[] {
+    const list: RankedContestPlatform[] = [];
+    const seen = new Set<string>();
+
+    // 1. Process Redux / API contest platforms
+    if (Array.isArray(contestPlatforms) && contestPlatforms.length > 0) {
+        for (const p of contestPlatforms) {
+            if (!p) continue;
+            const portalKey = (p.portal || "").toLowerCase().trim();
+            if (!portalKey || !CONTEST_ELIGIBLE_PORTALS.has(portalKey)) continue;
+
+            const username = p.portalUsername || (connectedPortals?.[portalKey]?.username) || fallbackUsername || "";
+            const isConn = Boolean(p.connected && username);
+            if (!isConn && !p.currentRating && !p.ratedContestsCount) continue;
+
+            const regDef = PLATFORM_REGISTRY.find((r) => r.id === portalKey);
+            const name = p.portalName || regDef?.name || PORTALS[portalKey]?.name || portalKey;
+            const rating = typeof p.currentRating === "number" ? p.currentRating : null;
+            const tier = p.tier || getFallbackTier(portalKey, rating);
+            const tierColor = p.tierColor || getPlatformTierColor(portalKey, tier, rating);
+
+            list.push({
+                id: portalKey,
+                name,
+                username,
+                profileUrl: p.profileUrl || "",
+                brandColor: regDef?.brandColor || "#6366f1",
+                rating,
+                peakRating: typeof p.peakRating === "number" ? p.peakRating : null,
+                tier,
+                tierColor,
+                tierInfo: p.tierInfo || null,
+                officialRank: typeof p.officialRank === "number" ? p.officialRank : null,
+                ratedContestsCount: typeof p.ratedContestsCount === "number" ? p.ratedContestsCount : 0,
+                isVerified: Boolean(p.connected),
+            });
+            seen.add(portalKey);
+        }
+    }
+
+    // 2. Discover from connectedPortals if not already added
+    if (connectedPortals && typeof connectedPortals === "object") {
+        for (const [key, val] of Object.entries(connectedPortals)) {
+            const portalKey = key.toLowerCase().trim();
+            if (seen.has(portalKey) || !CONTEST_ELIGIBLE_PORTALS.has(portalKey)) continue;
+
+            const profile = typeof val === "object" ? val : {};
+            const username = profile?.username || profile?.portal_username || (typeof val === "string" ? val : "") || fallbackUsername || "";
+            if (!username && !profile?.connected) continue;
+
+            const regDef = PLATFORM_REGISTRY.find((r) => r.id === portalKey);
+            const name = regDef?.name || PORTALS[portalKey]?.name || portalKey;
+            const rating = typeof profile?.rating === "number" ? profile.rating : null;
+            const tier = profile?.tier || getFallbackTier(portalKey, rating);
+            const tierColor = profile?.tierColor || getPlatformTierColor(portalKey, tier, rating);
+
+            list.push({
+                id: portalKey,
+                name,
+                username,
+                profileUrl: profile?.profileUrl || "",
+                brandColor: regDef?.brandColor || "#6366f1",
+                rating,
+                peakRating: typeof profile?.peakRating === "number" ? profile.peakRating : null,
+                tier,
+                tierColor,
+                tierInfo: null,
+                officialRank: typeof profile?.rank === "number" ? profile.rank : null,
+                ratedContestsCount: typeof profile?.contestsCount === "number" ? profile.contestsCount : 0,
+                isVerified: profile?.verified !== false,
+            });
+            seen.add(portalKey);
+        }
+    }
+
+    // Sort: highest rating first, or highest contest count, then alphabetical
+    return list.sort((a, b) => {
+        const ratingA = a.rating || 0;
+        const ratingB = b.rating || 0;
+        if (ratingA !== ratingB) return ratingB - ratingA;
+        if (a.ratedContestsCount !== b.ratedContestsCount) {
+            return b.ratedContestsCount - a.ratedContestsCount;
+        }
+        return a.name.localeCompare(b.name);
+    });
+}
+
+/**
+ * Resolves showcased contest platform slots for LinkedIn and Story cards.
+ * If user customized slots (selectedContestIds has items), respects exact ordering.
+ * If default/empty, auto-ranks top contest platforms by rating and participation.
+ */
+export function resolveShowcasedContests(
+    contestPlatforms?: any[],
+    connectedPortals?: Record<string, any>,
+    selectedContestIds?: string[],
+    maxSlots = 3,
+    fallbackUsername?: string
+): RankedContestPlatform[] {
+    const available = getAvailableContestPlatforms(contestPlatforms, connectedPortals, fallbackUsername);
+    const availableMap = new Map<string, RankedContestPlatform>();
+    for (const p of available) {
+        availableMap.set(p.id.toLowerCase(), p);
+    }
+
+    // Custom user slots
+    if (Array.isArray(selectedContestIds) && selectedContestIds.length > 0) {
+        const result: RankedContestPlatform[] = [];
+        for (const rawId of selectedContestIds) {
+            if (!rawId) continue;
+            const item = availableMap.get(rawId.toLowerCase());
+            if (item && !result.some((r) => r.id === item.id)) {
+                result.push(item);
+                if (result.length >= maxSlots) break;
+            }
+        }
+        if (result.length > 0) {
+            return result;
+        }
+    }
+
+    // Default smart auto-ranking: top rated / attended contest platforms
+    return available.slice(0, maxSlots);
+}
+
+

@@ -99,19 +99,6 @@ export const Sidebar = ({
         navigate("/auth/signin");
     };
 
-    const handleWorkspaceRedirection = (name: string, url: string, isLocked: boolean = false) => {
-        if (isLocked) {
-            alert(`${name} Workspace is coming soon! This environment is currently locked.`);
-            return;
-        }
-        const confirmed = window.confirm(
-            `Redirect to ${name} Workspace?\n\nYou will be navigating to the ${name} environment.`
-        );
-        if (confirmed) {
-            window.open(url, "_blank", "noopener,noreferrer");
-        }
-    };
-
     const handleItemClick = (tab: SidebarTab) => {
         if (onTabChange) {
             onTabChange(tab);
@@ -384,57 +371,35 @@ export const Sidebar = ({
                         </div>
                     )}
 
-                    {workspaceItems.map((item) => {
-                        const isCurrentActive = activeTab === item.id;
-
-                        return (
-                            <button
-                                key={item.id}
-                                type="button"
-                                onClick={() => {
-                                    handleItemClick(item.id);
-                                    handleWorkspaceRedirection(item.name, item.url, true);
-                                }}
-                                className={`flex items-center h-11 rounded-2xl text-xs sm:text-sm font-medium transition-all duration-200 group cursor-pointer text-left overflow-x-hidden relative w-full ${isCurrentActive
-                                    ? "bg-white/[0.1] text-white"
-                                    : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
-                                    }`}
-                                title={!isExpanded ? `${item.name} (Coming Soon)` : `${item.name} Workspace — Coming Soon`}
-                            >
-                                <div className="flex items-center overflow-x-hidden w-full min-w-0">
-                                    {/* SVG Icon: DEAD-CENTER in 44px container */}
-                                    <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                        <span className="w-5 h-5 flex items-center justify-center text-neutral-400 group-hover:text-white transition-colors">
-                                            {item.icon}
-                                        </span>
-                                    </div>
-
-                                    {isExpanded && (
-                                        <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5">
-                                            {item.name}
-                                        </span>
-                                    )}
+                    {workspaceItems.map((item) => (
+                        <div
+                            key={item.id}
+                            className="flex items-center h-11 rounded-2xl text-xs sm:text-sm font-medium text-neutral-400 select-none overflow-x-hidden relative w-full cursor-default"
+                            title={!isExpanded ? `${item.name} (Coming Soon)` : `${item.name} Workspace — Coming Soon`}
+                        >
+                            <div className="flex items-center overflow-x-hidden w-full min-w-0">
+                                {/* SVG Icon: DEAD-CENTER in 44px container */}
+                                <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                    <span className="w-5 h-5 flex items-center justify-center text-neutral-400">
+                                        {item.icon}
+                                    </span>
                                 </div>
 
                                 {isExpanded && (
-                                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-orange-500 bg-orange-500/25 text-orange-400 text-[10px] font-bold tracking-tight whitespace-nowrap flex-shrink-0 mr-1 shadow-xs animate-fadeIn">
-                                        <Lock className="w-2.5 h-2.5 text-orange-500 flex-shrink-0" />
-                                        <span>Coming soon</span>
-                                    </div>
-                                )}
-
-                                {/* Small lock badge in collapsed rail */}
-                                {!isExpanded && (
-                                    <span
-                                        title={`${item.name} — Coming Soon`}
-                                        className="absolute top-1 right-1 w-3.5 h-3.5 rounded-full bg-orange-500/25 border border-orange-500 flex items-center justify-center shadow-xs"
-                                    >
-                                        <Lock className="w-2 h-2 text-orange-500" />
+                                    <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 text-neutral-300">
+                                        {item.name}
                                     </span>
                                 )}
-                            </button>
-                        );
-                    })}
+                            </div>
+
+                            {isExpanded && (
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-orange-500 bg-orange-500/25 text-orange-400 text-[10px] font-bold tracking-tight whitespace-nowrap flex-shrink-0 mr-1 shadow-xs animate-fadeIn">
+                                    <Lock className="w-2.5 h-2.5 text-orange-500 flex-shrink-0" />
+                                    <span>Coming soon</span>
+                                </div>
+                            )}
+                        </div>
+                    ))}
                 </div>
             </div>
 
