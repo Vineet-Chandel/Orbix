@@ -1,5 +1,5 @@
 import React from "react";
-import { FolderGit2, GitCommit } from "lucide-react";
+import { FolderGit2, GitCommit, Trophy } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { OrbixCardQR } from "./OrbixCardQR";
 import { CardBannerSVG } from "./CardBannerSVG";
@@ -27,6 +27,8 @@ interface LinkedInCardProps {
     publicProfileUrl: string;
     cardRef?: React.RefObject<HTMLDivElement | null>;
     connectedPortals?: Record<string, any>;
+    showcaseMode?: "problems" | "contests";
+    topContests?: any[];
 }
 
 export const LinkedInCard: React.FC<LinkedInCardProps> = ({
@@ -42,6 +44,8 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
     publicProfileUrl,
     cardRef,
     connectedPortals,
+    showcaseMode = "problems",
+    topContests = [],
 }) => {
     const displayName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "Developer";
     const username = user?.username || "developer";
@@ -345,88 +349,175 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                 </div>
                             </div>
 
-                            {/* Right Column (5 cols): Top Coding Accounts */}
+                            {/* Right Column (5 cols): Showcased Platform or Contest Slots */}
                             <div className="col-span-5 flex flex-col justify-between space-y-2.5">
-                                <div className="space-y-2 flex-1 flex flex-col justify-between">
-                                    <div className="flex items-center justify-between text-xs font-black text-neutral-400 px-1">
-                                        <span className="uppercase tracking-wider text-[11px]">Top Coding Accounts</span>
-                                        <span className="text-[11px] text-neutral-400 font-mono">
-                                            {topPlatforms.length} displayed
-                                        </span>
-                                    </div>
-
-                                    {topPlatforms.length === 0 ? (
-                                        <div className="rounded-2xl bg-[#121824]/90 border border-white/10 p-4 text-center flex-1 flex items-center justify-center">
-                                            <p className="text-xs text-neutral-400">No platforms selected.</p>
+                                {showcaseMode === "contests" ? (
+                                    <div className="space-y-2 flex-1 flex flex-col justify-between">
+                                        <div className="flex items-center justify-between text-xs font-black text-neutral-400 px-1">
+                                            <div className="flex items-center gap-1.5">
+                                                <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                                                <span className="uppercase tracking-wider text-[11px]">Contest Standings</span>
+                                            </div>
+                                            <span className="text-[11px] text-neutral-400 font-mono">
+                                                {topContests.length} displayed
+                                            </span>
                                         </div>
-                                    ) : (
-                                        topPlatforms.slice(0, 3).map((plat) => {
-                                            if (plat.isGitHub || plat.id === "github") {
+
+                                        {topContests.length === 0 ? (
+                                            <div className="rounded-2xl bg-[#121824]/90 border border-white/10 p-4 text-center flex-1 flex items-center justify-center">
+                                                <p className="text-xs text-neutral-400">No contest standings available.</p>
+                                            </div>
+                                        ) : (
+                                            topContests.slice(0, 3).map((contest: any) => {
+                                                const hasRating = contest.rating !== null && contest.rating !== undefined;
                                                 return (
                                                     <div
-                                                        key="github"
+                                                        key={contest.id}
                                                         className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1"
                                                     >
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 text-white p-1.5">
-                                                                {getPortalIcon("github", "w-5 h-5")}
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center flex-shrink-0 p-1.5">
+                                                                {getPortalIcon(contest.id, "w-full h-full object-contain")}
                                                             </div>
-                                                            <div>
-                                                                <span className="text-sm font-black text-white block leading-none">GitHub</span>
-                                                                <span className="text-xs font-mono text-neutral-400 block mt-1">@{plat.username || githubStats.username}</span>
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-1.5">
+                                                                    <h4 className="text-sm font-black text-white leading-none truncate">
+                                                                        {contest.name}
+                                                                    </h4>
+                                                                    {contest.isVerified && (
+                                                                        <div
+                                                                            className="w-3.5 h-3.5 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center flex-shrink-0"
+                                                                            title="Verified Contest Profile"
+                                                                        >
+                                                                            <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
+                                                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                                                                            </svg>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <span className="text-xs font-mono text-neutral-400 truncate block mt-1">
+                                                                    @{contest.username}
+                                                                </span>
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-3 text-right">
-                                                            <div className="flex items-center gap-1.5 bg-white/[0.04] px-2.5 py-1 rounded-xl border border-white/5">
-                                                                <FolderGit2 className="w-3.5 h-3.5 text-emerald-400" />
-                                                                <div className="text-left">
-                                                                    <span className="text-xs font-black text-white block leading-tight font-mono">
-                                                                        {(plat.publicRepos ?? githubStats.publicRepos).toLocaleString()}
+
+                                                        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-base sm:text-lg font-black text-white font-mono tracking-tight leading-none">
+                                                                    {hasRating ? contest.rating?.toLocaleString() : "—"}
+                                                                </span>
+                                                                {contest.tier && (
+                                                                    <span
+                                                                        style={{
+                                                                            backgroundColor: contest.tierColor || "#ea3943",
+                                                                        }}
+                                                                        className="px-2 py-0.5 rounded text-[10px] font-black text-white uppercase tracking-wider shadow-xs leading-tight"
+                                                                    >
+                                                                        {contest.tier}
                                                                     </span>
-                                                                    <span className="text-[9px] text-neutral-400 uppercase font-bold">Repos</span>
-                                                                </div>
+                                                                )}
                                                             </div>
-                                                            <div className="flex items-center gap-1.5 bg-white/[0.04] px-2.5 py-1 rounded-xl border border-white/5">
-                                                                <GitCommit className="w-3.5 h-3.5 text-emerald-400" />
-                                                                <div className="text-left">
-                                                                    <span className="text-xs font-black text-white block leading-tight font-mono">
-                                                                        {(plat.contributionsOrCommits ?? githubStats.contributionsOrCommits).toLocaleString()}
-                                                                    </span>
-                                                                    <span className="text-[9px] text-neutral-400 uppercase font-bold">Commits</span>
-                                                                </div>
-                                                            </div>
+                                                            {contest.officialRank ? (
+                                                                <span className="text-[10px] font-mono text-neutral-400">
+                                                                    Rank #{contest.officialRank.toLocaleString()}{contest.peakRating ? ` • max ${contest.peakRating}` : ""}
+                                                                </span>
+                                                            ) : contest.tierInfo?.nextTierName && typeof contest.tierInfo.pointsToNextTier === "number" ? (
+                                                                <span className="text-[10px] font-mono text-neutral-400">
+                                                                    {contest.tierInfo.pointsToNextTier} to {contest.tierInfo.nextTierName}
+                                                                </span>
+                                                            ) : contest.ratedContestsCount && contest.ratedContestsCount > 0 ? (
+                                                                <span className="text-[10px] font-mono text-neutral-400">
+                                                                    {contest.ratedContestsCount} contests attended
+                                                                </span>
+                                                            ) : null}
                                                         </div>
                                                     </div>
                                                 );
-                                            }
+                                            })
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2 flex-1 flex flex-col justify-between">
+                                        <div className="flex items-center justify-between text-xs font-black text-neutral-400 px-1">
+                                            <span className="uppercase tracking-wider text-[11px]">Top Coding Accounts</span>
+                                            <span className="text-[11px] text-neutral-400 font-mono">
+                                                {topPlatforms.length} displayed
+                                            </span>
+                                        </div>
 
-                                            return (
-                                                <div
-                                                    key={plat.id}
-                                                    className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1"
-                                                >
-                                                    <div className="flex items-center gap-3 min-w-0">
-                                                        <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 p-1.5">
-                                                            {getPortalIcon(plat.id, "w-full h-full object-contain")}
+                                        {topPlatforms.length === 0 ? (
+                                            <div className="rounded-2xl bg-[#121824]/90 border border-white/10 p-4 text-center flex-1 flex items-center justify-center">
+                                                <p className="text-xs text-neutral-400">No platforms selected.</p>
+                                            </div>
+                                        ) : (
+                                            topPlatforms.slice(0, 3).map((plat) => {
+                                                if (plat.isGitHub || plat.id === "github") {
+                                                    return (
+                                                        <div
+                                                            key="github"
+                                                            className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1"
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 text-white p-1.5">
+                                                                    {getPortalIcon("github", "w-5 h-5")}
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-sm font-black text-white block leading-none">GitHub</span>
+                                                                    <span className="text-xs font-mono text-neutral-400 block mt-1">@{plat.username || githubStats.username}</span>
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 text-right">
+                                                                <div className="flex items-center gap-1.5 bg-white/[0.04] px-2.5 py-1 rounded-xl border border-white/5">
+                                                                    <FolderGit2 className="w-3.5 h-3.5 text-emerald-400" />
+                                                                    <div className="text-left">
+                                                                        <span className="text-xs font-black text-white block leading-tight font-mono">
+                                                                            {(plat.publicRepos ?? githubStats.publicRepos).toLocaleString()}
+                                                                        </span>
+                                                                        <span className="text-[9px] text-neutral-400 uppercase font-bold">Repos</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex items-center gap-1.5 bg-white/[0.04] px-2.5 py-1 rounded-xl border border-white/5">
+                                                                    <GitCommit className="w-3.5 h-3.5 text-emerald-400" />
+                                                                    <div className="text-left">
+                                                                        <span className="text-xs font-black text-white block leading-tight font-mono">
+                                                                            {(plat.contributionsOrCommits ?? githubStats.contributionsOrCommits).toLocaleString()}
+                                                                        </span>
+                                                                        <span className="text-[9px] text-neutral-400 uppercase font-bold">Commits</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div className="min-w-0">
-                                                            <h4 className="text-sm font-black text-white leading-none truncate">
-                                                                {plat.name}
-                                                            </h4>
-                                                            <span className="text-xs font-mono text-neutral-400 truncate block mt-1">
-                                                                @{plat.username}
-                                                            </span>
+                                                    );
+                                                }
+
+                                                return (
+                                                    <div
+                                                        key={plat.id}
+                                                        className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1"
+                                                    >
+                                                        <div className="flex items-center gap-3 min-w-0">
+                                                            <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 p-1.5">
+                                                                {getPortalIcon(plat.id, "w-full h-full object-contain")}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <h4 className="text-sm font-black text-white leading-none truncate">
+                                                                    {plat.name}
+                                                                </h4>
+                                                                <span className="text-xs font-mono text-neutral-400 truncate block mt-1">
+                                                                    @{plat.username}
+                                                                </span>
+                                                            </div>
                                                         </div>
+
+                                                        <span className="text-xs font-mono font-black text-white bg-white/10 px-3.5 py-1.5 rounded-xl">
+                                                            {plat.solvedCount.toLocaleString()} solved
+                                                        </span>
                                                     </div>
-
-                                                    <span className="text-xs font-mono font-black text-white bg-white/10 px-3.5 py-1.5 rounded-xl">
-                                                        {plat.solvedCount.toLocaleString()} solved
-                                                    </span>
-                                                </div>
-                                            );
-                                        })
-                                    )}
-                                </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

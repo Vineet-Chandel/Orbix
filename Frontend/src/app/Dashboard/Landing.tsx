@@ -7,6 +7,7 @@ import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
 import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
 import { ContestPerformanceSection } from "./ContestPerformanceSection";
 import { PracticeAnalyticsSection } from "./PracticeAnalytics/PracticeAnalyticsSection";
+import { PracticeMonthlyStatsCards } from "./PracticeMonthlyStatsCards";
 import { DevelopmentAnalyticsSection } from "./DevelopmentAnalytics/DevelopmentAnalyticsSection";
 
 export default function Dashboard() {
@@ -225,6 +226,10 @@ export default function Dashboard() {
                         {activeDashboardField === "practice" && (
                             <div className="w-full animate-fadeIn space-y-6">
                                 <CodingSubmissionsTable
+                                    connectedPortals={connectedPortals}
+                                    username={user?.username || ""}
+                                />
+                                <PracticeMonthlyStatsCards
                                     connectedPortals={connectedPortals}
                                     username={user?.username || ""}
                                 />
