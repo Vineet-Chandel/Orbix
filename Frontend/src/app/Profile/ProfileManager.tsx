@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Briefcase, Mail, Trash2, Plus } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { updateProfile } from "../../utils/profileApi";
@@ -8,6 +9,73 @@ import { Sidebar } from "../Dashboard/Sidebar";
 import { ProfilePhotoFrame } from "./ProfilePhotoFrame";
 import { ConnectedPlatformsSection } from "../Dashboard/ConnectedPlatformsSection";
 import { ProfileCardStudio } from "./CardStudio/ProfileCardStudio";
+import { NotificationBell } from "../../components/NotificationBell";
+import {
+    detectPlatform,
+    getPlatformIcon,
+    sanitizePlatformUrl,
+    PLATFORM_REGISTRY,
+} from "../../utils/platformLinks";
+
+interface LinkRow {
+    id: string;
+    label: string;
+    url: string;
+    platform?: string;
+}
+
+function parseInitialLinks(usr: any): LinkRow[] {
+    let rawLinks = usr?.links;
+    if (typeof rawLinks === "string") {
+        try {
+            rawLinks = JSON.parse(rawLinks);
+        } catch {
+            rawLinks = [];
+        }
+    }
+    if (Array.isArray(rawLinks)) {
+        return rawLinks.slice(0, 4).map((l: any, i: number) => ({
+            id: l.id || `link-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
+            label: l.label || l.platform || "Link",
+            url: l.url || "",
+            platform: l.platform || detectPlatform(l.url || l.label)?.id,
+        }));
+    }
+    const legacy: LinkRow[] = [];
+    if (usr?.linkedin) {
+        legacy.push({
+            id: "init-linkedin",
+            label: "LinkedIn",
+            url: usr.linkedin,
+            platform: "linkedin",
+        });
+    }
+    if (usr?.github) {
+        legacy.push({
+            id: "init-github",
+            label: "GitHub",
+            url: usr.github,
+            platform: "github",
+        });
+    }
+    if (usr?.website) {
+        legacy.push({
+            id: "init-website",
+            label: "Portfolio",
+            url: usr.website,
+            platform: detectPlatform(usr.website)?.id,
+        });
+    }
+    if (usr?.customLink) {
+        legacy.push({
+            id: "init-custom",
+            label: "Link",
+            url: usr.customLink,
+            platform: detectPlatform(usr.customLink)?.id,
+        });
+    }
+    return legacy.slice(0, 4);
+}
 
 export default function ProfileManager() {
     const navigate = useNavigate();
@@ -21,13 +89,12 @@ export default function ProfileManager() {
     const [lastName, setLastName] = useState(user?.lastName || "");
     const [headline, setHeadline] = useState(user?.headline || "");
     const [bio, setBio] = useState(user?.bio || "");
-    const [website, setWebsite] = useState(user?.website || "");
-    const [linkedin, setLinkedin] = useState(user?.linkedin || "");
-    const [github, setGithub] = useState(user?.github || "");
-    const [customLink, setCustomLink] = useState(user?.customLink || "");
     const [location, setLocation] = useState(user?.location || "");
     const [skills, setSkills] = useState<string[]>(user?.skills || []);
+    const [links, setLinks] = useState<LinkRow[]>(() => parseInitialLinks(user));
     const [newSkillInput, setNewSkillInput] = useState("");
+    const [isOpenToWork, setIsOpenToWork] = useState(Boolean(user?.isOpenToWork));
+    const [isHireable, setIsHireable] = useState(Boolean(user?.isHireable));
     const [savingProfile, setSavingProfile] = useState(false);
 
     // Connected Platforms from localStorage / sync
@@ -66,32 +133,215 @@ export default function ProfileManager() {
             setLastName(user.lastName || "");
             setHeadline(user.headline || "");
             setBio(user.bio || "");
-            setWebsite(user.website || "");
-            setLinkedin(user.linkedin || "");
-            setGithub(user.github || "");
-            setCustomLink(user.customLink || "");
             setLocation(user.location || "");
             setSkills(Array.isArray(user.skills) ? user.skills : []);
+            setLinks(parseInitialLinks(user));
+            setIsOpenToWork(Boolean(user.isOpenToWork));
+            setIsHireable(Boolean(user.isHireable));
         }
     }, [user]);
+
+    // Dynamic Links handlers
+    const handleAddLink = () => {
+        if (links.length >= 4) {
+            toast.info("Maximum of 4 links allowed");
+            return;
+        }
+        setLinks([
+            ...links,
+            {
+                id: `link-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                label: "",
+                url: "",
+            },
+        ]);
+    };
+
+    const handleRemoveLink = (index: number) => {
+        setLinks(links.filter((_, i) => i !== index));
+    };
+
+    const handleLinkChange = (index: number, field: "label" | "url", value: string) => {
+        setLinks((prev) => {
+            const next = [...prev];
+            const row = { ...next[index] };
+
+            if (field === "url") {
+                row.url = value;
+                const detected = detectPlatform(value);
+                if (detected) {
+                    row.platform = detected.id;
+                    if (!row.label || row.label === "Link" || PLATFORM_REGISTRY.some((p) => p.name.toLowerCase() === row.label.toLowerCase())) {
+                        row.label = detected.name;
+                    }
+                } else {
+                    row.platform = undefined;
+                }
+            } else if (field === "label") {
+                row.label = value;
+                const detected = detectPlatform(value);
+                if (detected) {
+                    row.platform = detected.id;
+                }
+            }
+
+            next[index] = row;
+            return next;
+        });
+    };
+
+    // Handle instant toggle for Open to work
+    const handleToggleOpenToWork = async () => {
+        const nextVal = !isOpenToWork;
+        setIsOpenToWork(nextVal);
+        try {
+            const updated = await updateProfile({ isOpenToWork: nextVal });
+            dispatch(updateUserProfile(updated));
+            toast.success(
+                nextVal
+                    ? "Open to work tag is now active on your public profile showcase."
+                    : "Open to work tag has been disabled.",
+                { title: nextVal ? "Open to Work Active" : "Open to Work Inactive" }
+            );
+        } catch (err: any) {
+            setIsOpenToWork(!nextVal); // Revert on failure
+            toast.error(err.message || "Failed to update Open to work status", {
+                title: "Update Error",
+            });
+        }
+    };
+
+    // Handle instant toggle for Hire me button
+    const handleToggleHireMe = async () => {
+        const nextVal = !isHireable;
+        setIsHireable(nextVal);
+        try {
+            const updated = await updateProfile({ isHireable: nextVal });
+            dispatch(updateUserProfile(updated));
+            toast.success(
+                nextVal
+                    ? "Hire me button is now visible so recruiters can message you directly."
+                    : "Hire me button has been hidden from your showcase.",
+                { title: nextVal ? "Hire Me Active" : "Hire Me Inactive" }
+            );
+        } catch (err: any) {
+            setIsHireable(!nextVal); // Revert on failure
+            toast.error(err.message || "Failed to update Hire me status", {
+                title: "Update Error",
+            });
+        }
+    };
+
+    // Determine whether user has made any changes compared to current saved profile state
+    const hasChanges = useMemo(() => {
+        if (!user) return false;
+
+        const currentFirst = firstName.trim();
+        const initialFirst = (user.firstName || "").trim();
+        if (currentFirst !== initialFirst) return true;
+
+        const currentLast = lastName.trim();
+        const initialLast = (user.lastName || "").trim();
+        if (currentLast !== initialLast) return true;
+
+        const currentHeadline = headline.trim();
+        const initialHeadline = (user.headline || "").trim();
+        if (currentHeadline !== initialHeadline) return true;
+
+        const currentBio = bio.trim();
+        const initialBio = (user.bio || "").trim();
+        if (currentBio !== initialBio) return true;
+
+        const currentLocation = location.trim();
+        const initialLocation = (user.location || "").trim();
+        if (currentLocation !== initialLocation) return true;
+
+        if (Boolean(isOpenToWork) !== Boolean(user.isOpenToWork)) return true;
+        if (Boolean(isHireable) !== Boolean(user.isHireable)) return true;
+
+        // Skills comparison
+        const currentSkills = skills.map((s) => s.trim()).filter(Boolean);
+        const initialSkills = (Array.isArray(user.skills) ? user.skills : [])
+            .map((s: string) => String(s).trim())
+            .filter(Boolean);
+        if (currentSkills.length !== initialSkills.length) return true;
+        for (let i = 0; i < currentSkills.length; i++) {
+            if (currentSkills[i] !== initialSkills[i]) return true;
+        }
+
+        // Links comparison
+        const currentClean = links
+            .filter((l) => l.url && l.url.trim().length > 0)
+            .map((l) => ({
+                label: (l.label || "Link").trim(),
+                url: sanitizePlatformUrl(l.url.trim()),
+                platform: l.platform || detectPlatform(l.url.trim())?.id || "",
+            }))
+            .slice(0, 4);
+
+        const initialClean = parseInitialLinks(user)
+            .filter((l) => l.url && l.url.trim().length > 0)
+            .map((l) => ({
+                label: (l.label || "Link").trim(),
+                url: sanitizePlatformUrl(l.url.trim()),
+                platform: l.platform || detectPlatform(l.url.trim())?.id || "",
+            }))
+            .slice(0, 4);
+
+        if (currentClean.length !== initialClean.length) return true;
+        for (let i = 0; i < currentClean.length; i++) {
+            const c = currentClean[i];
+            const init = initialClean[i];
+            if (!c || !init) return true;
+            if (c.label !== init.label || c.url !== init.url || c.platform !== init.platform) {
+                return true;
+            }
+        }
+
+        // Check raw rows if user added an empty row or is editing text
+        const initialRaw = parseInitialLinks(user);
+        if (links.length !== initialRaw.length) return true;
+        for (let i = 0; i < links.length; i++) {
+            const raw = links[i];
+            const init = initialRaw[i];
+            if (!raw || !init) return true;
+            if ((raw.label || "").trim() !== (init.label || "").trim() || (raw.url || "").trim() !== (init.url || "").trim()) {
+                return true;
+            }
+        }
+
+        return false;
+    }, [user, firstName, lastName, headline, bio, location, skills, links, isOpenToWork, isHireable]);
 
     // Handle profile save
     const handleSaveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!hasChanges) {
+            toast.info("No profile changes detected to save");
+            return;
+        }
         setSavingProfile(true);
 
         try {
+            const sanitizedLinks = links
+                .filter((l) => l.url.trim().length > 0)
+                .map((l) => ({
+                    label: l.label.trim() || "Link",
+                    url: sanitizePlatformUrl(l.url.trim()),
+                    platform: l.platform || detectPlatform(l.url.trim())?.id,
+                }))
+                .slice(0, 4);
+
             const payload = {
                 firstName: firstName.trim(),
                 lastName: lastName.trim(),
                 headline: headline.trim(),
                 bio: bio.trim(),
-                website: website.trim(),
-                linkedin: linkedin.trim(),
-                github: github.trim(),
-                customLink: customLink.trim(),
                 location: location.trim(),
                 skills,
+                links: sanitizedLinks,
+                isOpenToWork,
+                isHireable,
             };
 
             const updated = await updateProfile(payload);
@@ -158,14 +408,17 @@ export default function ProfileManager() {
         lastName,
         headline,
         bio,
-        website,
-        linkedin,
-        github,
-        customLink,
         location,
         skills,
+        links: links.map((l) => ({
+            label: l.label.trim() || "Link",
+            url: sanitizePlatformUrl(l.url.trim()),
+            platform: l.platform || detectPlatform(l.url.trim())?.id,
+        })).slice(0, 4),
+        isOpenToWork,
+        isHireable,
         photoUrl: user?.photoUrl || user?.avatarUrl,
-    }), [user, firstName, lastName, headline, bio, website, linkedin, github, customLink, location, skills]);
+    }), [user, firstName, lastName, headline, bio, location, skills, links, isOpenToWork, isHireable]);
 
     return (
         <div className="min-h-screen bg-[#F0F2F6] text-neutral-900 font-sans flex antialiased selection:bg-neutral-900 selection:text-white">
@@ -201,6 +454,7 @@ export default function ProfileManager() {
 
                         {/* Quick Profile Link & Share Controls */}
                         <div className="flex items-center gap-2.5 flex-wrap">
+                            <NotificationBell variant="light" />
                             <Link
                                 to={publicUrl}
                                 className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold transition-all cursor-pointer"
@@ -348,84 +602,90 @@ export default function ProfileManager() {
                                         />
                                     </div>
 
-                                    {/* Links & Profiles (LinkedIn, GitHub, Portfolio, Link) */}
+                                    {/* Dynamic Links Section (White Theme) */}
                                     <div className="space-y-3 pt-1">
                                         <div className="flex items-center justify-between">
-                                            <label className="block text-xs font-extrabold text-neutral-800">
-                                                Links & Profiles
-                                            </label>
-                                            <span className="text-[11px] text-neutral-400 font-medium">
-                                                Live-reacting buttons appear on your profile card
-                                            </span>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                                            {/* 1. LinkedIn */}
                                             <div>
-                                                <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-700 mb-1">
-                                                    <span className="font-black text-[12px] text-[#0A66C2]">in</span>
-                                                    <span>LinkedIn</span>
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="https://linkedin.com/in/username"
-                                                    value={linkedin}
-                                                    onChange={(e) => setLinkedin(e.target.value)}
-                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                                />
-                                            </div>
-
-                                            {/* 2. GitHub */}
-                                            <div>
-                                                <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-700 mb-1">
-                                                    <svg className="w-3.5 h-3.5 fill-current text-neutral-800" viewBox="0 0 24 24">
-                                                        <path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2Z" />
-                                                    </svg>
-                                                    <span>GitHub</span>
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    placeholder="https://github.com/username"
-                                                    value={github}
-                                                    onChange={(e) => setGithub(e.target.value)}
-                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                                />
-                                            </div>
-
-                                            {/* 3. Portfolio */}
-                                            <div>
-                                                <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-700 mb-1">
-                                                    <svg className="w-3.5 h-3.5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0a8.949 8.949 0 0 0 4.951-1.488A3.987 3.987 0 0 0 13 16h-2a3.987 3.987 0 0 0-3.951 3.512A8.949 8.949 0 0 0 12 21Zm-3-9a3 3 0 1 1 6 0 3 3 0 0 1-6 0Z" />
-                                                    </svg>
-                                                    <span>Portfolio</span>
-                                                </label>
-                                                <input
-                                                    type="url"
-                                                    placeholder="https://yourportfolio.dev"
-                                                    value={website}
-                                                    onChange={(e) => setWebsite(e.target.value)}
-                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                                />
-                                            </div>
-
-                                            {/* 4. Link */}
-                                            <div>
-                                                <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-700 mb-1">
-                                                    <svg className="w-3.5 h-3.5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                                    </svg>
-                                                    <span>Link</span>
-                                                </label>
-                                                <input
-                                                    type="url"
-                                                    placeholder="https://yourcustomlink.com"
-                                                    value={customLink}
-                                                    onChange={(e) => setCustomLink(e.target.value)}
-                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                                />
+                                                <div className="flex items-center gap-2">
+                                                    <label className="block text-xs font-black tracking-wider uppercase text-neutral-800">
+                                                        LINKS ({links.length}/4)
+                                                    </label>
+                                                </div>
+                                                <p className="text-[11px] text-neutral-400 font-medium mt-0.5">
+                                                    Portfolio, blog, X, anything with https://
+                                                </p>
                                             </div>
                                         </div>
+
+                                        {/* Platform Autocomplete Datalist */}
+                                        <datalist id="platform-suggestions">
+                                            {PLATFORM_REGISTRY.map((p) => (
+                                                 <option key={p.id} value={p.name} />
+                                            ))}
+                                        </datalist>
+
+                                        {/* Links Rows */}
+                                        <div className="space-y-2.5">
+                                            {links.map((item, index) => (
+                                                <div
+                                                    key={item.id}
+                                                    className="flex items-center gap-2 group"
+                                                >
+                                                    {/* Label / Platform Input */}
+                                                    <div className="w-28 sm:w-36 flex-shrink-0">
+                                                        <input
+                                                            type="text"
+                                                            list="platform-suggestions"
+                                                            placeholder="Label"
+                                                            value={item.label}
+                                                            onChange={(e) => handleLinkChange(index, "label", e.target.value)}
+                                                            className="w-full px-3 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-bold text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                                        />
+                                                    </div>
+
+                                                    {/* URL Input with Live Icon on Left */}
+                                                    <div className="relative flex-1 min-w-0">
+                                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                                            {getPlatformIcon(
+                                                                item.platform || item.label || item.url,
+                                                                "w-4 h-4 flex-shrink-0"
+                                                            )}
+                                                        </div>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="https://..."
+                                                            value={item.url}
+                                                            onChange={(e) => handleLinkChange(index, "url", e.target.value)}
+                                                            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                                        />
+                                                    </div>
+
+                                                    {/* Trash / Delete button */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveLink(index)}
+                                                        className="w-9 h-9 rounded-xl border border-neutral-200 hover:border-rose-300 bg-neutral-50 hover:bg-rose-50 text-neutral-400 hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
+                                                        title="Delete link"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+
+                                        {/* + Add Link Button */}
+                                        {links.length < 4 && (
+                                            <div className="pt-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={handleAddLink}
+                                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-800 text-xs font-bold transition-all shadow-2xs hover:border-neutral-400 cursor-pointer active:scale-95"
+                                                >
+                                                    <Plus className="w-3.5 h-3.5 text-neutral-600" />
+                                                    <span>Add link</span>
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
@@ -473,21 +733,87 @@ export default function ProfileManager() {
                                 <div className="pt-4 border-t border-neutral-100">
                                     <button
                                         type="submit"
-                                        disabled={savingProfile}
-                                        className="w-full h-11 flex items-center justify-center rounded-xl bg-black text-white text-xs font-bold hover:bg-neutral-800 transition-all cursor-pointer shadow-sm hover:scale-[1.005] active:scale-[0.995] disabled:opacity-50"
+                                        disabled={!hasChanges || savingProfile}
+                                        className={`w-full h-11 flex items-center justify-center rounded-xl text-xs font-bold transition-all shadow-sm ${
+                                            hasChanges && !savingProfile
+                                                ? "bg-black text-white hover:bg-neutral-800 cursor-pointer hover:scale-[1.005] active:scale-[0.995]"
+                                                : "bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed shadow-none"
+                                        }`}
                                     >
                                         {savingProfile ? (
                                             <div className="flex items-center gap-2">
-                                                <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                                                <svg className="h-4 w-4 animate-spin text-neutral-400" fill="none" viewBox="0 0 24 24">
                                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                                                 </svg>
                                                 <span>Saving Changes...</span>
                                             </div>
-                                        ) : (
+                                        ) : hasChanges ? (
                                             <span>Save Profile Details</span>
+                                        ) : (
+                                            <span>No Changes to Save</span>
                                         )}
                                     </button>
+                                </div>
+
+                                {/* OPEN TO WORK AND HIRE ME SECTION (Just below the save profile details button) */}
+                                <div className="space-y-2 pt-4 border-t border-neutral-100">
+                                    <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                                        OPEN TO WORK AND HIRE ME
+                                    </label>
+                                    <div className="space-y-2.5">
+                                        {/* Toggle 1: Open to work */}
+                                        <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-[#0B0F17] border border-neutral-800 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <Briefcase className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                                                <span className="text-xs sm:text-sm font-medium text-neutral-200">
+                                                    Show an Open to work tag on your profile
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={isOpenToWork}
+                                                onClick={handleToggleOpenToWork}
+                                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                                                    isOpenToWork ? "bg-[#2563EB]" : "bg-neutral-800"
+                                                }`}
+                                            >
+                                                <span
+                                                    aria-hidden="true"
+                                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                                        isOpenToWork ? "translate-x-5" : "translate-x-0"
+                                                    }`}
+                                                />
+                                            </button>
+                                        </div>
+
+                                        {/* Toggle 2: Hire me */}
+                                        <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-[#0B0F17] border border-neutral-800 transition-colors">
+                                            <div className="flex items-center gap-3">
+                                                <Mail className="w-4 h-4 text-blue-500 flex-shrink-0" />
+                                                <span className="text-xs sm:text-sm font-medium text-neutral-200">
+                                                    Show a Hire me button so recruiters can message you
+                                                </span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={isHireable}
+                                                onClick={handleToggleHireMe}
+                                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                                                    isHireable ? "bg-[#2563EB]" : "bg-neutral-800"
+                                                }`}
+                                            >
+                                                <span
+                                                    aria-hidden="true"
+                                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                                                        isHireable ? "translate-x-5" : "translate-x-0"
+                                                    }`}
+                                                />
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </form>
                         </div>

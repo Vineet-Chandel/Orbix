@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Repeat, Code2, GitBranch } from "lucide-react";
+import { Repeat, Code2, GitBranch, Briefcase, Mail, MapPin, ExternalLink, Share2, CreditCard, Check } from "lucide-react";
 import { fetchPublicProfile, type PublicProfileData } from "../../utils/profileApi";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
+import { HireMeModal } from "./HireMeModal";
+import { GetTheCardModal } from "./GetTheCardModal";
 import { CARD_THEMES } from "./CardStudio/types";
+import { useToast } from "../../context/ToastContext";
+import { getPlatformIcon, sanitizePlatformUrl } from "../../utils/platformLinks";
 import {
     aggregateCodingStats,
     getCoderType,
@@ -21,12 +25,16 @@ import { DevelopmentAnalyticsSection } from "../Dashboard/DevelopmentAnalytics/D
 
 export default function PublicProfilePage() {
     const { username } = useParams<{ username: string }>();
+    const toast = useToast();
 
     const [profile, setProfile] = useState<PublicProfileData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [cardFace, setCardFace] = useState<"front" | "back">("front");
     const [activeField, setActiveField] = useState<"practice" | "development">("practice");
+    const [isHireModalOpen, setIsHireModalOpen] = useState(false);
+    const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+    const [isCopied, setIsCopied] = useState(false);
 
     // Dynamic scale measurement for responsive LinkedInCard rendering
     const cardContainerRef = useRef<HTMLDivElement>(null);
@@ -118,12 +126,62 @@ export default function PublicProfilePage() {
         () => resolveShowcasedPlatforms(connectedPortals, [], 3, false, userFallback),
         [connectedPortals, userFallback]
     );
+    const showcasedPlatformsStory = useMemo(
+        () => resolveShowcasedPlatforms(connectedPortals, [], 5, false, userFallback),
+        [connectedPortals, userFallback]
+    );
     const showcasedContests = useMemo(
         () => resolveShowcasedContests([], connectedPortals, [], 3, userFallback),
         [connectedPortals, userFallback]
     );
     const allConnectedPlatforms = useMemo(() => getAllConnectedPlatforms(connectedPortals), [connectedPortals]);
     const githubStats = useMemo(() => extractGitHubStats(connectedPortals, userFallback), [connectedPortals, userFallback]);
+
+    const handleShareProfile = () => {
+        const url = window.location.href;
+        navigator.clipboard.writeText(url).then(
+            () => {
+                setIsCopied(true);
+                toast.success("Profile link copied to clipboard!", { title: "Copied" });
+                setTimeout(() => setIsCopied(false), 2000);
+            },
+            () => {
+                try {
+                    const input = document.createElement("input");
+                    input.value = url;
+                    document.body.appendChild(input);
+                    input.select();
+                    document.execCommand("copy");
+                    document.body.removeChild(input);
+                    setIsCopied(true);
+                    toast.success("Profile link copied to clipboard!", { title: "Copied" });
+                    setTimeout(() => setIsCopied(false), 2000);
+                } catch {
+                    toast.error("Failed to copy link", { title: "Error" });
+                }
+            }
+        );
+    };
+
+    const displayLinks = useMemo(() => {
+        let raw = profile?.links;
+        if (typeof raw === "string") {
+            try {
+                raw = JSON.parse(raw);
+            } catch {
+                raw = [];
+            }
+        }
+        if (Array.isArray(raw)) {
+            return raw.filter((l) => l && l.url && l.url.trim()).slice(0, 4);
+        }
+        const legacy: Array<{ label: string; url: string; platform?: string }> = [];
+        if (profile?.linkedin) legacy.push({ label: "LinkedIn", url: profile.linkedin, platform: "linkedin" });
+        if (profile?.github) legacy.push({ label: "GitHub", url: profile.github, platform: "github" });
+        if (profile?.website) legacy.push({ label: "Portfolio", url: profile.website });
+        if (profile?.customLink) legacy.push({ label: "Link", url: profile.customLink });
+        return legacy.slice(0, 4);
+    }, [profile]);
 
     // Loading Skeleton
     if (loading) {
@@ -207,109 +265,250 @@ export default function PublicProfilePage() {
 
             {/* Profile Showcase Container - Full Width */}
             <main className="w-full px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16 min-w-0">
-                {/* Official LinkedIn Developer Card (Replaces old Profile Owner View card) */}
-                <div className="w-full max-w-[1200px] mx-auto flex flex-col items-center mb-8">
-                    {/* Header Strip with Flip Toggle */}
-                    <div className="w-full flex items-center justify-between mb-3 px-1">
-                        <div className="flex items-center gap-2">
+                {/* 3/4 Main Card + 1/4 Sidebar Card Section */}
+                <div className="w-full max-w-[1600px] mx-auto mb-10">
+                    {/* Header Strip with Controls */}
+                    <div className="w-full flex items-center justify-between mb-3 px-1 flex-wrap gap-2.5">
+                        <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-xs font-mono font-bold uppercase tracking-wider text-neutral-500">
                                 Developer Profile Card
                             </span>
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 text-[10px] font-bold border border-emerald-500/20">
-                                Verified
-                            </span>
-                            {profile.isOwner && (
-                                <span className="px-2 py-0.5 rounded-full bg-neutral-900 text-white text-[10px] font-bold">
-                                    You
-                                </span>
-                            )}
                         </div>
 
-                        <button
-                            type="button"
-                            onClick={() => setCardFace((f) => (f === "front" ? "back" : "front"))}
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
-                            title="Flip to view card back with QR code"
-                        >
-                            <Repeat className="w-3.5 h-3.5" />
-                            <span>{cardFace === "front" ? "Flip To Back" : "Flip To Front"}</span>
-                        </button>
+                        <div className="flex items-center gap-2.5">
+                            <button
+                                type="button"
+                                onClick={() => setCardFace((f) => (f === "front" ? "back" : "front"))}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                                title="Flip to view card back with QR code"
+                            >
+                                <Repeat className="w-3.5 h-3.5" />
+                                <span>{cardFace === "front" ? "Flip To Back" : "Flip To Front"}</span>
+                            </button>
+                        </div>
                     </div>
 
-                    {/* Scaled LinkedIn Card Container */}
-                    <div
-                        ref={cardContainerRef}
-                        className="w-full flex justify-center overflow-hidden rounded-[28px] shadow-2xl"
-                        style={{ height: 627 * cardScale }}
-                    >
-                        <div
-                            style={{
-                                width: 1200,
-                                height: 627,
-                                transform: `scale(${cardScale})`,
-                                transformOrigin: "top center",
-                            }}
-                        >
-                            <LinkedInCard
-                                user={{
-                                    ...profile,
-                                    photoUrl: avatarSrc,
-                                }}
-                                stats={stats}
-                                coderType={coderType}
-                                topPlatforms={showcasedPlatforms}
-                                allConnectedPlatforms={allConnectedPlatforms}
-                                githubStats={githubStats}
-                                includeGitHub={false}
-                                theme={CARD_THEMES.indigo}
-                                face={cardFace}
-                                publicProfileUrl={window.location.href}
-                                connectedPortals={connectedPortals}
-                                topContests={showcasedContests}
-                            />
+                    {/* Split Layout: 3/4 Main Card + 1/4 Details, Bio & Links Card */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                        {/* LEFT (3/4 Screen Width on Large Screens): Main Developer Card */}
+                        <div className="lg:col-span-9 flex flex-col justify-center min-w-0">
+                            <div
+                                ref={cardContainerRef}
+                                className="w-full flex justify-center overflow-hidden rounded-[28px] shadow-2xl"
+                                style={{ height: 627 * cardScale }}
+                            >
+                                <div
+                                    style={{
+                                        width: 1200,
+                                        height: 627,
+                                        transform: `scale(${cardScale})`,
+                                        transformOrigin: "top center",
+                                    }}
+                                >
+                                    <LinkedInCard
+                                        user={{
+                                            ...profile,
+                                            photoUrl: avatarSrc,
+                                        }}
+                                        stats={stats}
+                                        coderType={coderType}
+                                        topPlatforms={showcasedPlatforms}
+                                        allConnectedPlatforms={allConnectedPlatforms}
+                                        githubStats={githubStats}
+                                        includeGitHub={false}
+                                        theme={CARD_THEMES.indigo}
+                                        face={cardFace}
+                                        publicProfileUrl={window.location.href}
+                                        connectedPortals={connectedPortals}
+                                        topContests={showcasedContests}
+                                        showSocialLinks={false}
+                                        onHireMeClick={() => setIsHireModalOpen(true)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* RIGHT (1/4 Screen Width on Large Screens): Bio, Location & Connected Links Card */}
+                        <div className="lg:col-span-3 flex flex-col min-w-0">
+                            <div className="w-full h-full rounded-[28px] bg-white border border-neutral-200/90 shadow-sm p-5 sm:p-6 flex flex-col justify-between space-y-5">
+                                {/* Top: Info, Bio & Location */}
+                                <div className="space-y-4">
+                                    {/* Card Subheader */}
+                                    <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-neutral-900" />
+                                            <h3 className="text-xs font-black tracking-wider uppercase text-neutral-800">
+                                                Developer Info
+                                            </h3>
+                                        </div>
+                                        <span className="text-[11px] font-mono text-neutral-400">
+                                            @{profile.username}
+                                        </span>
+                                    </div>
+
+                                    {/* Bio */}
+                                    <div>
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block mb-1">
+                                            Bio
+                                        </span>
+                                        {profile.bio ? (
+                                            <p className="text-xs text-neutral-700 leading-relaxed whitespace-pre-line">
+                                                {profile.bio}
+                                            </p>
+                                        ) : profile.headline ? (
+                                            <p className="text-xs text-neutral-600 leading-relaxed">
+                                                {profile.headline}
+                                            </p>
+                                        ) : (
+                                            <p className="text-xs text-neutral-400 italic">
+                                                No biography provided.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    {/* Location */}
+                                    {profile.location && (
+                                        <div className="flex items-center gap-2 pt-1 text-xs font-semibold text-neutral-700">
+                                            <MapPin className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" />
+                                            <span className="truncate">{profile.location}</span>
+                                        </div>
+                                    )}
+
+                                    {/* Skills if present */}
+                                    {profile.skills && profile.skills.length > 0 && (
+                                        <div className="pt-1">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 block mb-1.5">
+                                                Skills & Stack
+                                            </span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {profile.skills.map((skill) => (
+                                                    <span
+                                                        key={skill}
+                                                        className="px-2.5 py-0.5 rounded-full bg-neutral-100 border border-neutral-200/70 text-[11px] font-medium text-neutral-700"
+                                                    >
+                                                        {skill}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Bottom: Status & Actions (OPEN TO WORK & Hire me) + Connected Links */}
+                                <div className="space-y-3 pt-3 border-t border-neutral-100">
+                                    {/* Status & Actions: Open to work & Hire me matching bottom button layout */}
+                                    {(profile.isOpenToWork || profile.isHireable) && (
+                                        <div className="grid grid-cols-2 gap-2 pb-0.5">
+                                            {profile.isOpenToWork && (
+                                                <div
+                                                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-neutral-100 hover:bg-neutral-200/90 border border-neutral-200 text-neutral-800 text-xs font-bold transition-all shadow-2xs select-none ${!profile.isHireable ? "col-span-2" : ""}`}
+                                                    title="Open to Work"
+                                                >
+                                                    <Briefcase className="w-3.5 h-3.5 text-neutral-600 flex-shrink-0" />
+                                                    <span className="truncate">Open to work</span>
+                                                </div>
+                                            )}
+
+                                            {profile.isHireable && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setIsHireModalOpen(true)}
+                                                    className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all shadow-xs hover:shadow-md active:scale-95 cursor-pointer ${!profile.isOpenToWork ? "col-span-2" : ""}`}
+                                                    title={`Message ${profile.firstName || profile.displayName}`}
+                                                >
+                                                    <Mail className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                                                    <span className="truncate">Hire me</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Two Dynamic Action Buttons: Share Profile & Get the card */}
+                                    <div className="grid grid-cols-2 gap-2 pt-1 pb-1">
+                                        <button
+                                            type="button"
+                                            onClick={handleShareProfile}
+                                            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-neutral-100 hover:bg-neutral-200/90 border border-neutral-200 text-neutral-800 text-xs font-bold transition-all shadow-2xs hover:shadow-xs active:scale-95 cursor-pointer"
+                                            title="Copy public profile link to clipboard"
+                                        >
+                                            {isCopied ? (
+                                                <>
+                                                    <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
+                                                    <span className="text-emerald-700">Copied!</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Share2 className="w-3.5 h-3.5 text-neutral-600 flex-shrink-0" />
+                                                    <span className="truncate">Share Profile</span>
+                                                </>
+                                            )}
+                                        </button>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCardModalOpen(true)}
+                                            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all shadow-xs hover:shadow-md active:scale-95 cursor-pointer"
+                                            title="View and download LinkedIn and Instagram Story cards"
+                                        >
+                                            <CreditCard className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                                            <span className="truncate">Get the card</span>
+                                        </button>
+                                    </div>
+
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                                            Links ({displayLinks.length})
+                                        </span>
+                                    </div>
+
+                                    {displayLinks.length === 0 ? (
+                                        <p className="text-xs text-neutral-400 italic">No links connected.</p>
+                                    ) : (
+                                        <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1 scrollbar-thin">
+                                            {displayLinks.map((item, idx) => {
+                                                const formattedUrl = sanitizePlatformUrl(item.url);
+                                                const displayHost = formattedUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+                                                return (
+                                                    <a
+                                                        key={idx}
+                                                        href={formattedUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-neutral-50 hover:bg-neutral-100/90 border border-neutral-200/80 hover:border-neutral-300 text-neutral-800 transition-all group shadow-2xs"
+                                                        title={item.label || item.url}
+                                                    >
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <div className="w-8 h-8 rounded-lg bg-white border border-neutral-200/80 flex items-center justify-center flex-shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                                                                {getPlatformIcon(
+                                                                    item.platform || item.label || formattedUrl,
+                                                                    "w-4 h-4 flex-shrink-0"
+                                                                )}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <span className="text-xs font-bold text-neutral-900 block truncate group-hover:text-black">
+                                                                    {item.label || "Link"}
+                                                                </span>
+                                                                <span className="text-[10px] font-mono text-neutral-400 block truncate">
+                                                                    {displayHost}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <ExternalLink className="w-3.5 h-3.5 text-neutral-400 group-hover:text-neutral-900 transition-colors flex-shrink-0" />
+                                                    </a>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                {/* Optional Bio & Extra Details Strip if bio/location/website provided */}
-                {(profile.bio || profile.location || profile.website) && (
-                    <div className="w-full max-w-[1200px] mx-auto rounded-2xl bg-white border border-neutral-200/90 p-5 mb-8 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        {profile.bio && (
-                            <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed max-w-2xl whitespace-pre-line">
-                                {profile.bio}
-                            </p>
-                        )}
-                        <div className="flex items-center gap-4 text-xs font-medium text-neutral-500 flex-wrap flex-shrink-0">
-                            {profile.location && (
-                                <span className="flex items-center gap-1.5">
-                                    <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                    <span>{profile.location}</span>
-                                </span>
-                            )}
-                            {profile.website && (
-                                <a
-                                    href={profile.website}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-1.5 text-neutral-800 hover:text-indigo-600 font-semibold underline underline-offset-2 transition-colors"
-                                >
-                                    <svg className="w-4 h-4 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                    </svg>
-                                    <span>{profile.website.replace(/^https?:\/\//, "")}</span>
-                                </a>
-                            )}
-                        </div>
-                    </div>
-                )}
-
                 {/* ========================================================================= */}
                 {/* PRACTICE & DEVELOPMENT ACTIVITY & PERFORMANCE SECTION */}
                 {/* ========================================================================= */}
-                <section className="w-full space-y-6">
+                <section className="w-full max-w-[1600px] mx-auto space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
                         <div>
                             <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
@@ -326,8 +525,8 @@ export default function PublicProfilePage() {
                                 type="button"
                                 onClick={() => setActiveField("practice")}
                                 className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeField === "practice"
-                                        ? "bg-black text-white shadow-sm"
-                                        : "text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80"
+                                    ? "bg-black text-white shadow-sm"
+                                    : "text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80"
                                     }`}
                             >
                                 <Code2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -338,8 +537,8 @@ export default function PublicProfilePage() {
                                 type="button"
                                 onClick={() => setActiveField("development")}
                                 className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${activeField === "development"
-                                        ? "bg-black text-white shadow-sm"
-                                        : "text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80"
+                                    ? "bg-black text-white shadow-sm"
+                                    : "text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80"
                                     }`}
                             >
                                 <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
@@ -385,6 +584,34 @@ export default function PublicProfilePage() {
                     )}
                 </section>
             </main>
+
+            {/* Hire Me Recruiter Modal (Exact Match to User Reference Screenshot) */}
+            <HireMeModal
+                isOpen={isHireModalOpen}
+                onClose={() => setIsHireModalOpen(false)}
+                username={profile.username}
+                firstName={profile.firstName}
+                displayName={profile.displayName}
+            />
+
+            {/* Get The Card Modal: LinkedIn Card & Instagram Story with Flip and Both-Sides Download */}
+            <GetTheCardModal
+                isOpen={isCardModalOpen}
+                onClose={() => setIsCardModalOpen(false)}
+                user={{
+                    ...profile,
+                    photoUrl: avatarSrc,
+                }}
+                stats={stats}
+                coderType={coderType}
+                showcasedPlatformsLinkedIn={showcasedPlatforms}
+                showcasedPlatformsStory={showcasedPlatformsStory}
+                allConnectedPlatforms={allConnectedPlatforms}
+                githubStats={githubStats}
+                connectedPortals={connectedPortals}
+                showcasedContests={showcasedContests}
+                publicProfileUrl={window.location.href}
+            />
         </div>
     );
 }

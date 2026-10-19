@@ -409,6 +409,8 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                     dailyMerged={remoteData?.dailyMerged || clientAgg.dailyMerged}
                     serverCharts={remoteData?.charts || clientAgg.charts}
                     totalContributions={totalContributions}
+                    username={effectiveUser}
+                    githubHandle={rawGhHandle || effectiveUser}
                 />
             </div>
         </div>

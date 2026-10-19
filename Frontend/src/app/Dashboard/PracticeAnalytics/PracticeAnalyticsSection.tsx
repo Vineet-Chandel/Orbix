@@ -13,15 +13,17 @@ interface PracticeAnalyticsSectionProps {
 
 export const PracticeAnalyticsSection: React.FC<PracticeAnalyticsSectionProps> = ({
     connectedPortals,
-    username = "vineet_chandel",
+    username,
 }) => {
-    const effectiveUser = (username || "vineet_chandel").trim();
+    const authUser = useAppSelector((state) => state.user.user);
+    const effectiveUser = (username || authUser?.username || "").trim();
     const dispatch = useAppDispatch();
 
-    const data = useAppSelector((state) => state.practiceAnalytics.dataByUser[effectiveUser]);
-    const isLoading = useAppSelector((state) => state.practiceAnalytics.loadingByUser[effectiveUser] || false);
+    const data = useAppSelector((state) => (effectiveUser ? state.practiceAnalytics.dataByUser[effectiveUser] : undefined));
+    const isLoading = useAppSelector((state) => (effectiveUser ? state.practiceAnalytics.loadingByUser[effectiveUser] || false : false));
 
     useEffect(() => {
+        if (!effectiveUser) return;
         if (!data && !isLoading) {
             dispatch(fetchPracticeAnalytics({ username: effectiveUser, portals: connectedPortals }));
         }

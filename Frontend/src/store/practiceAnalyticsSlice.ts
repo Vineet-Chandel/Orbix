@@ -90,7 +90,10 @@ export const fetchPracticeAnalytics = createAsyncThunk<
 >(
     "practiceAnalytics/fetch",
     async ({ username, force = false, portals }, { getState, rejectWithValue }) => {
-        const effectiveUser = username.trim() || "vineet_chandel";
+        const effectiveUser = username.trim();
+        if (!effectiveUser) {
+            return rejectWithValue("Username is required to fetch practice analytics");
+        }
         const state = getState().practiceAnalytics;
         const existing = state.dataByUser[effectiveUser];
         const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
@@ -160,7 +163,8 @@ export const fetchPracticeAnalytics = createAsyncThunk<
     },
     {
         condition: ({ username, force = false }, { getState }) => {
-            const effectiveUser = username.trim() || "vineet_chandel";
+            const effectiveUser = username.trim();
+            if (!effectiveUser) return false;
             const state = getState().practiceAnalytics;
             if (state.loadingByUser[effectiveUser] && !force) {
                 return false;
@@ -193,22 +197,28 @@ export const practiceAnalyticsSlice = createSlice({
     extraReducers: (builder) => {
         builder
             .addCase(fetchPracticeAnalytics.pending, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = true;
-                state.errorByUser[user] = null;
+                const user = action.meta.arg.username.trim();
+                if (user) {
+                    state.loadingByUser[user] = true;
+                    state.errorByUser[user] = null;
+                }
             })
             .addCase(fetchPracticeAnalytics.fulfilled, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = false;
-                state.dataByUser[user] = action.payload;
-                state.lastFetchedAtByUser[user] = Date.now();
-                state.errorByUser[user] = null;
-                saveStoredPracticeAnalytics(state.dataByUser);
+                const user = action.meta.arg.username.trim();
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.dataByUser[user] = action.payload;
+                    state.lastFetchedAtByUser[user] = Date.now();
+                    state.errorByUser[user] = null;
+                    saveStoredPracticeAnalytics(state.dataByUser);
+                }
             })
             .addCase(fetchPracticeAnalytics.rejected, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = false;
-                state.errorByUser[user] = action.payload || "Failed to load practice analytics";
+                const user = action.meta.arg.username.trim();
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.errorByUser[user] = action.payload || "Failed to load practice analytics";
+                }
             });
     },
 });

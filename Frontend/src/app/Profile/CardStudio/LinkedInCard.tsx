@@ -5,6 +5,7 @@ import { OrbixCardQR } from "./OrbixCardQR";
 import { CardBannerSVG } from "./CardBannerSVG";
 import { GitHubContributionTable } from "./GitHubContributionTable";
 import { CodingSubmissionsChart } from "./CodingSubmissionsChart";
+import { getPlatformIcon, sanitizePlatformUrl } from "../../../utils/platformLinks";
 import type { CardThemeConfig } from "./types";
 import type {
     AggregatedCodingStats,
@@ -30,6 +31,8 @@ interface LinkedInCardProps {
     connectedPortals?: Record<string, any>;
     showcaseMode?: "problems" | "contests";
     topContests?: RankedContestPlatform[];
+    showSocialLinks?: boolean;
+    onHireMeClick?: () => void;
 }
 
 export const LinkedInCard: React.FC<LinkedInCardProps> = ({
@@ -47,6 +50,8 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
     connectedPortals,
     showcaseMode = "problems",
     topContests = [],
+    showSocialLinks = false,
+    onHireMeClick,
 }) => {
     const displayName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "Developer";
     const username = user?.username || "developer";
@@ -78,6 +83,8 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
     const portfolio = user?.website || user?.portfolio;
     const customLink = user?.customLink || user?.link;
 
+    const userLinks = user?.links;
+
     const socialLinks = useMemo(() => {
         const list: Array<{
             id: string;
@@ -86,78 +93,80 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
             icon: React.ReactNode;
         }> = [];
 
+        // Dynamic links from profile
+        if (Array.isArray(userLinks) && userLinks.length > 0) {
+            userLinks.forEach((item: any, idx: number) => {
+                if (!item) return;
+                const rawUrl = String(item.url || "").trim();
+                if (!rawUrl) return;
+                const formattedUrl = sanitizePlatformUrl(rawUrl);
+                const label = String(item.label || item.platform || "Link").trim();
+                const platformKey = item.platform || label || formattedUrl;
+                list.push({
+                    id: item.id || `link-${idx}`,
+                    label,
+                    url: formattedUrl,
+                    icon: getPlatformIcon(platformKey, "w-3.5 h-3.5 flex-shrink-0 text-white"),
+                });
+            });
+            return list;
+        }
+
+        // Backward compatibility fallback to individual fields
         if (linkedin && typeof linkedin === "string" && linkedin.trim()) {
             const raw = linkedin.trim();
-            const url = raw.startsWith("http://") || raw.startsWith("https://")
-                ? raw
-                : raw.startsWith("linkedin.com")
-                ? `https://${raw}`
-                : `https://www.linkedin.com/in/${raw.replace(/^@/, "")}`;
+            const url = sanitizePlatformUrl(
+                raw.startsWith("linkedin.com") || raw.startsWith("http")
+                    ? raw
+                    : `linkedin.com/in/${raw.replace(/^@/, "")}`
+            );
             list.push({
                 id: "linkedin",
                 label: "LinkedIn",
                 url,
-                icon: (
-                    <span className="font-extrabold text-[12px] font-sans leading-none text-white tracking-tight">in</span>
-                ),
+                icon: getPlatformIcon("linkedin", "w-3.5 h-3.5 flex-shrink-0 text-white"),
             });
         }
 
         if (github && typeof github === "string" && github.trim()) {
             const raw = github.trim();
-            const url = raw.startsWith("http://") || raw.startsWith("https://")
-                ? raw
-                : raw.startsWith("github.com")
-                ? `https://${raw}`
-                : `https://github.com/${raw.replace(/^@/, "")}`;
+            const url = sanitizePlatformUrl(
+                raw.startsWith("github.com") || raw.startsWith("http")
+                    ? raw
+                    : `github.com/${raw.replace(/^@/, "")}`
+            );
             list.push({
                 id: "github",
                 label: "GitHub",
                 url,
-                icon: (
-                    <svg className="w-3.5 h-3.5 fill-current text-white flex-shrink-0" viewBox="0 0 24 24">
-                        <path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2Z" />
-                    </svg>
-                ),
+                icon: getPlatformIcon("github", "w-3.5 h-3.5 flex-shrink-0 text-white"),
             });
         }
 
         if (portfolio && typeof portfolio === "string" && portfolio.trim()) {
             const raw = portfolio.trim();
-            const url = raw.startsWith("http://") || raw.startsWith("https://")
-                ? raw
-                : `https://${raw}`;
+            const url = sanitizePlatformUrl(raw);
             list.push({
                 id: "portfolio",
                 label: "Portfolio",
                 url,
-                icon: (
-                    <svg className="w-3.5 h-3.5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0a8.949 8.949 0 0 0 4.951-1.488A3.987 3.987 0 0 0 13 16h-2a3.987 3.987 0 0 0-3.951 3.512A8.949 8.949 0 0 0 12 21Zm-3-9a3 3 0 1 1 6 0 3 3 0 0 1-6 0Z" />
-                    </svg>
-                ),
+                icon: getPlatformIcon(url, "w-3.5 h-3.5 flex-shrink-0 text-white"),
             });
         }
 
         if (customLink && typeof customLink === "string" && customLink.trim()) {
             const raw = customLink.trim();
-            const url = raw.startsWith("http://") || raw.startsWith("https://")
-                ? raw
-                : `https://${raw}`;
+            const url = sanitizePlatformUrl(raw);
             list.push({
                 id: "customLink",
                 label: "Link",
                 url,
-                icon: (
-                    <svg className="w-3.5 h-3.5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
-                ),
+                icon: getPlatformIcon(url, "w-3.5 h-3.5 flex-shrink-0 text-white"),
             });
         }
 
         return list;
-    }, [linkedin, github, portfolio, customLink]);
+    }, [userLinks, linkedin, github, portfolio, customLink]);
 
 
     const isLightBanner = theme.id === "gold";
@@ -308,8 +317,8 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
 
                                 {/* Identity & Classification Settlement */}
                                 <div className="flex flex-col gap-1.5 justify-center">
-                                    {/* Line 1: Name + Verified Badge */}
-                                    <div className="flex items-center gap-2.5">
+                                    {/* Line 1: Name + Verified Badge + Open To Work Badge (Image 2) */}
+                                    <div className="flex items-center gap-2.5 flex-wrap">
                                         <h1 className="text-5xl font-black text-white tracking-tight leading-none">
                                             {displayName}
                                         </h1>
@@ -319,6 +328,8 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                 <path fill="#00c4ff" d="m11.335 2.065l.076.153l.577 1.533c.045.12.14.216.261.261l1.48.555c.65.244.999.938.826 1.595l-.042.13l-.688 1.523a.45.45 0 0 0 0 .37l.653 1.439a1.34 1.34 0 0 1-.543 1.711l-.153.076l-1.533.577a.45.45 0 0 0-.261.261l-.555 1.48a1.34 1.34 0 0 1-1.595.826l-.13-.042l-1.523-.688a.45.45 0 0 0-.37 0l-1.439.654a1.34 1.34 0 0 1-1.711-.544l-.076-.153l-.577-1.533a.45.45 0 0 0-.261-.261l-1.48-.555a1.34 1.34 0 0 1-.826-1.595l.042-.13l.689-1.523a.45.45 0 0 0 0-.37l-.654-1.439a1.34 1.34 0 0 1 .543-1.711l.153-.076l1.533-.577a.45.45 0 0 0 .261-.261l.555-1.48a1.34 1.34 0 0 1 1.595-.826l.13.042l1.523.689a.45.45 0 0 0 .37 0l1.439-.654a1.34 1.34 0 0 1 1.711.543m-1.171 3.64L6.978 9.348L5.816 8.184a.447.447 0 1 0-.632.632l1.5 1.5a.447.447 0 0 0 .652-.022l3.5-4a.447.447 0 0 0-.672-.588"></path>
                                             </svg>
                                         </div>
+
+
                                     </div>
 
                                     {/* Line 2: Tagline · @username */}
@@ -359,9 +370,26 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                 </div>
                             </div>
 
-                            {/* Social & Portfolio Links (Directly Above Top Coding Accounts) */}
-                            {socialLinks.length > 0 && (
-                                <div className="flex items-center gap-2 flex-wrap justify-end pb-1 max-w-[460px]">
+                            {/* Social & Portfolio Links + Hire Me Button (Only rendered on Public Profile, never on sharing card) */}
+                            {showSocialLinks && (socialLinks.length > 0 || user?.isHireable) && (
+                                <div className="flex items-center gap-2 flex-wrap justify-end pb-1 max-w-[480px]">
+                                    {user?.isHireable && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onHireMeClick?.();
+                                            }}
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-blue-600 hover:bg-blue-500 border border-blue-400/30 text-white text-xs font-bold tracking-wide transition-all shadow-md hover:scale-[1.03] active:scale-95 cursor-pointer select-none"
+                                            title={`Message ${displayName}`}
+                                        >
+                                            <svg className="w-3.5 h-3.5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                <rect width="20" height="16" x="2" y="4" rx="2" />
+                                                <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                            </svg>
+                                            <span>Hire me</span>
+                                        </button>
+                                    )}
                                     {socialLinks.map((item) => (
                                         <a
                                             key={item.id}

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAppSelector } from '../../store';
+import { NotificationBell } from '../../components/NotificationBell';
 
 export interface NavItem {
     id: string;
@@ -330,24 +331,27 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         Book a demo
                     </Link>
 
-                    {/* Authenticated User Rounded Profile Picture (at the left of Workspace button) */}
+                    {/* Authenticated User Notification Bell & Rounded Profile Picture */}
                     {isLoggedIn && (
-                        <Link
-                            to="/dashboard"
-                            title={`${displayName} - Open Dashboard`}
-                            className="group relative flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 transition-transform hover:scale-105 active:scale-95 focus:outline-none"
-                        >
-                            <img
-                                src={avatarSrc}
-                                alt={displayName}
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                        displayName
-                                    )}&background=111827&color=fff&size=128&bold=true`;
-                                }}
-                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-white/20 ring-2 ring-white/10 group-hover:ring-amber-400/50 shadow-sm transition-all"
-                            />
-                        </Link>
+                        <>
+                            <NotificationBell variant="dark" />
+                            <Link
+                                to="/dashboard"
+                                title={`${displayName} - Open Dashboard`}
+                                className="group relative flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 transition-transform hover:scale-105 active:scale-95 focus:outline-none"
+                            >
+                                <img
+                                    src={avatarSrc}
+                                    alt={displayName}
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                            displayName
+                                        )}&background=111827&color=fff&size=128&bold=true`;
+                                    }}
+                                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-white/20 ring-2 ring-white/10 group-hover:ring-amber-400/50 shadow-sm transition-all"
+                                />
+                            </Link>
+                        </>
                     )}
 
                     {/* Primary CTA Button: Workspace with dynamic auth redirection and loader */}

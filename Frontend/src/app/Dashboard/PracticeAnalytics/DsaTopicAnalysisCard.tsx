@@ -9,7 +9,7 @@ interface DsaTopicAnalysisCardProps {
 
 export const DsaTopicAnalysisCard: React.FC<DsaTopicAnalysisCardProps> = ({ data, isLoading }) => {
     const topics = data?.dsaTopics || [];
-    const maxCount = topics.length > 0 ? Math.max(...topics.map((t) => t.count)) : 1145;
+    const maxCount = topics.length > 0 ? Math.max(...topics.map((t) => t.count)) : 1;
 
     return (
         <div
@@ -39,6 +39,12 @@ export const DsaTopicAnalysisCard: React.FC<DsaTopicAnalysisCardProps> = ({ data
                                     <div className="flex-1 h-5 bg-white/[0.04] rounded-md" />
                                 </div>
                             ))}
+                        </div>
+                    ) : topics.length === 0 ? (
+                        <div className="py-12 text-center max-w-xs mx-auto space-y-2">
+                            <p className="text-xs text-neutral-400">
+                                No topic data available yet on connected accounts.
+                            </p>
                         </div>
                     ) : (
                         topics.slice(0, 10).map((item) => {

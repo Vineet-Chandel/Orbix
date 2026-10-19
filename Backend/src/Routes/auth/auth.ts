@@ -9,6 +9,7 @@ import { deleteUserDetailsCache, getUserDetailsCache, userDetailsCache } from '.
 import redis from '../../redis/client.js';
 import { authenticate } from '../../middlewares/auth.middleware.js';
 import { handleSavePortals, handleGetSavedPortals } from '../portals/portals.js';
+import { handleGetMyProfile, parseLinks } from '../profile/profile.js';
 import { time } from 'node:console';
 const authRouter = express.Router();
 
@@ -198,7 +199,25 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
                 email AS gmail,
                 username,
                 password AS password_hash,
-                termsAccepted
+                termsAccepted,
+                headline,
+                bio,
+                avatar_url AS "avatarUrl",
+                photo_url AS "photoUrl",
+                previous_photo_url AS "previousPhotoUrl",
+                (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
+                cover_image_url AS "coverImageUrl",
+                website,
+                linkedin,
+                github,
+                custom_link AS "customLink",
+                location,
+                skills,
+                links,
+                is_open_to_work AS "isOpenToWork",
+                is_hireable AS "isHireable",
+                is_public AS "isPublic",
+                created_at AS "createdAt"
             FROM users
             WHERE email = $1 OR username = $1
             LIMIT 1;`,
@@ -268,7 +287,9 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
         });
 
         // Strip password_hash before returning user
-        const { password_hash, ...safeUser } = user;
+        const { password_hash, ...safeUser }: any = user;
+        safeUser.links = parseLinks(safeUser.links, safeUser);
+        safeUser.skills = Array.isArray(safeUser.skills) ? safeUser.skills : [];
         await resetSigninFailures({ email: validatedData.gmail, ip: req.ip || "unknown" });
 
         await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, password_hash, termsAccepted: user.termsAccepted });
@@ -506,86 +527,10 @@ authRouter.post('/signout', async (req: Request, res: Response) => {
     }
 });
 
-const handleMeEndpoint = async (req: Request, res: Response) => {
-    try {
-        const user = req.user;
+const handleMeEndpoint = handleGetMyProfile;
 
-        if (!user) {
-            return res.status(401).json({
-                status: "failed",
-                success: false,
-                message: "Authentication required",
-            });
-        }
-
-        // Fetch fresh profile metadata from database
-        const dbResult = await query(
-            `SELECT
-                id,
-                username,
-                firstname AS "firstName",
-                middlename AS "middleName",
-                lastname AS "lastName",
-                email AS gmail,
-                termsaccepted AS "termsAccepted",
-                headline,
-                bio,
-                avatar_url AS "avatarUrl",
-                photo_url AS "photoUrl",
-                previous_photo_url AS "previousPhotoUrl",
-                (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
-                cover_image_url AS "coverImageUrl",
-                website,
-                location,
-                skills,
-                is_public AS "isPublic",
-                created_at AS "createdAt"
-            FROM users
-            WHERE id = $1 OR email = $2
-            LIMIT 1;`,
-            [user.id, user.gmail]
-        );
-
-        const fullUser = dbResult.rows[0] || user;
-
-        return res.status(200).json({
-            status: "success",
-            success: true,
-            users: fullUser,
-            user: {
-                id: fullUser.id,
-                firstName: fullUser.firstName,
-                middleName: fullUser.middleName,
-                lastName: fullUser.lastName,
-                gmail: fullUser.gmail,
-                termsAccepted: fullUser.termsAccepted,
-                username: fullUser.username,
-                headline: fullUser.headline || null,
-                bio: fullUser.bio || null,
-                avatarUrl: fullUser.photoUrl || fullUser.avatarUrl || null,
-                photoUrl: fullUser.photoUrl || null,
-                previousPhotoUrl: fullUser.previousPhotoUrl || null,
-                hasPreviousPhoto: Boolean(fullUser.previousPhotoUrl),
-                coverImageUrl: fullUser.coverImageUrl || null,
-                website: fullUser.website || null,
-                location: fullUser.location || null,
-                skills: Array.isArray(fullUser.skills) ? fullUser.skills : [],
-                isPublic: fullUser.isPublic !== false,
-                createdAt: fullUser.createdAt || null,
-            },
-        });
-    } catch (err: unknown) {
-        console.error("GET /me failed:", err);
-        return res.status(500).json({
-            status: "error",
-            success: false,
-            message: "An internal server error occurred",
-        });
-    }
-};
-
-authRouter.get("/profile/me", authenticate, handleMeEndpoint);
-authRouter.get("/me", authenticate, handleMeEndpoint);
+authRouter.get("/profile/me", authenticate, handleGetMyProfile);
+authRouter.get("/me", authenticate, handleGetMyProfile);
 
 // Profile portal save & retrieval endpoints (/api/profile/save)
 authRouter.post("/profile/save", authenticate, handleSavePortals);

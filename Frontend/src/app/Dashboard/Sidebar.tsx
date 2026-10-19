@@ -2,9 +2,11 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
+import { fetchUnreadNotificationCount } from "../../utils/profileApi";
 
 export type SidebarTab =
     | "dashboard"
+    | "notifications"
     | "leaderboard"
     | "events"
     | "connect-platform"
@@ -43,6 +45,7 @@ export const Sidebar = ({
     // Connected portals and health sync tracking
     const [connectedPortalsCount, setConnectedPortalsCount] = useState<number>(0);
     const [brokenPortalsCount, setBrokenPortalsCount] = useState<number>(0);
+    const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
 
     useEffect(() => {
         const handleSync = () => {
@@ -64,14 +67,34 @@ export const Sidebar = ({
             setBrokenPortalsCount(0);
         };
 
-        handleSync();
-        window.addEventListener("orbix_portals_updated", handleSync);
-        window.addEventListener("storage", handleSync);
-        return () => {
-            window.removeEventListener("orbix_portals_updated", handleSync);
-            window.removeEventListener("storage", handleSync);
+        const handleUnreadSync = async () => {
+            if (!user) return;
+            try {
+                const count = await fetchUnreadNotificationCount();
+                setUnreadNotificationsCount(count);
+            } catch {
+                // ignore
+            }
         };
-    }, []);
+
+        handleSync();
+        handleUnreadSync();
+
+        const notifInterval = setInterval(handleUnreadSync, 30000);
+
+        window.addEventListener("orbix_portals_updated", handleSync);
+        window.addEventListener("orbix_notifications_updated", handleUnreadSync);
+        window.addEventListener("storage", handleSync);
+        window.addEventListener("focus", handleUnreadSync);
+
+        return () => {
+            clearInterval(notifInterval);
+            window.removeEventListener("orbix_portals_updated", handleSync);
+            window.removeEventListener("orbix_notifications_updated", handleUnreadSync);
+            window.removeEventListener("storage", handleSync);
+            window.removeEventListener("focus", handleUnreadSync);
+        };
+    }, [user]);
 
     const displayName = user?.firstName
         ? `${user.firstName} ${user.lastName || ""}`.trim()
@@ -121,6 +144,19 @@ export const Sidebar = ({
                 </svg>
             ),
             path: "/dashboard",
+        },
+        {
+            id: "notifications" as SidebarTab,
+            label: "Notifications",
+            badge: unreadNotificationsCount > 0 ? `${unreadNotificationsCount}` : undefined,
+            badgeVariant: "danger" as const,
+            icon: (
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+            ),
+            path: "/notifications",
         },
         {
             id: "leaderboard" as SidebarTab,

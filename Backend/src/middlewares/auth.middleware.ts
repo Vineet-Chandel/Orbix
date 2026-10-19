@@ -38,8 +38,10 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
             });
         }
 
+        const userId = decoded?.sub;
         const userGmail = decoded?.gmail;
-        if (!userGmail) {
+        const username = decoded?.username;
+        if (!userGmail && !userId && !username) {
             return res.status(401).json({
                 status: "failed",
                 message: "Invalid token payload",
@@ -47,7 +49,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         }
 
         // Check Redis cache first, fallback to Postgres
-        let user = await getUserDetailsCache(userGmail);
+        let user = userGmail ? await getUserDetailsCache(userGmail) : null;
         if (!user) {
             const result = await query(
                 `SELECT
@@ -59,9 +61,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
                     username,
                     termsAccepted
                 FROM users
-                WHERE email = $1
+                WHERE id = $1 OR email = $2 OR username = $3
                 LIMIT 1;`,
-                [userGmail]
+                [userId || null, userGmail || null, username || null]
             );
             user = result.rows[0];
         }
@@ -110,12 +112,14 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
             return next();
         }
 
+        const userId = decoded?.sub;
         const userGmail = decoded?.gmail;
-        if (!userGmail) {
+        const username = decoded?.username;
+        if (!userGmail && !userId && !username) {
             return next();
         }
 
-        let user = await getUserDetailsCache(userGmail);
+        let user = userGmail ? await getUserDetailsCache(userGmail) : null;
         if (!user) {
             const result = await query(
                 `SELECT
@@ -127,9 +131,9 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
                     username,
                     termsAccepted
                 FROM users
-                WHERE email = $1
+                WHERE id = $1 OR email = $2 OR username = $3
                 LIMIT 1;`,
-                [userGmail]
+                [userId || null, userGmail || null, username || null]
             );
             user = result.rows[0];
         }

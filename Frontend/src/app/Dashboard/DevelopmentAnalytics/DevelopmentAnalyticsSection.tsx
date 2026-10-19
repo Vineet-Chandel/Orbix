@@ -14,25 +14,36 @@ interface DevelopmentAnalyticsSectionProps {
 
 export const DevelopmentAnalyticsSection: React.FC<DevelopmentAnalyticsSectionProps> = ({
     connectedPortals,
-    username = "vineet_chandel",
+    username,
 }) => {
-    const effectiveUser = (username || "vineet_chandel").trim();
+    const authUser = useAppSelector((state) => state.user.user);
+    const effectiveUser = (username || authUser?.username || "").trim();
     const dispatch = useAppDispatch();
 
     const gh = connectedPortals?.github || connectedPortals?.GitHub || connectedPortals?.Github;
     const githubHandle = useMemo(() => {
         if (typeof gh === "object" && gh) {
-            return (gh.username || gh.portal_username || gh.handle || "").trim();
+            const h = (gh.username || gh.portal_username || gh.handle || "").trim();
+            if (h) return h;
         }
-        if (typeof gh === "string") {
+        if (typeof gh === "string" && gh.trim()) {
             return gh.trim();
         }
-        return "Vineet-Chandel";
-    }, [gh]);
+        if (effectiveUser && effectiveUser === authUser?.username) {
+            if (authUser?.github) {
+                const cleaned = authUser.github.replace(/https?:\/\/(www\.)?github\.com\//i, "").replace(/\/.*$/, "").trim();
+                if (cleaned) return cleaned;
+            }
+            if (authUser?.portals?.github?.username) {
+                return authUser.portals.github.username.trim();
+            }
+        }
+        return "";
+    }, [gh, effectiveUser, authUser]);
 
-    const data = useAppSelector((state) => state.developmentAnalytics.dataByUser[effectiveUser]);
+    const data = useAppSelector((state) => (effectiveUser ? state.developmentAnalytics.dataByUser[effectiveUser] : undefined));
     const isLoading = useAppSelector(
-        (state) => state.developmentAnalytics.loadingByUser[effectiveUser] || false
+        (state) => (effectiveUser ? state.developmentAnalytics.loadingByUser[effectiveUser] || false : false)
     );
 
     const prevHandleRef = useRef<string | null>(null);

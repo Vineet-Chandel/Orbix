@@ -8,42 +8,12 @@ interface DevelopmentHighlightsCardProps {
     isLoading?: boolean;
 }
 
-const DEFAULT_REPOS: DevelopmentRepoItem[] = [
-    {
-        name: "Orbix",
-        description: "Developer profile aggregator, analytics & real-time rating sync",
-        stars: 68,
-        forks: 12,
-        language: "TypeScript",
-        languageColor: "#3178c6",
-        url: "https://github.com/Vineet-Chandel/Orbix",
-    },
-    {
-        name: "VoiceKhata",
-        description: "Smart voice-enabled ledger and financial accounting system",
-        stars: 5,
-        forks: 2,
-        language: "TypeScript",
-        languageColor: "#3178c6",
-        url: "https://github.com/Vineet-Chandel/VoiceKhata",
-    },
-    {
-        name: "Vineet-Chandel",
-        description: "Config files and personal profile documentation repository",
-        stars: 5,
-        forks: 0,
-        language: "Markdown",
-        languageColor: "#8b949e",
-        url: "https://github.com/Vineet-Chandel/Vineet-Chandel",
-    },
-];
-
 export const DevelopmentHighlightsCard: React.FC<DevelopmentHighlightsCardProps> = ({
     repositories,
-    githubHandle = "Vineet-Chandel",
-    isLoading: _isLoading = false,
+    githubHandle = "",
+    isLoading = false,
 }) => {
-    const repos = repositories && repositories.length > 0 ? repositories.slice(0, 3) : DEFAULT_REPOS;
+    const repos = repositories && repositories.length > 0 ? repositories.slice(0, 3) : [];
 
     return (
         <div className="w-full text-white select-none flex flex-col justify-between h-full">
@@ -76,51 +46,73 @@ export const DevelopmentHighlightsCard: React.FC<DevelopmentHighlightsCardProps>
                 )}
             </div>
 
-            {/* Repositories List */}
-            <div className="divide-y divide-white/[0.06] mt-4 space-y-2">
-                {repos.map((repo, idx) => (
-                    <div
-                        key={idx}
-                        className="pt-2.5 first:pt-0 flex items-center justify-between gap-3 group"
-                    >
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-2">
-                                <a
-                                    href={repo.url}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm font-bold text-white hover:text-indigo-300 transition-colors truncate"
-                                >
-                                    {repo.name}
-                                </a>
-                                <span className="inline-flex items-center gap-1 text-[10px] text-neutral-400 font-medium">
-                                    <span
-                                        className="w-2 h-2 rounded-full"
-                                        style={{ backgroundColor: repo.languageColor }}
-                                    />
-                                    <span>{repo.language}</span>
-                                </span>
+            {/* Repositories List / Loading / Empty State */}
+            {isLoading && repos.length === 0 ? (
+                <div className="space-y-3 mt-4">
+                    {Array.from({ length: 3 }).map((_, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-3 animate-pulse py-2">
+                            <div className="space-y-1.5 flex-1">
+                                <div className="w-36 h-3.5 bg-white/[0.08] rounded-md" />
+                                <div className="w-52 h-2.5 bg-white/[0.04] rounded-md" />
                             </div>
-                            <p className="text-xs text-neutral-400 truncate mt-0.5">
-                                {repo.description || "No description provided"}
-                            </p>
+                            <div className="w-12 h-3 bg-white/[0.06] rounded-md" />
                         </div>
+                    ))}
+                </div>
+            ) : repos.length === 0 ? (
+                <div className="py-10 text-center max-w-xs mx-auto space-y-2">
+                    <p className="text-xs text-neutral-400">
+                        {githubHandle
+                            ? `No public repositories found for @${githubHandle}.`
+                            : "Connect GitHub in Developer Profile to showcase your repositories."}
+                    </p>
+                </div>
+            ) : (
+                <div className="divide-y divide-white/[0.06] mt-4 space-y-2">
+                    {repos.map((repo, idx) => (
+                        <div
+                            key={idx}
+                            className="pt-2.5 first:pt-0 flex items-center justify-between gap-3 group"
+                        >
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                    <a
+                                        href={repo.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-sm font-bold text-white hover:text-indigo-300 transition-colors truncate"
+                                    >
+                                        {repo.name}
+                                    </a>
+                                    <span className="inline-flex items-center gap-1 text-[10px] text-neutral-400 font-medium">
+                                        <span
+                                            className="w-2 h-2 rounded-full"
+                                            style={{ backgroundColor: repo.languageColor }}
+                                        />
+                                        <span>{repo.language}</span>
+                                    </span>
+                                </div>
+                                <p className="text-xs text-neutral-400 truncate mt-0.5">
+                                    {repo.description || "No description provided"}
+                                </p>
+                            </div>
 
-                        <div className="flex items-center gap-3 flex-shrink-0 text-xs font-mono text-neutral-400">
-                            <span className="flex items-center gap-1">
-                                <Star className="w-3.5 h-3.5 text-amber-400" />
-                                <span>{repo.stars}</span>
-                            </span>
-                            {repo.forks > 0 && (
+                            <div className="flex items-center gap-3 flex-shrink-0 text-xs font-mono text-neutral-400">
                                 <span className="flex items-center gap-1">
-                                    <GitFork className="w-3.5 h-3.5 text-neutral-500" />
-                                    <span>{repo.forks}</span>
+                                    <Star className="w-3.5 h-3.5 text-amber-400" />
+                                    <span>{repo.stars}</span>
                                 </span>
-                            )}
+                                {repo.forks > 0 && (
+                                    <span className="flex items-center gap-1">
+                                        <GitFork className="w-3.5 h-3.5 text-neutral-500" />
+                                        <span>{repo.forks}</span>
+                                    </span>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

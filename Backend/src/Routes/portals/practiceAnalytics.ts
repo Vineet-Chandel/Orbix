@@ -93,7 +93,21 @@ export async function calculateUserPracticeAnalytics(
     username: string,
     clientPortals?: Record<string, any>
 ): Promise<PracticeAnalyticsData> {
-    const cleanUser = (username || "vineet_chandel").trim();
+    const cleanUser = (username || "").trim();
+    if (!cleanUser) {
+        return {
+            success: false,
+            username: "",
+            totalSolved: 0,
+            donutTotal: 0,
+            difficulty: { easy: 0, medium: 0, hard: 0, total: 0 },
+            platformBreakdown: [],
+            recentlySolved: [],
+            dsaTopics: [],
+            topicStrength: [],
+            timestamp: new Date().toISOString(),
+        };
+    }
 
     // 1. Resolve connected portals from Database with clientPortals fallback
     let portalRows: Array<{ portal: string; portal_username: string }> = [];
@@ -125,13 +139,6 @@ export async function calculateUserPracticeAnalytics(
             const u = (typeof v === "object" ? v?.username || v?.portal_username || "" : String(v || "")).trim();
             if (p && u) portalsMap[p] = u;
         }
-    }
-
-    // Default mock handles for known showcase user
-    if (Object.keys(portalsMap).length === 0 && cleanUser.toLowerCase().includes("vineet")) {
-        portalsMap["leetcode"] = "CodeMars";
-        portalsMap["codechef"] = "c0demars";
-        portalsMap["codeforces"] = "Code.Mars";
     }
 
     let leetCodeEasy = 0;
@@ -309,40 +316,18 @@ export async function calculateUserPracticeAnalytics(
                 }
             }
         } catch {
-            // Fallback: estimate from standard portfolio
-            if (ccUsername.toLowerCase() === "c0demars") {
-                codechefTotal = 307;
-            }
+            // Non-fatal
         }
     }
 
-    // Fallback numbers for CodeMars / Vineet showcase if platform queries timed out
-    if (leetCodeTotal === 0 && cleanUser.toLowerCase().includes("vineet")) {
-        leetCodeTotal = 1931;
-        leetCodeEasy = 513;
-        leetCodeMedium = 1062;
-        leetCodeHard = 356;
-    }
-    if (codechefTotal === 0 && cleanUser.toLowerCase().includes("vineet")) {
-        codechefTotal = 307;
-    }
-    if (codeforcesTotal === 0 && cleanUser.toLowerCase().includes("vineet")) {
-        codeforcesTotal = 47;
-        codeforcesEasy = 35;
-        codeforcesMedium = 12;
-    }
-
     // Difficulty Aggregation
-    // Easy: LeetCode Easy (513) + CF Easy (35) + 4 = 552
-    // Medium: LeetCode Medium (1062) + CF Medium (8) = 1070
-    // Hard: LeetCode Hard (356) = 356
-    const easyCount = leetCodeEasy + codeforcesEasy + 4;
-    const mediumCount = leetCodeMedium + (codeforcesMedium > 0 ? 8 : 0);
-    const hardCount = leetCodeHard;
-    const donutTotal = easyCount + mediumCount + hardCount; // 1978
+    const easyCount = leetCodeEasy + codeforcesEasy;
+    const mediumCount = leetCodeMedium + codeforcesMedium;
+    const hardCount = leetCodeHard + codeforcesHard;
+    const donutTotal = easyCount + mediumCount + hardCount;
 
     // Overall total solved across all connected platforms
-    const totalSolved = leetCodeTotal + codechefTotal + codeforcesTotal; // 1931 + 307 + 47 = 2285
+    const totalSolved = leetCodeTotal + codechefTotal + codeforcesTotal;
 
     // Platform breakdown array
     const platformBreakdown: PlatformProblemCount[] = [];
@@ -386,45 +371,69 @@ export async function calculateUserPracticeAnalytics(
         }
     }
 
-    // Merge DSA Topics (LeetCode + Codeforces)
-    // LeetCode: Array: 1145, String: 458, Hash Table: 433, Math: 340, DP: 325, Sorting: 289, Greedy: 245, DFS: 190, Binary Search: 178, Matrix: 165
-    // CF tags: math: 28, strings: 4, dp: 2, sortings: 5, greedy: 21, dfs and similar: 4, binary search: 1
-    const mergedTopics: Record<string, number> = {
-        "Array": (leetCodeTopicCounts["Array"] || 1145),
-        "String": (leetCodeTopicCounts["String"] || 458) + (cfTagCounts["strings"] || 4),
-        "Hash Table": (leetCodeTopicCounts["Hash Table"] || 433),
-        "Math": (leetCodeTopicCounts["Math"] || 340) + (cfTagCounts["math"] || 28),
-        "Dynamic Programming": (leetCodeTopicCounts["Dynamic Programming"] || 325) + (cfTagCounts["dp"] || 2),
-        "Sorting": (leetCodeTopicCounts["Sorting"] || 289) + (cfTagCounts["sortings"] || 5),
-        "Greedy": (leetCodeTopicCounts["Greedy"] || 245) + (cfTagCounts["greedy"] || 21),
-        "Depth-First Search": (leetCodeTopicCounts["Depth-First Search"] || 190) + (cfTagCounts["dfs and similar"] || 4),
-        "Binary Search": (leetCodeTopicCounts["Binary Search"] || 178) + (cfTagCounts["binary search"] || 1),
-        "Matrix": (leetCodeTopicCounts["Matrix"] || 165),
+    // Dynamic DSA Topics (LeetCode + Codeforces)
+    const cfTagMapping: Record<string, string> = {
+        "strings": "String",
+        "math": "Math",
+        "dp": "Dynamic Programming",
+        "sortings": "Sorting",
+        "greedy": "Greedy",
+        "dfs and similar": "Depth-First Search",
+        "binary search": "Binary Search",
+        "graphs": "Graph",
+        "trees": "Tree",
+        "data structures": "Data Structures",
+        "two pointers": "Two Pointers",
+        "implementation": "Implementation",
+        "brute force": "Brute Force",
+        "number theory": "Math",
+        "combinatorics": "Math",
+        "geometry": "Geometry",
+        "bitmasks": "Bit Manipulation",
     };
 
+    const mergedTopics: Record<string, number> = {};
+    for (const [tag, count] of Object.entries(leetCodeTopicCounts)) {
+        if (count > 0) {
+            mergedTopics[tag] = (mergedTopics[tag] || 0) + count;
+        }
+    }
+    for (const [cfTag, count] of Object.entries(cfTagCounts)) {
+        if (count > 0) {
+            const mapped = cfTagMapping[cfTag.toLowerCase()] || cfTag;
+            mergedTopics[mapped] = (mergedTopics[mapped] || 0) + count;
+        }
+    }
+
+    const maxTopicCount = Math.max(...Object.values(mergedTopics), 1);
     const topDsaTopicsList: DsaTopicItem[] = Object.entries(mergedTopics)
         .map(([topic, count]) => ({
             topic,
             count,
-            percentage: Math.min(100, Math.round((count / 1145) * 100)),
+            percentage: Math.min(100, Math.round((count / maxTopicCount) * 100)),
         }))
-        .sort((a, b) => b.count - a.count);
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
 
-    // Topic Strength for Radar / Spider Chart (6 Axes)
-    // 1. Array (1145) -> 92%
-    // 2. String (462) -> 45%
-    // 3. Hash Table (433) -> 40%
-    // 4. Math (368) -> 33%
-    // 5. DP (327) -> 30%
-    // 6. Sorting (294) -> 26%
-    const topicStrength: TopicStrengthItem[] = [
-        { topic: "Array", axisLabel: "Array", score: 92, count: mergedTopics["Array"] || 1145 },
-        { topic: "String", axisLabel: "String", score: 45, count: mergedTopics["String"] || 462 },
-        { topic: "Hash Table", axisLabel: "Hash Table", score: 40, count: mergedTopics["Hash Table"] || 433 },
-        { topic: "Math", axisLabel: "Math", score: 33, count: mergedTopics["Math"] || 368 },
-        { topic: "Dynamic Programming", axisLabel: "DP", score: 30, count: mergedTopics["Dynamic Programming"] || 327 },
-        { topic: "Sorting", axisLabel: "Sorting", score: 26, count: mergedTopics["Sorting"] || 294 },
+    // Topic Strength for Radar / Spider Chart (6 Key Pillars)
+    const RADAR_PILLARS = [
+        { topic: "Array", axisLabel: "Array" },
+        { topic: "String", axisLabel: "String" },
+        { topic: "Hash Table", axisLabel: "Hash Table" },
+        { topic: "Math", axisLabel: "Math" },
+        { topic: "Dynamic Programming", axisLabel: "DP" },
+        { topic: "Sorting", axisLabel: "Sorting" },
     ];
+    const topicStrength: TopicStrengthItem[] = RADAR_PILLARS.map(({ topic, axisLabel }) => {
+        const count = mergedTopics[topic] || 0;
+        const score = count > 0 ? Math.min(100, Math.max(15, Math.round((count / maxTopicCount) * 100))) : 0;
+        return {
+            topic,
+            axisLabel,
+            score,
+            count,
+        };
+    });
 
     return {
         success: true,

@@ -218,14 +218,6 @@ export async function calculateUserBadges(
         }
     }
 
-    // Fallback for demo user if empty
-    if (Object.keys(connectedPortals).length === 0 && cleanUser.toLowerCase().includes("vineet")) {
-        connectedPortals.leetcode = "CodeMars";
-        connectedPortals.codechef = "c0demars";
-        connectedPortals.codeforces = "Code.Mars";
-        connectedPortals.github = "Vineet-Chandel";
-    }
-
     const allBadges: UnifiedBadgeRecord[] = [];
     const platformCounts: Record<string, number> = {};
 

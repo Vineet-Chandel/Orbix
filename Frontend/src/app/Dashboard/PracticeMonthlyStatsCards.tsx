@@ -10,14 +10,15 @@ interface PracticeMonthlyStatsCardsProps {
 export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps> = ({
     username = "",
 }) => {
-    const effectiveUser = (username || "vineet_chandel").trim();
+    const authUser = useAppSelector((state) => state.user.user);
+    const effectiveUser = (username || authUser?.username || "").trim();
 
     // Redux selectors for submissions, analytics, and contests
     const submissionsData = useAppSelector(
-        (state) => state.submissions.dataByUser[effectiveUser]
+        (state) => (effectiveUser ? state.submissions.dataByUser[effectiveUser] : undefined)
     );
     const contestsData = useAppSelector(
-        (state) => state.contests.dataByUser[effectiveUser]
+        (state) => (effectiveUser ? state.contests.dataByUser[effectiveUser] : undefined)
     );
 
     // Compute this month analytics

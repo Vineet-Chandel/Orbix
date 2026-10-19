@@ -22,19 +22,21 @@ function formatBadgeDate(dateStr?: string | null): string {
 
 export const BadgesCard: React.FC<BadgesCardProps> = ({
     connectedPortals: _connectedPortals,
-    username = "vineet_chandel",
+    username,
     embedded = false,
 }) => {
-    const effectiveUser = (username || "vineet_chandel").trim();
+    const authUser = useAppSelector((state) => state.user.user);
+    const effectiveUser = (username || authUser?.username || "").trim();
     const dispatch = useAppDispatch();
 
-    const remoteData = useAppSelector((state) => state.badges.dataByUser[effectiveUser]);
-    const isLoading = useAppSelector((state) => state.badges.loadingByUser[effectiveUser] || false);
+    const remoteData = useAppSelector((state) => (effectiveUser ? state.badges.dataByUser[effectiveUser] : undefined));
+    const isLoading = useAppSelector((state) => (effectiveUser ? state.badges.loadingByUser[effectiveUser] || false : false));
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [selectedPlatform, setSelectedPlatform] = useState<string>("all");
     const [hoveredBadge, setHoveredBadge] = useState<UnifiedBadgeRecord | null>(null);
 
     useEffect(() => {
+        if (!effectiveUser) return;
         if (!remoteData && !isLoading) {
             dispatch(fetchUnifiedBadges({ username: effectiveUser }));
         }

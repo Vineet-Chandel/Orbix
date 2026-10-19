@@ -7,15 +7,18 @@ interface TopicStrengthCardProps {
     isLoading?: boolean;
 }
 
+const DEFAULT_EMPTY_AXES = [
+    { topic: "Array", axisLabel: "Array", score: 0, count: 0 },
+    { topic: "String", axisLabel: "String", score: 0, count: 0 },
+    { topic: "Hash Table", axisLabel: "Hash Table", score: 0, count: 0 },
+    { topic: "Math", axisLabel: "Math", score: 0, count: 0 },
+    { topic: "Dynamic Programming", axisLabel: "DP", score: 0, count: 0 },
+    { topic: "Sorting", axisLabel: "Sorting", score: 0, count: 0 },
+];
+
 export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLoading }) => {
-    const rawAxes = data?.topicStrength || [
-        { topic: "Array", axisLabel: "Array", score: 92, count: 1145 },
-        { topic: "String", axisLabel: "String", score: 45, count: 462 },
-        { topic: "Hash Table", axisLabel: "Hash Table", score: 40, count: 433 },
-        { topic: "Math", axisLabel: "Math", score: 33, count: 368 },
-        { topic: "Dynamic Programming", axisLabel: "DP", score: 30, count: 327 },
-        { topic: "Sorting", axisLabel: "Sorting", score: 26, count: 294 },
-    ];
+    const rawAxes = data?.topicStrength && data.topicStrength.length > 0 ? data.topicStrength : DEFAULT_EMPTY_AXES;
+    const hasScores = rawAxes.some((a) => a.score > 0);
 
     const radar = useMemo(() => {
         const cx = 160;
@@ -49,9 +52,9 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
         // Data Polygon points
         const dataPoints: Array<{ x: number; y: number; label: string; score: number }> = [];
         for (let i = 0; i < totalAxes; i++) {
-            const axis = rawAxes[i] || { axisLabel: "", score: 50 };
+            const axis = rawAxes[i] || { axisLabel: "", score: 0 };
             const angle = -Math.PI / 2 + (i * 2 * Math.PI) / totalAxes;
-            const val = Math.max(0.12, Math.min(1, axis.score / 100));
+            const val = hasScores ? Math.max(0.12, Math.min(1, axis.score / 100)) : 0;
             const ptR = r * val;
             const x = cx + ptR * Math.cos(angle);
             const y = cy + ptR * Math.sin(angle);

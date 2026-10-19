@@ -63,7 +63,10 @@ export const fetchUnifiedBadges = createAsyncThunk<
 >(
     "badges/fetchUnified",
     async ({ username, force = false }, { getState, rejectWithValue }) => {
-        const effectiveUser = username.trim() || "vineet_chandel";
+        const effectiveUser = username.trim();
+        if (!effectiveUser) {
+            return rejectWithValue("Username is required to fetch badges");
+        }
         const state = getState().badges;
         const existing = state.dataByUser[effectiveUser];
         const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
@@ -111,7 +114,8 @@ export const fetchUnifiedBadges = createAsyncThunk<
     },
     {
         condition: ({ username, force = false }, { getState }) => {
-            const effectiveUser = username.trim() || "vineet_chandel";
+            const effectiveUser = username.trim();
+            if (!effectiveUser) return false;
             const state = getState().badges;
             if (state.loadingByUser[effectiveUser] && !force) {
                 return false;
@@ -144,22 +148,28 @@ export const badgesSlice = createSlice({
     extraReducers: (builder) => {
         builder
             .addCase(fetchUnifiedBadges.pending, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = true;
-                state.errorByUser[user] = null;
+                const user = action.meta.arg.username.trim();
+                if (user) {
+                    state.loadingByUser[user] = true;
+                    state.errorByUser[user] = null;
+                }
             })
             .addCase(fetchUnifiedBadges.fulfilled, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = false;
-                state.dataByUser[user] = action.payload;
-                state.lastFetchedAtByUser[user] = Date.now();
-                state.errorByUser[user] = null;
-                saveStoredBadges(state.dataByUser);
+                const user = action.meta.arg.username.trim();
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.dataByUser[user] = action.payload;
+                    state.lastFetchedAtByUser[user] = Date.now();
+                    state.errorByUser[user] = null;
+                    saveStoredBadges(state.dataByUser);
+                }
             })
             .addCase(fetchUnifiedBadges.rejected, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = false;
-                state.errorByUser[user] = action.payload || "Failed to load badges";
+                const user = action.meta.arg.username.trim();
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.errorByUser[user] = action.payload || "Failed to load badges";
+                }
             });
     },
 });

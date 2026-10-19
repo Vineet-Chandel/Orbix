@@ -29,6 +29,9 @@ export interface PublicProfileData {
     customLink?: string | null;
     location?: string;
     skills?: string[];
+    links?: Array<{ label: string; url: string; platform?: string }>;
+    isOpenToWork?: boolean;
+    isHireable?: boolean;
     isPublic: boolean;
     createdAt?: string;
     isOwner: boolean;
@@ -204,6 +207,9 @@ export async function updateProfile(payload: {
     customLink?: string;
     location?: string;
     skills?: string[];
+    links?: Array<{ label: string; url: string; platform?: string }>;
+    isOpenToWork?: boolean;
+    isHireable?: boolean;
     isPublic?: boolean;
 }): Promise<any> {
     const json = await apiFetch<{ success: boolean; user: any }>("/api/profile", {
@@ -212,6 +218,108 @@ export async function updateProfile(payload: {
     });
     invalidatePublicProfileClientCache();
     return json.user;
+}
+
+/**
+ * Send a message / notification to the profile owner from a recruiter
+ */
+export async function sendHireMessage(payload: {
+    username: string;
+    senderName: string;
+    senderEmail: string;
+    communicationEmail: string;
+    company?: string;
+    message: string;
+}): Promise<{ success: boolean; message: string }> {
+    const encodedUsername = encodeURIComponent(payload.username.toLowerCase().trim());
+    const json = await apiFetch<{ success: boolean; message: string }>(
+        `/api/profile/${encodedUsername}/hire-message`,
+        {
+            method: "POST",
+            body: JSON.stringify(payload),
+        }
+    );
+    return json;
+}
+
+export interface UserNotification {
+    id: string;
+    title: string;
+    body: string;
+    type: string;
+    metadata: {
+        senderName?: string;
+        senderEmail?: string;
+        communicationEmail?: string;
+        company?: string;
+        messageId?: string;
+        fullMessage?: string;
+    };
+    isRead: boolean;
+    readAt?: string | null;
+    createdAt: string;
+}
+
+/**
+ * Fetch notifications for authenticated user
+ */
+export async function fetchNotifications(autoMarkRead = false): Promise<{
+    notifications: UserNotification[];
+    unreadCount: number;
+}> {
+    const query = autoMarkRead ? "?autoMarkRead=true" : "";
+    const json = await apiFetch<{
+        success: boolean;
+        notifications: UserNotification[];
+        unreadCount: number;
+    }>(`/api/notifications${query}`);
+    return {
+        notifications: json.notifications || [],
+        unreadCount: json.unreadCount || 0,
+    };
+}
+
+/**
+ * Fetch unread notification count
+ */
+export async function fetchUnreadNotificationCount(): Promise<number> {
+    try {
+        const json = await apiFetch<{ success: boolean; unreadCount: number }>(
+            "/api/notifications/unread-count"
+        );
+        return json.unreadCount || 0;
+    } catch {
+        return 0;
+    }
+}
+
+/**
+ * Mark notifications as read
+ */
+export async function markNotificationsAsRead(notificationIds?: string[]): Promise<boolean> {
+    try {
+        await apiFetch("/api/notifications/mark-read", {
+            method: "POST",
+            body: JSON.stringify({ notificationIds }),
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Delete a notification
+ */
+export async function deleteNotification(id: string): Promise<boolean> {
+    try {
+        await apiFetch(`/api/notifications/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+        });
+        return true;
+    } catch {
+        return false;
+    }
 }
 
 /**

@@ -18,6 +18,19 @@ export interface DevelopmentRepoItem {
     url: string;
 }
 
+export interface MostStarredRepo {
+    name: string;
+    stars: number;
+    url: string;
+}
+
+export interface LatestWorkRepo {
+    name: string;
+    pushedAt: string;
+    relativeTime: string;
+    url: string;
+}
+
 export interface DevelopmentAnalyticsData {
     username: string;
     githubHandle: string;
@@ -27,6 +40,8 @@ export interface DevelopmentAnalyticsData {
     followers: number;
     languages: LanguageItem[];
     topRepositories: DevelopmentRepoItem[];
+    mostStarred?: MostStarredRepo | null;
+    latestWork?: LatestWorkRepo | null;
     timestamp: string;
 }
 
@@ -69,8 +84,11 @@ export const fetchDevelopmentAnalytics = createAsyncThunk<
     { state: { developmentAnalytics: DevelopmentAnalyticsState }; rejectValue: string }
 >(
     "developmentAnalytics/fetch",
-    async ({ username, githubHandle, force = false, portals }, { getState }) => {
-        const effectiveUser = username.trim() || "vineet_chandel";
+    async ({ username, githubHandle, force = false, portals }, { getState, rejectWithValue }) => {
+        const effectiveUser = username.trim();
+        if (!effectiveUser) {
+            return rejectWithValue("Username is required to fetch development analytics");
+        }
         const state = getState().developmentAnalytics;
         const existing = state.dataByUser[effectiveUser];
         const lastFetched = state.lastFetchedAtByUser[effectiveUser] || 0;
@@ -117,13 +135,15 @@ export const fetchDevelopmentAnalytics = createAsyncThunk<
                     if (data.success || data.contributions !== undefined) {
                         return {
                             username: effectiveUser,
-                            githubHandle: data.githubHandle || ghHandle || "Vineet-Chandel",
-                            contributions: data.contributions ?? 219,
-                            repos: data.repos ?? 14,
-                            stars: data.stars ?? 45,
-                            followers: data.followers ?? 183,
+                            githubHandle: data.githubHandle || ghHandle || "",
+                            contributions: data.contributions ?? 0,
+                            repos: data.repos ?? 0,
+                            stars: data.stars ?? 0,
+                            followers: data.followers ?? 0,
                             languages: data.languages || [],
                             topRepositories: data.topRepositories || [],
+                            mostStarred: data.mostStarred ?? null,
+                            latestWork: data.latestWork ?? null,
                             timestamp: data.timestamp || new Date().toISOString(),
                         };
                     }
@@ -134,37 +154,22 @@ export const fetchDevelopmentAnalytics = createAsyncThunk<
             }
         }
 
-        // Realistic fallback for offline / initial state
+        // Return existing cached data if available
         if (existing) {
             return existing;
         }
 
         return {
             username: effectiveUser,
-            githubHandle: ghHandle || "Vineet-Chandel",
-            contributions: 219,
-            repos: 14,
-            stars: 45,
-            followers: 183,
-            languages: [
-                { name: "TypeScript", percentage: 75.8, color: "#3178c6", bytes: 2253975 },
-                { name: "JavaScript", percentage: 21.4, color: "#f1e05a", bytes: 178931 },
-                { name: "Java", percentage: 1.3, color: "#b07219", bytes: 40545 },
-                { name: "C++", percentage: 0.8, color: "#f34b7d", bytes: 25000 },
-                { name: "HTML", percentage: 0.4, color: "#e34c26", bytes: 12000 },
-                { name: "EJS", percentage: 0.3, color: "#8b949e", bytes: 9000 },
-            ],
-            topRepositories: [
-                {
-                    name: "Orbix",
-                    description: "Developer profile aggregator, analytics & real-time rating sync",
-                    stars: 68,
-                    forks: 12,
-                    language: "TypeScript",
-                    languageColor: "#3178c6",
-                    url: "https://github.com/Vineet-Chandel/Orbix",
-                },
-            ],
+            githubHandle: ghHandle || "",
+            contributions: 0,
+            repos: 0,
+            stars: 0,
+            followers: 0,
+            languages: [],
+            topRepositories: [],
+            mostStarred: null,
+            latestWork: null,
             timestamp: new Date().toISOString(),
         };
     }
@@ -193,22 +198,28 @@ export const developmentAnalyticsSlice = createSlice({
     extraReducers: (builder) => {
         builder
             .addCase(fetchDevelopmentAnalytics.pending, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = true;
-                state.errorByUser[user] = null;
+                const user = action.meta.arg.username.trim();
+                if (user) {
+                    state.loadingByUser[user] = true;
+                    state.errorByUser[user] = null;
+                }
             })
             .addCase(fetchDevelopmentAnalytics.fulfilled, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = false;
-                state.dataByUser[user] = action.payload;
-                state.lastFetchedAtByUser[user] = Date.now();
-                state.errorByUser[user] = null;
-                saveStoredDevelopmentAnalytics(state.dataByUser);
+                const user = action.meta.arg.username.trim();
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.dataByUser[user] = action.payload;
+                    state.lastFetchedAtByUser[user] = Date.now();
+                    state.errorByUser[user] = null;
+                    saveStoredDevelopmentAnalytics(state.dataByUser);
+                }
             })
             .addCase(fetchDevelopmentAnalytics.rejected, (state, action) => {
-                const user = action.meta.arg.username.trim() || "vineet_chandel";
-                state.loadingByUser[user] = false;
-                state.errorByUser[user] = action.payload || "Failed to load development analytics";
+                const user = action.meta.arg.username.trim();
+                if (user) {
+                    state.loadingByUser[user] = false;
+                    state.errorByUser[user] = action.payload || "Failed to load development analytics";
+                }
             });
     },
 });

@@ -18,6 +18,19 @@ export interface DevelopmentRepoItem {
     url: string;
 }
 
+export interface MostStarredRepo {
+    name: string;
+    stars: number;
+    url: string;
+}
+
+export interface LatestWorkRepo {
+    name: string;
+    pushedAt: string;
+    relativeTime: string;
+    url: string;
+}
+
 export interface DevelopmentAnalyticsData {
     success: boolean;
     username: string;
@@ -28,6 +41,8 @@ export interface DevelopmentAnalyticsData {
     followers: number;
     languages: LanguageItem[];
     topRepositories: DevelopmentRepoItem[];
+    mostStarred?: MostStarredRepo | null;
+    latestWork?: LatestWorkRepo | null;
     timestamp: string;
 }
 
@@ -64,44 +79,47 @@ export const GITHUB_LANGUAGE_COLORS: Record<string, string> = {
     Svelte: "#ff3e00",
 };
 
-export const DEFAULT_DEV_STATS: DevelopmentAnalyticsData = {
+export const EMPTY_DEV_STATS: DevelopmentAnalyticsData = {
     success: true,
-    username: "vineet_chandel",
-    githubHandle: "Vineet-Chandel",
-    contributions: 219,
-    repos: 14,
-    stars: 45,
-    followers: 183,
-    languages: [
-        { name: "TypeScript", percentage: 75.8, color: "#3178c6", bytes: 2253975 },
-        { name: "JavaScript", percentage: 21.4, color: "#f1e05a", bytes: 178931 },
-        { name: "Java", percentage: 1.3, color: "#b07219", bytes: 40545 },
-        { name: "C++", percentage: 0.8, color: "#f34b7d", bytes: 25000 },
-        { name: "HTML", percentage: 0.4, color: "#e34c26", bytes: 12000 },
-        { name: "EJS", percentage: 0.3, color: "#8b949e", bytes: 9000 },
-    ],
-    topRepositories: [
-        {
-            name: "Orbix",
-            description: "Developer profile aggregator, analytics & real-time rating sync",
-            stars: 68,
-            forks: 12,
-            language: "TypeScript",
-            languageColor: "#3178c6",
-            url: "https://github.com/Vineet-Chandel/Orbix",
-        },
-        {
-            name: "VoiceKhata",
-            description: "Smart voice-enabled ledger and financial accounting system",
-            stars: 5,
-            forks: 2,
-            language: "TypeScript",
-            languageColor: "#3178c6",
-            url: "https://github.com/Vineet-Chandel/VoiceKhata",
-        },
-    ],
+    username: "",
+    githubHandle: "",
+    contributions: 0,
+    repos: 0,
+    stars: 0,
+    followers: 0,
+    languages: [],
+    topRepositories: [],
+    mostStarred: null,
+    latestWork: null,
     timestamp: new Date().toISOString(),
 };
+
+export function formatRelativeTime(isoDate: string): string {
+    if (!isoDate) return "recently";
+    try {
+        const then = new Date(isoDate).getTime();
+        const now = Date.now();
+        if (isNaN(then)) return "recently";
+        const diffMs = Math.max(0, now - then);
+        const diffSecs = Math.floor(diffMs / 1000);
+        const diffMins = Math.floor(diffSecs / 60);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+        const diffWeeks = Math.floor(diffDays / 7);
+        const diffMonths = Math.floor(diffDays / 30);
+        const diffYears = Math.floor(diffDays / 365);
+
+        if (diffSecs < 60) return "just now";
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+        if (diffWeeks < 5) return `${diffWeeks}w ago`;
+        if (diffMonths < 12) return `${diffMonths}mo ago`;
+        return `${diffYears}y ago`;
+    } catch {
+        return "recently";
+    }
+}
 
 /**
  * Calculates dynamic development metrics & language breakdown for a connected GitHub account.
@@ -111,7 +129,13 @@ export async function calculateUserDevelopmentAnalytics(
     clientPortals?: Record<string, any>,
     directHandle?: string
 ): Promise<DevelopmentAnalyticsData> {
-    const cleanUsername = (username || "vineet_chandel").trim();
+    const cleanUsername = (username || "").trim();
+    if (!cleanUsername) {
+        return {
+            ...EMPTY_DEV_STATS,
+            timestamp: new Date().toISOString(),
+        };
+    }
     let githubHandle = (directHandle || "").trim();
 
     // 1. Resolve GitHub handle from clientPortals if not provided
@@ -124,13 +148,13 @@ export async function calculateUserDevelopmentAnalytics(
         }
     }
 
-    // 2. Resolve from database if still missing
+    // 2. Resolve from database if still missing (check user_links)
     if (!githubHandle) {
         try {
             const dbRes = await query(
-                `SELECT portal, portal_username, additional_details 
-                 FROM user_portals 
-                 WHERE username = $1 AND portal ILIKE '%github%' 
+                `SELECT portal, portal_username 
+                 FROM user_links 
+                 WHERE LOWER(username) = LOWER($1) AND portal ILIKE '%github%' 
                  LIMIT 1`,
                 [cleanUsername]
             );
@@ -143,14 +167,30 @@ export async function calculateUserDevelopmentAnalytics(
         }
     }
 
-    // Default fallback for vineet_chandel
-    if (!githubHandle && (cleanUsername.toLowerCase() === "vineet_chandel" || cleanUsername.toLowerCase() === "vineetchandel")) {
-        githubHandle = "Vineet-Chandel";
+    // 3. Resolve from users table if still missing (github column)
+    if (!githubHandle) {
+        try {
+            const userRes = await query(
+                `SELECT github FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1`,
+                [cleanUsername]
+            );
+            if (userRes.rows && userRes.rows.length > 0 && userRes.rows[0].github) {
+                const raw = String(userRes.rows[0].github).trim();
+                githubHandle = raw.replace(/https?:\/\/(www\.)?github\.com\//i, "").replace(/\/.*$/, "").trim();
+            }
+        } catch {
+            // DB non-fatal
+        }
+    }
+
+    // Clean githubHandle if someone provided a full URL
+    if (githubHandle.includes("github.com/")) {
+        githubHandle = githubHandle.replace(/https?:\/\/(www\.)?github\.com\//i, "").replace(/\/.*$/, "").trim();
     }
 
     if (!githubHandle) {
         return {
-            success: false,
+            success: true,
             username: cleanUsername,
             githubHandle: "",
             contributions: 0,
@@ -211,6 +251,9 @@ export async function calculateUserDevelopmentAnalytics(
         let totalStars = 0;
         const languageByteMap: Record<string, number> = {};
         const topRepositories: DevelopmentRepoItem[] = [];
+        let mostStarred: MostStarredRepo | null = null;
+        let latestWork: LatestWorkRepo | null = null;
+        let reposFetched = false;
 
         try {
             const reposRes = await fetch(
@@ -227,6 +270,7 @@ export async function calculateUserDevelopmentAnalytics(
             if (reposRes.ok) {
                 const reposList = (await reposRes.json()) as any[];
                 if (Array.isArray(reposList) && reposList.length > 0) {
+                    reposFetched = true;
                     if (reposCount === 0) {
                         reposCount = reposList.length;
                     }
@@ -289,10 +333,118 @@ export async function calculateUserDevelopmentAnalytics(
                             url: r.html_url || `https://github.com/${githubHandle}/${r.name}`,
                         });
                     }
+
+                    if (sortedRepos[0]) {
+                        mostStarred = {
+                            name: sortedRepos[0].name || "Repository",
+                            stars: sortedRepos[0].stargazers_count || 0,
+                            url: sortedRepos[0].html_url || `https://github.com/${githubHandle}/${sortedRepos[0].name}`,
+                        };
+                    }
+
+                    const sortedByPushed = [...reposList].sort((a, b) => {
+                        const timeA = new Date(a.pushed_at || a.updated_at || 0).getTime();
+                        const timeB = new Date(b.pushed_at || b.updated_at || 0).getTime();
+                        return timeB - timeA;
+                    });
+                    if (sortedByPushed[0]) {
+                        const pushDate = sortedByPushed[0].pushed_at || sortedByPushed[0].updated_at || "";
+                        latestWork = {
+                            name: sortedByPushed[0].name || "Repository",
+                            pushedAt: pushDate,
+                            relativeTime: pushDate ? formatRelativeTime(pushDate) : "recently",
+                            url: sortedByPushed[0].html_url || `https://github.com/${githubHandle}/${sortedByPushed[0].name}`,
+                        };
+                    }
                 }
             }
         } catch {
             // non-fatal
+        }
+
+        // Resilient Scraper Fallback if GitHub API was rate limited or empty
+        if (!reposFetched && githubHandle) {
+            try {
+                const [starredRes, updatedRes] = await Promise.allSettled([
+                    fetch(`https://github.com/${encodeURIComponent(githubHandle)}?tab=repositories&sort=stargazers`, {
+                        headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
+                        signal: AbortSignal.timeout(6000),
+                    }),
+                    fetch(`https://github.com/${encodeURIComponent(githubHandle)}?tab=repositories`, {
+                        headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
+                        signal: AbortSignal.timeout(6000),
+                    }),
+                ]);
+
+                if (starredRes.status === "fulfilled" && starredRes.value.ok) {
+                    const html = await starredRes.value.text();
+                    const blocks = html.split('itemprop="name codeRepository"');
+                    for (let i = 1; i < blocks.length; i++) {
+                        const chunk = blocks[i];
+                        if (!chunk) continue;
+                        const nameMatch = chunk.match(/>\s*([^<]+)<\/a>/);
+                        if (!nameMatch || !nameMatch[1]) continue;
+                        const repoName = nameMatch[1].trim();
+                        const starMatch = chunk.match(/href="\/[^\/]+\/[^\/]+\/stargazers"[^>]*>[\s\S]*?<\/svg>\s*([\d,]+)/);
+                        const stars = starMatch && starMatch[1] ? parseInt(starMatch[1].replace(/,/g, ""), 10) || 0 : 0;
+                        const descMatch = chunk.match(/itemprop="description">([\s\S]*?)<\/p>/);
+                        const desc = descMatch && descMatch[1] ? descMatch[1].trim() : "Public repository";
+                        const langMatch = chunk.match(/itemprop="programmingLanguage">([^<]+)<\/span>/);
+                        const lang = langMatch && langMatch[1] ? langMatch[1].trim() : "TypeScript";
+                        totalStars += stars;
+
+                        if (topRepositories.length < 4) {
+                            topRepositories.push({
+                                name: repoName,
+                                description: desc,
+                                stars,
+                                forks: 0,
+                                language: lang,
+                                languageColor: GITHUB_LANGUAGE_COLORS[lang] || "#3178c6",
+                                url: `https://github.com/${githubHandle}/${repoName}`,
+                            });
+                        }
+
+                        if (!mostStarred) {
+                            mostStarred = {
+                                name: repoName,
+                                stars,
+                                url: `https://github.com/${githubHandle}/${repoName}`,
+                            };
+                        }
+
+                        if (lang) {
+                            const estBytes = Math.max(10000, stars * 5000);
+                            languageByteMap[lang] = (languageByteMap[lang] || 0) + estBytes;
+                        }
+                    }
+                    if (reposCount === 0 && blocks.length > 1) {
+                        reposCount = blocks.length - 1;
+                    }
+                }
+
+                if (updatedRes.status === "fulfilled" && updatedRes.value.ok) {
+                    const html = await updatedRes.value.text();
+                    const blocks = html.split('itemprop="name codeRepository"');
+                    const chunk = blocks[1];
+                    if (chunk) {
+                        const nameMatch = chunk.match(/>\s*([^<]+)<\/a>/);
+                        const timeMatch = chunk.match(/<relative-time[^>]*datetime="([^"]+)"/);
+                        if (nameMatch && nameMatch[1]) {
+                            const repoName = nameMatch[1].trim();
+                            const dateStr = timeMatch && timeMatch[1] ? timeMatch[1] : "";
+                            latestWork = {
+                                name: repoName,
+                                pushedAt: dateStr,
+                                relativeTime: dateStr ? formatRelativeTime(dateStr) : "recently",
+                                url: `https://github.com/${githubHandle}/${repoName}`,
+                            };
+                        }
+                    }
+                }
+            } catch {
+                // non-blocking fallback
+            }
         }
 
         // Calculate language percentage distribution
@@ -318,50 +470,26 @@ export async function calculateUserDevelopmentAnalytics(
             languages = topLangs;
         }
 
-        // Check if we retrieved actual data; if all are 0 or empty and user is vineet_chandel, use realistic fallback
-        if (
-            contributions === 0 &&
-            reposCount === 0 &&
-            languages.length === 0 &&
-            (cleanUsername.toLowerCase() === "vineet_chandel" || cleanUsername.toLowerCase() === "vineetchandel")
-        ) {
-            return {
-                ...DEFAULT_DEV_STATS,
-                githubHandle,
-                timestamp: new Date().toISOString(),
-            };
-        }
-
-        // If languages are empty but repos exist, provide realistic distribution
-        if (languages.length === 0 && (reposCount > 0 || contributions > 0)) {
-            languages = [
-                { name: "TypeScript", percentage: 75.8, color: "#3178c6", bytes: 2253975 },
-                { name: "JavaScript", percentage: 21.4, color: "#f1e05a", bytes: 178931 },
-                { name: "Java", percentage: 1.3, color: "#b07219", bytes: 40545 },
-                { name: "C++", percentage: 0.8, color: "#f34b7d", bytes: 25000 },
-                { name: "HTML", percentage: 0.4, color: "#e34c26", bytes: 12000 },
-                { name: "EJS", percentage: 0.3, color: "#8b949e", bytes: 9000 },
-            ];
-        }
-
         return {
             success: true,
             username: cleanUsername,
             githubHandle,
-            contributions: contributions > 0 ? contributions : 219,
-            repos: reposCount > 0 ? reposCount : 14,
-            stars: totalStars > 0 ? totalStars : 45,
-            followers: followersCount > 0 ? followersCount : 183,
+            contributions,
+            repos: reposCount,
+            stars: totalStars,
+            followers: followersCount,
             languages,
-            topRepositories: topRepositories.length > 0 ? topRepositories : DEFAULT_DEV_STATS.topRepositories,
+            topRepositories,
+            mostStarred,
+            latestWork,
             timestamp: new Date().toISOString(),
         };
     } catch (err) {
         console.error("Error in calculateUserDevelopmentAnalytics:", err);
         return {
-            ...DEFAULT_DEV_STATS,
+            ...EMPTY_DEV_STATS,
             username: cleanUsername,
-            githubHandle: githubHandle || "Vineet-Chandel",
+            githubHandle: githubHandle || "",
             timestamp: new Date().toISOString(),
         };
     }

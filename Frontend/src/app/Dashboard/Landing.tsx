@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Code2, GitBranch } from "lucide-react";
 import { useAppDispatch, useAppSelector, clearUser, fetchUserProfile } from "../../store";
+import { NotificationBell } from "../../components/NotificationBell";
 import { Sidebar, type SidebarTab } from "./Sidebar";
 import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
 import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
@@ -9,6 +10,7 @@ import { ContestPerformanceSection } from "./ContestPerformanceSection";
 import { PracticeAnalyticsSection } from "./PracticeAnalytics/PracticeAnalyticsSection";
 import { PracticeMonthlyStatsCards } from "./PracticeMonthlyStatsCards";
 import { DevelopmentAnalyticsSection } from "./DevelopmentAnalytics/DevelopmentAnalyticsSection";
+import { NotificationsView } from "../Notifications/NotificationsView";
 
 export default function Dashboard() {
     const location = useLocation();
@@ -18,6 +20,7 @@ export default function Dashboard() {
 
     // Determine initial active tab based on pathname
     const getTabFromPath = (path: string): SidebarTab => {
+        if (path.includes("/notifications") || path.includes("/inbox")) return "notifications";
         if (path.includes("/profile")) return "profile";
         if (path.includes("/resume")) return "resume";
         if (path.includes("/projects")) return "projects";
@@ -109,6 +112,7 @@ export default function Dashboard() {
                 onTabChange={(tab) => {
                     setActiveTab(tab);
                     if (tab === "dashboard") navigate("/dashboard");
+                    if (tab === "notifications") navigate("/notifications");
                     if (tab === "profile") navigate("/profile");
                     if (tab === "resume") navigate("/resume");
                     if (tab === "projects") navigate("/projects");
@@ -136,7 +140,9 @@ export default function Dashboard() {
                             </svg>
                         </button>
                         <h1 className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight">
-                            {activeTab === "profile"
+                            {activeTab === "notifications"
+                                ? "Inbox & Inquiries"
+                                : activeTab === "profile"
                                 ? "Developer Profile"
                                 : activeTab === "resume"
                                 ? "Resume & Credentials"
@@ -172,8 +178,24 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    {/* Right spacer for header balance */}
-                    <div className="flex items-center" />
+                    {/* Right action area: Notification Bell & Quick Profile */}
+                    <div className="flex items-center gap-2">
+                        <NotificationBell variant="light" />
+                        <Link
+                            to="/profile"
+                            title="Profile Settings"
+                            className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full hover:bg-neutral-100 transition-colors"
+                        >
+                            <img
+                                src={user?.photoUrl || user?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=111827&color=fff&size=64&bold=true`}
+                                alt={displayName}
+                                className="w-7 h-7 rounded-full object-cover border border-neutral-200"
+                            />
+                            <span className="hidden sm:inline text-xs font-semibold text-neutral-700">
+                                {displayName}
+                            </span>
+                        </Link>
+                    </div>
                 </header>
 
                 {/* Dashboard View */}
@@ -405,6 +427,11 @@ export default function Dashboard() {
                             ))}
                         </div>
                     </div>
+                )}
+
+                {/* Sub-view: Notifications & Messages */}
+                {activeTab === "notifications" && (
+                    <NotificationsView />
                 )}
             </div>
         </div>

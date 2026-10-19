@@ -87,6 +87,7 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS custom_link VARCHAR(255);
             ALTER TABLE users ADD COLUMN IF NOT EXISTS location VARCHAR(150);
             ALTER TABLE users ADD COLUMN IF NOT EXISTS skills JSONB DEFAULT '[]'::jsonb;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS links JSONB DEFAULT '[]'::jsonb;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT true;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_url TEXT NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS photo_public_id TEXT NULL;
@@ -102,9 +103,49 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS total_solved INT DEFAULT 0;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS total_contests INT DEFAULT 0;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS platform_ratings JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS is_open_to_work BOOLEAN DEFAULT false;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS is_hireable BOOLEAN DEFAULT false;
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
             CREATE INDEX IF NOT EXISTS idx_users_orbix_score ON users(orbix_score DESC, username ASC);
             CREATE INDEX IF NOT EXISTS idx_users_is_public ON users(is_public);
+
+            -- Ensure recruiter messages and notifications tables exist
+            CREATE TABLE IF NOT EXISTS recruiter_messages (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                recipient_user_id UUID,
+                recipient_username VARCHAR(100) NOT NULL,
+                recipient_email VARCHAR(255),
+                sender_name VARCHAR(150) NOT NULL,
+                sender_email VARCHAR(255) NOT NULL,
+                communication_email VARCHAR(255),
+                company VARCHAR(200) NULL,
+                message TEXT NOT NULL,
+                status VARCHAR(50) DEFAULT 'delivered',
+                is_read BOOLEAN DEFAULT false,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            ALTER TABLE recruiter_messages ADD COLUMN IF NOT EXISTS communication_email VARCHAR(255);
+            ALTER TABLE recruiter_messages ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'delivered';
+            ALTER TABLE recruiter_messages ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+            CREATE INDEX IF NOT EXISTS idx_recruiter_messages_recipient ON recruiter_messages(recipient_username);
+            CREATE INDEX IF NOT EXISTS idx_recruiter_messages_created_at ON recruiter_messages(created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS user_notifications (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID,
+                username VARCHAR(100) NOT NULL,
+                title VARCHAR(200) NOT NULL,
+                body TEXT NOT NULL,
+                type VARCHAR(50) DEFAULT 'hire_inquiry',
+                metadata JSONB DEFAULT '{}'::jsonb,
+                is_read BOOLEAN DEFAULT false,
+                read_at TIMESTAMPTZ NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            ALTER TABLE user_notifications ADD COLUMN IF NOT EXISTS read_at TIMESTAMPTZ NULL;
+            CREATE INDEX IF NOT EXISTS idx_user_notifications_username ON user_notifications(username, is_read);
+            CREATE INDEX IF NOT EXISTS idx_user_notifications_unread ON user_notifications(username, is_read, created_at DESC);
 
             -- Ensure leaderboard_entries precomputed projection table exists
             CREATE TABLE IF NOT EXISTS leaderboard_entries (

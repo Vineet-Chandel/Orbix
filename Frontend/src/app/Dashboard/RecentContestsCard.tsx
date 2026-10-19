@@ -23,12 +23,13 @@ function formatRecentContestDate(dateStr: string, timestamp?: number): string {
 
 export const RecentContestsCard: React.FC<RecentContestsCardProps> = ({
     connectedPortals: _connectedPortals,
-    username = "vineet_chandel",
+    username,
     embedded = false,
 }) => {
-    const effectiveUser = (username || "vineet_chandel").trim();
-    const remoteData = useAppSelector((state) => state.contests.dataByUser[effectiveUser]);
-    const isLoading = useAppSelector((state) => state.contests.loadingByUser[effectiveUser] || false);
+    const authUser = useAppSelector((state) => state.user.user);
+    const effectiveUser = (username || authUser?.username || "").trim();
+    const remoteData = useAppSelector((state) => (effectiveUser ? state.contests.dataByUser[effectiveUser] : undefined));
+    const isLoading = useAppSelector((state) => (effectiveUser ? state.contests.loadingByUser[effectiveUser] || false : false));
 
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [selectedPortal, setSelectedPortal] = useState<string>("all");

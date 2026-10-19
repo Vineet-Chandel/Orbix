@@ -21,6 +21,9 @@ export interface User {
     customLink?: string | null;
     location?: string | null;
     skills?: string[];
+    links?: Array<{ label: string; url: string; platform?: string }>;
+    isOpenToWork?: boolean;
+    isHireable?: boolean;
     isPublic?: boolean;
     createdAt?: string | null;
     platforms?: any[];
@@ -48,7 +51,7 @@ const initialStoredUser = getStoredUser();
 
 const initialState: UserState = {
     user: initialStoredUser,
-    loading: true, // starts true while verifying session with /profile/me
+    loading: !initialStoredUser, // only loading if no stored user
     isAuthenticated: !!initialStoredUser,
     error: null,
     lastFetchedAt: null,
@@ -61,8 +64,8 @@ let inFlightFetchPromise: Promise<User> | null = null;
 export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | void, { rejectValue: string }>(
     "user/fetchUserProfile",
     async (_options, { rejectWithValue }) => {
-        // Return existing in-flight request if one is active (request deduplication)
-        if (inFlightFetchPromise) {
+        // Return existing in-flight request if one is active unless forced
+        if (inFlightFetchPromise && !_options?.force) {
             try {
                 return await inFlightFetchPromise;
             } catch (err: any) {
@@ -98,7 +101,15 @@ export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | voi
                     if (response.ok) {
                         const data = await response.json();
                         if (data?.user) {
-                            return data.user as User;
+                            const u = data.user;
+                            if (typeof u.links === "string") {
+                                try {
+                                    u.links = JSON.parse(u.links);
+                                } catch {
+                                    u.links = [];
+                                }
+                            }
+                            return u as User;
                         }
                     } else if (response.status === 401) {
                         throw new Error("Unauthorized");
@@ -201,7 +212,9 @@ export const userSlice = createSlice({
     extraReducers: (builder) => {
         builder
             .addCase(fetchUserProfile.pending, (state) => {
-                state.loading = true;
+                if (!state.user) {
+                    state.loading = true;
+                }
                 state.error = null;
             })
             .addCase(fetchUserProfile.fulfilled, (state, action) => {

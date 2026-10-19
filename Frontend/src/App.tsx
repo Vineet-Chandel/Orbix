@@ -62,6 +62,8 @@ const App = () => {
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/notifications" element={<Dashboard />} />
+            <Route path="/inbox" element={<Dashboard />} />
             <Route path="/profile" element={<ProfileManager />} />
             <Route path="/resume" element={<Dashboard />} />
             <Route path="/projects" element={<Dashboard />} />

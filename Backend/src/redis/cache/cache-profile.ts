@@ -15,9 +15,12 @@ export interface PublicProfilePayload {
     linkedin?: string | null;
     github?: string | null;
     customLink?: string | null;
+    links?: Array<{ label: string; url: string; platform?: string }>;
     location?: string;
     skills?: string[];
     isPublic: boolean;
+    isOpenToWork?: boolean;
+    isHireable?: boolean;
     createdAt?: string;
     platforms: Array<{
         portal: string;

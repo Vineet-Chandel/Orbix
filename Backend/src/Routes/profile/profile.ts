@@ -33,6 +33,39 @@ function parseSkills(input: any): string[] {
     return [];
 }
 
+export function parseLinks(rawLinks: any, row?: any): Array<{ label: string; url: string; platform?: string }> {
+    let list = rawLinks;
+    if (typeof list === "string") {
+        try {
+            list = JSON.parse(list);
+        } catch {
+            list = [];
+        }
+    }
+    const result: Array<{ label: string; url: string; platform?: string }> = [];
+    if (Array.isArray(list)) {
+        for (const item of list) {
+            if (!item) continue;
+            const url = String(item.url || "").trim();
+            if (!url) continue;
+            const label = String(item.label || item.title || item.name || "Link").trim();
+            const linkObj: { label: string; url: string; platform?: string } = { label, url };
+            if (item.platform) {
+                linkObj.platform = String(item.platform).trim();
+            }
+            result.push(linkObj);
+        }
+    }
+    // Backward compatibility fallback ONLY if rawLinks was completely null/undefined in DB
+    if ((rawLinks === null || rawLinks === undefined) && result.length === 0 && row) {
+        if (row.linkedin) result.push({ label: "LinkedIn", url: row.linkedin, platform: "linkedin" });
+        if (row.github) result.push({ label: "GitHub", url: row.github, platform: "github" });
+        if (row.website) result.push({ label: "Portfolio", url: row.website, platform: "portfolio" });
+        if (row.customLink || row.custom_link) result.push({ label: "Link", url: row.customLink || row.custom_link });
+    }
+    return result.slice(0, 4);
+}
+
 /**
  * GET /api/profile/me & GET /api/me
  * Retrieves current authenticated user's private profile details.
@@ -70,6 +103,9 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 custom_link AS "customLink",
                 location,
                 skills,
+                links,
+                is_open_to_work AS "isOpenToWork",
+                is_hireable AS "isHireable",
                 is_public AS "isPublic",
                 created_at AS "createdAt"
             FROM users
@@ -113,6 +149,7 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
             user: {
                 ...userRow,
                 skills: Array.isArray(userRow.skills) ? userRow.skills : [],
+                links: parseLinks(userRow.links, userRow),
                 platforms: linksResult.rows || [],
             },
         });
@@ -156,6 +193,9 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             customLink,
             location,
             skills,
+            links,
+            isOpenToWork,
+            isHireable,
             isPublic,
         } = req.body;
 
@@ -166,13 +206,193 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
         const sanitizedBio = bio !== undefined ? String(bio).trim().slice(0, 2000) : null;
         const sanitizedAvatarUrl = avatarUrl !== undefined ? String(avatarUrl).trim() : null;
         const sanitizedCoverImageUrl = coverImageUrl !== undefined ? String(coverImageUrl).trim() : null;
-        const sanitizedWebsite = website !== undefined ? String(website).trim().slice(0, 255) : null;
-        const sanitizedLinkedin = linkedin !== undefined ? String(linkedin).trim().slice(0, 255) : null;
-        const sanitizedGithub = github !== undefined ? String(github).trim().slice(0, 255) : null;
-        const sanitizedCustomLink = customLink !== undefined ? String(customLink).trim().slice(0, 255) : null;
+        let sanitizedWebsite = website !== undefined ? String(website).trim().slice(0, 255) : null;
+        let sanitizedLinkedin = linkedin !== undefined ? String(linkedin).trim().slice(0, 255) : null;
+        let sanitizedGithub = github !== undefined ? String(github).trim().slice(0, 255) : null;
+        let sanitizedCustomLink = customLink !== undefined ? String(customLink).trim().slice(0, 255) : null;
         const sanitizedLocation = location !== undefined ? String(location).trim().slice(0, 150) : null;
         const sanitizedSkills = skills !== undefined ? parseSkills(skills) : [];
+        const sanitizedIsOpenToWork = typeof isOpenToWork === "boolean" ? isOpenToWork : null;
+        const sanitizedIsHireable = typeof isHireable === "boolean" ? isHireable : null;
         const sanitizedIsPublic = typeof isPublic === "boolean" ? isPublic : true;
+
+        let sanitizedLinksJson: string | null = null;
+        if (links !== undefined) {
+            const rawArr = Array.isArray(links) ? links : [];
+            const cleanLinks = rawArr
+                .filter((l: any) => l && typeof l === "object" && typeof l.url === "string" && l.url.trim().length > 0)
+                .map((l: any) => ({
+                    label: String(l.label || l.platform || "Link").trim().slice(0, 50),
+                    url: String(l.url).trim().slice(0, 500),
+                    platform: l.platform ? String(l.platform).trim().slice(0, 50) : undefined,
+                }))
+                .slice(0, 4);
+            sanitizedLinksJson = JSON.stringify(cleanLinks);
+
+            // Sync legacy link fields if not explicitly provided
+            for (const l of cleanLinks) {
+                const p = (l.platform || l.label || "").toLowerCase();
+                const u = l.url;
+                if (!sanitizedLinkedin && (p.includes("linkedin") || u.includes("linkedin.com"))) {
+                    sanitizedLinkedin = u;
+                } else if (!sanitizedGithub && (p.includes("github") || u.includes("github.com"))) {
+                    sanitizedGithub = u;
+                } else if (!sanitizedWebsite && (p.includes("website") || p.includes("portfolio") || p.includes("personal"))) {
+                    sanitizedWebsite = u;
+                } else if (!sanitizedCustomLink) {
+                    sanitizedCustomLink = u;
+                }
+            }
+        }
+
+        // Retrieve existing profile to verify whether any changes actually exist
+        const currentRes = await query(
+            `SELECT
+                firstname AS "firstName",
+                lastname AS "lastName",
+                headline,
+                bio,
+                avatar_url AS "avatarUrl",
+                cover_image_url AS "coverImageUrl",
+                website,
+                linkedin,
+                github,
+                custom_link AS "customLink",
+                location,
+                skills,
+                links,
+                is_open_to_work AS "isOpenToWork",
+                is_hireable AS "isHireable",
+                is_public AS "isPublic"
+             FROM users
+             WHERE id = $1 OR email = $2
+             LIMIT 1;`,
+            [authUser.id, authUser.gmail]
+        );
+
+        if (!currentRes.rows[0]) {
+            return res.status(404).json({
+                success: false,
+                message: "User account not found",
+            });
+        }
+
+        const current = currentRes.rows[0];
+
+        const hasTextDiff = (incoming: string | null | undefined, existing: string | null | undefined) => {
+            const inc = incoming !== undefined && incoming !== null ? String(incoming).trim() : "";
+            const ext = existing !== undefined && existing !== null ? String(existing).trim() : "";
+            return inc !== ext;
+        };
+
+        const isFirstNameChanged = firstName !== undefined && (sanitizedFirstName || "").trim() !== (current.firstName || "").trim();
+        const isLastNameChanged = lastName !== undefined && (sanitizedLastName || "").trim() !== (current.lastName || "").trim();
+        const isHeadlineChanged = headline !== undefined && hasTextDiff(sanitizedHeadline, current.headline);
+        const isBioChanged = bio !== undefined && hasTextDiff(sanitizedBio, current.bio);
+        const isAvatarChanged = avatarUrl !== undefined && hasTextDiff(sanitizedAvatarUrl, current.avatarUrl);
+        const isCoverChanged = coverImageUrl !== undefined && hasTextDiff(sanitizedCoverImageUrl, current.coverImageUrl);
+        const isWebsiteChanged = website !== undefined && hasTextDiff(sanitizedWebsite, current.website);
+        const isLinkedinChanged = linkedin !== undefined && hasTextDiff(sanitizedLinkedin, current.linkedin);
+        const isGithubChanged = github !== undefined && hasTextDiff(sanitizedGithub, current.github);
+        const isCustomLinkChanged = customLink !== undefined && hasTextDiff(sanitizedCustomLink, current.customLink);
+        const isLocationChanged = location !== undefined && hasTextDiff(sanitizedLocation, current.location);
+
+        const isIsOpenToWorkChanged = typeof isOpenToWork === "boolean" && Boolean(isOpenToWork) !== Boolean(current.isOpenToWork);
+        const isIsHireableChanged = typeof isHireable === "boolean" && Boolean(isHireable) !== Boolean(current.isHireable);
+        const isIsPublicChanged = typeof isPublic === "boolean" && Boolean(isPublic) !== Boolean(current.isPublic);
+
+        // Skills difference check
+        let isSkillsChanged = false;
+        if (skills !== undefined) {
+            const existingSkills = parseSkills(current.skills);
+            if (sanitizedSkills.length !== existingSkills.length) {
+                isSkillsChanged = true;
+            } else {
+                for (let i = 0; i < sanitizedSkills.length; i++) {
+                    const s = sanitizedSkills[i];
+                    const es = existingSkills[i];
+                    if (s !== es) {
+                        isSkillsChanged = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Links difference check
+        let isLinksChanged = false;
+        if (links !== undefined) {
+            const cleanLinks = (Array.isArray(links) ? links : [])
+                .filter((l: any) => l && typeof l === "object" && typeof l.url === "string" && l.url.trim().length > 0)
+                .map((l: any) => ({
+                    label: String(l.label || l.platform || "Link").trim().slice(0, 50),
+                    url: String(l.url).trim().slice(0, 500),
+                    platform: l.platform ? String(l.platform).trim().slice(0, 50) : undefined,
+                }))
+                .slice(0, 4);
+
+            const existingLinks = parseLinks(current.links, current);
+            if (cleanLinks.length !== existingLinks.length) {
+                isLinksChanged = true;
+            } else {
+                for (let i = 0; i < cleanLinks.length; i++) {
+                    const c = cleanLinks[i];
+                    const e = existingLinks[i];
+                    if (
+                        !c ||
+                        !e ||
+                        c.label !== e.label ||
+                        c.url !== e.url ||
+                        (c.platform || undefined) !== (e.platform || undefined)
+                    ) {
+                        isLinksChanged = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        const hasAnyChanges =
+            isFirstNameChanged ||
+            isLastNameChanged ||
+            isHeadlineChanged ||
+            isBioChanged ||
+            isAvatarChanged ||
+            isCoverChanged ||
+            isWebsiteChanged ||
+            isLinkedinChanged ||
+            isGithubChanged ||
+            isCustomLinkChanged ||
+            isLocationChanged ||
+            isIsOpenToWorkChanged ||
+            isIsHireableChanged ||
+            isIsPublicChanged ||
+            isSkillsChanged ||
+            isLinksChanged;
+
+        if (!hasAnyChanges) {
+            return res.status(400).json({
+                success: false,
+                message: "No profile changes detected. The submitted details are identical to your current profile.",
+            });
+        }
+
+        const finalFirstName = firstName !== undefined ? (sanitizedFirstName || null) : current.firstName;
+        const finalLastName = lastName !== undefined ? (sanitizedLastName || null) : current.lastName;
+        const finalHeadline = headline !== undefined ? sanitizedHeadline : current.headline;
+        const finalBio = bio !== undefined ? sanitizedBio : current.bio;
+        const finalAvatarUrl = avatarUrl !== undefined ? sanitizedAvatarUrl : current.avatarUrl;
+        const finalCoverImageUrl = coverImageUrl !== undefined ? sanitizedCoverImageUrl : current.coverImageUrl;
+        const finalWebsite = website !== undefined ? sanitizedWebsite : (sanitizedWebsite || current.website);
+        const finalLinkedin = linkedin !== undefined ? sanitizedLinkedin : (sanitizedLinkedin || current.linkedin);
+        const finalGithub = github !== undefined ? sanitizedGithub : (sanitizedGithub || current.github);
+        const finalCustomLink = customLink !== undefined ? sanitizedCustomLink : (sanitizedCustomLink || current.customLink);
+        const finalLocation = location !== undefined ? sanitizedLocation : current.location;
+        const finalSkills = skills !== undefined ? sanitizedSkills : parseSkills(current.skills);
+        const finalIsPublic = typeof isPublic === "boolean" ? sanitizedIsPublic : (current.isPublic ?? true);
+        const finalLinksJson = links !== undefined ? (sanitizedLinksJson || "[]") : (current.links ? (typeof current.links === "string" ? current.links : JSON.stringify(current.links)) : "[]");
+        const finalIsOpenToWork = typeof isOpenToWork === "boolean" ? sanitizedIsOpenToWork : current.isOpenToWork;
+        const finalIsHireable = typeof isHireable === "boolean" ? sanitizedIsHireable : current.isHireable;
 
         const updateResult = await query(
             `UPDATE users
@@ -190,8 +410,11 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 location = $11,
                 skills = $12::jsonb,
                 is_public = $13,
+                links = COALESCE($14::jsonb, '[]'::jsonb),
+                is_open_to_work = COALESCE($15, false),
+                is_hireable = COALESCE($16, false),
                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $14 OR email = $15
+             WHERE id = $17 OR email = $18
              RETURNING
                 id,
                 username,
@@ -210,22 +433,28 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 custom_link AS "customLink",
                 location,
                 skills,
+                links,
+                is_open_to_work AS "isOpenToWork",
+                is_hireable AS "isHireable",
                 is_public AS "isPublic",
                 updated_at AS "updatedAt";`,
             [
-                sanitizedFirstName || null,
-                sanitizedLastName || null,
-                sanitizedHeadline,
-                sanitizedBio,
-                sanitizedAvatarUrl,
-                sanitizedCoverImageUrl,
-                sanitizedWebsite,
-                sanitizedLinkedin,
-                sanitizedGithub,
-                sanitizedCustomLink,
-                sanitizedLocation,
-                JSON.stringify(sanitizedSkills),
-                sanitizedIsPublic,
+                finalFirstName || null,
+                finalLastName || null,
+                finalHeadline,
+                finalBio,
+                finalAvatarUrl,
+                finalCoverImageUrl,
+                finalWebsite,
+                finalLinkedin,
+                finalGithub,
+                finalCustomLink,
+                finalLocation,
+                JSON.stringify(finalSkills),
+                finalIsPublic,
+                finalLinksJson,
+                finalIsOpenToWork,
+                finalIsHireable,
                 authUser.id,
                 authUser.gmail,
             ]
@@ -253,6 +482,7 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             user: {
                 ...updatedUser,
                 skills: Array.isArray(updatedUser.skills) ? updatedUser.skills : [],
+                links: parseLinks(updatedUser.links, updatedUser),
             },
         });
     } catch (err: any) {
@@ -319,6 +549,9 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 custom_link AS "customLink",
                 location,
                 skills,
+                links,
+                is_open_to_work AS "isOpenToWork",
+                is_hireable AS "isHireable",
                 is_public AS "isPublic",
                 created_at AS "createdAt"
             FROM users
@@ -376,6 +609,9 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             customLink: userRow.customLink || null,
             location: userRow.location,
             skills: Array.isArray(userRow.skills) ? userRow.skills : [],
+            links: parseLinks(userRow.links, userRow),
+            isOpenToWork: userRow.isOpenToWork === true,
+            isHireable: userRow.isHireable === true,
             isPublic: userRow.isPublic !== false,
             createdAt: userRow.createdAt,
             platforms: linksResult.rows || [],
@@ -405,6 +641,163 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
 
 profileRouter.get("/public/:username", optionalAuthenticate, handleGetPublicProfile);
 profileRouter.get("/user/:username", optionalAuthenticate, handleGetPublicProfile);
+
+/**
+ * POST /api/profile/:username/hire-message (and /api/profile/hire-message)
+ * Recruiter / hiring manager inquiry endpoint to send notification & message to profile owner.
+ */
+const handleSendHireMessage = async (req: Request, res: Response) => {
+    try {
+        const usernameParam = req.params.username || req.body.username;
+        const username = String(usernameParam || "").trim().toLowerCase();
+        const { senderName, senderEmail, communicationEmail, company, message } = req.body;
+
+        if (!username) {
+            return res.status(400).json({ success: false, message: "Recipient username is required" });
+        }
+
+        // Strict verification: all entries are necessary
+        if (!senderName || typeof senderName !== "string" || senderName.trim().length < 2) {
+            return res.status(400).json({ success: false, message: "Your full name is required (minimum 2 characters)" });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!senderEmail || typeof senderEmail !== "string" || !emailRegex.test(senderEmail.trim())) {
+            return res.status(400).json({ success: false, message: "A valid work email is required" });
+        }
+
+        if (!communicationEmail || typeof communicationEmail !== "string" || !emailRegex.test(communicationEmail.trim())) {
+            return res.status(400).json({ success: false, message: "A valid communication email is required for direct correspondence" });
+        }
+
+        if (!company || typeof company !== "string" || company.trim().length < 2) {
+            return res.status(400).json({ success: false, message: "Company name is required" });
+        }
+
+        if (!message || typeof message !== "string" || message.trim().length < 10) {
+            return res.status(400).json({ success: false, message: "Message is required (minimum 10 characters describing the role)" });
+        }
+
+        // Verify user exists and retrieve email + name
+        const userRes = await query(
+            `SELECT id, username, firstname, lastname, email, is_hireable
+             FROM users
+             WHERE LOWER(username) = $1
+             LIMIT 1;`,
+            [username]
+        );
+
+        if (!userRes.rows[0]) {
+            return res.status(404).json({ success: false, message: `User '@${username}' not found` });
+        }
+
+        const recipient = userRes.rows[0];
+
+        // Store recruiter message in recruiter_messages table with communication_email
+        const msgResult = await query(
+            `INSERT INTO recruiter_messages (
+                recipient_user_id,
+                recipient_username,
+                recipient_email,
+                sender_name,
+                sender_email,
+                communication_email,
+                company,
+                message,
+                status
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'delivered')
+            RETURNING id, created_at;`,
+            [
+                recipient.id,
+                recipient.username,
+                recipient.email,
+                senderName.trim().slice(0, 150),
+                senderEmail.trim().slice(0, 255),
+                communicationEmail.trim().slice(0, 255),
+                company.trim().slice(0, 200),
+                message.trim().slice(0, 5000),
+            ]
+        );
+
+        // Store notification for user in user_notifications table
+        const cleanCompany = company.trim();
+        await query(
+            `INSERT INTO user_notifications (
+                user_id,
+                username,
+                title,
+                body,
+                type,
+                metadata
+            ) VALUES ($1, $2, $3, $4, $5, $6);`,
+            [
+                recipient.id,
+                recipient.username,
+                `New hire inquiry from ${senderName.trim()} at ${cleanCompany}`,
+                message.trim().slice(0, 280),
+                "hire_inquiry",
+                JSON.stringify({
+                    senderName: senderName.trim(),
+                    senderEmail: senderEmail.trim(),
+                    communicationEmail: communicationEmail.trim(),
+                    company: cleanCompany,
+                    messageId: msgResult.rows[0]?.id,
+                    fullMessage: message.trim(),
+                }),
+            ]
+        );
+
+        const recipientFirst = recipient.firstname || recipient.username;
+
+        return res.status(200).json({
+            success: true,
+            message: `Your message has been sent to ${recipientFirst}. They will receive your communication email so they can get back to you!`,
+        });
+    } catch (err: any) {
+        console.error("Hire message dispatch error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to send message. Please try again later.",
+            error: err.message,
+        });
+    }
+};
+
+profileRouter.post("/:username/hire-message", handleSendHireMessage);
+profileRouter.post("/hire-message", handleSendHireMessage);
+
+/**
+ * GET /api/profile/messages
+ * Retrieves inbound recruiter messages for the authenticated user.
+ */
+profileRouter.get("/messages", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = req.user;
+        if (!authUser) {
+            return res.status(401).json({ success: false, message: "Authentication required" });
+        }
+        const msgs = await query(
+            `SELECT
+                id,
+                sender_name AS "senderName",
+                sender_email AS "senderEmail",
+                communication_email AS "communicationEmail",
+                company,
+                message,
+                status,
+                is_read AS "isRead",
+                created_at AS "createdAt"
+             FROM recruiter_messages
+             WHERE LOWER(recipient_username) = $1 OR LOWER(recipient_username) = $2
+             ORDER BY created_at DESC
+             LIMIT 50;`,
+            [authUser.username.toLowerCase(), authUser.gmail.toLowerCase()]
+        );
+        return res.status(200).json({ success: true, messages: msgs.rows });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to fetch messages", error: err.message });
+    }
+});
 
 
 /**

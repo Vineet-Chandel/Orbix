@@ -5,7 +5,7 @@ const ProtectedRoute = () => {
     const { user, loading } = useAppSelector((state) => state.user);
     const context = useOutletContext();
 
-    if (loading) {
+    if (loading && !user) {
         return (
             <div className="min-h-screen bg-[#07090e] flex items-center justify-center text-white">
                 <div className="flex flex-col items-center gap-4">
