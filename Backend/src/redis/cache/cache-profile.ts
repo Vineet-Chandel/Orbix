@@ -12,6 +12,9 @@ export interface PublicProfilePayload {
     headline?: string;
     bio?: string;
     website?: string;
+    linkedin?: string | null;
+    github?: string | null;
+    customLink?: string | null;
     location?: string;
     skills?: string[];
     isPublic: boolean;

@@ -24,6 +24,9 @@ export interface PublicProfileData {
     headline?: string;
     bio?: string;
     website?: string;
+    linkedin?: string | null;
+    github?: string | null;
+    customLink?: string | null;
     location?: string;
     skills?: string[];
     isPublic: boolean;
@@ -196,6 +199,9 @@ export async function updateProfile(payload: {
     avatarUrl?: string;
     coverImageUrl?: string;
     website?: string;
+    linkedin?: string;
+    github?: string;
+    customLink?: string;
     location?: string;
     skills?: string[];
     isPublic?: boolean;

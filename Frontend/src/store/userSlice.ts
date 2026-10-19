@@ -16,6 +16,9 @@ export interface User {
     hasPreviousPhoto?: boolean;
     coverImageUrl?: string | null;
     website?: string | null;
+    linkedin?: string | null;
+    github?: string | null;
+    customLink?: string | null;
     location?: string | null;
     skills?: string[];
     isPublic?: boolean;

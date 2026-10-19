@@ -2,15 +2,16 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
     GitBranch,
-    GitPullRequest,
     Flame,
     Calendar,
     Layers,
     Sparkles,
     CheckCircle2,
     ArrowRight,
+    ExternalLink,
 } from "lucide-react";
-import { useAppDispatch, useAppSelector, fetchUnifiedDevelopment, clearDevelopmentCache } from "../../store";
+import { useAppDispatch, useAppSelector, fetchUnifiedDevelopment, clearDevelopmentCache, fetchDevelopmentAnalytics } from "../../store";
+import { DevelopmentMetricCards } from "./DevelopmentAnalytics/DevelopmentMetricCards";
 import { getPortalIcon } from "../../utils/portalIcons";
 import {
     aggregateClientDevelopmentContributions,
@@ -37,7 +38,21 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
     const weeksCount = 52; // Full 1 Year activity heatmap
 
     const gh = connectedPortals?.github || connectedPortals?.["GitHub"] || connectedPortals?.["Github"];
-    const githubHandle = (typeof gh === "object" ? gh?.username || gh?.portal_username || "" : String(gh || "")).trim().toLowerCase();
+    const rawGhHandle = useMemo(() => {
+        if (typeof gh === "object" && gh) {
+            return (gh.username || gh.portal_username || gh.handle || "").trim();
+        }
+        if (typeof gh === "string") {
+            return gh.trim();
+        }
+        return "";
+    }, [gh]);
+    const githubHandle = rawGhHandle.toLowerCase();
+
+    const analyticsData = useAppSelector((state) => state.developmentAnalytics.dataByUser[effectiveUser]);
+    const isAnalyticsLoading = useAppSelector(
+        (state) => state.developmentAnalytics.loadingByUser[effectiveUser] || false
+    );
 
     const prevGhRef = React.useRef<string | null>(null);
 
@@ -53,6 +68,20 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
             dispatch(fetchUnifiedDevelopment({ username: effectiveUser, force: true, portals: connectedPortals }));
         }
     }, [effectiveUser, githubHandle, connectedPortals, dispatch]);
+
+    // Fetch development analytics if not loaded yet
+    useEffect(() => {
+        if (!effectiveUser) return;
+        if (!analyticsData && !isAnalyticsLoading) {
+            dispatch(
+                fetchDevelopmentAnalytics({
+                    username: effectiveUser,
+                    githubHandle: rawGhHandle || effectiveUser,
+                    portals: connectedPortals,
+                })
+            );
+        }
+    }, [effectiveUser, rawGhHandle, connectedPortals, analyticsData, isAnalyticsLoading, dispatch]);
 
     // Compute fallback client development aggregation
     const clientAgg = useMemo(() => {
@@ -180,7 +209,7 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
             <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
             {/* Top Header Row */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
                 <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500/20 to-sky-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400 flex-shrink-0 shadow-lg">
                         <GitBranch className="w-6 h-6" />
@@ -201,22 +230,34 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                     </div>
                 </div>
 
-                <div className="flex items-center gap-5 flex-shrink-0">
-                    {/* Total Contributions Metric */}
-                    <div className="text-right">
-                        <span className="text-3xl sm:text-4xl font-mono font-black text-emerald-400 block leading-none">
-                            {totalContributions.toLocaleString()}
-                        </span>
-                        <div className="flex items-center justify-end gap-1 text-[11px] font-bold uppercase tracking-wider text-neutral-400 mt-1">
-                            <GitPullRequest className="w-3.5 h-3.5 text-indigo-400" />
-                            <span>Contributions Done</span>
-                        </div>
+                {rawGhHandle && (
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                        <a
+                            href={`https://github.com/${rawGhHandle}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-mono text-neutral-300 hover:text-white transition-all cursor-pointer shadow-sm group"
+                            title={`View ${rawGhHandle} on GitHub`}
+                        >
+                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                            <span>@{rawGhHandle}</span>
+                            <ExternalLink className="w-3.5 h-3.5 text-neutral-400 group-hover:text-white transition-colors" />
+                        </a>
                     </div>
-                </div>
+                )}
+            </div>
+
+            {/* 4 Metric Stats: Contributions, Repositories, Stars, Followers */}
+            <div className="py-5 my-2 border-t border-white/[0.08] relative z-10">
+                <DevelopmentMetricCards
+                    data={analyticsData}
+                    isLoading={isAnalyticsLoading}
+                    totalContributionsFallback={totalContributions}
+                />
             </div>
 
             {/* Platform Filter Chips Row */}
-            <div className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y border-white/[0.06] relative z-10 scrollbar-none">
+            <div className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y border-white/[0.08] relative z-10 scrollbar-none">
                 <button
                     type="button"
                     onClick={() => setSelectedPortal("all")}

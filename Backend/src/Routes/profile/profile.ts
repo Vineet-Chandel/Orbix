@@ -65,6 +65,9 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
                 cover_image_url AS "coverImageUrl",
                 website,
+                linkedin,
+                github,
+                custom_link AS "customLink",
                 location,
                 skills,
                 is_public AS "isPublic",
@@ -148,6 +151,9 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             avatarUrl,
             coverImageUrl,
             website,
+            linkedin,
+            github,
+            customLink,
             location,
             skills,
             isPublic,
@@ -161,6 +167,9 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
         const sanitizedAvatarUrl = avatarUrl !== undefined ? String(avatarUrl).trim() : null;
         const sanitizedCoverImageUrl = coverImageUrl !== undefined ? String(coverImageUrl).trim() : null;
         const sanitizedWebsite = website !== undefined ? String(website).trim().slice(0, 255) : null;
+        const sanitizedLinkedin = linkedin !== undefined ? String(linkedin).trim().slice(0, 255) : null;
+        const sanitizedGithub = github !== undefined ? String(github).trim().slice(0, 255) : null;
+        const sanitizedCustomLink = customLink !== undefined ? String(customLink).trim().slice(0, 255) : null;
         const sanitizedLocation = location !== undefined ? String(location).trim().slice(0, 150) : null;
         const sanitizedSkills = skills !== undefined ? parseSkills(skills) : [];
         const sanitizedIsPublic = typeof isPublic === "boolean" ? isPublic : true;
@@ -175,11 +184,14 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 avatar_url = $5,
                 cover_image_url = $6,
                 website = $7,
-                location = $8,
-                skills = $9::jsonb,
-                is_public = $10,
+                linkedin = $8,
+                github = $9,
+                custom_link = $10,
+                location = $11,
+                skills = $12::jsonb,
+                is_public = $13,
                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $11 OR email = $12
+             WHERE id = $14 OR email = $15
              RETURNING
                 id,
                 username,
@@ -193,6 +205,9 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 avatar_url AS "avatarUrl",
                 cover_image_url AS "coverImageUrl",
                 website,
+                linkedin,
+                github,
+                custom_link AS "customLink",
                 location,
                 skills,
                 is_public AS "isPublic",
@@ -205,6 +220,9 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 sanitizedAvatarUrl,
                 sanitizedCoverImageUrl,
                 sanitizedWebsite,
+                sanitizedLinkedin,
+                sanitizedGithub,
+                sanitizedCustomLink,
                 sanitizedLocation,
                 JSON.stringify(sanitizedSkills),
                 sanitizedIsPublic,
@@ -296,6 +314,9 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 photo_url AS "photoUrl",
                 cover_image_url AS "coverImageUrl",
                 website,
+                linkedin,
+                github,
+                custom_link AS "customLink",
                 location,
                 skills,
                 is_public AS "isPublic",
@@ -350,6 +371,9 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             headline: userRow.headline,
             bio: userRow.bio,
             website: userRow.website,
+            linkedin: userRow.linkedin || null,
+            github: userRow.github || null,
+            customLink: userRow.customLink || null,
             location: userRow.location,
             skills: Array.isArray(userRow.skills) ? userRow.skills : [],
             isPublic: userRow.isPublic !== false,

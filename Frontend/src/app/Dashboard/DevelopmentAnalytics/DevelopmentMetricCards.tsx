@@ -4,16 +4,18 @@ import type { DevelopmentAnalyticsData } from "../../../store/developmentAnalyti
 interface DevelopmentMetricCardsProps {
     data?: DevelopmentAnalyticsData | null;
     isLoading?: boolean;
+    totalContributionsFallback?: number;
 }
 
 export const DevelopmentMetricCards: React.FC<DevelopmentMetricCardsProps> = ({
     data,
     isLoading = false,
+    totalContributionsFallback,
 }) => {
-    const contributions = data?.contributions ?? 219;
-    const repos = data?.repos ?? 14;
-    const stars = data?.stars ?? 45;
-    const followers = data?.followers ?? 183;
+    const contributions = data?.contributions ?? totalContributionsFallback ?? 0;
+    const repos = data?.repos ?? 0;
+    const stars = data?.stars ?? 0;
+    const followers = data?.followers ?? 0;
 
     const metrics = [
         {
@@ -41,7 +43,7 @@ export const DevelopmentMetricCards: React.FC<DevelopmentMetricCardsProps> = ({
                     key={idx}
                     className="flex flex-col items-center justify-center text-center py-2 px-4 select-none"
                 >
-                    {isLoading && !data ? (
+                    {isLoading && !data && !totalContributionsFallback ? (
                         <div className="animate-pulse space-y-2 flex flex-col items-center w-full">
                             <div className="h-8 w-16 bg-white/[0.08] rounded-lg" />
                             <div className="h-3.5 w-20 bg-white/[0.06] rounded" />

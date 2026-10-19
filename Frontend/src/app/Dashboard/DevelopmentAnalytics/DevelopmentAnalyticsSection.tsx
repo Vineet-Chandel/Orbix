@@ -4,7 +4,6 @@ import {
     fetchDevelopmentAnalytics,
     clearDevelopmentAnalyticsCache,
 } from "../../../store/developmentAnalyticsSlice";
-import { DevelopmentMetricCards } from "./DevelopmentMetricCards";
 import { LanguagesCard } from "./LanguagesCard";
 import { DevelopmentHighlightsCard } from "./DevelopmentHighlightsCard";
 
@@ -73,14 +72,8 @@ export const DevelopmentAnalyticsSection: React.FC<DevelopmentAnalyticsSectionPr
             <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-500/[0.04] rounded-full blur-3xl pointer-events-none" />
             <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-500/[0.04] rounded-full blur-3xl pointer-events-none" />
 
-            <div className="relative z-10 space-y-8">
-                {/* Row 1: The 4 Metric Stats */}
-                <DevelopmentMetricCards data={data} isLoading={isLoading} />
-
-                {/* Horizontal divider between metrics and Row 2 */}
-                <div className="w-full h-px bg-white/[0.08]" />
-
-                {/* Row 2: Languages (left) & Top Repositories (right) */}
+            <div className="relative z-10">
+                {/* Languages (left) & Top Repositories (right) */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
                     <div className="flex flex-col justify-between">
                         <LanguagesCard languages={data?.languages} isLoading={isLoading} />
