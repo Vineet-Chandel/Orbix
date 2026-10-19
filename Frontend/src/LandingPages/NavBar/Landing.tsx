@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAppSelector } from '../../store';
 
 export interface NavItem {
     id: string;
@@ -128,10 +129,39 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
         }
     };
 
+    const { user, loading, isAuthenticated } = useAppSelector((state) => state.user);
+
+    // Synchronous fallback from localStorage for immediate paint
+    const storedUser = React.useMemo(() => {
+        try {
+            const raw = localStorage.getItem("orbix_user");
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const currentUser = user || storedUser;
+    const isLoggedIn = Boolean(
+        (isAuthenticated && user) ||
+        (currentUser && (currentUser.username || currentUser.gmail || currentUser.id))
+    );
+
+    const displayName = currentUser?.firstName
+        ? `${currentUser.firstName} ${currentUser.lastName || ""}`.trim()
+        : currentUser?.username || "Developer";
+
+    const avatarSrc = currentUser?.photoUrl
+        || currentUser?.avatarUrl
+        || (currentUser as any)?.photo_url
+        || (currentUser as any)?.avatar_url
+        || (currentUser as any)?.avatar
+        || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=111827&color=fff&size=128&bold=true`;
+
     const handleWorkspaceClick = (e: React.MouseEvent) => {
         e.preventDefault();
-        const user = localStorage.getItem("orbix_user");
-        if (user) {
+        if (loading) return;
+        if (isLoggedIn) {
             navigate("/dashboard");
         } else {
             navigate("/auth/signin");
@@ -291,7 +321,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                 </div>
 
                 {/* Right Action Buttons */}
-                <div className="flex items-center gap-1 sm:gap-2 ml-1 sm:ml-2">
+                <div className="flex items-center gap-1.5 sm:gap-2.5 ml-1 sm:ml-2">
                     {/* Book a Demo Link */}
                     <Link
                         to="/support"
@@ -300,11 +330,32 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         Book a demo
                     </Link>
 
-                    {/* Primary CTA Button: Workspace with dynamic auth redirection */}
+                    {/* Authenticated User Rounded Profile Picture (at the left of Workspace button) */}
+                    {isLoggedIn && (
+                        <Link
+                            to="/dashboard"
+                            title={`${displayName} - Open Dashboard`}
+                            className="group relative flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 transition-transform hover:scale-105 active:scale-95 focus:outline-none"
+                        >
+                            <img
+                                src={avatarSrc}
+                                alt={displayName}
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                        displayName
+                                    )}&background=111827&color=fff&size=128&bold=true`;
+                                }}
+                                className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-white/20 ring-2 ring-white/10 group-hover:ring-amber-400/50 shadow-sm transition-all"
+                            />
+                        </Link>
+                    )}
+
+                    {/* Primary CTA Button: Workspace with dynamic auth redirection and loader */}
                     <button
                         type="button"
                         onClick={handleWorkspaceClick}
-                        className="group relative inline-flex items-center h-[46px] gap-1.5 pl-3.5 sm:pl-4 pr-2 sm:pr-2.5 rounded-full bg-gradient-to-b from-white to-[#dfe3ef] text-neutral-950 font-semibold text-xs sm:text-sm shadow-sm hover:from-white hover:to-white transition-all duration-200 hover:shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:scale-[1.02] active:scale-[0.98] focus:outline-none whitespace-nowrap cursor-pointer"
+                        disabled={loading}
+                        className="group relative inline-flex items-center h-[46px] gap-1.5 pl-3.5 sm:pl-4 pr-2 sm:pr-2.5 rounded-full bg-gradient-to-b from-white to-[#dfe3ef] text-neutral-950 font-semibold text-xs sm:text-sm shadow-sm hover:from-white hover:to-white transition-all duration-200 hover:shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:scale-[1.02] active:scale-[0.98] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden"
                     >
                         <span>Workspace</span>
                         <span className="w-5 h-5 rounded-full bg-neutral-950/10 flex items-center justify-center transition-transform duration-200 group-hover:translate-x-0.5">
@@ -321,6 +372,20 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                 <polyline points="12 5 19 12 12 19" />
                             </svg>
                         </span>
+
+                        {/* Loader overlay over the workspace button while auth is verifying */}
+                        {loading && (
+                            <div className="absolute inset-0 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center z-10 transition-opacity">
+                                <svg
+                                    className="w-4 h-4 animate-spin text-neutral-950"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                >
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                </svg>
+                            </div>
+                        )}
                     </button>
                 </div>
 

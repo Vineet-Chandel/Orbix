@@ -1,12 +1,20 @@
 import { Link, useNavigate } from 'react-router-dom';
 import NavBar from '../NavBar/Landing';
+import { useAppSelector } from '../../store';
 
 export default function MainLanding() {
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAppSelector((state) => state.user);
 
   const handleLaunchWorkspace = () => {
-    const user = localStorage.getItem("orbix_user");
-    if (user) {
+    let storedUser = null;
+    try {
+      const raw = localStorage.getItem("orbix_user");
+      if (raw) storedUser = JSON.parse(raw);
+    } catch {}
+
+    const currentUser = user || storedUser;
+    if (isAuthenticated || currentUser) {
       navigate("/dashboard");
     } else {
       navigate("/auth/signup");

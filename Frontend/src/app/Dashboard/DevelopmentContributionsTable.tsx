@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUnifiedDevelopment, clearDevelopmentCache, fetchDevelopmentAnalytics } from "../../store";
 import { DevelopmentMetricCards } from "./DevelopmentAnalytics/DevelopmentMetricCards";
+import { DevelopmentActivityCharts } from "./DevelopmentAnalytics/DevelopmentActivityCharts";
 import { getPortalIcon } from "../../utils/portalIcons";
 import {
     aggregateClientDevelopmentContributions,
@@ -400,6 +401,15 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                     </div>
                     <span className="text-[10px] uppercase font-bold text-neutral-400">More</span>
                 </div>
+            </div>
+
+            {/* Dynamic Development Activity Charts: Contributions by month & Coding days */}
+            <div className="pt-6 mt-6 border-t border-white/[0.08] relative z-10">
+                <DevelopmentActivityCharts
+                    dailyMerged={remoteData?.dailyMerged || clientAgg.dailyMerged}
+                    serverCharts={remoteData?.charts || clientAgg.charts}
+                    totalContributions={totalContributions}
+                />
             </div>
         </div>
     );

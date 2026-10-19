@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { FolderGit2, GitCommit, Trophy } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { OrbixCardQR } from "./OrbixCardQR";
@@ -72,6 +72,93 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
     });
 
     const displayUrl = publicProfileUrl.replace(/^https?:\/\//, "");
+
+    const linkedin = user?.linkedin;
+    const github = user?.github;
+    const portfolio = user?.website || user?.portfolio;
+    const customLink = user?.customLink || user?.link;
+
+    const socialLinks = useMemo(() => {
+        const list: Array<{
+            id: string;
+            label: string;
+            url: string;
+            icon: React.ReactNode;
+        }> = [];
+
+        if (linkedin && typeof linkedin === "string" && linkedin.trim()) {
+            const raw = linkedin.trim();
+            const url = raw.startsWith("http://") || raw.startsWith("https://")
+                ? raw
+                : raw.startsWith("linkedin.com")
+                ? `https://${raw}`
+                : `https://www.linkedin.com/in/${raw.replace(/^@/, "")}`;
+            list.push({
+                id: "linkedin",
+                label: "LinkedIn",
+                url,
+                icon: (
+                    <span className="font-extrabold text-[12px] font-sans leading-none text-white tracking-tight">in</span>
+                ),
+            });
+        }
+
+        if (github && typeof github === "string" && github.trim()) {
+            const raw = github.trim();
+            const url = raw.startsWith("http://") || raw.startsWith("https://")
+                ? raw
+                : raw.startsWith("github.com")
+                ? `https://${raw}`
+                : `https://github.com/${raw.replace(/^@/, "")}`;
+            list.push({
+                id: "github",
+                label: "GitHub",
+                url,
+                icon: (
+                    <svg className="w-3.5 h-3.5 fill-current text-white flex-shrink-0" viewBox="0 0 24 24">
+                        <path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2Z" />
+                    </svg>
+                ),
+            });
+        }
+
+        if (portfolio && typeof portfolio === "string" && portfolio.trim()) {
+            const raw = portfolio.trim();
+            const url = raw.startsWith("http://") || raw.startsWith("https://")
+                ? raw
+                : `https://${raw}`;
+            list.push({
+                id: "portfolio",
+                label: "Portfolio",
+                url,
+                icon: (
+                    <svg className="w-3.5 h-3.5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0a8.949 8.949 0 0 0 4.951-1.488A3.987 3.987 0 0 0 13 16h-2a3.987 3.987 0 0 0-3.951 3.512A8.949 8.949 0 0 0 12 21Zm-3-9a3 3 0 1 1 6 0 3 3 0 0 1-6 0Z" />
+                    </svg>
+                ),
+            });
+        }
+
+        if (customLink && typeof customLink === "string" && customLink.trim()) {
+            const raw = customLink.trim();
+            const url = raw.startsWith("http://") || raw.startsWith("https://")
+                ? raw
+                : `https://${raw}`;
+            list.push({
+                id: "customLink",
+                label: "Link",
+                url,
+                icon: (
+                    <svg className="w-3.5 h-3.5 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                ),
+            });
+        }
+
+        return list;
+    }, [linkedin, github, portfolio, customLink]);
+
 
     const isLightBanner = theme.id === "gold";
     const bannerTextColor = isLightBanner ? "black" : "black";
@@ -272,7 +359,27 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                 </div>
                             </div>
 
-
+                            {/* Social & Portfolio Links (Directly Above Top Coding Accounts) */}
+                            {socialLinks.length > 0 && (
+                                <div className="flex items-center gap-2 flex-wrap justify-end pb-1 max-w-[460px]">
+                                    {socialLinks.map((item) => (
+                                        <a
+                                            key={item.id}
+                                            href={item.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            onClick={(e) => e.stopPropagation()}
+                                            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#121824]/90 hover:bg-[#1c2436] border border-white/15 hover:border-white/35 text-white text-xs font-semibold tracking-wide transition-all duration-150 cursor-pointer shadow-md hover:scale-[1.03] active:scale-95 group/btn select-none"
+                                            title={`Open ${item.label}`}
+                                        >
+                                            {item.icon}
+                                            <span className="font-semibold text-[13px] text-neutral-100 group-hover/btn:text-white">
+                                                {item.label}
+                                            </span>
+                                        </a>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Two Columns Dashboard Content - Full Height Rich Blocks */}

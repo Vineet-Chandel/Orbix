@@ -22,6 +22,9 @@ export default function ProfileManager() {
     const [headline, setHeadline] = useState(user?.headline || "");
     const [bio, setBio] = useState(user?.bio || "");
     const [website, setWebsite] = useState(user?.website || "");
+    const [linkedin, setLinkedin] = useState(user?.linkedin || "");
+    const [github, setGithub] = useState(user?.github || "");
+    const [customLink, setCustomLink] = useState(user?.customLink || "");
     const [location, setLocation] = useState(user?.location || "");
     const [skills, setSkills] = useState<string[]>(user?.skills || []);
     const [newSkillInput, setNewSkillInput] = useState("");
@@ -64,6 +67,9 @@ export default function ProfileManager() {
             setHeadline(user.headline || "");
             setBio(user.bio || "");
             setWebsite(user.website || "");
+            setLinkedin(user.linkedin || "");
+            setGithub(user.github || "");
+            setCustomLink(user.customLink || "");
             setLocation(user.location || "");
             setSkills(Array.isArray(user.skills) ? user.skills : []);
         }
@@ -81,6 +87,9 @@ export default function ProfileManager() {
                 headline: headline.trim(),
                 bio: bio.trim(),
                 website: website.trim(),
+                linkedin: linkedin.trim(),
+                github: github.trim(),
+                customLink: customLink.trim(),
                 location: location.trim(),
                 skills,
             };
@@ -150,10 +159,13 @@ export default function ProfileManager() {
         headline,
         bio,
         website,
+        linkedin,
+        github,
+        customLink,
         location,
         skills,
         photoUrl: user?.photoUrl || user?.avatarUrl,
-    }), [user, firstName, lastName, headline, bio, website, location, skills]);
+    }), [user, firstName, lastName, headline, bio, website, linkedin, github, customLink, location, skills]);
 
     return (
         <div className="min-h-screen bg-[#F0F2F6] text-neutral-900 font-sans flex antialiased selection:bg-neutral-900 selection:text-white">
@@ -324,7 +336,7 @@ export default function ProfileManager() {
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-4">
                                     <div>
                                         <label className="block text-xs font-bold text-neutral-700 mb-1">Location</label>
                                         <input
@@ -335,15 +347,85 @@ export default function ProfileManager() {
                                             className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
                                         />
                                     </div>
-                                    <div>
-                                        <label className="block text-xs font-bold text-neutral-700 mb-1">Portfolio / Website</label>
-                                        <input
-                                            type="url"
-                                            placeholder="https://yourportfolio.dev"
-                                            value={website}
-                                            onChange={(e) => setWebsite(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                        />
+
+                                    {/* Links & Profiles (LinkedIn, GitHub, Portfolio, Link) */}
+                                    <div className="space-y-3 pt-1">
+                                        <div className="flex items-center justify-between">
+                                            <label className="block text-xs font-extrabold text-neutral-800">
+                                                Links & Profiles
+                                            </label>
+                                            <span className="text-[11px] text-neutral-400 font-medium">
+                                                Live-reacting buttons appear on your profile card
+                                            </span>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                            {/* 1. LinkedIn */}
+                                            <div>
+                                                <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-700 mb-1">
+                                                    <span className="font-black text-[12px] text-[#0A66C2]">in</span>
+                                                    <span>LinkedIn</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="https://linkedin.com/in/username"
+                                                    value={linkedin}
+                                                    onChange={(e) => setLinkedin(e.target.value)}
+                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                                />
+                                            </div>
+
+                                            {/* 2. GitHub */}
+                                            <div>
+                                                <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-700 mb-1">
+                                                    <svg className="w-3.5 h-3.5 fill-current text-neutral-800" viewBox="0 0 24 24">
+                                                        <path d="M12 2A10 10 0 0 0 2 12c0 4.42 2.87 8.17 6.84 9.5.5.08.66-.23.66-.5v-1.69c-2.77.6-3.36-1.34-3.36-1.34-.46-1.16-1.11-1.47-1.11-1.47-.91-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.87 1.52 2.34 1.07 2.91.83.1-.65.35-1.09.63-1.34-2.22-.25-4.55-1.11-4.55-4.92 0-1.11.38-2 1.03-2.71-.1-.25-.45-1.29.1-2.64 0 0 .84-.27 2.75 1.02.79-.22 1.65-.33 2.5-.33.85 0 1.71.11 2.5.33 1.91-1.29 2.75-1.02 2.75-1.02.55 1.35.2 2.39.1 2.64.65.71 1.03 1.6 1.03 2.71 0 3.82-2.34 4.66-4.57 4.91.36.31.69.92.69 1.85V21c0 .27.16.59.67.5C19.14 20.16 22 16.42 22 12A10 10 0 0 0 12 2Z" />
+                                                    </svg>
+                                                    <span>GitHub</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="https://github.com/username"
+                                                    value={github}
+                                                    onChange={(e) => setGithub(e.target.value)}
+                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                                />
+                                            </div>
+
+                                            {/* 3. Portfolio */}
+                                            <div>
+                                                <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-700 mb-1">
+                                                    <svg className="w-3.5 h-3.5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0 0a8.949 8.949 0 0 0 4.951-1.488A3.987 3.987 0 0 0 13 16h-2a3.987 3.987 0 0 0-3.951 3.512A8.949 8.949 0 0 0 12 21Zm-3-9a3 3 0 1 1 6 0 3 3 0 0 1-6 0Z" />
+                                                    </svg>
+                                                    <span>Portfolio</span>
+                                                </label>
+                                                <input
+                                                    type="url"
+                                                    placeholder="https://yourportfolio.dev"
+                                                    value={website}
+                                                    onChange={(e) => setWebsite(e.target.value)}
+                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                                />
+                                            </div>
+
+                                            {/* 4. Link */}
+                                            <div>
+                                                <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-700 mb-1">
+                                                    <svg className="w-3.5 h-3.5 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                                    </svg>
+                                                    <span>Link</span>
+                                                </label>
+                                                <input
+                                                    type="url"
+                                                    placeholder="https://yourcustomlink.com"
+                                                    value={customLink}
+                                                    onChange={(e) => setCustomLink(e.target.value)}
+                                                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
 

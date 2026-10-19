@@ -1,6 +1,29 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 import type { PlatformSubmissionStat } from "../utils/submissionsAggregator";
 
+export interface MonthlyContributionStat {
+    monthKey: string;
+    label: string;
+    year: number;
+    count: number;
+    isMax: boolean;
+}
+
+export interface DayOfWeekContributionStat {
+    dayKey: string;
+    label: string;
+    dayIndex: number;
+    count: number;
+    isMax: boolean;
+}
+
+export interface DevelopmentChartsData {
+    monthlyContributions: MonthlyContributionStat[];
+    dayOfWeekContributions: DayOfWeekContributionStat[];
+    busiestDay: string;
+    maxMonth: string;
+}
+
 export interface UnifiedDevelopmentData {
     username: string;
     totalContributions: number;
@@ -9,6 +32,7 @@ export interface UnifiedDevelopmentData {
     dayStreak: number;
     platformBreakdown: Record<string, PlatformSubmissionStat>;
     dailyMerged: Record<string, { count: number; platforms: string[] }>;
+    charts?: DevelopmentChartsData;
     connectedPlatformsCount: number;
     timestamp?: string;
 }
