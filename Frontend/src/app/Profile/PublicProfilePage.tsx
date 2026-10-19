@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { Repeat, Code2, GitBranch } from "lucide-react";
 import { fetchPublicProfile, type PublicProfileData } from "../../utils/profileApi";
-import { getPortalIcon } from "../../utils/portalIcons";
 import { useToast } from "../../context/ToastContext";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
 import { CARD_THEMES } from "./CardStudio/types";
@@ -129,32 +128,6 @@ export default function PublicProfilePage() {
     const allConnectedPlatforms = useMemo(() => getAllConnectedPlatforms(connectedPortals), [connectedPortals]);
     const githubStats = useMemo(() => extractGitHubStats(connectedPortals, userFallback), [connectedPortals, userFallback]);
 
-    // Series of platforms sorted strictly from largest number of submissions to lowest
-    const sortedPlatforms = useMemo(() => {
-        if (!profile?.platforms) return [];
-        return [...profile.platforms].sort((a, b) => {
-            const getCount = (plat: typeof a) => {
-                let count = 0;
-                for (const s of plat.stats || []) {
-                    const l = (s.label || "").toLowerCase();
-                    const v = (s.value || "").toLowerCase();
-                    if (l.includes("submission") || v.includes("submission") || l.includes("solved") || v.includes("solved")) {
-                        const m = (s.value || "").match(/([\d,]+)/);
-                        if (m && m[1]) {
-                            const parsed = parseInt(m[1].replace(/,/g, ""), 10);
-                            if (!isNaN(parsed) && parsed > count) count = parsed;
-                        }
-                    }
-                }
-                return count;
-            };
-            const countA = getCount(a);
-            const countB = getCount(b);
-            if (countB !== countA) return countB - countA;
-            return (a.portal || "").localeCompare(b.portal || "");
-        });
-    }, [profile?.platforms]);
-
     const handleCopyLink = () => {
         navigator.clipboard.writeText(window.location.href).then(
             () => toast.success("Profile link copied to clipboard!", { title: "Copied" }),
@@ -269,10 +242,10 @@ export default function PublicProfilePage() {
                 </div>
             </header>
 
-            {/* Profile Showcase Container */}
-            <main className="max-w-[1240px] mx-auto px-4 sm:px-6 pt-6">
+            {/* Profile Showcase Container - Full Width */}
+            <main className="w-full px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16 min-w-0">
                 {/* Official LinkedIn Developer Card (Replaces old Profile Owner View card) */}
-                <div className="w-full flex flex-col items-center mb-8">
+                <div className="w-full max-w-[1200px] mx-auto flex flex-col items-center mb-8">
                     {/* Header Strip with Flip Toggle */}
                     <div className="w-full flex items-center justify-between mb-3 px-1">
                         <div className="flex items-center gap-2">
@@ -337,7 +310,7 @@ export default function PublicProfilePage() {
 
                 {/* Optional Bio & Extra Details Strip if bio/location/website provided */}
                 {(profile.bio || profile.location || profile.website) && (
-                    <div className="rounded-2xl bg-white border border-neutral-200/90 p-5 mb-8 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="w-full max-w-[1200px] mx-auto rounded-2xl bg-white border border-neutral-200/90 p-5 mb-8 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         {profile.bio && (
                             <p className="text-xs sm:text-sm text-neutral-600 leading-relaxed max-w-2xl whitespace-pre-line">
                                 {profile.bio}
@@ -373,7 +346,7 @@ export default function PublicProfilePage() {
                 {/* ========================================================================= */}
                 {/* PRACTICE & DEVELOPMENT ACTIVITY & PERFORMANCE SECTION */}
                 {/* ========================================================================= */}
-                <section className="space-y-6 mb-12">
+                <section className="w-full space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
                         <div>
                             <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
@@ -447,108 +420,6 @@ export default function PublicProfilePage() {
                                 connectedPortals={connectedPortals}
                                 username={profile.username}
                             />
-                        </div>
-                    )}
-                </section>
-
-                {/* Platforms Showcase Section */}
-                <section className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-xl font-black text-neutral-900 tracking-tight">
-                                Connected Platforms
-                            </h2>
-                            <p className="text-xs text-neutral-500">
-                                Verified developer and competitive programming profiles.
-                            </p>
-                        </div>
-                        <span className="text-xs font-bold text-neutral-500 bg-white px-3 py-1 rounded-full border border-neutral-200">
-                            {profile.platforms.length} Accounts
-                        </span>
-                    </div>
-
-                    {profile.platforms.length === 0 ? (
-                        <div className="rounded-3xl bg-white border border-neutral-200/90 p-8 text-center">
-                            <p className="text-sm font-semibold text-neutral-700 mb-1">
-                                No platforms connected yet.
-                            </p>
-                            <p className="text-xs text-neutral-400">
-                                This developer hasn't added any coding platform accounts.
-                            </p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {sortedPlatforms.map((platform) => {
-                                const handle = platform.portalUsername || "connected";
-                                const profileUrl = platform.link;
-
-                                return (
-                                    <div
-                                        key={platform.portal}
-                                        className="rounded-2xl bg-white border border-neutral-200/90 hover:border-neutral-300 p-5 shadow-2xs transition-all flex flex-col justify-between"
-                                    >
-                                        <div>
-                                            {/* Header: Icon, Name, Verified Badge */}
-                                            <div className="flex items-start justify-between gap-3 mb-3">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-11 h-11 rounded-xl bg-neutral-50 border border-neutral-200/70 flex items-center justify-center flex-shrink-0 shadow-2xs">
-                                                        {getPortalIcon(platform.portal, "w-6 h-6")}
-                                                    </div>
-                                                    <div>
-                                                        <h3 className="text-sm font-extrabold text-neutral-900 capitalize">
-                                                            {platform.portal}
-                                                        </h3>
-                                                        <span className="text-[11px] font-mono font-medium text-neutral-500">
-                                                            @{handle}
-                                                        </span>
-                                                    </div>
-                                                </div>
-
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                                    <span>Verified</span>
-                                                    <svg className="w-3 h-3 text-emerald-600" viewBox="0 0 20 20" fill="currentColor">
-                                                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                    </svg>
-                                                </span>
-                                            </div>
-
-                                            {/* Live Platform Stats */}
-                                            {Array.isArray(platform.stats) && platform.stats.length > 0 && (
-                                                <div className="grid grid-cols-2 gap-2 my-3 pt-2.5 border-t border-neutral-100">
-                                                    {platform.stats.map((st, idx) => (
-                                                        <div
-                                                            key={idx}
-                                                            className="p-2 rounded-xl bg-neutral-50 border border-neutral-100 text-center"
-                                                        >
-                                                            <p className="text-[10px] uppercase font-bold text-neutral-400 tracking-wider">
-                                                                {st.label}
-                                                            </p>
-                                                            <p className="text-xs font-black text-neutral-900 mt-0.5 truncate">
-                                                                {st.value}
-                                                            </p>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* External Profile Link Action */}
-                                        <div className="pt-2">
-                                            <a
-                                                href={profileUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="w-full py-2 px-3 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold transition-all flex items-center justify-center gap-2 group cursor-pointer"
-                                            >
-                                                <span>View on {platform.portal}</span>
-                                                <svg className="w-3.5 h-3.5 text-neutral-500 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                </svg>
-                                            </a>
-                                        </div>
-                                    </div>
-                                );
-                            })}
                         </div>
                     )}
                 </section>
