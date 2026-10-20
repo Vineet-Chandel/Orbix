@@ -59,6 +59,24 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = ({
         }
     }, [effectiveUser, portalsFingerprint, connectedPortals, dispatch]);
 
+    // Clear any stale cached submissions for Vineet-Chandel from localStorage
+    useEffect(() => {
+        if (effectiveUser === "Vineet-Chandel") {
+            try {
+                const stored = localStorage.getItem("orbix_unified_submissions");
+                if (stored) {
+                    const parsed = JSON.parse(stored);
+                    if (parsed["Vineet-Chandel"]) {
+                        delete parsed["Vineet-Chandel"];
+                        localStorage.setItem("orbix_unified_submissions", JSON.stringify(parsed));
+                    }
+                }
+            } catch {
+                // Ignore
+            }
+        }
+    }, [effectiveUser]);
+
     // Client-side fallback aggregation (strictly excludes GitHub)
     const clientAgg = useMemo(() => {
         return aggregateClientPortalsSubmissions(connectedPortals, weeksCount);
@@ -66,6 +84,16 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = ({
 
     // Build weeks from dailyMerged in Redux filtered strictly to active connected platforms
     const { weeks, totalLifetimeSubmissions } = useMemo(() => {
+        const isMockUser = !effectiveUser || effectiveUser.toLowerCase() === "vineet-chandel";
+
+        // For mock showcase profile, strictly prioritize client portals data so stale cache/API never interferes
+        if (isMockUser) {
+            return {
+                weeks: clientAgg.weeks,
+                totalLifetimeSubmissions: Math.max(clientAgg.totalSubmissions, 4540),
+            };
+        }
+
         const rawMap = cachedData?.dailyMerged || {};
         const activePortalsSet = new Set(Array.from(activePortalsMap.keys()));
 
@@ -116,7 +144,7 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = ({
             weeks: built.weeks,
             totalLifetimeSubmissions: finalTotal,
         };
-    }, [cachedData, weeksCount, clientAgg, activePortalsMap]);
+    }, [cachedData, weeksCount, clientAgg, activePortalsMap, effectiveUser]);
 
     // Calculate exact time period (e.g. "Apr – Oct 2026")
     const timePeriodStr = useMemo(() => {
@@ -145,13 +173,13 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = ({
     const getCellColor = (level: 0 | 1 | 2 | 3 | 4) => {
         switch (level) {
             case 4:
-                return "bg-[#39d353] border-[#72ff8f] shadow-[0_0_8px_rgba(57,211,83,0.85)]";
+                return "bg-[#39d353] border-[#72ff8f] shadow-[0_0_9px_rgba(57,211,83,0.85)]";
             case 3:
-                return "bg-[#26a641] border-[#3ee667] shadow-[0_0_5px_rgba(38,166,65,0.6)]";
+                return "bg-[#26a641] border-[#3ee667] shadow-[0_0_7px_rgba(38,166,65,0.7)]";
             case 2:
-                return "bg-[#006d32] border-[#20964c] shadow-[0_0_4px_rgba(0,109,50,0.4)]";
+                return "bg-[#1a8c42] border-[#34d468] shadow-[0_0_5px_rgba(26,140,66,0.5)]";
             case 1:
-                return "bg-[#0e4429] border-[#1b7342]/70 shadow-[0_0_3px_rgba(14,68,41,0.3)]";
+                return "bg-[#0e5c30] border-[#20964c]/80 shadow-[0_0_4px_rgba(14,92,48,0.4)]";
             case 0:
             default:
                 return "bg-[#141b25] border-white/[0.08]";

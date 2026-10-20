@@ -578,68 +578,68 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                                     );
                                                 }
 
-                                            // PRACTICE PLATFORM (Smart Sync)
-                                            const showContestRating = Boolean(plat.hasGoodRating && plat.rating && plat.rating > 0);
+                                                // PRACTICE PLATFORM (Smart Sync)
+                                                const showContestRating = Boolean(plat.hasGoodRating && plat.rating && plat.rating > 0);
 
-                                            return (
-                                                <div
-                                                    key={plat.id}
-                                                    className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 flex items-center justify-between shadow-xl"
-                                                >
-                                                    <div className="flex items-center gap-5 min-w-0">
-                                                        <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center p-3 flex-shrink-0">
-                                                            {getPortalIcon(plat.id, "w-full h-full object-contain")}
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <h4 className="text-2xl font-black text-white truncate">{plat.name}</h4>
-                                                            <span className="text-lg font-mono text-neutral-400 block mt-0.5 truncate">
-                                                                @{plat.username}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-
-                                                    {showContestRating ? (
-                                                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="text-3xl font-black text-white font-mono tracking-tight leading-none">
-                                                                    {plat.rating?.toLocaleString()}
+                                                return (
+                                                    <div
+                                                        key={plat.id}
+                                                        className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 flex items-center justify-between shadow-xl"
+                                                    >
+                                                        <div className="flex items-center gap-5 min-w-0">
+                                                            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center p-3 flex-shrink-0">
+                                                                {getPortalIcon(plat.id, "w-full h-full object-contain")}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <h4 className="text-2xl font-black text-white truncate">{plat.name}</h4>
+                                                                <span className="text-lg font-mono text-neutral-400 block mt-0.5 truncate">
+                                                                    @{plat.username}
                                                                 </span>
-                                                                {plat.tier && (
-                                                                    <span
-                                                                        style={{
-                                                                            backgroundColor: plat.tierColor || "#f59e0b",
-                                                                        }}
-                                                                        className="px-3 py-1 rounded-xl text-xs font-black text-white uppercase tracking-wider shadow-md leading-none"
-                                                                    >
-                                                                        {plat.tier}
+                                                            </div>
+                                                        </div>
+
+                                                        {showContestRating ? (
+                                                            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-3xl font-black text-white font-mono tracking-tight leading-none">
+                                                                        {plat.rating?.toLocaleString()}
                                                                     </span>
-                                                                )}
-                                                            </div>
-
-                                                            <div className="flex items-center gap-2 text-sm font-mono text-neutral-300 bg-white/[0.06] px-3 py-1 rounded-xl border border-white/5">
-                                                                <span className="font-bold text-white">
-                                                                    {plat.solvedCount.toLocaleString()}
-                                                                </span>
-                                                                <span className="text-neutral-400">solved</span>
-                                                                {plat.contestsCount && plat.contestsCount > 0 ? (
-                                                                    <>
-                                                                        <span className="text-neutral-500">•</span>
-                                                                        <span className="text-neutral-400">
-                                                                            {plat.contestsCount} contests
+                                                                    {plat.tier && (
+                                                                        <span
+                                                                            style={{
+                                                                                backgroundColor: plat.tierColor || "#f59e0b",
+                                                                            }}
+                                                                            className="px-3 py-1 rounded-xl text-xs font-black text-white uppercase tracking-wider shadow-md leading-none"
+                                                                        >
+                                                                            {plat.tier}
                                                                         </span>
-                                                                    </>
-                                                                ) : null}
+                                                                    )}
+                                                                </div>
+
+                                                                <div className="flex items-center gap-2 text-sm font-mono text-neutral-300 bg-white/[0.06] px-3 py-1 rounded-xl border border-white/5">
+                                                                    <span className="font-bold text-white">
+                                                                        {plat.solvedCount.toLocaleString()}
+                                                                    </span>
+                                                                    <span className="text-neutral-400">solved</span>
+                                                                    {plat.contestsCount && plat.contestsCount > 0 ? (
+                                                                        <>
+                                                                            <span className="text-neutral-500">•</span>
+                                                                            <span className="text-neutral-400">
+                                                                                {plat.contestsCount} contests
+                                                                            </span>
+                                                                        </>
+                                                                    ) : null}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-xl font-mono font-black text-white bg-white/10 px-6 py-2.5 rounded-2xl border border-white/5 shadow-md flex-shrink-0">
-                                                            {plat.solvedCount.toLocaleString()} solved
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            );
-                                        })
-                                    )}
+                                                        ) : (
+                                                            <span className="text-xl font-mono font-black text-white bg-white/10 px-6 py-2.5 rounded-2xl border border-white/5 shadow-md flex-shrink-0">
+                                                                {plat.solvedCount.toLocaleString()} solved
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })
+                                        )}
                                     </div>
                                 </>
                             )}
