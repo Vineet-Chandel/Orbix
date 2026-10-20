@@ -153,7 +153,7 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
                 <div>
                     <div className="flex items-center justify-center gap-1.5">
                         <Link
-                            to={`/u/${encodeURIComponent(entry.username)}`}
+                            to={`/profile/u/${encodeURIComponent(entry.username)}`}
                             className="text-base sm:text-lg font-black text-white hover:text-amber-400 transition-colors tracking-tight truncate max-w-[200px]"
                         >
                             {entry.displayName}

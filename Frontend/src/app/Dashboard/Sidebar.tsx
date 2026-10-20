@@ -598,7 +598,7 @@ export const Sidebar = ({
 
                         {user?.username && (
                             <Link
-                                to={`/u/${user.username}`}
+                                to={`/profile/u/${encodeURIComponent(user.username)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={() => setIsProfileMenuOpen(false)}

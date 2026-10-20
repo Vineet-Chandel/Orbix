@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import NavBar from '../NavBar/Landing';
 import { useAppSelector } from '../../store';
 import { Card } from './Card';
+import { Platform } from './Platform';
 
 export default function MainLanding() {
   const navigate = useNavigate();
@@ -12,7 +13,7 @@ export default function MainLanding() {
     try {
       const raw = localStorage.getItem("orbix_user");
       if (raw) storedUser = JSON.parse(raw);
-    } catch {}
+    } catch { }
 
     const currentUser = user || storedUser;
     if (isAuthenticated || currentUser) {
@@ -97,11 +98,16 @@ export default function MainLanding() {
           </div>
         </div>
       </section>
-
+      {/* Flagship Connected Ecosystem Showcase: All Connectable Platforms Orbiting Orbix */}
+      <section className="w-full my-6 rounded-[40px] sm:rounded-[48px] overflow-hidden shadow-2xl">
+        <Platform />
+      </section>
       {/* Flagship Profile Card Showcase: One Card Every Place That Matters (Full Screen) */}
       <section className="w-full my-6 rounded-[40px] sm:rounded-[48px] overflow-hidden shadow-2xl">
         <Card />
       </section>
+
+
 
       {/* Highlights linking to dedicated subpages */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-slate-900">

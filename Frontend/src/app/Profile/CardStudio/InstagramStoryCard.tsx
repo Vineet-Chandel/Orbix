@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { FolderGit2, GitCommit, Trophy, Sparkles, Code2 } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { OrbixCardQR } from "./OrbixCardQR";
@@ -67,6 +67,19 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
             isVerified: p.isVerified,
         }));
 
+    const backPlatforms = useMemo(() => {
+        const fromTop = topPlatforms.filter((p) => !p.isGitHub && p.id !== "github");
+        if (fromTop.length > 0) return fromTop.slice(0, 5);
+        return connectedList.filter((p) => p.id !== "github").slice(0, 5);
+    }, [topPlatforms, connectedList]);
+
+    const remainingCount = useMemo(() => {
+        const total = (allConnectedPlatforms && allConnectedPlatforms.length > 0)
+            ? allConnectedPlatforms.filter((p) => p.id !== "github").length
+            : connectedList.filter((p) => p.id !== "github").length;
+        return Math.max(0, total - backPlatforms.length);
+    }, [allConnectedPlatforms, connectedList, backPlatforms]);
+
     const todayDate = new Date().toLocaleDateString("en-GB", {
         day: "numeric",
         month: "short",
@@ -76,10 +89,10 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
     const displayUrl = publicProfileUrl.replace(/^https?:\/\//, "");
 
     const isLightBanner = theme.id === "gold";
-    const bannerTextColor = isLightBanner ? "text-black" : "text-white";
-    const bannerSubtextColor = isLightBanner ? "text-black/75" : "text-white/80";
-    const bannerFill = isLightBanner ? "black" : "white";
-    const bannerStroke = isLightBanner ? "black" : "white";
+    const bannerTextColor = isLightBanner ? "text-black" : "text-black";
+    const bannerSubtextColor = isLightBanner ? "text-black/75" : "text-black/80";
+    const bannerFill = isLightBanner ? "black" : "black";
+    const bannerStroke = isLightBanner ? "black" : "black";
 
     return (
         <div
@@ -700,7 +713,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                     {/* Top Header */}
                     <div className="h-[160px] w-full px-14 pt-8 flex items-center justify-between border-b border-white/10 bg-[#0e131b]">
                         <div className="flex items-center gap-5">
-                            <div className="w-11 h-11 rounded-2xl flex items-center justify-center">
+                            <div className="w-[100px] h-[100px] rounded-2xl flex items-center justify-center">
                                 <svg className="w-full h-full text-white" viewBox="0 0 271 270" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" fill="white" />
                                     <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" fill="white" />
@@ -715,13 +728,13 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                 </svg>
                             </div>
                             <div>
-                                <span className="text-4xl font-black text-white tracking-tight leading-none block">Orbix</span>
-                                <span className="text-sm font-black text-neutral-400 tracking-widest uppercase mt-1 block">Scan To Explore</span>
+                                <span className="text-5xl font-black text-white tracking-tight leading-none block">Orbix</span>
+                                <span className="text-xl font-black text-neutral-400 tracking-widest uppercase mt-1 block">Scan To Explore</span>
                             </div>
                         </div>
 
                         <div
-                            className="px-8 py-3.5 rounded-full font-black text-base uppercase tracking-wider text-black shadow-xl"
+                            className="px-8 py-3.5 rounded-full font-black text-xl uppercase tracking-wider text-black shadow-xl"
                             style={{ backgroundColor: theme.accentColor }}
                         >
                             SCAN TO EXPLORE
@@ -729,24 +742,24 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                     </div>
 
                     {/* Centered QR & Platform Showcase */}
-                    <div className="px-16 flex-1 flex flex-col items-center justify-around py-10 space-y-8">
+                    <div className="px-12 flex-1 flex flex-col justify-around py-6">
                         {/* Prominent Center QR Code */}
-                        <div className="flex flex-col items-center gap-6">
-                            <div className="p-5 bg-white rounded-[36px] shadow-2xl">
-                                <OrbixCardQR value={publicProfileUrl} size={440} showLogo={true} />
+                        <div className="flex flex-col items-center gap-3">
+                            <div className=" bg-white rounded-[32px] shadow-2xl">
+                                <OrbixCardQR value={publicProfileUrl} size={340} showLogo={true} />
                             </div>
-                            <div className="text-center mt-2">
-                                <h3 className="text-4xl font-black text-white tracking-tight uppercase">
+                            <div className="text-center mt-1">
+                                <h3 className="text-3xl font-black text-white tracking-tight uppercase">
                                     {displayName}
                                 </h3>
-                                <p className="text-xl text-neutral-300 mt-2 font-medium">
+                                <p className="text-lg text-neutral-300 mt-1 font-medium">
                                     Scan with your camera to open my live coding profile
                                 </p>
                             </div>
                         </div>
 
-                        {/* GitHub Contribution Activity Table for last 3-4 months */}
-                        <div className="w-full max-w-2xl mx-auto">
+                        {/* GitHub Contribution Activity Table for last 5 months (Full Width) */}
+                        <div className="w-full">
                             <GitHubContributionTable
                                 username={username}
                                 githubUsername={githubStats.username}
@@ -756,6 +769,42 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                 activeDays={stats.activeDays}
                                 variant="spacious"
                             />
+                        </div>
+
+                        {/* Top Connected Platforms Showcase (FIND ME ON - Full Width, Below Contribution Table) */}
+                        <div className="w-full">
+                            <span className="text-xl font-black tracking-[0.2em] uppercase text-neutral-400 block mb-4">
+                                FIND ME ON
+                            </span>
+                            <div className="space-y-3.5">
+                                {backPlatforms.map((plat) => {
+                                    const handle = plat.username || username;
+                                    const displayHandle = handle.startsWith("@") ? handle : `@${handle}`;
+                                    return (
+                                        <div
+                                            key={plat.id}
+                                            className="flex items-center justify-between py-0.5"
+                                        >
+                                            <div className="flex items-center gap-5 min-w-0">
+                                                <div className="w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center p-2.5 flex-shrink-0">
+                                                    {getPortalIcon(plat.id, "w-full h-full object-contain")}
+                                                </div>
+                                                <span className="text-3xl font-bold text-white tracking-tight truncate">
+                                                    {plat.name}
+                                                </span>
+                                            </div>
+                                            <span className="text-2xl font-mono text-neutral-400 flex-shrink-0 ml-4">
+                                                {displayHandle}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            {remainingCount > 0 && (
+                                <div className="mt-4 text-xl font-mono text-neutral-400 font-medium">
+                                    +{remainingCount} more on my profile
+                                </div>
+                            )}
                         </div>
                     </div>
 

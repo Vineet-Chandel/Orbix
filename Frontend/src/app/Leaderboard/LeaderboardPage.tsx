@@ -222,7 +222,7 @@ export const LeaderboardPage: React.FC = () => {
                                     <span className="text-xl font-mono font-black text-amber-400">{currentUserRank.score.toLocaleString()}</span>
                                 </div>
                                 <Link
-                                    to={`/u/${currentUserRank.username}`}
+                                    to={`/profile/u/${encodeURIComponent(currentUserRank.username)}`}
                                     className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs font-bold text-white transition-colors"
                                 >
                                     <span>View Profile</span>

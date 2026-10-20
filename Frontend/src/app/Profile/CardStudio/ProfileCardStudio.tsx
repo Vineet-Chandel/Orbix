@@ -279,7 +279,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
     };
 
     const themeConfig = CARD_THEMES[themeId] || CARD_THEMES.indigo;
-    const publicProfileUrl = `${window.location.origin}/profile/${encodeURIComponent(user?.username || "")}`;
+    const publicProfileUrl = `${window.location.origin}/profile/u/${encodeURIComponent(user?.username || "")}`;
 
     // Flip handler
     const handleFlip = () => {

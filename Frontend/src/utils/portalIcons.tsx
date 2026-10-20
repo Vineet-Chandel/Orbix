@@ -11,6 +11,7 @@ export const getPortalIcon = (portalId: string, className = "w-5 h-5"): ReactNod
                 </svg>
             );
 
+
         case "codeforces":
             return (
 

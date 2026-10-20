@@ -411,7 +411,7 @@ export default function ProfileManager() {
     };
 
     const handleCopyProfileLink = () => {
-        const fullUrl = `${window.location.origin}/profile/${encodeURIComponent(user?.username || "")}`;
+        const fullUrl = `${window.location.origin}/profile/u/${encodeURIComponent(user?.username || "")}`;
         navigator.clipboard.writeText(fullUrl).then(
             () => toast.success("Profile link copied to clipboard!", { title: "Copied" }),
             () => toast.error("Failed to copy link", { title: "Error" })
@@ -419,7 +419,7 @@ export default function ProfileManager() {
     };
 
     const handleShareProfile = async () => {
-        const fullUrl = `${window.location.origin}/profile/${encodeURIComponent(user?.username || "")}`;
+        const fullUrl = `${window.location.origin}/profile/u/${encodeURIComponent(user?.username || "")}`;
         if (navigator.share) {
             try {
                 await navigator.share({
@@ -435,7 +435,7 @@ export default function ProfileManager() {
         }
     };
 
-    const publicUrl = `/profile/${encodeURIComponent(user?.username || "")}`;
+    const publicUrl = `/profile/u/${encodeURIComponent(user?.username || "")}`;
 
     // Live combined user object for the Card Studio to react instantly to form edits
     const liveUser = useMemo(() => ({

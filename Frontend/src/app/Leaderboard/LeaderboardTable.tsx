@@ -130,7 +130,7 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-1.5">
                                                     <Link
-                                                        to={`/u/${encodeURIComponent(entry.username)}`}
+                                                        to={`/profile/u/${encodeURIComponent(entry.username)}`}
                                                         className="font-bold text-white hover:text-amber-400 transition-colors truncate max-w-[160px] sm:max-w-[200px]"
                                                     >
                                                         {entry.displayName}

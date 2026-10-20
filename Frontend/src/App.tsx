@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import SignInPage from './LandingPages/Auth-Pages/Signin/Landing';
 import SignUpPage from './LandingPages/Auth-Pages/Signup/Landing';
 import MainLanding from "./LandingPages/Main-Landing-Pages/Landing";
@@ -14,6 +14,7 @@ import ProfilesOnboardingPage from "./LandingPages/Auth-Pages/ProfilesOnboarding
 import LeaderboardPage from "./app/Leaderboard/LeaderboardPage";
 import EventTrackerPage from "./app/Events/EventTrackerPage";
 import { Card } from "./LandingPages/Main-Landing-Pages/Card";
+import { Platform } from "./LandingPages/Main-Landing-Pages/Platform";
 import ProtectedRoute from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
@@ -21,6 +22,14 @@ import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
 const WorkspaceRedirect = () => {
   const { user } = useAppSelector((state) => state.user);
   return user ? <Navigate to="/dashboard" replace /> : <Navigate to="/auth/signin" replace />;
+};
+
+const LegacyProfileRedirect = () => {
+  const { username } = useParams<{ username: string }>();
+  if (!username || username === "setup") {
+    return <ProfilesOnboardingPage />;
+  }
+  return <Navigate to={`/profile/u/${encodeURIComponent(username)}`} replace />;
 };
 
 const App = () => {
@@ -45,10 +54,13 @@ const App = () => {
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/events" element={<EventTrackerPage />} />
           <Route path="/card" element={<Card />} />
+          <Route path="/platforms" element={<Platform />} />
+          <Route path="/orbit" element={<Platform />} />
 
           {/* Public Shareable Profile Showcase Route */}
-          <Route path="/profile/:username" element={<PublicProfilePage />} />
-          <Route path="/u/:username" element={<PublicProfilePage />} />
+          <Route path="/profile/u/:username" element={<PublicProfilePage />} />
+          <Route path="/profile/:username" element={<LegacyProfileRedirect />} />
+          <Route path="/u/:username" element={<LegacyProfileRedirect />} />
 
           {/* Auth Pages */}
           <Route path="/auth/signup" element={<SignUpPage />} />

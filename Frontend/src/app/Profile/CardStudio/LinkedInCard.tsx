@@ -929,7 +929,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                     <div className="px-12 py-7 flex-1 flex items-center justify-between gap-12">
                         {/* Left: Scannable QR Code */}
                         <div className="flex flex-col items-center gap-3.5">
-                            <div className="p-3 bg-white rounded-3xl shadow-2xl">
+                            <div className=" bg-white  rounded-[32px] shadow-2xl">
                                 <OrbixCardQR value={publicProfileUrl} size={240} showLogo={true} />
                             </div>
                             <div className="text-center">

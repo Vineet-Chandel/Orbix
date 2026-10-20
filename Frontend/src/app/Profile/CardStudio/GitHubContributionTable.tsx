@@ -36,9 +36,9 @@ export const GitHubContributionTable: React.FC<GitHubContributionTableProps> = (
     const effectiveContributions = totalContributions;
     const isSpacious = variant === "spacious";
 
-    // Generate 16 weeks (last 3.8 to 4 months) of dense, vibrant circular green contribution dots
+    // Generate 16 weeks (for compact) or 21 weeks (for spacious / Instagram story: 5 months) of dense, vibrant circular green contribution dots
     const { weeks, monthNames, totalCount } = useMemo(() => {
-        const numWeeks = 16;
+        const numWeeks = isSpacious ? 21 : 16;
         const totalDays = numWeeks * 7;
 
         // Deterministic PRNG seeded by username
@@ -62,7 +62,7 @@ export const GitHubContributionTable: React.FC<GitHubContributionTableProps> = (
             d.setDate(today.getDate() - i);
             const dateStr = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-            // High green density (~80% active) covering last 3-4 months
+            // High green density (~80% active) covering last 4-5 months
             const isRecentStreak = i < Math.max(dayStreak, 7);
             const randVal = seededRand(i);
 
@@ -108,15 +108,16 @@ export const GitHubContributionTable: React.FC<GitHubContributionTableProps> = (
             days.push({ dateStr, count, level });
         }
 
-        // Group into 16 week columns
+        // Group into week columns
         const weekCols: DayCell[][] = [];
         for (let w = 0; w < numWeeks; w++) {
             weekCols.push(days.slice(w * 7, (w + 1) * 7));
         }
 
-        // Compute 4 months names ending with current month
+        // Compute month names ending with current month
+        const monthsCount = isSpacious ? 5 : 4;
         const monthsList: string[] = [];
-        for (let m = 3; m >= 0; m--) {
+        for (let m = monthsCount - 1; m >= 0; m--) {
             const mDate = new Date(today);
             mDate.setMonth(today.getMonth() - m);
             monthsList.push(mDate.toLocaleDateString("en-US", { month: "short" }));
@@ -125,7 +126,7 @@ export const GitHubContributionTable: React.FC<GitHubContributionTableProps> = (
         const finalTotal = effectiveContributions > 0 ? Math.max(effectiveContributions, calculatedTotal) : calculatedTotal;
 
         return { weeks: weekCols, monthNames: monthsList, totalCount: finalTotal };
-    }, [effectiveUsername, effectiveContributions, dayStreak]);
+    }, [effectiveUsername, effectiveContributions, dayStreak, isSpacious]);
 
     // Color mapper for GitHub Green in circular curvy form with delicate glow
     const getCellColor = (level: 0 | 1 | 2 | 3 | 4) => {
@@ -164,7 +165,7 @@ export const GitHubContributionTable: React.FC<GitHubContributionTableProps> = (
                             <Sparkles className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
                         </div>
                         <span className={`font-mono text-neutral-400 block mt-1 truncate ${isSpacious ? "text-base" : "text-xs"}`}>
-                            @{effectiveUsername} · Last 4 months
+                            @{effectiveUsername} · Last {isSpacious ? "5" : "4"} months
                         </span>
                     </div>
                 </div>
@@ -184,8 +185,8 @@ export const GitHubContributionTable: React.FC<GitHubContributionTableProps> = (
 
             {/* GitHub Heatmap Grid Area - Clean, Uncovered, Circular Curvy Dots */}
             <div className="flex flex-col space-y-2">
-                {/* 4 Month Labels Row aligned across 16 weeks */}
-                <div className="grid grid-cols-4 pl-7 pr-1 text-[11px] font-mono text-neutral-300 font-semibold select-none">
+                {/* Month Labels Row aligned across weeks */}
+                <div className={`grid ${isSpacious ? "grid-cols-5" : "grid-cols-4"} pl-7 pr-1 text-[11px] font-mono text-neutral-300 font-semibold select-none`}>
                     {monthNames.map((m, idx) => (
                         <span key={idx} className="block text-left">
                             {m}

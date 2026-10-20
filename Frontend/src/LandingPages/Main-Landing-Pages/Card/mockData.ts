@@ -63,16 +63,16 @@ export const mockUser = {
     firstName: "Vineet",
     lastName: "Chandel",
     username: "Vineet-Chandel",
-    headline: "Senior Staff Software Engineer & System Architect",
+    headline: "Full Stack Developer",
     photoUrl: "/avatar.png",
     avatarUrl: "/avatar.png",
     linkedin: "https://linkedin.com/in/Vineet-Chandel",
     github: "https://github.com/Vineet-Chandel",
-    website: "https://orbix.dev/u/Vineet-Chandel",
+    website: "https://orbix.dev/profile/u/Vineet-Chandel",
     links: {
         github: "https://github.com/Vineet-Chandel",
         linkedin: "https://linkedin.com/in/Vineet-Chandel",
-        portfolio: "https://orbix.dev/u/Vineet-Chandel",
+        portfolio: "https://orbix.dev/profile/u/Vineet-Chandel",
         leetcode: "https://leetcode.com/u/Vineet-Chandel",
     },
 };
@@ -308,7 +308,7 @@ export const mockGithubStats: GitHubCardStats = {
 
 export const mockTheme: CardThemeConfig = CARD_THEMES.indigo;
 
-export const mockPublicProfileUrl = "https://orbix.dev/u/Vineet-Chandel";
+export const mockPublicProfileUrl = "https://orbix.dev/profile/u/Vineet-Chandel";
 
 export const mockConnectedPortals: Record<string, any> = {
     leetcode: {
