@@ -126,6 +126,42 @@ export default function ProfileManager() {
         };
     }, []);
 
+    // Sync connectedPortals from user.platforms when available
+    useEffect(() => {
+        if (user?.platforms && Array.isArray(user.platforms) && user.platforms.length > 0) {
+            setConnectedPortals((prev) => {
+                const next = { ...prev };
+                let hasChanges = false;
+                for (const p of user.platforms!) {
+                    const k = (p.portal || "").toLowerCase().trim();
+                    if (!k) continue;
+                    const handle = (p.portalUsername || p.portal_username || p.username || "").trim();
+                    if (!next[k] || !next[k].username || next[k].username !== handle) {
+                        next[k] = {
+                            portal: k,
+                            username: handle,
+                            profileUrl: p.link || p.profileUrl || "",
+                            verified: p.verified !== false,
+                            displayName: p.displayName || p.display_name || handle,
+                            avatarUrl: p.avatarUrl || p.avatar_url,
+                            stats: p.stats,
+                            syncStatus: p.lastSyncStatus || p.syncStatus || "valid",
+                            lastSyncAt: p.lastSyncAt || p.last_sync_at,
+                        };
+                        hasChanges = true;
+                    }
+                }
+                if (hasChanges) {
+                    try {
+                        localStorage.setItem("orbix_connected_portals", JSON.stringify(next));
+                    } catch {}
+                    return next;
+                }
+                return prev;
+            });
+        }
+    }, [user?.platforms]);
+
     // Sync initial form values when user object loads
     useEffect(() => {
         if (user) {

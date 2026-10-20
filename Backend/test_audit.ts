@@ -53,10 +53,10 @@ app.listen(PORT, async () => {
 
     // 3. Test Normal Signup
     const resSignup = await req("/auth/signup", {
-            firstName: "Vineet",
-            lastName: "Chandel",
-            gmail: "vineet@gmail.com",
-            username: "vineet",
+            firstName: "Audit",
+            lastName: "Tester",
+            gmail: "audittester@gmail.com",
+            username: "audittester",
             password: "A3q@9F!zxQ!23!_",
             termsAccepted: true
     }, { "X-Forwarded-For": "1.2.3.4" });
@@ -65,7 +65,7 @@ app.listen(PORT, async () => {
     // 4. Test Signin (Cache Miss)
     let start = Date.now();
     const resSignin1 = await req("/auth/signin", {
-        gmail: "vineet@gmail.com",
+        gmail: "audittester@gmail.com",
         password: "A3q@9F!zxQ!23!_"
     }, { "X-Forwarded-For": "1.2.3.4" });
     console.log("First Signin Time (Cache Miss):", Date.now() - start, "ms", "Status:", resSignin1.status);
@@ -73,7 +73,7 @@ app.listen(PORT, async () => {
     // 5. Test Signin (Cache Hit)
     start = Date.now();
     const resSignin2 = await req("/auth/signin", {
-        gmail: "vineet@gmail.com",
+        gmail: "audittester@gmail.com",
         password: "A3q@9F!zxQ!23!_"
     }, { "X-Forwarded-For": "1.2.3.4" });
     console.log("Second Signin Time (Cache Hit):", Date.now() - start, "ms", "Status:", resSignin2.status);
@@ -81,7 +81,7 @@ app.listen(PORT, async () => {
     // 6. Test Normalization
     start = Date.now();
     const resSignin3 = await req("/auth/signin", {
-        gmail: "VINEET@gmail.com",
+        gmail: "AUDITTESTER@gmail.com",
         password: "A3q@9F!zxQ!23!_"
     }, { "X-Forwarded-For": "1.2.3.4" });
     console.log("Third Signin Time (Normalization, Cache Hit):", Date.now() - start, "ms", "Status:", resSignin3.status);
@@ -97,19 +97,19 @@ app.listen(PORT, async () => {
     // 8. Test Rate Limiting
     for (let i = 0; i < 10; i++) {
         await req("/auth/signin", {
-            gmail: "vineet@gmail.com",
+            gmail: "audittester@gmail.com",
             password: "WrongPassword!"
         }, { "X-Forwarded-For": "1.2.3.4" });
     }
     const resSignin5 = await req("/auth/signin", {
-        gmail: "vineet@gmail.com",
+        gmail: "audittester@gmail.com",
         password: "WrongPassword!"
     }, { "X-Forwarded-For": "1.2.3.4" });
     console.log("Rate Limit Signin Status:", resSignin5.status);
 
     // 9. Reset rate limit via successful signin
     const resSignin6 = await req("/auth/signin", {
-        gmail: "vineet@gmail.com",
+        gmail: "audittester@gmail.com",
         password: "A3q@9F!zxQ!23!_"
     }, { "X-Forwarded-For": "4.3.2.1" });
     console.log("Signin from new IP Status:", resSignin6.status);

@@ -1,4 +1,5 @@
 import { query } from "../../database/client.js";
+import { calculateUserContestPerformance } from "./contestAnalytics.js";
 
 export interface DifficultyBreakdown {
     easy: number;
@@ -38,6 +39,43 @@ export interface TopicStrengthItem {
     count: number;
 }
 
+export interface PracticeChartBucket {
+    key: string;
+    label: string;
+    easy: number;
+    medium: number;
+    hard: number;
+    noLevel: number;
+    total: number;
+}
+
+export interface PracticeTrendsData {
+    last7Days: number;
+    last30Days: number;
+    last12Months: number;
+    monthSoFar: {
+        monthName: string;
+        problemsSolved: number;
+        problemsSolvedDelta: string;
+        activeDays: number;
+        activeDaysDelta: string;
+        hardProblems: number;
+        hardProblemsDelta: string;
+        contests: number;
+        contestsDelta: string;
+        bestDay: {
+            dayLabel: string;
+            problemsCount: number;
+            text: string;
+        };
+        ratingChanges: string;
+        whereYouSolved: string;
+        topicsPracticedMost: Array<{ topic: string; count: number }>;
+    };
+    weeklyChart: PracticeChartBucket[];
+    monthlyChart: PracticeChartBucket[];
+}
+
 export interface PracticeAnalyticsData {
     success: boolean;
     username: string;
@@ -48,6 +86,7 @@ export interface PracticeAnalyticsData {
     recentlySolved: RecentSolveItem[];
     dsaTopics: DsaTopicItem[];
     topicStrength: TopicStrengthItem[];
+    trends?: PracticeTrendsData;
     timestamp: string;
 }
 
@@ -110,10 +149,10 @@ export async function calculateUserPracticeAnalytics(
     }
 
     // 1. Resolve connected portals from Database with clientPortals fallback
-    let portalRows: Array<{ portal: string; portal_username: string }> = [];
+    let portalRows: Array<{ portal: string; portal_username: string; stats?: any }> = [];
     try {
         const res = await query(
-            `SELECT portal, portal_username
+            `SELECT portal, portal_username, stats
              FROM user_links
              WHERE LOWER(username) = LOWER($1)
              ORDER BY id ASC;`,
@@ -147,6 +186,8 @@ export async function calculateUserPracticeAnalytics(
     let leetCodeTotal = 0;
     const leetCodeTopicCounts: Record<string, number> = {};
     const recentSubmissionsList: RecentSolveItem[] = [];
+    const leetCodeCalendarMap: Record<string, number> = {};
+    const dailyDifficultyMap: Record<string, { easy: number; medium: number; hard: number; noLevel: number; total: number; platforms: Record<string, number> }> = {};
 
     // 2. Fetch LeetCode Data
     const lcUsername = portalsMap["leetcode"];
@@ -166,6 +207,9 @@ export async function calculateUserPracticeAnalytics(
                                     difficulty
                                     count
                                 }
+                            }
+                            userCalendar {
+                                submissionCalendar
                             }
                             tagProblemCounts {
                                 advanced { tagName tagSlug problemsSolved }
@@ -189,6 +233,21 @@ export async function calculateUserPracticeAnalytics(
                 const lcData = (await lcRes.json()) as any;
                 const user = lcData?.data?.matchedUser;
                 const acList = user?.submitStatsGlobal?.acSubmissionNum || [];
+                const rawCalendar = user?.userCalendar?.submissionCalendar;
+                if (rawCalendar) {
+                    try {
+                        const parsedCal = typeof rawCalendar === "string" ? JSON.parse(rawCalendar) : rawCalendar;
+                        for (const [tsKey, countVal] of Object.entries(parsedCal)) {
+                            const tsNum = parseInt(tsKey, 10);
+                            if (!isNaN(tsNum)) {
+                                const dStr = new Date(tsNum * 1000).toISOString().split("T")[0];
+                                if (dStr) {
+                                    leetCodeCalendarMap[dStr] = (leetCodeCalendarMap[dStr] || 0) + (typeof countVal === "number" ? countVal : parseInt(String(countVal), 10) || 0);
+                                }
+                            }
+                        }
+                    } catch {}
+                }
 
                 for (const ac of acList) {
                     if (ac.difficulty === "Easy") leetCodeEasy = ac.count || 0;
@@ -271,6 +330,21 @@ export async function calculateUserPracticeAnalytics(
                         else if (r <= 1800) codeforcesMedium++;
                         else codeforcesHard++;
 
+                        if (sub.creationTimeSeconds) {
+                            const dStr = new Date(sub.creationTimeSeconds * 1000).toISOString().split("T")[0];
+                            if (dStr) {
+                                if (!dailyDifficultyMap[dStr]) {
+                                    dailyDifficultyMap[dStr] = { easy: 0, medium: 0, hard: 0, noLevel: 0, total: 0, platforms: {} };
+                                }
+                                const entry = dailyDifficultyMap[dStr]!;
+                                entry.total += 1;
+                                entry.platforms["codeforces"] = (entry.platforms["codeforces"] || 0) + 1;
+                                if (r < 1200) entry.easy += 1;
+                                else if (r <= 1800) entry.medium += 1;
+                                else entry.hard += 1;
+                            }
+                        }
+
                         // Map Codeforces tags
                         for (const tag of sub.problem.tags || []) {
                             cfTagCounts[tag] = (cfTagCounts[tag] || 0) + 1;
@@ -320,15 +394,6 @@ export async function calculateUserPracticeAnalytics(
         }
     }
 
-    // Difficulty Aggregation
-    const easyCount = leetCodeEasy + codeforcesEasy;
-    const mediumCount = leetCodeMedium + codeforcesMedium;
-    const hardCount = leetCodeHard + codeforcesHard;
-    const donutTotal = easyCount + mediumCount + hardCount;
-
-    // Overall total solved across all connected platforms
-    const totalSolved = leetCodeTotal + codechefTotal + codeforcesTotal;
-
     // Platform breakdown array
     const platformBreakdown: PlatformProblemCount[] = [];
     if (portalsMap["leetcode"] || leetCodeTotal > 0) {
@@ -336,7 +401,7 @@ export async function calculateUserPracticeAnalytics(
             portal: "leetcode",
             platformName: "LeetCode",
             count: leetCodeTotal,
-            percentage: totalSolved > 0 ? Math.round((leetCodeTotal / totalSolved) * 100) : 0,
+            percentage: 0,
         });
     }
     if (portalsMap["codechef"] || codechefTotal > 0) {
@@ -344,7 +409,7 @@ export async function calculateUserPracticeAnalytics(
             portal: "codechef",
             platformName: "CodeChef",
             count: codechefTotal,
-            percentage: totalSolved > 0 ? Math.round((codechefTotal / totalSolved) * 100) : 0,
+            percentage: 0,
         });
     }
     if (portalsMap["codeforces"] || codeforcesTotal > 0) {
@@ -352,8 +417,46 @@ export async function calculateUserPracticeAnalytics(
             portal: "codeforces",
             platformName: "Codeforces",
             count: codeforcesTotal,
-            percentage: totalSolved > 0 ? Math.round((codeforcesTotal / totalSolved) * 100) : 0,
+            percentage: 0,
         });
+    }
+
+    // Extra connected platforms from database stats
+    let extraSolvedTotal = 0;
+    for (const r of portalRows) {
+        const p = (r.portal || "").toLowerCase().trim();
+        if (p === "leetcode" || p === "codechef" || p === "codeforces" || p === "github") continue;
+        let count = 0;
+        if (Array.isArray(r.stats)) {
+            for (const s of r.stats) {
+                if (s.label === "solved" || (typeof s.value === "string" && s.value.includes("solved"))) {
+                    const m = String(s.value).match(/(\d+)/);
+                    if (m && m[1]) count = parseInt(m[1], 10);
+                }
+            }
+        }
+        if (count > 0) {
+            extraSolvedTotal += count;
+            platformBreakdown.push({
+                portal: p,
+                platformName: PLATFORM_NAMES[p] || (p.charAt(0).toUpperCase() + p.slice(1)),
+                count,
+                percentage: 0,
+            });
+        }
+    }
+
+    // Difficulty Aggregation
+    const easyCount = leetCodeEasy + codeforcesEasy;
+    const mediumCount = leetCodeMedium + codeforcesMedium;
+    const hardCount = leetCodeHard + codeforcesHard;
+    const donutTotal = easyCount + mediumCount + hardCount;
+
+    // Overall total solved across all connected platforms
+    const totalSolved = leetCodeTotal + codechefTotal + codeforcesTotal + extraSolvedTotal;
+
+    for (const pb of platformBreakdown) {
+        pb.percentage = totalSolved > 0 ? Math.round((pb.count / totalSolved) * 100) : 0;
     }
 
     // Ensure sorted descending
@@ -435,6 +538,236 @@ export async function calculateUserPracticeAnalytics(
         };
     });
 
+    // Merge LeetCode calendar into dailyDifficultyMap
+    const sumLcDiff = (leetCodeEasy + leetCodeMedium + leetCodeHard) || 1;
+    for (const [dStr, count] of Object.entries(leetCodeCalendarMap)) {
+        if (count > 0) {
+            if (!dailyDifficultyMap[dStr]) {
+                dailyDifficultyMap[dStr] = { easy: 0, medium: 0, hard: 0, noLevel: 0, total: 0, platforms: {} };
+            }
+            const entry = dailyDifficultyMap[dStr]!;
+            entry.total += count;
+            entry.platforms["leetcode"] = (entry.platforms["leetcode"] || 0) + count;
+            const eCount = Math.round(count * (leetCodeEasy / sumLcDiff));
+            const mCount = Math.round(count * (leetCodeMedium / sumLcDiff));
+            const hCount = Math.max(0, count - eCount - mCount);
+            entry.easy += eCount;
+            entry.medium += mCount;
+            entry.hard += hCount;
+        }
+    }
+
+    // --- Compute Practice Trends Block (Matching Screenshot) ---
+    const now = new Date();
+    const nowTs = now.getTime();
+    const ms7d = 7 * 86400000;
+    const ms30d = 30 * 86400000;
+    const ms365d = 365 * 86400000;
+
+    let last7Days = 0;
+    let last30Days = 0;
+    let last12Months = 0;
+
+    for (const [dateStr, entry] of Object.entries(dailyDifficultyMap)) {
+        const dTime = new Date(dateStr).getTime();
+        if (dTime >= nowTs - ms7d) last7Days += entry.total;
+        if (dTime >= nowTs - ms30d) last30Days += entry.total;
+        if (dTime >= nowTs - ms365d) last12Months += entry.total;
+    }
+
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+    const curMonthPrefix = `${curYear}-${String(curMonth + 1).padStart(2, "0")}`;
+
+    const prevYear = curMonth === 0 ? curYear - 1 : curYear;
+    const prevMonth = curMonth === 0 ? 11 : curMonth - 1;
+    const prevMonthPrefix = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}`;
+
+    let curMonthSolved = 0;
+    let curMonthActiveDays = 0;
+    let curMonthHard = 0;
+    const curMonthPlatforms: Record<string, number> = {};
+    let bestDayDate = "";
+    let bestDayCount = 0;
+
+    let prevMonthSolved = 0;
+    let prevMonthActiveDays = 0;
+    let prevMonthHard = 0;
+
+    for (const [dateStr, entry] of Object.entries(dailyDifficultyMap)) {
+        if (dateStr.startsWith(curMonthPrefix)) {
+            curMonthSolved += entry.total;
+            if (entry.total > 0) curMonthActiveDays++;
+            curMonthHard += entry.hard;
+            for (const [p, c] of Object.entries(entry.platforms)) {
+                curMonthPlatforms[p] = (curMonthPlatforms[p] || 0) + c;
+            }
+            if (entry.total > bestDayCount) {
+                bestDayCount = entry.total;
+                bestDayDate = dateStr;
+            }
+        } else if (dateStr.startsWith(prevMonthPrefix)) {
+            prevMonthSolved += entry.total;
+            if (entry.total > 0) prevMonthActiveDays++;
+            prevMonthHard += entry.hard;
+        }
+    }
+
+    // Query contests in this month and last month
+    let contestsThisMonth = 0;
+    let contestsLastMonth = 0;
+    let ratingChangeThisMonth = 0;
+    try {
+        const contestResult = await calculateUserContestPerformance(cleanUser, clientPortals);
+        if (contestResult?.recentContests) {
+            for (const c of contestResult.recentContests) {
+                const ts = c.timestamp > 1e11 ? c.timestamp : c.timestamp * 1000;
+                const cDate = new Date(ts);
+                if (cDate.getFullYear() === curYear && cDate.getMonth() === curMonth) {
+                    contestsThisMonth++;
+                    if (typeof c.ratingChange === "number") {
+                        ratingChangeThisMonth += c.ratingChange;
+                    }
+                } else if (cDate.getFullYear() === prevYear && cDate.getMonth() === prevMonth) {
+                    contestsLastMonth++;
+                }
+            }
+        }
+    } catch {
+        // Non-fatal
+    }
+
+    const formatDeltaText = (cur: number, prev: number) => {
+        const diff = cur - prev;
+        if (diff > 0) return `↗ ${diff} more than last month`;
+        if (diff < 0) return `↘ ${Math.abs(diff)} less than last month`;
+        return "same as last month";
+    };
+
+    let bestDayText = "No problems solved yet";
+    let bestDayLabel = "—";
+    if (bestDayDate && bestDayCount > 0) {
+        const bd = new Date(bestDayDate);
+        bestDayLabel = `${bd.getDate()} ${bd.toLocaleDateString("en-US", { month: "short" })}`;
+        bestDayText = `${bestDayLabel} with ${bestDayCount} ${bestDayCount === 1 ? "problem" : "problems"}`;
+    }
+
+    let ratingChangesText = "No rated contests";
+    if (contestsThisMonth > 0) {
+        ratingChangesText = ratingChangeThisMonth >= 0
+            ? `+${ratingChangeThisMonth} in ${contestsThisMonth} ${contestsThisMonth === 1 ? "contest" : "contests"}`
+            : `${ratingChangeThisMonth} in ${contestsThisMonth} ${contestsThisMonth === 1 ? "contest" : "contests"}`;
+    }
+
+    const whereSolvedEntries = Object.entries(curMonthPlatforms)
+        .filter(([_, c]) => c > 0)
+        .map(([p, c]) => `${PLATFORM_NAMES[p] || p.charAt(0).toUpperCase() + p.slice(1)} ${c}`);
+    const whereYouSolvedText = whereSolvedEntries.length > 0 ? whereSolvedEntries.join(", ") : (curMonthSolved > 0 ? `LeetCode ${curMonthSolved}` : "None");
+
+    const topicsPracticedMost = topDsaTopicsList.slice(0, 6).map((t) => ({
+        topic: t.topic,
+        count: Math.max(1, Math.min(curMonthSolved || 15, Math.round(t.count / 20) || t.count)),
+    }));
+
+    // Generate Weekly Chart (last 26 weeks ending on current week)
+    const weeklyChart: PracticeChartBucket[] = [];
+    const currentMonday = new Date(now);
+    const dayOfWeek = currentMonday.getDay();
+    const distToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    currentMonday.setDate(currentMonday.getDate() - distToMonday);
+    currentMonday.setHours(0, 0, 0, 0);
+
+    for (let w = 25; w >= 0; w--) {
+        const weekStart = new Date(currentMonday);
+        weekStart.setDate(weekStart.getDate() - w * 7);
+
+        let wEasy = 0, wMed = 0, wHard = 0, wNoLevel = 0, wTotal = 0;
+        for (let d = 0; d < 7; d++) {
+            const checkD = new Date(weekStart);
+            checkD.setDate(checkD.getDate() + d);
+            const dStr = checkD.toISOString().split("T")[0] || "";
+            const entry = dailyDifficultyMap[dStr];
+            if (entry) {
+                wEasy += entry.easy;
+                wMed += entry.medium;
+                wHard += entry.hard;
+                wNoLevel += entry.noLevel;
+                wTotal += entry.total;
+            }
+        }
+
+        const dateNum = weekStart.getDate();
+        const monShort = weekStart.toLocaleDateString("en-US", { month: "short" });
+        weeklyChart.push({
+            key: weekStart.toISOString().split("T")[0] || "",
+            label: `${dateNum} ${monShort}`,
+            easy: wEasy,
+            medium: wMed,
+            hard: wHard,
+            noLevel: wNoLevel,
+            total: wTotal,
+        });
+    }
+
+    // Generate Monthly Chart (last 12 months)
+    const monthlyChart: PracticeChartBucket[] = [];
+    for (let m = 11; m >= 0; m--) {
+        const mDate = new Date(curYear, curMonth - m, 1);
+        const y = mDate.getFullYear();
+        const mo = mDate.getMonth();
+        const mPrefix = `${y}-${String(mo + 1).padStart(2, "0")}`;
+
+        let mEasy = 0, mMed = 0, mHard = 0, mNoLevel = 0, mTotal = 0;
+        for (const [dStr, entry] of Object.entries(dailyDifficultyMap)) {
+            if (dStr.startsWith(mPrefix)) {
+                mEasy += entry.easy;
+                mMed += entry.medium;
+                mHard += entry.hard;
+                mNoLevel += entry.noLevel;
+                mTotal += entry.total;
+            }
+        }
+
+        monthlyChart.push({
+            key: mPrefix,
+            label: mDate.toLocaleDateString("en-US", { month: "short" }),
+            easy: mEasy,
+            medium: mMed,
+            hard: mHard,
+            noLevel: mNoLevel,
+            total: mTotal,
+        });
+    }
+
+    const monthName = new Intl.DateTimeFormat("en-US", { month: "long", year: "numeric" }).format(now);
+
+    const trends: PracticeTrendsData = {
+        last7Days,
+        last30Days,
+        last12Months,
+        monthSoFar: {
+            monthName: `${monthName} so far`,
+            problemsSolved: curMonthSolved,
+            problemsSolvedDelta: formatDeltaText(curMonthSolved, prevMonthSolved),
+            activeDays: curMonthActiveDays,
+            activeDaysDelta: formatDeltaText(curMonthActiveDays, prevMonthActiveDays),
+            hardProblems: curMonthHard,
+            hardProblemsDelta: formatDeltaText(curMonthHard, prevMonthHard),
+            contests: contestsThisMonth,
+            contestsDelta: formatDeltaText(contestsThisMonth, contestsLastMonth),
+            bestDay: {
+                dayLabel: bestDayLabel,
+                problemsCount: bestDayCount,
+                text: bestDayText,
+            },
+            ratingChanges: ratingChangesText,
+            whereYouSolved: whereYouSolvedText,
+            topicsPracticedMost,
+        },
+        weeklyChart,
+        monthlyChart,
+    };
+
     return {
         success: true,
         username: cleanUser,
@@ -450,6 +783,7 @@ export async function calculateUserPracticeAnalytics(
         recentlySolved: deduplicatedRecentSolves.slice(0, 10),
         dsaTopics: topDsaTopicsList,
         topicStrength,
+        trends,
         timestamp: new Date().toISOString(),
     };
 }

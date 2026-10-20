@@ -38,6 +38,43 @@ export interface TopicStrengthItem {
     count: number;
 }
 
+export interface PracticeChartBucket {
+    key: string;
+    label: string;
+    easy: number;
+    medium: number;
+    hard: number;
+    noLevel: number;
+    total: number;
+}
+
+export interface PracticeTrendsData {
+    last7Days: number;
+    last30Days: number;
+    last12Months: number;
+    monthSoFar: {
+        monthName: string;
+        problemsSolved: number;
+        problemsSolvedDelta: string;
+        activeDays: number;
+        activeDaysDelta: string;
+        hardProblems: number;
+        hardProblemsDelta: string;
+        contests: number;
+        contestsDelta: string;
+        bestDay: {
+            dayLabel: string;
+            problemsCount: number;
+            text: string;
+        };
+        ratingChanges: string;
+        whereYouSolved: string;
+        topicsPracticedMost: Array<{ topic: string; count: number }>;
+    };
+    weeklyChart: PracticeChartBucket[];
+    monthlyChart: PracticeChartBucket[];
+}
+
 export interface PracticeAnalyticsData {
     username: string;
     totalSolved: number;
@@ -47,6 +84,7 @@ export interface PracticeAnalyticsData {
     recentlySolved: RecentSolveItem[];
     dsaTopics: DsaTopicItem[];
     topicStrength: TopicStrengthItem[];
+    trends?: PracticeTrendsData;
     timestamp: string;
 }
 
@@ -149,6 +187,7 @@ export const fetchPracticeAnalytics = createAsyncThunk<
                             recentlySolved: data.recentlySolved || [],
                             dsaTopics: data.dsaTopics || [],
                             topicStrength: data.topicStrength || [],
+                            trends: data.trends,
                             timestamp: data.timestamp || new Date().toISOString(),
                         };
                     }

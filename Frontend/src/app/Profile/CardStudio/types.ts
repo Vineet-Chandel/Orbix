@@ -1,6 +1,7 @@
 export type CardFormat = "linkedin" | "instagram";
 export type CardFace = "front" | "back";
 export type CardThemeId = "indigo" | "gold" | "emerald" | "ruby" | "slate";
+export type SlotShowcaseCategory = "practice" | "dev" | "both";
 
 export interface CardThemeConfig {
     id: CardThemeId;
@@ -71,6 +72,7 @@ export interface CardCustomizationSettings {
     face: CardFace;
     theme: CardThemeId;
     includeGitHub: boolean;
+    slotCategory?: SlotShowcaseCategory;
     selectedPlatforms: string[]; // Custom manual selection or auto order
 }
 
@@ -79,5 +81,6 @@ export const DEFAULT_CARD_SETTINGS: CardCustomizationSettings = {
     face: "front",
     theme: "indigo",
     includeGitHub: false,
+    slotCategory: "both",
     selectedPlatforms: [],
 };

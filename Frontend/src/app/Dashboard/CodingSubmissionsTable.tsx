@@ -37,6 +37,8 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
 
     const weeksCount = 52; // Full 1 Year activity heatmap
 
+    const user = useAppSelector((state) => state.user.user);
+
     // Map of currently active connected portals and usernames (strictly excluding GitHub)
     const activePortalsMap = useMemo(() => {
         const map = new Map<string, string>();
@@ -48,8 +50,17 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                 if (handle) map.set(lk, handle);
             }
         }
+        // Fallback to user.platforms from Redux if map is empty
+        if (map.size === 0 && user?.platforms && Array.isArray(user.platforms)) {
+            for (const p of user.platforms) {
+                const lk = (p.portal || "").toLowerCase().trim();
+                if (lk === "github") continue;
+                const handle = (p.portalUsername || p.portal_username || p.username || "").trim().toLowerCase();
+                if (handle) map.set(lk, handle);
+            }
+        }
         return map;
-    }, [connectedPortals]);
+    }, [connectedPortals, user?.platforms]);
 
     // Unique fingerprint of currently connected non-github portals
     const portalsFingerprint = useMemo(() => {

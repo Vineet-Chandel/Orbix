@@ -4,6 +4,7 @@ import type { PlatformSubmissionStat } from "../utils/submissionsAggregator";
 export interface UnifiedSubmissionsData {
     username: string;
     totalSubmissions: number;
+    totalSolved?: number;
     activeDays: number;
     dayStreak: number;
     platformBreakdown: Record<string, PlatformSubmissionStat>;

@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { FolderGit2, GitCommit, Trophy } from "lucide-react";
+import { FolderGit2, GitCommit, Trophy, Sparkles, Code2 } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { OrbixCardQR } from "./OrbixCardQR";
 import { CardBannerSVG } from "./CardBannerSVG";
@@ -30,6 +30,7 @@ interface LinkedInCardProps {
     cardRef?: React.RefObject<HTMLDivElement | null>;
     connectedPortals?: Record<string, any>;
     showcaseMode?: "problems" | "contests";
+    slotCategory?: "practice" | "dev" | "both";
     topContests?: RankedContestPlatform[];
     showSocialLinks?: boolean;
     onHireMeClick?: () => void;
@@ -49,6 +50,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
     cardRef,
     connectedPortals,
     showcaseMode = "problems",
+    slotCategory = "both",
     topContests = [],
     showSocialLinks = false,
     onHireMeClick,
@@ -170,10 +172,10 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
 
 
     const isLightBanner = theme.id === "gold";
-    const bannerTextColor = isLightBanner ? "black" : "black";
-    const bannerSubtextColor = isLightBanner ? "black" : "black";
-    const bannerFill = isLightBanner ? "black" : "black";
-    const bannerStroke = isLightBanner ? "black" : "black";
+    const bannerTextColor = isLightBanner ? "text-black" : "text-white";
+    const bannerSubtextColor = isLightBanner ? "text-black/75" : "text-white/80";
+    const bannerFill = isLightBanner ? "black" : "white";
+    const bannerStroke = isLightBanner ? "black" : "white";
 
     return (
         <div
@@ -230,10 +232,10 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                 </svg>
                             </div>
                             <div>
-                                <span className={`text-4xl font-black text-black ${bannerTextColor} tracking-tight leading-none block`}>
+                                <span className={`text-4xl font-black ${bannerTextColor} tracking-tight leading-none block`}>
                                     Orbix
                                 </span>
-                                <span className={`text-sm font-black text-black ${bannerSubtextColor} tracking-widest uppercase mt-0.5 block`}>
+                                <span className={`text-sm font-black ${bannerSubtextColor} tracking-widest uppercase mt-0.5 block`}>
                                     Profile Card
                                 </span>
                             </div>
@@ -516,21 +518,9 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                                 {getPortalIcon(contest.id, "w-full h-full object-contain")}
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <h4 className="text-sm font-black text-white leading-none truncate">
-                                                                        {contest.name}
-                                                                    </h4>
-                                                                    {contest.isVerified && (
-                                                                        <div
-                                                                            className="w-3.5 h-3.5 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center flex-shrink-0"
-                                                                            title="Verified Contest Profile"
-                                                                        >
-                                                                            <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 24 24">
-                                                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                                                            </svg>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
+                                                                <h4 className="text-sm font-black text-white leading-none truncate">
+                                                                    {contest.name}
+                                                                </h4>
                                                                 <span className="text-xs font-mono text-neutral-400 truncate block mt-1">
                                                                     @{contest.username}
                                                                 </span>
@@ -557,10 +547,6 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                                 <span className="text-[10px] font-mono text-neutral-400">
                                                                     Rank #{contest.officialRank.toLocaleString()}{contest.peakRating ? ` • max ${contest.peakRating}` : ""}
                                                                 </span>
-                                                            ) : contest.tierInfo?.nextTierName && typeof contest.tierInfo.pointsToNextTier === "number" ? (
-                                                                <span className="text-[10px] font-mono text-neutral-400">
-                                                                    {contest.tierInfo.pointsToNextTier} to {contest.tierInfo.nextTierName}
-                                                                </span>
                                                             ) : contest.ratedContestsCount && contest.ratedContestsCount > 0 ? (
                                                                 <span className="text-[10px] font-mono text-neutral-400">
                                                                     {contest.ratedContestsCount} contests attended
@@ -575,9 +561,26 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                 ) : (
                                     <div className="space-y-2 flex-1 flex flex-col justify-between">
                                         <div className="flex items-center justify-between text-xs font-black text-neutral-400 px-1">
-                                            <span className="uppercase tracking-wider text-[11px]">Top Coding Accounts</span>
-                                            <span className="text-[11px] text-neutral-400 font-mono">
-                                                {topPlatforms.length} displayed
+                                            <div className="flex items-center gap-1.5">
+                                                {slotCategory === "practice" ? (
+                                                    <>
+                                                        <Code2 className="w-3.5 h-3.5 text-indigo-400" />
+                                                        <span className="uppercase tracking-wider text-[11px]">Practice Slots</span>
+                                                    </>
+                                                ) : slotCategory === "dev" ? (
+                                                    <>
+                                                        <FolderGit2 className="w-3.5 h-3.5 text-emerald-400" />
+                                                        <span className="uppercase tracking-wider text-[11px]">Dev Slots</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                                        <span className="uppercase tracking-wider text-[11px]">Practice & Dev Slots</span>
+                                                    </>
+                                                )}
+                                            </div>
+                                            <span className="text-[11px] text-neutral-400 font-mono uppercase">
+                                                Top {topPlatforms.length} Showcased
                                             </span>
                                         </div>
 
@@ -585,46 +588,186 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                             <div className="rounded-2xl bg-[#121824]/90 border border-white/10 p-4 text-center flex-1 flex items-center justify-center">
                                                 <p className="text-xs text-neutral-400">No platforms selected.</p>
                                             </div>
-                                        ) : (
-                                            topPlatforms.slice(0, 3).map((plat) => {
-                                                if (plat.isGitHub || plat.id === "github") {
-                                                    return (
-                                                        <div
-                                                            key="github"
-                                                            className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1"
-                                                        >
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 text-white p-1.5">
-                                                                    {getPortalIcon("github", "w-5 h-5")}
+                                        ) : slotCategory === "dev" && topPlatforms.length === 1 ? (
+                                            (() => {
+                                                const plat = topPlatforms[0];
+                                                const bestDay = plat.bestWorkingDay || githubStats.bestWorkingDay || "Wednesday";
+                                                const repos = (plat.publicRepos ?? githubStats.publicRepos) || 0;
+                                                const commits = (plat.contributionsOrCommits ?? githubStats.contributionsOrCommits) || 0;
+                                                const heroValue = commits > 0 ? commits.toLocaleString() : repos > 0 ? repos.toLocaleString() : "—";
+                                                const heroLabel = commits > 0 ? "COMMITS" : repos > 0 ? "REPOS" : "DEV";
+
+                                                return (
+                                                    <div className="flex-1 flex flex-col justify-between gap-2">
+                                                        {/* Primary Hero Dev Slot */}
+                                                        <div className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md">
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className="w-9 h-9 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center flex-shrink-0 text-white shadow-xs p-1.5">
+                                                                    {getPortalIcon(plat.id || "github", "w-5 h-5 text-white")}
                                                                 </div>
-                                                                <div>
-                                                                    <span className="text-sm font-black text-white block leading-none">GitHub</span>
-                                                                    <span className="text-xs font-mono text-neutral-400 block mt-1">@{plat.username || githubStats.username}</span>
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-sm font-black text-white block leading-none truncate">
+                                                                            {plat.name || "GitHub"}
+                                                                        </span>
+                                                                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 leading-none">
+                                                                            DEV
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-xs font-mono text-neutral-400 block mt-1 truncate">
+                                                                        @{plat.username || githubStats.username}
+                                                                    </span>
                                                                 </div>
                                                             </div>
-                                                            <div className="flex items-center gap-3 text-right">
-                                                                <div className="flex items-center gap-1.5 bg-white/[0.04] px-2.5 py-1 rounded-xl border border-white/5">
-                                                                    <FolderGit2 className="w-3.5 h-3.5 text-emerald-400" />
-                                                                    <div className="text-left">
-                                                                        <span className="text-xs font-black text-white block leading-tight font-mono">
-                                                                            {(plat.publicRepos ?? githubStats.publicRepos).toLocaleString()}
-                                                                        </span>
-                                                                        <span className="text-[9px] text-neutral-400 uppercase font-bold">Repos</span>
-                                                                    </div>
+
+                                                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-base sm:text-lg font-black text-white font-mono tracking-tight leading-none">
+                                                                        {heroValue}
+                                                                    </span>
+                                                                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider leading-tight bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-xs flex items-center gap-1">
+                                                                        <GitCommit className="w-2.5 h-2.5 text-emerald-400" />
+                                                                        {heroLabel}
+                                                                    </span>
                                                                 </div>
-                                                                <div className="flex items-center gap-1.5 bg-white/[0.04] px-2.5 py-1 rounded-xl border border-white/5">
+                                                                <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-300 bg-white/[0.06] px-2.5 py-0.5 rounded-md border border-white/5">
+                                                                    <span className="font-bold text-sky-400 flex items-center gap-1">
+                                                                        <FolderGit2 className="w-2.5 h-2.5 text-sky-400" />
+                                                                        {repos.toLocaleString()} repos
+                                                                    </span>
+                                                                    {bestDay ? (
+                                                                        <>
+                                                                            <span className="text-neutral-500">•</span>
+                                                                            <span className="text-amber-300 font-semibold flex items-center gap-1">
+                                                                                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                                                                Peak: {bestDay}
+                                                                            </span>
+                                                                        </>
+                                                                    ) : null}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* 3-Column Engineering Metrics Grid */}
+                                                        <div className="grid grid-cols-3 gap-2 flex-1">
+                                                            <div className="rounded-xl bg-[#121824]/80 border border-white/10 p-2.5 flex flex-col justify-between">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[10px] font-mono uppercase text-neutral-400 font-bold">Commits</span>
                                                                     <GitCommit className="w-3.5 h-3.5 text-emerald-400" />
-                                                                    <div className="text-left">
-                                                                        <span className="text-xs font-black text-white block leading-tight font-mono">
-                                                                            {(plat.contributionsOrCommits ?? githubStats.contributionsOrCommits).toLocaleString()}
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-base font-black text-white font-mono block leading-none">
+                                                                        {commits.toLocaleString()}
+                                                                    </span>
+                                                                    <span className="text-[9px] text-neutral-400 block mt-0.5">All-time activity</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="rounded-xl bg-[#121824]/80 border border-white/10 p-2.5 flex flex-col justify-between">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[10px] font-mono uppercase text-neutral-400 font-bold">Repositories</span>
+                                                                    <FolderGit2 className="w-3.5 h-3.5 text-sky-400" />
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-base font-black text-white font-mono block leading-none">
+                                                                        {repos.toLocaleString()}
+                                                                    </span>
+                                                                    <span className="text-[9px] text-neutral-400 block mt-0.5">Public projects</span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="rounded-xl bg-[#121824]/80 border border-white/10 p-2.5 flex flex-col justify-between">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[10px] font-mono uppercase text-neutral-400 font-bold">Peak Day</span>
+                                                                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-sm font-black text-amber-300 font-mono block leading-none truncate">
+                                                                        {bestDay}
+                                                                    </span>
+                                                                    <span className="text-[9px] text-neutral-400 block mt-0.5">Peak coding flow</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Developer Flow Insight Pill */}
+                                                        <div className="rounded-xl bg-white/[0.04] border border-white/5 px-3 py-1.5 flex items-center justify-between text-[11px] font-mono">
+                                                            <div className="flex items-center gap-1.5 text-neutral-300 truncate">
+                                                                <Sparkles className="w-3 h-3 text-amber-400 flex-shrink-0" />
+                                                                <span className="truncate">Peak engineering velocity on <strong className="text-amber-300">{bestDay}s</strong></span>
+                                                            </div>
+                                                            <span className="text-emerald-400 font-bold uppercase tracking-wider text-[10px] flex-shrink-0">Active Builder</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()
+                                        ) : (
+                                            topPlatforms.slice(0, 3).map((plat) => {
+                                                // DEV SLOT (GitHub / GitLab)
+                                                if (plat.isGitHub || plat.id === "github" || plat.category === "dev") {
+                                                    const bestDay = plat.bestWorkingDay || githubStats.bestWorkingDay || "Wednesday";
+                                                    const repos = (plat.publicRepos ?? githubStats.publicRepos) || 0;
+                                                    const commits = (plat.contributionsOrCommits ?? githubStats.contributionsOrCommits) || 0;
+                                                    const heroValue = commits > 0 ? commits.toLocaleString() : repos > 0 ? repos.toLocaleString() : "—";
+                                                    const heroLabel = commits > 0 ? "COMMITS" : repos > 0 ? "REPOS" : "DEV";
+
+                                                    return (
+                                                        <div
+                                                            key={plat.id || "github"}
+                                                            className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1 transition-all"
+                                                        >
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className="w-9 h-9 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center flex-shrink-0 text-white shadow-xs p-1.5">
+                                                                    {getPortalIcon(plat.id || "github", "w-5 h-5 text-white")}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-sm font-black text-white block leading-none truncate">
+                                                                            {plat.name || "GitHub"}
                                                                         </span>
-                                                                        <span className="text-[9px] text-neutral-400 uppercase font-bold">Commits</span>
+                                                                        <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 leading-none">
+                                                                            DEV
+                                                                        </span>
                                                                     </div>
+                                                                    <span className="text-xs font-mono text-neutral-400 block mt-1 truncate">
+                                                                        @{plat.username || githubStats.username}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-base sm:text-lg font-black text-white font-mono tracking-tight leading-none">
+                                                                        {heroValue}
+                                                                    </span>
+                                                                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider leading-tight bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-xs flex items-center gap-1">
+                                                                        <GitCommit className="w-2.5 h-2.5 text-emerald-400" />
+                                                                        {heroLabel}
+                                                                    </span>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-300 bg-white/[0.06] px-2.5 py-0.5 rounded-md border border-white/5">
+                                                                    <span className="font-bold text-sky-400 flex items-center gap-1">
+                                                                        <FolderGit2 className="w-2.5 h-2.5 text-sky-400" />
+                                                                        {repos.toLocaleString()} repos
+                                                                    </span>
+                                                                    {bestDay ? (
+                                                                        <>
+                                                                            <span className="text-neutral-500">•</span>
+                                                                            <span className="text-amber-300 font-semibold flex items-center gap-1">
+                                                                                <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                                                                                Peak: {bestDay}
+                                                                            </span>
+                                                                        </>
+                                                                    ) : null}
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     );
                                                 }
+
+                                                // PRACTICE PLATFORM (Smart Sync: Contest Rating + Solved Within it, or Solved Only if poor/no rating)
+                                                const showContestRating = Boolean(plat.hasGoodRating && plat.rating && plat.rating > 0);
 
                                                 return (
                                                     <div
@@ -645,9 +788,52 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                             </div>
                                                         </div>
 
-                                                        <span className="text-xs font-mono font-black text-white bg-white/10 px-3.5 py-1.5 rounded-xl">
-                                                            {plat.solvedCount.toLocaleString()} solved
-                                                        </span>
+                                                        {showContestRating ? (
+                                                            // Platform has a good contest rating -> Show rating with problem solved nested within it!
+                                                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-base sm:text-lg font-black text-white font-mono tracking-tight leading-none">
+                                                                        {plat.rating?.toLocaleString()}
+                                                                    </span>
+                                                                    {plat.tier && (
+                                                                        <span
+                                                                            style={{
+                                                                                backgroundColor: plat.tierColor || "#f59e0b",
+                                                                            }}
+                                                                            className="px-2 py-0.5 rounded text-[10px] font-black text-white uppercase tracking-wider shadow-xs leading-tight"
+                                                                        >
+                                                                            {plat.tier}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+
+                                                                {/* Problem solved nested within contest rating */}
+                                                                <div className="flex items-center gap-1.5 text-[10px] font-mono text-neutral-300 bg-white/[0.06] px-2 py-0.5 rounded-md border border-white/5">
+                                                                    <span className="font-bold text-white">
+                                                                        {plat.solvedCount.toLocaleString()}
+                                                                    </span>
+                                                                    <span className="text-neutral-400">solved</span>
+                                                                    {plat.contestsCount && plat.contestsCount > 0 ? (
+                                                                        <>
+                                                                            <span className="text-neutral-500">•</span>
+                                                                            <span className="text-neutral-400">
+                                                                                {plat.contestsCount} contests
+                                                                            </span>
+                                                                        </>
+                                                                    ) : null}
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            // Platform has no rating or poor rating -> Display ONLY problems solved prominently
+                                                            <div className="flex items-center gap-1.5 bg-white/10 px-3.5 py-1.5 rounded-xl border border-white/5 shadow-xs flex-shrink-0">
+                                                                <span className="text-xs font-mono font-black text-white">
+                                                                    {plat.solvedCount.toLocaleString()}
+                                                                </span>
+                                                                <span className="text-xs font-semibold text-neutral-300">
+                                                                    solved
+                                                                </span>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 );
                                             })

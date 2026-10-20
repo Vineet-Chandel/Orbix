@@ -1158,6 +1158,49 @@ export const ELIGIBLE_CONTEST_PLATFORMS: Record<string, EligiblePlatformConfig> 
         fetcher: fetchTopCoderContests,
         getTier: (r) => getTopCoderTier(r),
     },
+    hackerrank: {
+        name: "HackerRank",
+        exploreContestsUrl: "https://www.hackerrank.com/contests",
+        buildProfileUrl: (u) => `https://www.hackerrank.com/profile/${u}`,
+        fetcher: fetchHackerRankContests,
+        getTier: (r) => getHackerRankTier(r),
+    },
+    geeksforgeeks: {
+        name: "GeeksforGeeks",
+        exploreContestsUrl: "https://practice.geeksforgeeks.org/events",
+        buildProfileUrl: (u) => `https://www.geeksforgeeks.org/user/${u}/`,
+        fetcher: fetchGeeksforGeeksContests,
+        getTier: (r) => getGeeksforGeeksTier(r),
+    },
+    hackerearth: {
+        name: "HackerEarth",
+        exploreContestsUrl: "https://www.hackerearth.com/challenges/",
+        buildProfileUrl: (u) => `https://www.hackerearth.com/@${u}`,
+        fetcher: fetchHackerEarthContests,
+        getTier: (r) => getHackerEarthTier(r),
+    },
+    interviewbit: {
+        name: "InterviewBit",
+        exploreContestsUrl: "https://www.interviewbit.com/contests/",
+        buildProfileUrl: (u) => `https://www.interviewbit.com/profile/${u}`,
+        fetcher: fetchInterviewBitContests,
+        getTier: (r) => getInterviewBitTier(r),
+    },
+    code360: {
+        name: "Code360",
+        exploreContestsUrl: "https://www.naukri.com/code360/contests",
+        buildProfileUrl: (u) => `https://www.naukri.com/code360/profile/${u}`,
+        fetcher: fetchCode360Contests,
+        getTier: (r) => ({
+            name: "Contender",
+            color: "#f59e0b",
+            badgeBg: "#fef3c7",
+            nextTierName: null,
+            pointsToNextTier: 0,
+            progressPercent: 100,
+            description: "Code360 competitive coder",
+        }),
+    },
 };
 
 /**
@@ -1220,21 +1263,21 @@ export async function calculateUserContestPerformance(
     }
 
     const connectedMap = new Map<string, string>();
-    if (clientPortals && Object.keys(clientPortals).length > 0) {
-        // Client-driven dynamic set: ONLY query and return platforms the client is currently connected to
+    // First, populate from database rows
+    for (const row of rows) {
+        const portal = (row.portal || "").toLowerCase().trim();
+        const portalUsername = (row.portal_username || "").trim();
+        if (portal && portalUsername) {
+            connectedMap.set(portal, portalUsername);
+        }
+    }
+    // Then merge with client-supplied portals (clientPortals may have newer links or local sessions)
+    if (clientPortals && typeof clientPortals === "object") {
         for (const [k, v] of Object.entries(clientPortals)) {
             const portalKey = k.toLowerCase().trim();
             const portalUsername = (typeof v === "string" ? v : (v as any)?.username || (v as any)?.portalUsername || "").trim();
             if (portalKey && portalUsername && portalKey !== "github" && !portalKey.startsWith("_") && portalKey !== "theme") {
                 connectedMap.set(portalKey, portalUsername);
-            }
-        }
-    } else {
-        for (const row of rows) {
-            const portal = (row.portal || "").toLowerCase().trim();
-            const portalUsername = (row.portal_username || "").trim();
-            if (portal && portalUsername) {
-                connectedMap.set(portal, portalUsername);
             }
         }
     }
@@ -1403,8 +1446,8 @@ export async function calculateUserContestPerformance(
     // Collect settled platform analytics where contest data could be extracted
     for (const res of results) {
         if (res.status === "fulfilled" && res.value) {
-            // Only include platform if user is connected and contest data could be extracted
-            if (res.value.connected && res.value.status !== "error" && res.value.status !== "not_connected") {
+            // Only include platform if user is connected
+            if (res.value.connected && res.value.status !== "not_connected") {
                 platforms.push(res.value);
                 if (res.value.ratedContestsCount > 0) {
                     totalRatedContests += res.value.ratedContestsCount;

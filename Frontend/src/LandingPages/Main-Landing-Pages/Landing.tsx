@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import NavBar from '../NavBar/Landing';
 import { useAppSelector } from '../../store';
+import { Card } from './Card';
 
 export default function MainLanding() {
   const navigate = useNavigate();
@@ -95,6 +96,11 @@ export default function MainLanding() {
             </div>
           </div>
         </div>
+      </section>
+
+      {/* Flagship Profile Card Showcase: One Card Every Place That Matters (Full Screen) */}
+      <section className="w-full my-6 rounded-[40px] sm:rounded-[48px] overflow-hidden shadow-2xl">
+        <Card />
       </section>
 
       {/* Highlights linking to dedicated subpages */}

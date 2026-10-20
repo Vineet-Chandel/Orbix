@@ -130,7 +130,7 @@ export const getPortalIcon = (portalId: string, className = "w-5 h-5"): ReactNod
 
         case "github":
             return (
-                <svg className={className} viewBox="0 0 24 24" fill="#24292E">
+                <svg className={className} viewBox="0 0 24 24" fill="currentColor">
                     <path
                         fillRule="evenodd"
                         clipRule="evenodd"

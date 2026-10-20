@@ -11,6 +11,7 @@ import { PracticeAnalyticsSection } from "./PracticeAnalytics/PracticeAnalyticsS
 import { PracticeMonthlyStatsCards } from "./PracticeMonthlyStatsCards";
 import { DevelopmentAnalyticsSection } from "./DevelopmentAnalytics/DevelopmentAnalyticsSection";
 import { NotificationsView } from "../Notifications/NotificationsView";
+import { TrendsView } from "../Trends/TrendsView";
 
 export default function Dashboard() {
     const location = useLocation();
@@ -20,6 +21,7 @@ export default function Dashboard() {
 
     // Determine initial active tab based on pathname
     const getTabFromPath = (path: string): SidebarTab => {
+        if (path.includes("/trends") || path.includes("/reports")) return "trends";
         if (path.includes("/notifications") || path.includes("/inbox")) return "notifications";
         if (path.includes("/profile")) return "profile";
         if (path.includes("/resume")) return "resume";
@@ -39,10 +41,8 @@ export default function Dashboard() {
     }, [location.pathname]);
 
     useEffect(() => {
-        if (!user) {
-            dispatch(fetchUserProfile());
-        }
-    }, [dispatch, user]);
+        dispatch(fetchUserProfile());
+    }, [dispatch]);
 
     const handleSignOut = async () => {
         try {
@@ -71,11 +71,46 @@ export default function Dashboard() {
     const [connectedPortals, setConnectedPortals] = useState<Record<string, any>>(() => {
         try {
             const raw = localStorage.getItem("orbix_connected_portals");
-            return raw ? JSON.parse(raw) : {};
-        } catch {
-            return {};
-        }
+            if (raw) return JSON.parse(raw);
+        } catch {}
+        return {};
     });
+
+    // Synchronize connectedPortals from user.platforms when loaded from server
+    useEffect(() => {
+        if (user?.platforms && Array.isArray(user.platforms) && user.platforms.length > 0) {
+            setConnectedPortals((prev) => {
+                const next = { ...prev };
+                let hasChanges = false;
+                for (const p of user.platforms!) {
+                    const k = (p.portal || "").toLowerCase().trim();
+                    if (!k) continue;
+                    const handle = (p.portalUsername || p.portal_username || p.username || "").trim();
+                    if (!next[k] || !next[k].username || next[k].username !== handle) {
+                        next[k] = {
+                            portal: k,
+                            username: handle,
+                            profileUrl: p.link || p.profileUrl || "",
+                            verified: p.verified !== false,
+                            displayName: p.displayName || p.display_name || handle,
+                            avatarUrl: p.avatarUrl || p.avatar_url,
+                            stats: p.stats,
+                            syncStatus: p.lastSyncStatus || p.syncStatus || "valid",
+                            lastSyncAt: p.lastSyncAt || p.last_sync_at,
+                        };
+                        hasChanges = true;
+                    }
+                }
+                if (hasChanges) {
+                    try {
+                        localStorage.setItem("orbix_connected_portals", JSON.stringify(next));
+                    } catch {}
+                    return next;
+                }
+                return prev;
+            });
+        }
+    }, [user?.platforms]);
 
     useEffect(() => {
         const handleSync = () => {
@@ -112,6 +147,7 @@ export default function Dashboard() {
                 onTabChange={(tab) => {
                     setActiveTab(tab);
                     if (tab === "dashboard") navigate("/dashboard");
+                    if (tab === "trends") navigate("/trends");
                     if (tab === "notifications") navigate("/notifications");
                     if (tab === "profile") navigate("/profile");
                     if (tab === "resume") navigate("/resume");
@@ -140,7 +176,9 @@ export default function Dashboard() {
                             </svg>
                         </button>
                         <h1 className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight">
-                            {activeTab === "notifications"
+                            {activeTab === "trends"
+                                ? "Trends & Performance Reports"
+                                : activeTab === "notifications"
                                 ? "Inbox & Inquiries"
                                 : activeTab === "profile"
                                 ? "Developer Profile"
@@ -432,6 +470,14 @@ export default function Dashboard() {
                 {/* Sub-view: Notifications & Messages */}
                 {activeTab === "notifications" && (
                     <NotificationsView />
+                )}
+
+                {/* Sub-view: Trends & Performance Reports */}
+                {activeTab === "trends" && (
+                    <TrendsView
+                        connectedPortals={connectedPortals}
+                        username={user?.username || ""}
+                    />
                 )}
             </div>
         </div>

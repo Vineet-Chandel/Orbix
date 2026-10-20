@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Lock } from "lucide-react";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
@@ -6,6 +6,7 @@ import { fetchUnreadNotificationCount } from "../../utils/profileApi";
 
 export type SidebarTab =
     | "dashboard"
+    | "trends"
     | "notifications"
     | "leaderboard"
     | "events"
@@ -35,12 +36,40 @@ export const Sidebar = ({
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.user);
 
-    // Profile menu toggle
+    // Profile menu toggle and ref for outside-click handling
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+    const profileMenuRef = useRef<HTMLDivElement>(null);
 
-    // Hover-driven expansion: collapsed by default (Image 2), expands on hovering (Image 1)
+    // Hover-driven expansion: collapsed by default (Image 2), expands on hovering or when profile menu is open
     const [isHovered, setIsHovered] = useState(false);
-    const isExpanded = isOpen || isHovered;
+    const isExpanded = isOpen || isHovered || isProfileMenuOpen;
+
+    // Close profile menu when clicking/tapping outside or pressing Escape
+    useEffect(() => {
+        if (!isProfileMenuOpen) return;
+
+        const handlePointerDown = (event: MouseEvent | TouchEvent) => {
+            if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+                setIsProfileMenuOpen(false);
+            }
+        };
+
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.key === "Escape") {
+                setIsProfileMenuOpen(false);
+            }
+        };
+
+        document.addEventListener("mousedown", handlePointerDown);
+        document.addEventListener("touchstart", handlePointerDown);
+        document.addEventListener("keydown", handleKeyDown);
+
+        return () => {
+            document.removeEventListener("mousedown", handlePointerDown);
+            document.removeEventListener("touchstart", handlePointerDown);
+            document.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [isProfileMenuOpen]);
 
     // Connected portals and health sync tracking
     const [connectedPortalsCount, setConnectedPortalsCount] = useState<number>(0);
@@ -53,10 +82,19 @@ export const Sidebar = ({
                 const raw = localStorage.getItem("orbix_connected_portals");
                 if (raw) {
                     const parsed = JSON.parse(raw);
-                    setConnectedPortalsCount(Object.keys(parsed).length);
-                    const broken = Object.values(parsed).filter(
-                        (p: any) => p && (p.verified === false || p.syncStatus === "broken")
-                    ).length;
+                    const count = Object.keys(parsed).length;
+                    if (count > 0) {
+                        setConnectedPortalsCount(count);
+                        const broken = Object.values(parsed).filter(
+                            (p: any) => p && (p.verified === false || p.syncStatus === "broken")
+                        ).length;
+                        setBrokenPortalsCount(broken);
+                        return;
+                    }
+                }
+                if (user?.platforms && Array.isArray(user.platforms) && user.platforms.length > 0) {
+                    setConnectedPortalsCount(user.platforms.length);
+                    const broken = user.platforms.filter((p: any) => p && p.verified === false).length;
                     setBrokenPortalsCount(broken);
                     return;
                 }
@@ -132,7 +170,7 @@ export const Sidebar = ({
         }
     };
 
-    // 1 dashboard, 2 connect platform, 3 profile, 4 resume, 5 projects
+    // 1 dashboard, 2 leaderboard, 3 event tracker, 4 connect platform, 5 profile, 6 resume, 7 projects
     const mainNavItems = [
         {
             id: "dashboard" as SidebarTab,
@@ -146,17 +184,15 @@ export const Sidebar = ({
             path: "/dashboard",
         },
         {
-            id: "notifications" as SidebarTab,
-            label: "Notifications",
-            badge: unreadNotificationsCount > 0 ? `${unreadNotificationsCount}` : undefined,
-            badgeVariant: "danger" as const,
+            id: "trends" as SidebarTab,
+            label: "Trends & Reports",
             icon: (
                 <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+                    <polyline points="17 6 23 6 23 12" />
                 </svg>
             ),
-            path: "/notifications",
+            path: "/trends",
         },
         {
             id: "leaderboard" as SidebarTab,
@@ -277,7 +313,6 @@ export const Sidebar = ({
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => {
                 setIsHovered(false);
-                setIsProfileMenuOpen(false);
             }}
             className={`h-[calc(100vh-1.5rem)] sm:h-[calc(100vh-2rem)] flex flex-col justify-between rounded-[32px] bg-black border border-neutral-800 text-white p-3.5 select-none transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-3 sm:top-4 left-3 sm:left-4 z-50 overflow-x-hidden will-change-[width] ${isExpanded
                 ? "w-64 sm:w-[264px] shadow-2xl shadow-black/80 ring-1 ring-white/10"
@@ -285,7 +320,7 @@ export const Sidebar = ({
                 }`}
         >
             {/* Top Brand Header without border or bg around logo */}
-            <div className="overflow-x-hidden flex-shrink-0">
+            <div className="flex-1 min-h-0 flex flex-col overflow-y-auto no-scrollbar overflow-x-hidden">
                 <div className={`flex items-center pb-4 pt-1 border-b border-white/[0.07] overflow-x-hidden ${isExpanded ? "px-1 justify-start" : "justify-center"}`}>
                     <Link
                         to="/dashboard"
@@ -452,14 +487,16 @@ export const Sidebar = ({
             </div>
 
             {/* Bottom Section: Profile Card (DEAD CENTER avatar when collapsed) */}
-            <div className="pt-3 border-t border-white/[0.07] relative overflow-x-hidden flex-shrink-0">
+            <div ref={profileMenuRef} className="pt-3 border-t border-white/[0.07] relative flex-shrink-0">
                 <button
                     type="button"
                     onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                    className="w-full h-12 flex items-center rounded-2xl hover:bg-white/[0.05] transition-colors cursor-pointer group text-left overflow-x-hidden relative"
+                    className="w-full h-12 flex items-center rounded-2xl hover:bg-white/[0.05] transition-colors cursor-pointer group text-left overflow-hidden relative"
                     title={`${displayName} (${displayEmail})`}
+                    aria-expanded={isProfileMenuOpen}
+                    aria-haspopup="menu"
                 >
-                    <div className="flex items-center overflow-x-hidden w-full">
+                    <div className="flex items-center overflow-hidden w-full">
                         {/* Circular Avatar: DEAD CENTER in 44px container with glowing amber ring */}
                         <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
                             <img
@@ -472,11 +509,17 @@ export const Sidebar = ({
                                 }}
                                 className="w-9 h-9 rounded-full object-cover ring-2 ring-amber-500/40"
                             />
+                            {unreadNotificationsCount > 0 && (
+                                <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 ring-2 ring-[#0c0d10]" />
+                                </span>
+                            )}
                         </div>
 
                         {/* Name & Email fade in */}
                         {isExpanded && (
-                            <div className="min-w-0 flex-1 overflow-x-hidden animate-fadeIn pl-2">
+                            <div className="min-w-0 flex-1 overflow-hidden animate-fadeIn pl-2">
                                 <h4 className="text-xs sm:text-sm font-bold text-white whitespace-nowrap truncate group-hover:text-neutral-100">
                                     {displayName}
                                 </h4>
@@ -488,7 +531,17 @@ export const Sidebar = ({
 
                         {isExpanded && (
                             <div className="text-neutral-400 group-hover:text-white transition-colors p-1 flex-shrink-0 pr-2 ml-auto">
-                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <svg
+                                    className={`w-4 h-4 transition-transform duration-200 ${
+                                        isProfileMenuOpen ? "rotate-180 text-white" : ""
+                                    }`}
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2.2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                >
                                     <polyline points="6 9 12 15 18 9" />
                                 </svg>
                             </div>
@@ -499,8 +552,8 @@ export const Sidebar = ({
                 {/* Profile Popup Menu */}
                 {isProfileMenuOpen && (
                     <div
-                        className={`absolute bottom-full mb-2 p-1.5 rounded-2xl bg-black border border-neutral-800 shadow-2xl z-50 animate-fadeIn text-xs ${isExpanded ? "left-0 right-0" : "left-0 w-52"
-                            }`}
+                        role="menu"
+                        className="absolute bottom-full mb-2 left-0 right-0 p-1.5 rounded-2xl bg-[#0c0d10] border border-neutral-800/90 shadow-2xl z-50 animate-fadeIn text-xs"
                     >
                         <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
                             <p className="font-bold text-white truncate">{displayName}</p>
@@ -515,11 +568,54 @@ export const Sidebar = ({
                             }}
                             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/[0.07] transition-colors"
                         >
-                            <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
-                            <span>Developer Profile</span>
+                            <span className="truncate">Developer Profile</span>
                         </Link>
+
+                        <Link
+                            to="/notifications"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                handleItemClick("notifications");
+                            }}
+                            className="flex items-center justify-between px-3 py-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/[0.07] transition-colors"
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <svg className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.73 21a2 2 0 01-3.46 0" />
+                                </svg>
+                                <span className="truncate">Notifications</span>
+                            </div>
+                            {unreadNotificationsCount > 0 && (
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white min-w-[18px] text-center leading-none">
+                                    {unreadNotificationsCount}
+                                </span>
+                            )}
+                        </Link>
+
+                        {user?.username && (
+                            <Link
+                                to={`/u/${user.username}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => setIsProfileMenuOpen(false)}
+                                className="flex items-center justify-between px-3 py-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/[0.07] transition-colors"
+                            >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                    <svg className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                    <span className="truncate">Public Showcase</span>
+                                </div>
+                                <svg className="w-3 h-3 text-neutral-500 flex-shrink-0 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                            </Link>
+                        )}
 
                         <Link
                             to="/onboarding"
@@ -529,10 +625,10 @@ export const Sidebar = ({
                             }}
                             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/[0.07] transition-colors"
                         >
-                            <svg className="w-3.5 h-3.5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                             </svg>
-                            <span>Connected Platforms ({connectedPortalsCount})</span>
+                            <span className="truncate">Connected Platforms ({connectedPortalsCount})</span>
                         </Link>
 
                         <div className="my-1 border-t border-white/[0.06]" />
@@ -545,10 +641,10 @@ export const Sidebar = ({
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
                         >
-                            <svg className="w-3.5 h-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                             </svg>
-                            <span>Sign out</span>
+                            <span className="truncate">Sign out</span>
                         </button>
                     </div>
                 )}

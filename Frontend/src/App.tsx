@@ -13,6 +13,7 @@ import PublicProfilePage from "./app/Profile/PublicProfilePage";
 import ProfilesOnboardingPage from "./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage";
 import LeaderboardPage from "./app/Leaderboard/LeaderboardPage";
 import EventTrackerPage from "./app/Events/EventTrackerPage";
+import { Card } from "./LandingPages/Main-Landing-Pages/Card";
 import ProtectedRoute from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
@@ -43,6 +44,7 @@ const App = () => {
           <Route path="/demo" element={<SupportPage />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/events" element={<EventTrackerPage />} />
+          <Route path="/card" element={<Card />} />
 
           {/* Public Shareable Profile Showcase Route */}
           <Route path="/profile/:username" element={<PublicProfilePage />} />
@@ -62,6 +64,8 @@ const App = () => {
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/trends" element={<Dashboard />} />
+            <Route path="/reports" element={<Dashboard />} />
             <Route path="/notifications" element={<Dashboard />} />
             <Route path="/inbox" element={<Dashboard />} />
             <Route path="/profile" element={<ProfileManager />} />

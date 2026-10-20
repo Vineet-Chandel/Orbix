@@ -38,16 +38,32 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
 
     const weeksCount = 52; // Full 1 Year activity heatmap
 
+    const user = useAppSelector((state) => state.user.user);
+
     const gh = connectedPortals?.github || connectedPortals?.["GitHub"] || connectedPortals?.["Github"];
     const rawGhHandle = useMemo(() => {
         if (typeof gh === "object" && gh) {
-            return (gh.username || gh.portal_username || gh.handle || "").trim();
+            const h = (gh.username || gh.portal_username || gh.handle || "").trim();
+            if (h) return h;
         }
-        if (typeof gh === "string") {
+        if (typeof gh === "string" && gh.trim()) {
             return gh.trim();
         }
+        // Fallback to user.platforms or user.github from Redux
+        if (user?.platforms && Array.isArray(user.platforms)) {
+            const ghPlatform = user.platforms.find(
+                (p: any) => (p.portal || "").toLowerCase() === "github"
+            );
+            if (ghPlatform) {
+                const h = (ghPlatform.portalUsername || ghPlatform.portal_username || ghPlatform.username || "").trim();
+                if (h) return h;
+            }
+        }
+        if (user?.github) {
+            return user.github.trim();
+        }
         return "";
-    }, [gh]);
+    }, [gh, user?.platforms, user?.github]);
     const githubHandle = rawGhHandle.toLowerCase();
 
     const analyticsData = useAppSelector((state) => state.developmentAnalytics.dataByUser[effectiveUser]);

@@ -1667,8 +1667,17 @@ export async function calculateUnifiedSubmissions(
                     if (m && m[1]) activeDaysCount = parseInt(m[1].replace(/,/g, ""), 10) || activeDaysCount;
                 }
             }
+            if (solvedCount === 0 && profileData?.difficulty?.total) {
+                solvedCount = profileData.difficulty.total;
+            }
+            if (solvedCount === 0 && profileData?.totalSolved) {
+                solvedCount = profileData.totalSolved;
+            }
             if (subCount === 0) {
                 subCount = solvedCount;
+            }
+            if (activeDaysCount === 0 && profileData?.activeDays) {
+                activeDaysCount = profileData.activeDays;
             }
 
             // Collect any recent verified solves from this platform
@@ -1886,12 +1895,17 @@ export async function calculateUnifiedSubmissions(
         syncStatus = "partial";
     }
 
-    // Calculate overall totals
+    // Calculate overall totals across all connected platforms
     let totalMergedSubmissions = Object.values(dailyMerged).reduce((acc, d) => acc + d.count, 0);
     const sumPlatformSubs = Object.values(platformBreakdown).reduce((acc, p) => acc + p.submissions, 0);
     totalMergedSubmissions = Math.max(totalMergedSubmissions, sumPlatformSubs);
 
-    const activeDays = Object.keys(dailyMerged).length;
+    const sumPlatformSolved = Object.values(platformBreakdown).reduce((acc, p) => acc + (p.solved || 0), 0);
+    const totalSolved = Math.max(sumPlatformSolved, 0);
+
+    const sumPlatformActiveDays = Object.values(platformBreakdown).reduce((acc, p) => acc + (p.activeDays || 0), 0);
+    const calendarActiveDays = Object.keys(dailyMerged).length;
+    const activeDays = Math.max(calendarActiveDays, sumPlatformActiveDays);
 
     // Calculate streak up to today
     let dayStreak = 0;
@@ -1911,6 +1925,7 @@ export async function calculateUnifiedSubmissions(
         success: true,
         username,
         totalSubmissions: totalMergedSubmissions,
+        totalSolved,
         activeDays: activeDays || 1,
         dayStreak: Math.max(dayStreak, 1),
         platformBreakdown,
@@ -2979,7 +2994,7 @@ export const handleSavePortals = async (req: Request, res: Response) => {
             }
         }
 
-        // 3. Process array of links: ["https://interviewbit.com/profile/_211_938/", "https://leetcode.com/u/vineet-chandel"]
+        // 3. Process array of links: ["https://interviewbit.com/profile/username/", "https://leetcode.com/u/username"]
         if (Array.isArray(body.links)) {
             for (const linkStr of body.links) {
                 if (typeof linkStr !== "string") continue;

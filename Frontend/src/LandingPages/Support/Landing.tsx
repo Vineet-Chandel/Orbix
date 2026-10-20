@@ -1,17 +1,32 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import NavBar from '../NavBar/Landing';
 import { useToast } from '../../context/ToastContext';
+import { useAppSelector } from '../../store';
 
 export default function SupportPage() {
     const toast = useToast();
+    const { user } = useAppSelector((state) => state.user);
+    const dynamicName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || '' : '';
+    const dynamicEmail = user?.gmail || (user as any)?.email || '';
+
     const [submitting, setSubmitting] = useState(false);
     const [ticket, setTicket] = useState({
-        name: '',
-        email: '',
+        name: dynamicName,
+        email: dynamicEmail,
         category: 'technical',
         priority: 'normal',
         message: '',
     });
+
+    useEffect(() => {
+        if (dynamicName || dynamicEmail) {
+            setTicket((prev) => ({
+                ...prev,
+                name: prev.name || dynamicName,
+                email: prev.email || dynamicEmail,
+            }));
+        }
+    }, [dynamicName, dynamicEmail]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -25,8 +40,8 @@ export default function SupportPage() {
             setSubmitting(false);
             toast.success("Support ticket created! Our team will reply within 30 minutes.", { title: "Ticket Submitted" });
             setTicket({
-                name: '',
-                email: '',
+                name: dynamicName,
+                email: dynamicEmail,
                 category: 'technical',
                 priority: 'normal',
                 message: '',
@@ -138,7 +153,7 @@ export default function SupportPage() {
                                 </label>
                                 <input
                                     type="text"
-                                    placeholder="Vineet Singh"
+                                    placeholder={dynamicName || "Your full name"}
                                     value={ticket.name}
                                     onChange={(e) => setTicket({ ...ticket, name: e.target.value })}
                                     className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
@@ -152,7 +167,7 @@ export default function SupportPage() {
                                 <input
                                     type="email"
                                     required
-                                    placeholder="alex@company.com"
+                                    placeholder={dynamicEmail || "alex@company.com"}
                                     value={ticket.email}
                                     onChange={(e) => setTicket({ ...ticket, email: e.target.value })}
                                     className="w-full h-11 px-4 rounded-xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:bg-white transition-all"

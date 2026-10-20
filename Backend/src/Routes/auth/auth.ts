@@ -290,6 +290,29 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
         const { password_hash, ...safeUser }: any = user;
         safeUser.links = parseLinks(safeUser.links, safeUser);
         safeUser.skills = Array.isArray(safeUser.skills) ? safeUser.skills : [];
+
+        // Fetch user's connected platforms from database
+        const linksResult = await query(
+            `SELECT
+                id,
+                portal,
+                portal_username AS "portalUsername",
+                link,
+                raw_input AS "rawInput",
+                verified,
+                display_name AS "displayName",
+                avatar_url AS "avatarUrl",
+                stats,
+                is_public AS "isPublic",
+                last_sync_status AS "lastSyncStatus",
+                last_sync_at AS "lastSyncAt"
+            FROM user_links
+            WHERE username = $1 OR username = $2
+            ORDER BY created_at ASC;`,
+            [user.username, user.gmail]
+        );
+        safeUser.platforms = linksResult.rows || [];
+
         await resetSigninFailures({ email: validatedData.gmail, ip: req.ip || "unknown" });
 
         await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, password_hash, termsAccepted: user.termsAccepted });
@@ -443,7 +466,31 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
             maxAge: REFRESH_TOKEN_EXPIRY_MS
         });
 
-        const { password_hash, ...safeUser } = user;
+        const { password_hash, ...safeUser }: any = user;
+        safeUser.links = parseLinks(safeUser.links, safeUser);
+        safeUser.skills = Array.isArray(safeUser.skills) ? safeUser.skills : [];
+
+        const linksResult = await query(
+            `SELECT
+                id,
+                portal,
+                portal_username AS "portalUsername",
+                link,
+                raw_input AS "rawInput",
+                verified,
+                display_name AS "displayName",
+                avatar_url AS "avatarUrl",
+                stats,
+                is_public AS "isPublic",
+                last_sync_status AS "lastSyncStatus",
+                last_sync_at AS "lastSyncAt"
+            FROM user_links
+            WHERE username = $1 OR username = $2
+            ORDER BY created_at ASC;`,
+            [user.username, user.gmail]
+        );
+        safeUser.platforms = linksResult.rows || [];
+
         await userDetailsCache({ ...user, id: user.id });
 
         return res.status(200).json({

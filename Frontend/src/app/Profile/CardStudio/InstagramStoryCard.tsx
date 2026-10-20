@@ -1,5 +1,5 @@
 import React from "react";
-import { FolderGit2, GitCommit, Trophy } from "lucide-react";
+import { FolderGit2, GitCommit, Trophy, Sparkles, Code2 } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { OrbixCardQR } from "./OrbixCardQR";
 import { CardBannerSVG } from "./CardBannerSVG";
@@ -29,6 +29,7 @@ interface InstagramStoryCardProps {
     cardRef?: React.RefObject<HTMLDivElement | null>;
     connectedPortals?: Record<string, any>;
     showcaseMode?: "problems" | "contests";
+    slotCategory?: "practice" | "dev" | "both";
     topContests?: RankedContestPlatform[];
 }
 
@@ -46,6 +47,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
     cardRef,
     connectedPortals,
     showcaseMode = "problems",
+    slotCategory = "both",
     topContests = [],
 }) => {
     const displayName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "Developer";
@@ -113,9 +115,9 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                         </div>
 
                         {/* Top Left: Orbix Brand Star + Wordmark */}
-                        <div className="relative z-10 flex items-center gap-2">
-                            <div className="w-[84px] h-[84px] rounded-2xl flex items-center justify-center p-1">
-                                <svg className="w-full h-full" viewBox="0 0 271 270" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <div className="relative z-10 flex items-center">
+                            <div className="w-[120px] h-[120px] rounded-2xl flex items-center justify-center p-1">
+                                <svg className="w-full h-full text-white" viewBox="0 0 271 270" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" fill={bannerFill} />
                                     <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" fill={bannerFill} />
                                     <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" fill={bannerFill} />
@@ -129,44 +131,86 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                 </svg>
                             </div>
                             <div>
-                                <span className={`text-4xl font-black ${bannerTextColor} tracking-tight leading-none block`}>
+                                <span className={`text-5xl font-black ${bannerTextColor} tracking-tight leading-none block`}>
                                     Orbix
                                 </span>
-                                <span className={`text-base font-extrabold ${bannerSubtextColor} tracking-widest uppercase mt-1 block`}>
-                                    Developer Story Card
+                                <span className={`text-xl font-black ${bannerSubtextColor} tracking-widest uppercase mt-0.5 block`}>
+                                    Profile Card
                                 </span>
                             </div>
                         </div>
 
                         {/* Top Right: Verified Badge */}
-                        <div className={`relative z-10 flex items-center gap-3 px-6 py-2.5 rounded-full ${isLightBanner ? "bg-black text-white" : "bg-white/15 backdrop-blur-md text-white border border-white/20"} shadow-xl`}>
-                            <span className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
-                            <span className="text-base font-black tracking-wider uppercase">Verified</span>
+                        <div className="relative z-10 flex items-center gap-3.5 mt-5">
+                            <div>
+                                <svg className="w-[65px] flex-shrink-0" viewBox="0 0 141 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M28.001 9.5L2.50104 54.5C0.998939 58.5834 0.64081 60.8842 0.501038 65C0.938524 68.5876 1.28381 70.4643 2.50104 73L30.001 120.5C35.4895 125.639 38.9529 126.875 45.501 127.5H99.001C105.055 125.113 108.146 123.091 113.001 118L138.001 74.5C137.555 72.8604 137.011 72.6945 136.001 72.5H120.501C115.678 74.645 113.297 76.327 109.501 80C100.469 95.3741 95.8945 104.483 85.001 118C79.395 121.617 75.9883 122.881 69.001 122.5C61.7381 121.647 58.3542 120.112 53.501 115.5L26.501 70C24.9477 65.1254 24.8433 61.7609 27.501 57L52.501 14.5C56.0812 9.93194 58.5322 7.57464 64.001 6H73.501C80.5078 6.26746 82.9476 8.58767 87.501 13C95.4738 21.4342 94.5253 25.7724 102.001 37C105.329 43.6932 111.503 52.4157 121.001 56H137.501C138.562 54.4501 138.56 53.4612 137.501 51.5L110.001 6.5C104.567 2.11059 101.303 0.697955 95.001 0.5H42.001C35.9066 2.76829 32.8347 4.72468 28.001 9.5Z" fill={bannerFill} />
+                                    <path d="M73.001 28.5L72.501 12.5C70.7058 11.0543 69.8735 11.3238 68.501 12.5V28.5C66.6181 38.531 63.7181 43.4648 56.501 51.5C48.4748 57.6826 43.6156 60.3666 33.501 62C31.6617 63.574 30.9902 64.4922 33.501 66.5C43.8214 67.5752 48.5852 70.34 56.501 76.5C62.7019 83.5583 65.51 88.1063 68.501 98V115.5C70.2071 116.947 71.1914 116.977 73.001 115.5V98C75.4015 88.542 78.0024 83.8767 84.501 76.5C91.0133 71.4181 95.0765 69.1031 103.501 66.5H139.001C140.933 64.5141 140.478 63.5826 139.001 62L103.501 61.5C95.2528 59.0485 91.2098 56.5163 84.501 51C78.304 44.7688 75.3678 39.8531 73.001 28.5Z" fill={bannerFill} />
+                                </svg>
+                            </div>
+                            <div>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-[65px] flex-shrink-0" viewBox="0 0 121 89" fill="none">
+                                    <path d="M1.70876 4.5C0.12191 2.90864 0.0724409 1.99494 1.70876 0.5H117.709C119.545 1.97671 119.977 2.8261 117.709 4.5C104.181 12.5622 98.954 17.9449 94.2088 29C92.6688 30.6466 91.6861 30.6173 89.7088 29C79.7437 10.5806 72.2203 6.69689 59.7088 6.5C45.4453 8.09559 38.2192 11.668 31.7088 27.5C30.4283 40.9054 30.4372 48.3489 31.7088 61.5C37.9917 76.5533 44.5975 80.7771 60.7088 82.5C77.7677 78.9809 83.6949 73.7856 89.7088 60.5C91.7028 57.2348 93.1523 57.7809 94.7085 60.5C102.674 75.3508 108.536 78.7372 119.209 84C119.834 85.9888 119.8 86.9752 117.709 88H1.70876C0.183632 86.2274 0.0547327 85.3401 1.70876 84C13.7194 76.5162 20.6745 70.4354 22.7088 61.5C24.6139 49.0868 24.218 41.4629 22.7088 27.5C18.6733 17.3207 14.491 12.1814 1.70876 4.5Z" fill={bannerFill} />
+                                    <path d="M62.7085 19C61.538 18.0534 60.879 17.5934 59.7088 19C53.2869 30.3265 48.6067 35.5219 37.2085 41.5C34.6732 43.3691 34.2664 44.4424 37.2085 46.5C48.0841 52.2247 52.886 56.9754 58.7085 68.5C60.5486 69.8018 61.5591 70.1832 63.2085 68.5C68.5928 57.3944 73.8336 52.8094 85.7085 46.5C87.027 45.0962 87.7324 44.308 85.7085 42.5C75.5879 36.7207 70.2354 32.5144 62.7085 19Z" fill={bannerFill} />
+                                </svg>
+                            </div>
+                            <div>
+                                <svg className="w-[65px] flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 475 462" fill="none">
+                                    <path d="M121.238 43.9466C59.009 80.5035 33.1605 107.594 0.738281 165.947C105.26 197.551 137.021 234.274 172.238 314.947C184.063 377.952 179.633 409.761 153.238 460.447C214.254 425.34 239.644 395.514 273.738 329.447C304.125 246.736 306.738 196.516 281.238 98.9466C199.34 161.027 147.684 179.97 73.2383 165.947C130.596 158.31 160.167 149.436 207.738 124.447C274.352 86.5932 300.141 57.7559 338.738 1.44657C241.336 -2.43033 190.709 4.44276 121.238 43.9466Z" fill={bannerFill} />
+                                    <path d="M294.238 94.013C349.223 86.4663 369.977 68.9291 386.724 10.9463C395.658 59.6846 411.018 80.3366 474.238 94.013C426.713 105.579 402.401 115.84 386.724 178.946C371.021 121.546 348.728 105.363 294.238 94.013Z" fill={bannerFill} />
+                                </svg>
+                            </div>
                         </div>
                     </div>
 
                     {/* Main Content Area - Beautifully Proportioned to Fill Story Height */}
-                    <div className="px-14 flex-1 flex flex-col justify-around -mt-20 relative z-20 pb-6 space-y-5">
+                    <div className="px-14 flex-1 flex flex-col justify-around -mt-[150px] relative z-20 pb-6 space-y-5">
                         {/* Avatar & User Details */}
                         <div className="flex flex-col items-center text-center">
-                            <div
-                                className="w-44 h-44 rounded-full p-2 bg-gradient-to-br from-white/40 via-white/10 to-black/90 shadow-2xl ring-8 ring-[#0c1017]"
-                                style={{ boxShadow: `0 0 45px ${theme.borderGlow}` }}
-                            >
-                                {avatarSrc ? (
-                                    <img
-                                        src={avatarSrc}
-                                        alt={displayName}
-                                        className="w-full h-full rounded-full object-cover border-4 border-[#0c1017] bg-[#161b22]"
-                                        crossOrigin="anonymous"
-                                    />
-                                ) : (
-                                    <div className="w-full h-full rounded-full bg-neutral-900 border-4 border-[#0c1017] flex items-center justify-center font-black text-6xl text-white">
-                                        {displayName.slice(0, 2).toUpperCase()}
+                            <div className="relative flex-shrink-0 w-[250px] h-[250px]">
+                                {/* Segmented outer ring */}
+                                <div
+                                    className="absolute inset-0 rounded-full"
+                                    style={{
+                                        background: `
+                conic-gradient(
+                    from -75deg,
+                    #C084FC 0deg 98deg,
+                    #17191f 98deg 103deg,
+                    #38BDF8 103deg 190deg,
+                    #17191f 190deg 195deg,
+                    #ff80d7ff 195deg 355deg,
+                    #17191f 355deg 360deg
+                )
+            `,
+                                        padding: "9px",
+                                    }}
+                                >
+                                    {/* Dark separator / inner ring */}
+                                    <div className="w-full h-full rounded-full bg-[#17191f] p-[7px]">
+                                        {/* Avatar image */}
+                                        <div
+                                            className="w-full h-full rounded-full overflow-hidden"
+                                            style={{
+                                                boxShadow: `0 0 30px ${theme.borderGlow}`,
+                                            }}
+                                        >
+                                            {avatarSrc ? (
+                                                <img
+                                                    src={avatarSrc}
+                                                    alt={displayName}
+                                                    crossOrigin="anonymous"
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full bg-neutral-900 flex items-center justify-center font-black text-3xl text-white">
+                                                    {displayName.slice(0, 2).toUpperCase()}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                )}
+                                </div>
                             </div>
-
                             <div className="mt-4">
                                 <h1 className="text-5xl font-black text-white tracking-tight flex items-center justify-center gap-3.5">
                                     <span>{displayName}</span>
@@ -188,24 +232,29 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                 </div>
                             </div>
 
-                            {/* Difficulty Badges (Easy / Medium / Hard) - Wide Glassmorphic Banner */}
-                            <div className="flex items-center gap-10 bg-[#131924]/90 border border-white/10 px-10 py-5 rounded-3xl shadow-xl mt-5">
-                                <div className="flex items-center gap-3">
-                                    <span className="w-4 h-4 rounded-full bg-[#00E5FF] shadow-[0_0_12px_#00E5FF]" />
-                                    <span className="text-lg font-bold text-neutral-300">Easy</span>
-                                    <span className="text-3xl font-black text-white font-mono ml-1">{stats.easy.toLocaleString()}</span>
+
+                            {/* Line 3: Classification of Questions (Easy / Medium / Hard) */}
+                            <div className="flex items-center gap-4 text-3xl font-semibold mt-5">
+                                <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-white/[0.05]">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF]" />
+                                    <span className="text-neutral-300 font-bold">Easy</span>
+                                    <span className="text-2xl font-black text-white font-mono ml-0.5">
+                                        {stats.easy.toLocaleString()}
+                                    </span>
                                 </div>
-                                <span className="text-neutral-600 font-light text-xl">|</span>
-                                <div className="flex items-center gap-3">
-                                    <span className="w-4 h-4 rounded-full bg-[#FFD600] shadow-[0_0_12px_#FFD600]" />
-                                    <span className="text-lg font-bold text-neutral-300">Medium</span>
-                                    <span className="text-3xl font-black text-white font-mono ml-1">{stats.medium.toLocaleString()}</span>
+                                <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-white/[0.05]">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#FFD600] shadow-[0_0_8px_#FFD600]" />
+                                    <span className="text-neutral-300 font-bold">Medium</span>
+                                    <span className="text-2xl font-black text-white font-mono ml-0.5">
+                                        {stats.medium.toLocaleString()}
+                                    </span>
                                 </div>
-                                <span className="text-neutral-600 font-light text-xl">|</span>
-                                <div className="flex items-center gap-3">
-                                    <span className="w-4 h-4 rounded-full bg-[#FF383C] shadow-[0_0_12px_#FF383C]" />
-                                    <span className="text-lg font-bold text-neutral-300">Hard</span>
-                                    <span className="text-3xl font-black text-white font-mono ml-1">{stats.hard.toLocaleString()}</span>
+                                <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-white/[0.05]">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#FF383C] shadow-[0_0_8px_#FF383C]" />
+                                    <span className="text-neutral-300 font-bold">Hard</span>
+                                    <span className="text-2xl font-black text-white font-mono ml-0.5">
+                                        {stats.hard.toLocaleString()}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -218,7 +267,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                         />
 
                         {/* 4 Core Metrics Grid */}
-                        <div className="grid grid-cols-4 gap-4.5">
+                        <div className="grid grid-cols-4 gap-2">
                             <div className="rounded-3xl bg-[#131924]/90 border border-white/10 p-6 flex flex-col items-center justify-center text-center shadow-xl">
                                 <span className="text-5xl font-black text-white font-mono tracking-tight">{stats.totalSolved.toLocaleString()}</span>
                                 <div className="flex items-center gap-2 text-sm font-bold text-neutral-400 mt-2 uppercase tracking-wider">
@@ -278,19 +327,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                                                 {getPortalIcon(contest.id, "w-full h-full object-contain")}
                                                             </div>
                                                             <div className="min-w-0">
-                                                                <div className="flex items-center gap-2">
-                                                                    <h4 className="text-2xl font-black text-white truncate">{contest.name}</h4>
-                                                                    {contest.isVerified && (
-                                                                        <div
-                                                                            className="w-5 h-5 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center flex-shrink-0"
-                                                                            title="Verified Contest Profile"
-                                                                        >
-                                                                            <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                                                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
-                                                                            </svg>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
+                                                                <h4 className="text-2xl font-black text-white truncate">{contest.name}</h4>
                                                                 <span className="text-lg font-mono text-neutral-400 block mt-0.5 truncate">
                                                                     @{contest.username}
                                                                 </span>
@@ -336,71 +373,273 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                             ) : (
                                 <>
                                     <div className="flex items-center justify-between text-base font-black text-neutral-400 px-3">
-                                        <span className="uppercase tracking-wider">Top Coding Accounts</span>
-                                        <span className="text-base font-mono">{topPlatforms.length} connected</span>
+                                        <div className="flex items-center gap-2">
+                                            {slotCategory === "practice" ? (
+                                                <>
+                                                    <Code2 className="w-5 h-5 text-indigo-400" />
+                                                    <span className="uppercase tracking-wider">Practice Slots</span>
+                                                </>
+                                            ) : slotCategory === "dev" ? (
+                                                <>
+                                                    <FolderGit2 className="w-5 h-5 text-emerald-400" />
+                                                    <span className="uppercase tracking-wider">Dev Slots</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Sparkles className="w-5 h-5 text-amber-400" />
+                                                    <span className="uppercase tracking-wider">Practice & Dev Slots</span>
+                                                </>
+                                            )}
+                                        </div>
+                                        <span className="text-base font-mono">{topPlatforms.length} showcased</span>
                                     </div>
 
                                     <div className="space-y-3.5">
-                                        {topPlatforms.slice(0, 5).map((plat) => {
-                                            if (plat.isGitHub || plat.id === "github") {
+                                        {topPlatforms.length === 0 ? (
+                                            <div className="rounded-3xl bg-[#131924]/90 border border-white/10 p-8 text-center flex items-center justify-center">
+                                                <p className="text-lg text-neutral-400">No platforms selected.</p>
+                                            </div>
+                                        ) : slotCategory === "dev" && topPlatforms.length === 1 ? (
+                                            (() => {
+                                                const plat = topPlatforms[0];
+                                                const bestDay = plat.bestWorkingDay || githubStats.bestWorkingDay || "Wednesday";
+                                                const repos = (plat.publicRepos ?? githubStats.publicRepos) || 0;
+                                                const commits = (plat.contributionsOrCommits ?? githubStats.contributionsOrCommits) || 0;
+                                                const heroValue = commits > 0 ? commits.toLocaleString() : repos > 0 ? repos.toLocaleString() : "—";
+                                                const heroLabel = commits > 0 ? "COMMITS" : repos > 0 ? "REPOS" : "DEV";
+
                                                 return (
-                                                    <div
-                                                        key="github"
-                                                        className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 flex items-center justify-between shadow-xl"
-                                                    >
-                                                        <div className="flex items-center gap-5">
-                                                            <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center p-3 text-white">
-                                                                {getPortalIcon("github", "w-8 h-8")}
+                                                    <div className="space-y-3.5">
+                                                        {/* Primary Hero Dev Slot */}
+                                                        <div className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 flex items-center justify-between shadow-xl">
+                                                            <div className="flex items-center gap-5 min-w-0">
+                                                                <div className="w-16 h-16 rounded-2xl bg-white/[0.08] border border-white/10 flex items-center justify-center p-3 text-white flex-shrink-0 shadow-md">
+                                                                    {getPortalIcon(plat.id || "github", "w-8 h-8 text-white")}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-2.5">
+                                                                        <h4 className="text-2xl font-black text-white truncate">
+                                                                            {plat.name || "GitHub"}
+                                                                        </h4>
+                                                                        <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 leading-none">
+                                                                            DEV
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-lg font-mono text-neutral-400 block mt-0.5 truncate">
+                                                                        @{plat.username || githubStats.username}
+                                                                    </span>
+                                                                </div>
                                                             </div>
-                                                            <div>
-                                                                <h4 className="text-2xl font-black text-white">GitHub</h4>
-                                                                <span className="text-lg font-mono text-neutral-400 block mt-0.5">@{plat.username || githubStats.username}</span>
+
+                                                            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-3xl font-black text-white font-mono tracking-tight leading-none">
+                                                                        {heroValue}
+                                                                    </span>
+                                                                    <span className="px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider leading-none bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-md flex items-center gap-1.5">
+                                                                        <GitCommit className="w-3.5 h-3.5 text-emerald-400" />
+                                                                        {heroLabel}
+                                                                    </span>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-2 text-sm font-mono text-neutral-300 bg-white/[0.06] px-3.5 py-1 rounded-xl border border-white/5">
+                                                                    <span className="font-bold text-sky-400 flex items-center gap-1.5">
+                                                                        <FolderGit2 className="w-3.5 h-3.5 text-sky-400" />
+                                                                        {repos.toLocaleString()} repos
+                                                                    </span>
+                                                                    {bestDay ? (
+                                                                        <>
+                                                                            <span className="text-neutral-500">•</span>
+                                                                            <span className="text-amber-300 font-semibold flex items-center gap-1.5">
+                                                                                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                                                                Peak: {bestDay}
+                                                                            </span>
+                                                                        </>
+                                                                    ) : null}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                        <div className="flex items-center gap-6 text-right">
-                                                            <div className="flex items-center gap-3 bg-white/[0.04] px-4 py-2 rounded-2xl border border-white/5">
-                                                                <FolderGit2 className="w-6 h-6 text-emerald-400" />
-                                                                <div className="text-left">
-                                                                    <span className="text-2xl font-black text-white block font-mono leading-tight">
-                                                                        {(plat.publicRepos ?? githubStats.publicRepos).toLocaleString()}
+
+                                                        {/* 3-Column Engineering Metrics Grid */}
+                                                        <div className="grid grid-cols-3 gap-3">
+                                                            <div className="rounded-2xl bg-[#131924]/80 border border-white/10 p-5 flex flex-col justify-between">
+                                                                <div className="flex items-center justify-between mb-3">
+                                                                    <span className="text-xs font-mono uppercase text-neutral-400 font-bold">Commits</span>
+                                                                    <GitCommit className="w-5 h-5 text-emerald-400" />
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-2xl font-black text-white font-mono block leading-none">
+                                                                        {commits.toLocaleString()}
                                                                     </span>
-                                                                    <span className="text-xs text-neutral-400 uppercase font-bold">Repos</span>
+                                                                    <span className="text-xs text-neutral-400 block mt-1">All-time contributions</span>
                                                                 </div>
                                                             </div>
-                                                            <div className="flex items-center gap-3 bg-white/[0.04] px-4 py-2 rounded-2xl border border-white/5">
-                                                                <GitCommit className="w-6 h-6 text-emerald-400" />
-                                                                <div className="text-left">
-                                                                    <span className="text-2xl font-black text-white block font-mono leading-tight">
-                                                                        {(plat.contributionsOrCommits ?? githubStats.contributionsOrCommits).toLocaleString()}
+
+                                                            <div className="rounded-2xl bg-[#131924]/80 border border-white/10 p-5 flex flex-col justify-between">
+                                                                <div className="flex items-center justify-between mb-3">
+                                                                    <span className="text-xs font-mono uppercase text-neutral-400 font-bold">Repositories</span>
+                                                                    <FolderGit2 className="w-5 h-5 text-sky-400" />
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-2xl font-black text-white font-mono block leading-none">
+                                                                        {repos.toLocaleString()}
                                                                     </span>
-                                                                    <span className="text-xs text-neutral-400 uppercase font-bold">Commits</span>
+                                                                    <span className="text-xs text-neutral-400 block mt-1">Public projects</span>
                                                                 </div>
                                                             </div>
+
+                                                            <div className="rounded-2xl bg-[#131924]/80 border border-white/10 p-5 flex flex-col justify-between">
+                                                                <div className="flex items-center justify-between mb-3">
+                                                                    <span className="text-xs font-mono uppercase text-neutral-400 font-bold">Best Day</span>
+                                                                    <Sparkles className="w-5 h-5 text-amber-400" />
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-2xl font-black text-amber-300 font-mono block leading-none truncate">
+                                                                        {bestDay}
+                                                                    </span>
+                                                                    <span className="text-xs text-neutral-400 block mt-1">Peak coding velocity</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Developer Flow Insight Banner */}
+                                                        <div className="rounded-2xl bg-white/[0.04] border border-white/5 px-6 py-3.5 flex items-center justify-between text-base font-mono">
+                                                            <div className="flex items-center gap-2 text-neutral-300">
+                                                                <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                                                                <span>Peak engineering velocity on <strong className="text-amber-300">{bestDay}s</strong></span>
+                                                            </div>
+                                                            <span className="text-emerald-400 font-bold uppercase tracking-wider text-xs">Active Builder</span>
                                                         </div>
                                                     </div>
                                                 );
-                                            }
+                                            })()
+                                        ) : (
+                                            topPlatforms.slice(0, 5).map((plat) => {
+                                                // DEV SLOT
+                                                if (plat.isGitHub || plat.id === "github" || plat.category === "dev") {
+                                                    const bestDay = plat.bestWorkingDay || githubStats.bestWorkingDay || "Wednesday";
+                                                    const repos = (plat.publicRepos ?? githubStats.publicRepos) || 0;
+                                                    const commits = (plat.contributionsOrCommits ?? githubStats.contributionsOrCommits) || 0;
+                                                    const heroValue = commits > 0 ? commits.toLocaleString() : repos > 0 ? repos.toLocaleString() : "—";
+                                                    const heroLabel = commits > 0 ? "COMMITS" : repos > 0 ? "REPOS" : "DEV";
+
+                                                    return (
+                                                        <div
+                                                            key={plat.id || "github"}
+                                                            className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 flex items-center justify-between shadow-xl"
+                                                        >
+                                                            <div className="flex items-center gap-5 min-w-0">
+                                                                <div className="w-16 h-16 rounded-2xl bg-white/[0.08] border border-white/10 flex items-center justify-center p-3 text-white flex-shrink-0 shadow-md">
+                                                                    {getPortalIcon(plat.id || "github", "w-8 h-8 text-white")}
+                                                                </div>
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-2.5">
+                                                                        <h4 className="text-2xl font-black text-white truncate">
+                                                                            {plat.name || "GitHub"}
+                                                                        </h4>
+                                                                        <span className="text-xs font-black uppercase px-2.5 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 leading-none">
+                                                                            DEV
+                                                                        </span>
+                                                                    </div>
+                                                                    <span className="text-lg font-mono text-neutral-400 block mt-0.5 truncate">
+                                                                        @{plat.username || githubStats.username}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-3xl font-black text-white font-mono tracking-tight leading-none">
+                                                                        {heroValue}
+                                                                    </span>
+                                                                    <span className="px-3 py-1 rounded-xl text-xs font-black uppercase tracking-wider leading-none bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-md flex items-center gap-1.5">
+                                                                        <GitCommit className="w-3.5 h-3.5 text-emerald-400" />
+                                                                        {heroLabel}
+                                                                    </span>
+                                                                </div>
+
+                                                                <div className="flex items-center gap-2 text-sm font-mono text-neutral-300 bg-white/[0.06] px-3.5 py-1 rounded-xl border border-white/5">
+                                                                    <span className="font-bold text-sky-400 flex items-center gap-1.5">
+                                                                        <FolderGit2 className="w-3.5 h-3.5 text-sky-400" />
+                                                                        {repos.toLocaleString()} repos
+                                                                    </span>
+                                                                    {bestDay ? (
+                                                                        <>
+                                                                            <span className="text-neutral-500">•</span>
+                                                                            <span className="text-amber-300 font-semibold flex items-center gap-1.5">
+                                                                                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                                                                Peak: {bestDay}
+                                                                            </span>
+                                                                        </>
+                                                                    ) : null}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+
+                                            // PRACTICE PLATFORM (Smart Sync)
+                                            const showContestRating = Boolean(plat.hasGoodRating && plat.rating && plat.rating > 0);
 
                                             return (
                                                 <div
                                                     key={plat.id}
                                                     className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 flex items-center justify-between shadow-xl"
                                                 >
-                                                    <div className="flex items-center gap-5">
+                                                    <div className="flex items-center gap-5 min-w-0">
                                                         <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center p-3 flex-shrink-0">
                                                             {getPortalIcon(plat.id, "w-full h-full object-contain")}
                                                         </div>
-                                                        <div>
-                                                            <h4 className="text-2xl font-black text-white">{plat.name}</h4>
-                                                            <span className="text-lg font-mono text-neutral-400 block mt-0.5">@{plat.username}</span>
+                                                        <div className="min-w-0">
+                                                            <h4 className="text-2xl font-black text-white truncate">{plat.name}</h4>
+                                                            <span className="text-lg font-mono text-neutral-400 block mt-0.5 truncate">
+                                                                @{plat.username}
+                                                            </span>
                                                         </div>
                                                     </div>
-                                                    <span className="text-xl font-mono font-black text-white bg-white/10 px-6 py-2.5 rounded-2xl">
-                                                        {plat.solvedCount.toLocaleString()} solved
-                                                    </span>
+
+                                                    {showContestRating ? (
+                                                        <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                                                            <div className="flex items-center gap-3">
+                                                                <span className="text-3xl font-black text-white font-mono tracking-tight leading-none">
+                                                                    {plat.rating?.toLocaleString()}
+                                                                </span>
+                                                                {plat.tier && (
+                                                                    <span
+                                                                        style={{
+                                                                            backgroundColor: plat.tierColor || "#f59e0b",
+                                                                        }}
+                                                                        className="px-3 py-1 rounded-xl text-xs font-black text-white uppercase tracking-wider shadow-md leading-none"
+                                                                    >
+                                                                        {plat.tier}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="flex items-center gap-2 text-sm font-mono text-neutral-300 bg-white/[0.06] px-3 py-1 rounded-xl border border-white/5">
+                                                                <span className="font-bold text-white">
+                                                                    {plat.solvedCount.toLocaleString()}
+                                                                </span>
+                                                                <span className="text-neutral-400">solved</span>
+                                                                {plat.contestsCount && plat.contestsCount > 0 ? (
+                                                                    <>
+                                                                        <span className="text-neutral-500">•</span>
+                                                                        <span className="text-neutral-400">
+                                                                            {plat.contestsCount} contests
+                                                                        </span>
+                                                                    </>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xl font-mono font-black text-white bg-white/10 px-6 py-2.5 rounded-2xl border border-white/5 shadow-md flex-shrink-0">
+                                                            {plat.solvedCount.toLocaleString()} solved
+                                                        </span>
+                                                    )}
                                                 </div>
                                             );
-                                        })}
+                                        })
+                                    )}
                                     </div>
                                 </>
                             )}

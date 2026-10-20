@@ -3,7 +3,7 @@ CREATE TABLE IF NOT EXISTS user_links (
     user_id UUID,
     username VARCHAR(100), -- User's Orbix username or email identifier
     portal VARCHAR(50) NOT NULL, -- e.g., 'interviewbit', 'leetcode', 'codeforces'
-    portal_username VARCHAR(100) NOT NULL, -- Extracted platform username (e.g. '_211_938', 'vineet-chandel')
+    portal_username VARCHAR(100) NOT NULL, -- Extracted platform username (e.g. 'dev_user', 'code_ninja')
     link TEXT NOT NULL, -- Full canonical profile URL (e.g. 'https://www.interviewbit.com/profile/_211_938/')
     raw_input TEXT, -- The raw link or handle entered by the user
     verified BOOLEAN DEFAULT true,

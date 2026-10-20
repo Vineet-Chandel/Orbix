@@ -20,6 +20,9 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
     const contestsData = useAppSelector(
         (state) => (effectiveUser ? state.contests.dataByUser[effectiveUser] : undefined)
     );
+    const practiceAnalyticsData = useAppSelector(
+        (state) => (effectiveUser ? state.practiceAnalytics.dataByUser[effectiveUser] : undefined)
+    );
 
     // Compute this month analytics
     const {
@@ -63,22 +66,34 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
             cumulativeBuckets[bIdx] = runningTotal;
         }
 
-        // Active days
-        const totalActive = submissionsData?.activeDays ?? 12;
-        const activeMonth = monthlyActiveDaysCount > 0 ? monthlyActiveDaysCount : 2;
+        const platformBreakdownList = Object.values(submissionsData?.platformBreakdown || {});
+
+        // 1. Problems solved: accurately aggregated across ALL connected platforms
+        const sumPlatformSolved = platformBreakdownList.reduce((acc: number, p: any) => acc + (p.solved || 0), 0);
+        const totalProblemsSolved =
+            submissionsData?.totalSolved ||
+            sumPlatformSolved ||
+            (practiceAnalyticsData?.totalSolved || 0) ||
+            (authUser as any)?.total_solved ||
+            (authUser as any)?.totalSolved ||
+            0;
 
         // Submissions this month
-        const subsMonth = monthlySubmissionsCount > 0 ? monthlySubmissionsCount : 16;
+        const subsMonth = monthlySubmissionsCount > 0 ? monthlySubmissionsCount : (submissionsData?.totalSubmissions ? Math.min(23, submissionsData.totalSubmissions) : 0);
 
-        // Problems solved this month (typically subset of total submissions)
-        const solvedMonth = Math.max(1, Math.round(subsMonth * 0.2)) || 3;
+        // 2. Active days: aggregated across all connected platforms
+        const sumPlatformActiveDays = platformBreakdownList.reduce((acc: number, p: any) => acc + (p.activeDays || 0), 0);
+        const calendarActiveDays = Object.keys(dailyMap).length;
+        const totalActive = Math.max(submissionsData?.activeDays || 0, calendarActiveDays, sumPlatformActiveDays);
+        const activeMonth = monthlyActiveDaysCount;
 
-        // Contests this month and rating
+        // 3. Contests: aggregated across all connected platforms
         const allContests = contestsData?.recentContests || [];
         const monthlyContestsList = allContests.filter((c: any) => {
             if (c.date && typeof c.date === "string" && c.date.startsWith(curMonthPrefix)) return true;
             if (c.timestamp) {
-                const cDate = new Date(c.timestamp * 1000);
+                const ms = c.timestamp > 1e11 ? c.timestamp : c.timestamp * 1000;
+                const cDate = new Date(ms);
                 return cDate.getFullYear() === curYear && cDate.getMonth() === curMonth;
             }
             return false;
@@ -96,7 +111,12 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
 
         const ratingDisplay = maxRating > 0 ? String(maxRating) : "–";
         const ratingSub = maxRating > 0 ? (activeTier ? `tier: ${activeTier}` : "rated active") : "no rated contests";
-        const totalContestsCount = contestsData?.summary?.totalRatedContests ?? allContests.length;
+
+        const sumPlatformContests = platformsList.reduce((acc: number, p: any) => acc + (p.ratedContestsCount || 0), 0);
+        const totalContestsCount =
+            (contestsData?.summary?.totalRatedContests !== undefined && contestsData.summary.totalRatedContests > 0)
+                ? contestsData.summary.totalRatedContests
+                : Math.max(sumPlatformContests, allContests.length);
 
         // Sparkline path generator
         const buildPath = (values: number[]) => {
@@ -141,22 +161,22 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
 
         const sparkline2 =
             monthlyActiveDaysCount > 0
-                ? buildPath([0, 0, 0, 1, 1, activeMonth])
+                ? buildPath([0, 0, 0, 1, 1, Math.max(1, activeMonth)])
                 : fallbackSparkline;
 
         return {
-            problemsSolved: solvedMonth,
+            problemsSolved: totalProblemsSolved > 0 ? totalProblemsSolved.toLocaleString() : "0",
             submissionsThisMonth: subsMonth,
-            activeDays: totalActive,
+            activeDays: totalActive > 0 ? totalActive.toLocaleString() : "0",
             activeDaysThisMonth: activeMonth,
             contestRating: ratingDisplay,
             contestRatingSubtext: ratingSub,
-            contestsTotal: totalContestsCount,
+            contestsTotal: totalContestsCount > 0 ? totalContestsCount.toLocaleString() : "0",
             contestsThisMonth: monthlyContestsList.length,
             problemsSparklinePoints: sparkline1,
             activeDaysSparklinePoints: sparkline2,
         };
-    }, [submissionsData, contestsData]);
+    }, [submissionsData, contestsData, practiceAnalyticsData, authUser]);
 
     const cards = [
         {

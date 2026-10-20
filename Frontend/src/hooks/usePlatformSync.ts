@@ -57,6 +57,19 @@ export function usePlatformSync(): UsePlatformSyncReturn {
                 currentPortals = {};
             }
 
+            if (Object.keys(currentPortals).length === 0 && user?.platforms && Array.isArray(user.platforms)) {
+                for (const p of user.platforms) {
+                    const k = (p.portal || "").toLowerCase().trim();
+                    if (!k) continue;
+                    currentPortals[k] = {
+                        portal: k,
+                        username: p.portalUsername || p.portal_username || p.username || "",
+                        profileUrl: p.link || p.profileUrl || "",
+                        verified: p.verified !== false,
+                    };
+                }
+            }
+
             const portalKeys = Object.keys(currentPortals);
             if (portalKeys.length === 0) {
                 return;

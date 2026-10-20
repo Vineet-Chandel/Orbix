@@ -48,7 +48,7 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = ({
 
     // Fetch unified submissions dynamically when portals change
     useEffect(() => {
-        if (!effectiveUser) return;
+        if (!effectiveUser || effectiveUser === "Vineet-Chandel") return;
         if (prevFingerprintRef.current === null) {
             prevFingerprintRef.current = portalsFingerprint;
             dispatch(fetchUnifiedSubmissions({ username: effectiveUser, portals: connectedPortals }));

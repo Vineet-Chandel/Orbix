@@ -15,6 +15,8 @@ export interface AggregatedCodingStats {
     qualificationNote: string;
 }
 
+export type SlotCategory = "practice" | "dev" | "both";
+
 export interface RankedPlatform {
     id: string;
     name: string;
@@ -25,12 +27,21 @@ export interface RankedPlatform {
     easy?: number;
     medium?: number;
     hard?: number;
-    rating?: number;
+    rating?: number | null;
+    peakRating?: number | null;
+    tier?: string | null;
+    tierColor?: string | null;
+    tierInfo?: any;
+    contestsCount?: number;
+    officialRank?: number | null;
+    hasGoodRating?: boolean;
     isVerified: boolean;
     syncStatus?: string;
     isGitHub?: boolean;
     publicRepos?: number;
     contributionsOrCommits?: number;
+    bestWorkingDay?: string;
+    category?: "practice" | "dev";
 }
 
 export interface GitHubCardStats {
@@ -42,6 +53,7 @@ export interface GitHubCardStats {
     contributionsOrCommits: number;
     followers: number;
     profileUrl: string;
+    bestWorkingDay?: string;
 }
 
 export interface CoderTypeBadge {
@@ -426,6 +438,119 @@ export function rankTopCodingPlatforms(
 }
 
 /**
+ * Platform-specific intelligence to determine if a platform has a good contest rating
+ * vs no rating or very poor rating.
+ *
+ * Rules:
+ * - If no rating or rating <= 0 or 0 contests: false (unrated / no rating).
+ * - LeetCode: Requires >= 1 rated contest and rating >= 1400, or Knight/Guardian tier.
+ * - Codeforces: Requires rating >= 1200 (Pupil and above) or >= 1 contest with rating >= 1150.
+ * - CodeChef: Requires rating >= 1400 (2-star and above).
+ * - AtCoder: Requires rating >= 400 (Brown and above).
+ * - General/Other: Requires rating >= 1200 or active tier.
+ */
+export function hasGoodContestRating(
+    portalId: string,
+    rating: number | null | undefined,
+    contestsCount = 0,
+    tier: string | null = null
+): boolean {
+    if (!rating || rating <= 0) return false;
+    const p = portalId.toLowerCase().trim();
+    const t = (tier || "").toLowerCase();
+
+    if (p === "leetcode") {
+        if (t.includes("knight") || t.includes("guardian")) {
+            return true;
+        }
+        return contestsCount >= 1 && rating >= 1400;
+    }
+
+    if (p === "codeforces") {
+        if (t && !t.includes("newbie")) {
+            return true;
+        }
+        return rating >= 1200 || (contestsCount >= 1 && rating >= 1150);
+    }
+
+    if (p === "codechef") {
+        if (t && (t.includes("2") || t.includes("3") || t.includes("4") || t.includes("5") || t.includes("6") || t.includes("7"))) {
+            return true;
+        }
+        return rating >= 1400;
+    }
+
+    if (p === "atcoder") {
+        return rating >= 400;
+    }
+
+    return rating >= 1200 || contestsCount >= 2;
+}
+
+/**
+ * Extracts best/busiest working day from GitHub metrics or submission calendar.
+ */
+export function extractGitHubBestDay(githubProfile: any): string {
+    if (!githubProfile || typeof githubProfile !== "object") return "Wednesday";
+
+    if (typeof githubProfile.busiestDay === "string" && githubProfile.busiestDay.trim()) {
+        return githubProfile.busiestDay.trim();
+    }
+    if (typeof githubProfile.bestWorkingDay === "string" && githubProfile.bestWorkingDay.trim()) {
+        return githubProfile.bestWorkingDay.trim();
+    }
+
+    const stats = Array.isArray(githubProfile.stats) ? githubProfile.stats : [];
+    for (const s of stats) {
+        const l = (s.label || "").toLowerCase();
+        const v = (s.value || "").trim();
+        if ((l.includes("busiest") || l.includes("best") || l.includes("active day")) && v) {
+            return v;
+        }
+    }
+
+    const cal = githubProfile.submissionCalendar;
+    if (cal && typeof cal === "object") {
+        const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+        const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+        let hasData = false;
+
+        for (const [k, val] of Object.entries(cal)) {
+            const count = typeof val === "number" ? val : parseInt(String(val), 10) || 0;
+            if (count <= 0) continue;
+            let d: Date;
+            if (/^\d{9,11}$/.test(k)) {
+                d = new Date(parseInt(k, 10) * 1000);
+            } else if (/^\d{12,14}$/.test(k)) {
+                d = new Date(parseInt(k, 10));
+            } else {
+                d = new Date(k);
+            }
+            if (!isNaN(d.getTime())) {
+                dayCounts[d.getDay()] += count;
+                hasData = true;
+            }
+        }
+
+        if (hasData) {
+            let maxCount = -1;
+            let maxIdx = 3;
+            for (let i = 0; i < 7; i++) {
+                if (dayCounts[i] > maxCount) {
+                    maxCount = dayCounts[i];
+                    maxIdx = i;
+                }
+            }
+            if (maxCount > 0) {
+                return dayNames[maxIdx];
+            }
+        }
+    }
+
+    return "Wednesday";
+}
+
+/**
  * Extracts verified GitHub metrics if GitHub is connected.
  */
 export function extractGitHubStats(
@@ -444,6 +569,7 @@ export function extractGitHubStats(
             contributionsOrCommits: 0,
             followers: 0,
             profileUrl: "",
+            bestWorkingDay: "Wednesday",
         };
     }
 
@@ -459,6 +585,7 @@ export function extractGitHubStats(
             contributionsOrCommits: 0,
             followers: 0,
             profileUrl: "",
+            bestWorkingDay: "Wednesday",
         };
     }
 
@@ -488,6 +615,8 @@ export function extractGitHubStats(
         }
     }
 
+    const bestWorkingDay = extractGitHubBestDay(gh);
+
     return {
         connected: true,
         username,
@@ -497,6 +626,7 @@ export function extractGitHubStats(
         contributionsOrCommits: commitsOrContributions,
         followers,
         profileUrl,
+        bestWorkingDay,
     };
 }
 
@@ -549,16 +679,28 @@ export function getAllConnectedPlatforms(
 
 /**
  * Extracts and returns all platforms available for card slots (coding platforms + GitHub + other connected platforms).
- * Coding platforms are ranked by solved count, GitHub includes its repos/commits metrics.
+ * Coding platforms are ranked by solved count, GitHub includes its repos/commits/bestDay metrics.
+ * Integrates contest standings to provide smart, platform-specific contest ratings.
  */
 export function getAvailableCardPlatforms(
     connectedPortals: Record<string, any>,
-    fallbackUsername?: string
+    fallbackUsername?: string,
+    contestPlatforms?: any[]
 ): RankedPlatform[] {
     const list: RankedPlatform[] = [];
     if (!connectedPortals || typeof connectedPortals !== "object") return list;
 
     const seen = new Set<string>();
+
+    // Build lookup map for contest standings from Redux or external cache
+    const contestMap = new Map<string, any>();
+    if (Array.isArray(contestPlatforms) && contestPlatforms.length > 0) {
+        for (const cp of contestPlatforms) {
+            if (!cp) continue;
+            const pKey = (cp.portal || cp.id || "").toLowerCase().trim();
+            if (pKey) contestMap.set(pKey, cp);
+        }
+    }
 
     // 1. Coding platforms
     for (const [pId, profile] of Object.entries(connectedPortals)) {
@@ -578,6 +720,16 @@ export function getAvailableCardPlatforms(
         const solvedCount = extractPlatformSolved(profile, lowerId);
         const diff = extractPlatformDifficulty(profile, lowerId, solvedCount);
 
+        // Contest metrics integration
+        const cp = contestMap.get(lowerId);
+        const rawRating = typeof cp?.currentRating === "number" ? cp.currentRating : (typeof profile?.rating === "number" ? profile.rating : null);
+        const rawPeakRating = typeof cp?.peakRating === "number" ? cp.peakRating : (typeof profile?.peakRating === "number" ? profile.peakRating : null);
+        const rawContestsCount = typeof cp?.ratedContestsCount === "number" ? cp.ratedContestsCount : (typeof profile?.contestsCount === "number" ? profile.contestsCount : 0);
+        const rawOfficialRank = typeof cp?.officialRank === "number" ? cp.officialRank : (typeof profile?.rank === "number" ? profile.rank : null);
+        const tier = cp?.tier || profile?.tier || getFallbackTier(lowerId, rawRating);
+        const tierColor = cp?.tierColor || profile?.tierColor || getPlatformTierColor(lowerId, tier, rawRating);
+        const isGood = hasGoodContestRating(lowerId, rawRating, rawContestsCount, tier);
+
         list.push({
             id: lowerId,
             name,
@@ -588,9 +740,18 @@ export function getAvailableCardPlatforms(
             easy: diff.easy,
             medium: diff.medium,
             hard: diff.hard,
+            rating: rawRating,
+            peakRating: rawPeakRating,
+            tier,
+            tierColor,
+            tierInfo: cp?.tierInfo || null,
+            contestsCount: rawContestsCount,
+            officialRank: rawOfficialRank,
+            hasGoodRating: isGood,
             isVerified: profile.verified !== false && profile.syncStatus !== "broken",
             syncStatus: profile.syncStatus,
             isGitHub: false,
+            category: "practice",
         });
         seen.add(lowerId);
     }
@@ -602,7 +763,7 @@ export function getAvailableCardPlatforms(
         return a.name.localeCompare(b.name);
     });
 
-    // 2. GitHub (if connected or active user)
+    // 2. GitHub (Dev Platform)
     const ghStats = extractGitHubStats(connectedPortals, fallbackUsername);
     if (ghStats.connected || ghStats.username) {
         list.push({
@@ -616,11 +777,13 @@ export function getAvailableCardPlatforms(
             isGitHub: true,
             publicRepos: ghStats.publicRepos,
             contributionsOrCommits: ghStats.contributionsOrCommits,
+            bestWorkingDay: ghStats.bestWorkingDay || "Wednesday",
+            category: "dev",
         });
         seen.add("github");
     }
 
-    // 3. Any other connected publishing / portfolio platforms (e.g. hashnode, devto, kaggle)
+    // 3. Any other connected publishing / portfolio platforms (e.g. hashnode, devto, kaggle, gitlab)
     for (const [pId, profile] of Object.entries(connectedPortals)) {
         if (!profile) continue;
         const lowerId = pId.toLowerCase();
@@ -634,6 +797,7 @@ export function getAvailableCardPlatforms(
         const name = regDef?.name || PORTALS[lowerId]?.name || profile.name || (lowerId.charAt(0).toUpperCase() + lowerId.slice(1));
         const brandColor = regDef?.brandColor || "#6366F1";
         const finalUrl = profileUrl || regDef?.buildUrl(username) || "";
+        const isGitLab = lowerId === "gitlab";
 
         list.push({
             id: lowerId,
@@ -645,6 +809,10 @@ export function getAvailableCardPlatforms(
             isVerified: profile.verified !== false && profile.syncStatus !== "broken",
             syncStatus: profile.syncStatus,
             isGitHub: false,
+            category: isGitLab ? "dev" : "practice",
+            publicRepos: typeof profile.publicRepos === "number" ? profile.publicRepos : undefined,
+            contributionsOrCommits: typeof profile.contributions === "number" ? profile.contributions : undefined,
+            bestWorkingDay: isGitLab ? extractGitHubBestDay(profile) : undefined,
         });
         seen.add(lowerId);
     }
@@ -654,29 +822,51 @@ export function getAvailableCardPlatforms(
 
 /**
  * Resolves the displayed platform slots on LinkedIn (max 3) or Instagram Story (max 5) cards.
- * If user customized slots (selectedPlatformIds has items), respects user's exact slot ordering.
- * If default/empty, auto-ranks top coding platforms and dynamically includes GitHub if toggled.
+ * Classifies slots based on the category:
+ * - "practice": Top coding platforms with smart contest sync (rating + solved or only solved).
+ * - "dev": Engineering platforms (GitHub with total commits, total repos, best working day).
+ * - "both": Hybrid mode: Allocates 1 slot to Dev, and remaining slots to Practice.
+ *
+ * Fully backward-compatible with legacy includeGitHub boolean parameter.
  */
 export function resolveShowcasedPlatforms(
     connectedPortals: Record<string, any>,
     selectedPlatformIds?: string[],
     maxSlots = 3,
-    includeGitHub = false,
-    fallbackUsername?: string
+    categoryOrIncludeGitHub: SlotCategory | boolean = "both",
+    fallbackUsername?: string,
+    contestPlatforms?: any[]
 ): RankedPlatform[] {
-    const available = getAvailableCardPlatforms(connectedPortals, fallbackUsername);
+    const category: SlotCategory =
+        typeof categoryOrIncludeGitHub === "boolean"
+            ? (categoryOrIncludeGitHub ? "both" : "practice")
+            : categoryOrIncludeGitHub;
+
+    const available = getAvailableCardPlatforms(connectedPortals, fallbackUsername, contestPlatforms);
     const availableMap = new Map<string, RankedPlatform>();
     for (const p of available) {
         availableMap.set(p.id.toLowerCase(), p);
     }
 
-    // Custom user slots
+    const practicePlatforms = available.filter(
+        (p) => p.category === "practice" || (!p.isGitHub && !NON_PROBLEM_PORTALS.has(p.id.toLowerCase()))
+    );
+    const devPlatforms = available.filter(
+        (p) => p.category === "dev" || p.isGitHub
+    );
+
+    // 1. Custom user slots
     if (Array.isArray(selectedPlatformIds) && selectedPlatformIds.length > 0) {
         const result: RankedPlatform[] = [];
         for (const rawId of selectedPlatformIds) {
             if (!rawId) continue;
             const item = availableMap.get(rawId.toLowerCase());
             if (item && !result.some((r) => r.id === item.id)) {
+                // If practice mode, filter out dev items
+                if (category === "practice" && (item.isGitHub || item.category === "dev")) continue;
+                // If dev mode, filter out practice items
+                if (category === "dev" && !item.isGitHub && item.category !== "dev") continue;
+
                 result.push(item);
                 if (result.length >= maxSlots) break;
             }
@@ -686,18 +876,25 @@ export function resolveShowcasedPlatforms(
         }
     }
 
-    // Default smart auto-ranking:
-    // Coding platforms first
-    const codingPlatforms = available.filter((p) => !p.isGitHub && !NON_PROBLEM_PORTALS.has(p.id.toLowerCase()));
-    const ghItem = availableMap.get("github");
-
-    if (includeGitHub && ghItem) {
-        // Dedicate the last slot to GitHub so card stays perfectly balanced
-        const selectedCoding = codingPlatforms.slice(0, Math.max(0, maxSlots - 1));
-        return [...selectedCoding, ghItem];
+    // 2. Default Smart Auto-Resolution per Category:
+    if (category === "practice") {
+        return practicePlatforms.slice(0, maxSlots);
     }
 
-    return codingPlatforms.slice(0, maxSlots);
+    if (category === "dev") {
+        return devPlatforms.slice(0, maxSlots);
+    }
+
+    // Category: "both" (Hybrid mode)
+    // "give 1 slot out of all the other slot of the practice to the dev"
+    const ghItem = availableMap.get("github") || devPlatforms[0];
+    if (ghItem) {
+        const practiceQuota = Math.max(0, maxSlots - 1);
+        const selectedPractice = practicePlatforms.slice(0, practiceQuota);
+        return [...selectedPractice, ghItem];
+    }
+
+    return practicePlatforms.slice(0, maxSlots);
 }
 
 // ============================================================================

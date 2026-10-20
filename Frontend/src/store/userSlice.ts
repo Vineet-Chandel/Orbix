@@ -138,6 +138,59 @@ export const fetchUserProfile = createAsyncThunk<User, { force?: boolean } | voi
     }
 );
 
+export function syncConnectedPortalsStorage(platforms?: any[]) {
+    if (!platforms || !Array.isArray(platforms) || platforms.length === 0) {
+        return;
+    }
+
+    try {
+        let existing: Record<string, any> = {};
+        try {
+            const raw = localStorage.getItem("orbix_connected_portals");
+            if (raw) existing = JSON.parse(raw);
+        } catch {}
+
+        const nextPortals: Record<string, any> = { ...existing };
+        const rawPortals: Record<string, any> = {};
+
+        for (const p of platforms) {
+            const portalKey = (p.portal || "").toLowerCase().trim();
+            if (!portalKey) continue;
+
+            const handle = (p.portalUsername || p.portal_username || p.username || "").trim();
+            const profileUrl = (p.link || p.profileUrl || p.url || "").trim();
+
+            nextPortals[portalKey] = {
+                portal: portalKey,
+                username: handle,
+                profileUrl,
+                verified: p.verified !== false,
+                displayName: p.displayName || p.display_name || handle,
+                avatarUrl: p.avatarUrl || p.avatar_url,
+                stats: p.stats,
+                syncStatus: p.lastSyncStatus || p.syncStatus || "valid",
+                lastSyncAt: p.lastSyncAt || p.last_sync_at || new Date().toISOString(),
+            };
+
+            rawPortals[portalKey] = {
+                raw: handle,
+                username: handle,
+                url: profileUrl,
+            };
+        }
+
+        localStorage.setItem("orbix_connected_portals", JSON.stringify(nextPortals));
+        localStorage.setItem("orbix_portals", JSON.stringify(rawPortals));
+
+        if (typeof window !== "undefined") {
+            window.dispatchEvent(new Event("orbix_portals_updated"));
+            window.dispatchEvent(new Event("storage"));
+        }
+    } catch (err) {
+        console.error("Failed to sync connected portals to storage:", err);
+    }
+}
+
 export const userSlice = createSlice({
     name: "user",
     initialState,
@@ -152,6 +205,9 @@ export const userSlice = createSlice({
             if (action.payload) {
                 try {
                     localStorage.setItem("orbix_user", JSON.stringify(action.payload));
+                    if (action.payload.platforms) {
+                        syncConnectedPortalsStorage(action.payload.platforms);
+                    }
                 } catch {
                     // ignore localStorage quota errors
                 }
@@ -167,6 +223,9 @@ export const userSlice = createSlice({
                 };
                 try {
                     localStorage.setItem("orbix_user", JSON.stringify(state.user));
+                    if (state.user.platforms) {
+                        syncConnectedPortalsStorage(state.user.platforms);
+                    }
                 } catch {
                     // ignore
                 }
@@ -226,6 +285,9 @@ export const userSlice = createSlice({
 
                 try {
                     localStorage.setItem("orbix_user", JSON.stringify(action.payload));
+                    if (action.payload?.platforms) {
+                        syncConnectedPortalsStorage(action.payload.platforms);
+                    }
                 } catch {
                     // ignore
                 }

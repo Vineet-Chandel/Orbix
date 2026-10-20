@@ -3,7 +3,7 @@ import { toPng } from "html-to-image";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, useAppSelector, fetchContestPerformance } from "../../../store";
 import { CARD_THEMES } from "./types";
-import type { CardFormat, CardFace, CardThemeId } from "./types";
+import type { CardFormat, CardFace, CardThemeId, SlotShowcaseCategory } from "./types";
 import {
     aggregateCodingStats,
     getCoderType,
@@ -34,8 +34,9 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
     const [format, setFormat] = useState<CardFormat>("linkedin");
     const [face, setFace] = useState<CardFace>("front");
     const [themeId, setThemeId] = useState<CardThemeId>("indigo");
-    const [includeGitHub, setIncludeGitHub] = useState(false);
+    const [includeGitHub, setIncludeGitHub] = useState(true);
     const [customSlots, setCustomSlots] = useState<string[]>([]);
+    const [slotCategory, setSlotCategory] = useState<SlotShowcaseCategory>("both");
     const [showcaseMode, setShowcaseMode] = useState<"problems" | "contests">("problems");
     const [customContestSlots, setCustomContestSlots] = useState<string[]>([]);
     const [isExporting, setIsExporting] = useState(false);
@@ -73,11 +74,24 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
 
     const maxSlots = format === "linkedin" ? 3 : 5;
 
+    // Unified Redux Contests Performance Fetching
+    const effectiveUser = (user?.username || user?.firstName || "").trim();
+    const contestData = useAppSelector((state) => state.contests.dataByUser[effectiveUser]);
+
+    useEffect(() => {
+        if (effectiveUser) {
+            dispatch(fetchContestPerformance({ username: effectiveUser, portals: connectedPortals }));
+        }
+    }, [dispatch, effectiveUser, connectedPortals]);
+
     // Multi-Platform Coding Analytics
     const userFallback = user?.username || user?.firstName || "developer";
     const stats = useMemo(() => aggregateCodingStats(connectedPortals), [connectedPortals]);
     const coderType = useMemo(() => getCoderType(stats.totalSolved), [stats.totalSolved]);
-    const availablePlatforms = useMemo(() => getAvailableCardPlatforms(connectedPortals, userFallback), [connectedPortals, userFallback]);
+    const availablePlatforms = useMemo(
+        () => getAvailableCardPlatforms(connectedPortals, userFallback, contestData?.platforms),
+        [connectedPortals, userFallback, contestData?.platforms]
+    );
     const allConnectedPlatforms = useMemo(() => getAllConnectedPlatforms(connectedPortals), [connectedPortals]);
     const githubStats = useMemo(() => extractGitHubStats(connectedPortals, userFallback), [connectedPortals, userFallback]);
 
@@ -85,10 +99,10 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
         connectedPortals.github?.connected || connectedPortals.github?.username || githubStats.connected
     );
 
-    // Dynamic Platform Slot Resolution
+    // Dynamic Platform Slot Resolution with Category Classification
     const showcasedPlatforms = useMemo(
-        () => resolveShowcasedPlatforms(connectedPortals, customSlots, maxSlots, includeGitHub, userFallback),
-        [connectedPortals, customSlots, maxSlots, includeGitHub, userFallback]
+        () => resolveShowcasedPlatforms(connectedPortals, customSlots, maxSlots, slotCategory, userFallback, contestData?.platforms),
+        [connectedPortals, customSlots, maxSlots, slotCategory, userFallback, contestData?.platforms]
     );
 
     // The current slot IDs matching the showcased platforms
@@ -101,6 +115,16 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
     }, [showcasedPlatforms, maxSlots]);
 
     const isCustomized = customSlots.length > 0;
+
+    const handleCategoryChange = (newCat: SlotShowcaseCategory) => {
+        setSlotCategory(newCat);
+        setCustomSlots([]);
+        if (newCat === "practice") {
+            setIncludeGitHub(false);
+        } else {
+            setIncludeGitHub(true);
+        }
+    };
 
     // Slot Management Handlers
     const handleSlotChange = (slotIndex: number, newPlatformId: string) => {
@@ -185,16 +209,6 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
             }
         }
     };
-
-    // Unified Redux Contests Performance Fetching
-    const effectiveUser = (user?.username || user?.firstName || "").trim();
-    const contestData = useAppSelector((state) => state.contests.dataByUser[effectiveUser]);
-
-    useEffect(() => {
-        if (effectiveUser) {
-            dispatch(fetchContestPerformance({ username: effectiveUser, portals: connectedPortals }));
-        }
-    }, [dispatch, effectiveUser, connectedPortals]);
 
     // Contest Platforms & Dynamic Slot Resolution
     const availableContests = useMemo(
@@ -413,6 +427,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                                 publicProfileUrl={publicProfileUrl}
                                 connectedPortals={connectedPortals}
                                 showcaseMode={showcaseMode}
+                                slotCategory={slotCategory}
                                 topContests={showcasedContests}
                             />
                         ) : (
@@ -429,6 +444,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                                 publicProfileUrl={publicProfileUrl}
                                 connectedPortals={connectedPortals}
                                 showcaseMode={showcaseMode}
+                                slotCategory={slotCategory}
                                 topContests={showcasedContests}
                             />
                         )}
@@ -461,6 +477,8 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                 onTogglePlatform={handleTogglePlatform}
                 onResetSlots={handleResetSlots}
                 isCustomized={isCustomized}
+                slotCategory={slotCategory}
+                onSlotCategoryChange={handleCategoryChange}
                 showcaseMode={showcaseMode}
                 onShowcaseModeChange={setShowcaseMode}
                 availableContests={availableContests}
@@ -500,6 +518,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                             publicProfileUrl={publicProfileUrl}
                             connectedPortals={connectedPortals}
                             showcaseMode={showcaseMode}
+                            slotCategory={slotCategory}
                             topContests={showcasedContests}
                         />
                     ) : (
@@ -516,6 +535,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                             publicProfileUrl={publicProfileUrl}
                             connectedPortals={connectedPortals}
                             showcaseMode={showcaseMode}
+                            slotCategory={slotCategory}
                             topContests={showcasedContests}
                         />
                     )}
