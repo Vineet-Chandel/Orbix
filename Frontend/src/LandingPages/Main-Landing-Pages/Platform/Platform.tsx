@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { motion, useScroll, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { Sparkles } from "lucide-react";
 
 export interface PlatformItem {
     id: string;
@@ -350,7 +349,6 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
 export interface PlatformShowcaseProps {
     title?: string;
     subtitle?: string;
-    badgeText?: string;
     showHeading?: boolean;
     className?: string;
     onPlatformClick?: (platformId: string) => void;
@@ -358,8 +356,7 @@ export interface PlatformShowcaseProps {
 
 export const Platform: React.FC<PlatformShowcaseProps> = ({
     title = "Connect every platform that matters",
-    subtitle = "Seamlessly sync ratings, submissions, streaks and repositories from all 16+ developer ecosystems into your unified Orbix profile.",
-    badgeText = "Orbix Ecosystem Universe",
+    subtitle = "Connect your handles once. We sync solved problems, contest ratings, badges and commits every few hours, automatically. New platforms keep joining.",
     showHeading = true,
     className = "",
     onPlatformClick,
@@ -465,10 +462,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
             {/* Optional Section Header */}
             {showHeading && (
                 <div className="text-center max-w-4xl mx-auto mb-12 sm:mb-16 relative z-10">
-                    <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-semibold text-indigo-300 tracking-wide uppercase mb-4 shadow-sm backdrop-blur-md">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>{badgeText}</span>
-                    </div>
+
 
                     <h2 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-tight">
                         {title.includes("every platform") ? (

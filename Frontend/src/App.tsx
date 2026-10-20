@@ -15,6 +15,7 @@ import LeaderboardPage from "./app/Leaderboard/LeaderboardPage";
 import EventTrackerPage from "./app/Events/EventTrackerPage";
 import { Card } from "./LandingPages/Main-Landing-Pages/Card";
 import { Platform } from "./LandingPages/Main-Landing-Pages/Platform";
+import { Events } from "./LandingPages/Main-Landing-Pages/Events";
 import ProtectedRoute from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
@@ -56,6 +57,8 @@ const App = () => {
           <Route path="/card" element={<Card />} />
           <Route path="/platforms" element={<Platform />} />
           <Route path="/orbit" element={<Platform />} />
+          <Route path="/events-showcase" element={<Events />} />
+          <Route path="/event-calendar" element={<Events />} />
 
           {/* Public Shareable Profile Showcase Route */}
           <Route path="/profile/u/:username" element={<PublicProfilePage />} />

@@ -3,6 +3,7 @@ import NavBar from '../NavBar/Landing';
 import { useAppSelector } from '../../store';
 import { Card } from './Card';
 import { Platform } from './Platform';
+import { Events } from './Events';
 
 export default function MainLanding() {
   const navigate = useNavigate();
@@ -105,6 +106,11 @@ export default function MainLanding() {
       {/* Flagship Profile Card Showcase: One Card Every Place That Matters (Full Screen) */}
       <section className="w-full my-6 rounded-[40px] sm:rounded-[48px] overflow-hidden shadow-2xl">
         <Card />
+      </section>
+
+      {/* Flagship Event Tracker Showcase: Every Contest, One Calendar (Midnight Indigo Theme) */}
+      <section className="w-full my-6 rounded-[40px] sm:rounded-[48px] overflow-hidden shadow-2xl">
+        <Events />
       </section>
 
 
