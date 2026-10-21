@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 import type { PlatformSubmissionStat } from "../utils/submissionsAggregator";
+import { isDemoProfileUsername, demoDevelopmentData } from "../data/demoProfileData";
 
 export interface MonthlyContributionStat {
     monthKey: string;
@@ -81,6 +82,14 @@ export const fetchUnifiedDevelopment = createAsyncThunk<
         const effectiveUser = username.trim();
         if (!effectiveUser) {
             return rejectWithValue("Username is required to fetch unified development contributions");
+        }
+
+        // Instantly return enhanced mock data for demo profile
+        if (isDemoProfileUsername(effectiveUser)) {
+            return {
+                ...demoDevelopmentData,
+                username: effectiveUser,
+            };
         }
         const state = getState().development;
         const existing = state.dataByUser[effectiveUser];

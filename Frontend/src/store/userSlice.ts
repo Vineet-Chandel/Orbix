@@ -28,6 +28,14 @@ export interface User {
     createdAt?: string | null;
     platforms?: any[];
     portals?: Record<string, { raw: string; username: string; url: string }>;
+    // Dynamic Resume section
+    resumeUrl?: string | null;
+    resumePublicId?: string | null;
+    resumeFilename?: string | null;
+    resumeFilesize?: number | null;
+    resumeUpdatedAt?: string | null;
+    isResumePublic?: boolean;
+    resumeMetadata?: Record<string, any> | null;
 }
 
 export interface UserState {

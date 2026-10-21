@@ -249,21 +249,21 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                             {/* Line 3: Classification of Questions (Easy / Medium / Hard) */}
                             <div className="flex items-center gap-4 text-3xl font-semibold mt-5">
                                 <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-white/[0.05]">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF]" />
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF] " />
                                     <span className="text-neutral-300 font-bold">Easy</span>
                                     <span className="text-2xl font-black text-white font-mono ml-0.5">
                                         {stats.easy.toLocaleString()}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-white/[0.05]">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-[#FFD600] shadow-[0_0_8px_#FFD600]" />
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#FFD600] " />
                                     <span className="text-neutral-300 font-bold">Medium</span>
                                     <span className="text-2xl font-black text-white font-mono ml-0.5">
                                         {stats.medium.toLocaleString()}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-white/[0.05]">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-[#FF383C] shadow-[0_0_8px_#FF383C]" />
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#FF383C] " />
                                     <span className="text-neutral-300 font-bold">Hard</span>
                                     <span className="text-2xl font-black text-white font-mono ml-0.5">
                                         {stats.hard.toLocaleString()}

@@ -21,6 +21,11 @@ export interface PublicProfilePayload {
     isPublic: boolean;
     isOpenToWork?: boolean;
     isHireable?: boolean;
+    resumeUrl?: string | null;
+    resumeFilename?: string | null;
+    resumeFilesize?: number | null;
+    resumeUpdatedAt?: string | null;
+    isResumePublic?: boolean;
     createdAt?: string;
     platforms: Array<{
         portal: string;

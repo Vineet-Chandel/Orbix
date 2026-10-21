@@ -323,12 +323,13 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
 
                 {/* Right Action Buttons */}
                 <div className="flex items-center gap-1.5 sm:gap-2.5 ml-1 sm:ml-2">
-                    {/* Book a Demo Link */}
+                    {/* Demo Profile Link */}
                     <Link
-                        to="/support"
+                        to="/profile/u/Vineet-Chandel"
                         className="h-[46px] px-3.5 sm:px-4 flex items-center justify-center text-xs sm:text-sm font-medium text-neutral-300 hover:text-white transition-colors rounded-full hover:bg-white/[0.06] focus:outline-none whitespace-nowrap"
+                        title="View live demo showcase profile (@Vineet-Chandel)"
                     >
-                        Book a demo
+                        Demo Profile
                     </Link>
 
                     {/* Authenticated User Notification Bell & Rounded Profile Picture */}

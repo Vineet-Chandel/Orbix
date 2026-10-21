@@ -197,11 +197,11 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                 ? `+${change90d}`
                 : `${change90d}`
             : change90d === 0
-            ? "0"
-            : "—";
+                ? "0"
+                : "—";
 
     return (
-        <div className="w-full rounded-3xl bg-black border border-neutral-800 p-5 sm:p-6 text-white font-sans select-none flex flex-col justify-between transition-all hover:border-neutral-700 shadow-xl relative overflow-hidden group">
+        <div className="w-full relative  rounded-3xl bg-black  p-5 sm:p-6 text-white font-sans select-none flex flex-col justify-between transition-all hover:border-neutral-700 shadow-xl relative overflow-hidden group">
             {/* Top Card Header */}
             <div>
                 <div className="flex items-center justify-between gap-3 pb-2.5">
@@ -229,8 +229,8 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                     </div>
 
                     {/* Total Contests Count (e.g. "11 contests") */}
-                    <div className="flex-shrink-0">
-                        <span className="text-xs sm:text-sm font-medium text-neutral-400">
+                    <div className="flex-shrink-0 bg-white absolute right-14 top-2 px-3 rounded-xl">
+                        <span className="text-xs sm:text-sm font-medium text-black">
                             {platform.ratedContestsCount} {platform.ratedContestsCount === 1 ? "contest" : "contests"}
                         </span>
                     </div>
@@ -249,13 +249,12 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                     <span>
                         Last 90 days{" "}
                         <strong
-                            className={`ml-1 font-bold ${
-                                typeof change90d === "number" && change90d > 0
-                                    ? "text-emerald-400"
-                                    : typeof change90d === "number" && change90d < 0
+                            className={`ml-1 font-bold ${typeof change90d === "number" && change90d > 0
+                                ? "text-emerald-400"
+                                : typeof change90d === "number" && change90d < 0
                                     ? "text-rose-400"
                                     : "text-neutral-300"
-                            }`}
+                                }`}
                         >
                             {changeFormatted}
                         </strong>
@@ -291,6 +290,27 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                         </div>
                     )}
                 </div>
+            </div>
+
+            {/* Full-width folder outline */}
+            <div className="absolute inset-0 z-0 pointer-events-none">
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="absolute inset-0 w-full h-full"
+                    viewBox="0 0 827 787"
+                    preserveAspectRatio="none"
+                    fill="none"
+                >
+                    <path
+                        d="M0.534388 88.5V702.5C1.37149 765.707 16.5914 787.069 85.0344 785.5L748.534 782C809.208 781.551 826.318 761.151 826.034 689V149C825.154 89.9777 803.25 78.3333 744.534 78.5H600.034C560.105 77.6164 545.291 65.9329 526.034 34.5C510.033 10.0413 495.709 0.764389 458.034 0.5H80.0344C20.1286 2.70061 -0.463685 18.3914 0.534388 88.5Z"
+                        stroke="white"
+                        strokeOpacity="0.45"
+                        strokeWidth="3"
+                        vectorEffect="non-scaling-stroke"
+                    />
+                </svg>
+
+
             </div>
 
             {/* Sparkline / Area Curve Chart */}

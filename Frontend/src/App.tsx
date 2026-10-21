@@ -51,7 +51,8 @@ const App = () => {
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/support" element={<SupportPage />} />
           <Route path="/platform" element={<PlatformPage />} />
-          <Route path="/demo" element={<SupportPage />} />
+          <Route path="/demo" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
+          <Route path="/demo-profile" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/events" element={<EventTrackerPage />} />
           <Route path="/card" element={<Card />} />

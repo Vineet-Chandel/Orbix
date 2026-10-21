@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
 import type { PlatformSubmissionStat } from "../utils/submissionsAggregator";
+import { isDemoProfileUsername, demoUnifiedSubmissions } from "../data/demoProfileData";
 
 export interface UnifiedSubmissionsData {
     username: string;
@@ -57,6 +58,14 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
         const effectiveUser = username.trim();
         if (!effectiveUser) {
             return rejectWithValue("Username is required to fetch unified submissions");
+        }
+
+        // Instantly return enhanced mock data for demo profile
+        if (isDemoProfileUsername(effectiveUser)) {
+            return {
+                ...demoUnifiedSubmissions,
+                username: effectiveUser,
+            };
         }
         const state = getState().submissions;
         const existing = state.dataByUser[effectiveUser];

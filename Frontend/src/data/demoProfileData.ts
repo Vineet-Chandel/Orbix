@@ -1,0 +1,1495 @@
+import type { PublicProfileData, PublicProfilePlatform } from "../utils/profileApi";
+import type { UnifiedSubmissionsData } from "../store/submissionsSlice";
+import type { PracticeAnalyticsData } from "../store/practiceAnalyticsSlice";
+import type { UnifiedContestData, PlatformContestAnalytics, UnifiedRecentContestItem } from "../store/contestsSlice";
+import type { UnifiedDevelopmentData } from "../store/developmentSlice";
+import type { DevelopmentAnalyticsData } from "../store/developmentAnalyticsSlice";
+import type { UnifiedBadgesData } from "../store/badgesSlice";
+import type {
+    AggregatedCodingStats,
+    CoderTypeBadge,
+    GitHubCardStats,
+    RankedPlatform,
+    ConnectedPlatformBadge,
+    RankedContestPlatform,
+} from "../utils/cardStatsAggregator";
+import { CARD_THEMES, type CardThemeConfig } from "../app/Profile/CardStudio/types";
+
+export const DEMO_USERNAME = "Vineet-Chandel";
+
+/**
+ * Normalizes and checks if a given username corresponds to the demo profile
+ */
+export function isDemoProfileUsername(username?: string | null): boolean {
+    if (!username) return false;
+    const clean = username.trim().toLowerCase();
+    return clean === "vineet-chandel" || clean === "vineetchandel" || clean === "demo";
+}
+
+/**
+ * Deterministically generates a rich, highly active submission calendar
+ * covering the full 53 weeks (370+ days) so the heatmap is vivid and populated throughout.
+ */
+export function generateFullYearCalendar(seedOffset: number, days = 370): Record<string, number> {
+    const calendar: Record<string, number> = {};
+    const today = new Date();
+    const seed = 1337 + seedOffset;
+
+    const rand = (offset: number) => {
+        const x = Math.sin(seed + offset * 9301 + 49297) * 233280;
+        return x - Math.floor(x);
+    };
+
+    for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+        const dateStr = d.toISOString().split("T")[0] || "";
+        const localDateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+        const r = rand(i);
+        let count = 0;
+
+        if (seedOffset === 11) {
+            // LeetCode: daily practice (2 to 8 submissions every day)
+            count = Math.floor(rand(i + 100) * 7) + 2;
+        } else if (seedOffset === 22) {
+            // Codeforces: 1 to 4 submissions on 85% of days
+            if (r > 0.15) count = Math.floor(rand(i + 200) * 4) + 1;
+        } else if (seedOffset === 33) {
+            // CodeChef: 1 to 3 submissions on 80% of days
+            if (r > 0.20) count = Math.floor(rand(i + 300) * 3) + 1;
+        } else if (seedOffset === 44) {
+            // GeeksforGeeks: 1 to 4 submissions on 85% of days
+            if (r > 0.15) count = Math.floor(rand(i + 400) * 4) + 1;
+        } else if (seedOffset === 55) {
+            // HackerRank: 1 to 2 submissions on 70% of days
+            if (r > 0.30) count = Math.floor(rand(i + 500) * 2) + 1;
+        } else if (seedOffset === 99) {
+            // GitHub Commits: high activity (3 to 14 commits most days, peak mid-week)
+            const dayOfWeek = d.getDay(); // 3 = Wed
+            const boost = dayOfWeek === 2 || dayOfWeek === 3 || dayOfWeek === 4 ? 4 : 1;
+            count = Math.floor(rand(i + 600) * 8) + boost;
+        } else {
+            // General platform
+            if (r > 0.35) count = Math.floor(rand(i + 700) * 2) + 1;
+        }
+
+        if (count > 0) {
+            calendar[dateStr] = count;
+            calendar[localDateKey] = count;
+        }
+    }
+
+    return calendar;
+}
+
+// ---------------------------------------------------------------------------
+// 1. PUBLIC PROFILE DATA
+// ---------------------------------------------------------------------------
+export const demoPublicProfilePlatforms: PublicProfilePlatform[] = [
+    {
+        portal: "leetcode",
+        portalUsername: "Vineet-Chandel",
+        link: "https://leetcode.com/u/Vineet-Chandel",
+        verified: true,
+        displayName: "LeetCode",
+        isPublic: true,
+        stats: [
+            { label: "solved", value: "912" },
+            { label: "rating", value: "2,340" },
+            { label: "tier", value: "Guardian" },
+            { label: "contests", value: "56" },
+            { label: "active days", value: "280" },
+        ],
+    },
+    {
+        portal: "codeforces",
+        portalUsername: "Vineet-Chandel",
+        link: "https://codeforces.com/profile/Vineet-Chandel",
+        verified: true,
+        displayName: "Codeforces",
+        isPublic: true,
+        stats: [
+            { label: "solved", value: "468" },
+            { label: "rating", value: "2,045" },
+            { label: "tier", value: "Candidate Master" },
+            { label: "contests", value: "38" },
+            { label: "active days", value: "145" },
+        ],
+    },
+    {
+        portal: "codechef",
+        portalUsername: "Vineet-Chandel",
+        link: "https://www.codechef.com/users/Vineet-Chandel",
+        verified: true,
+        displayName: "CodeChef",
+        isPublic: true,
+        stats: [
+            { label: "solved", value: "342" },
+            { label: "rating", value: "2,215" },
+            { label: "tier", value: "6 Star" },
+            { label: "contests", value: "26" },
+            { label: "active days", value: "112" },
+        ],
+    },
+    {
+        portal: "github",
+        portalUsername: "Vineet-Chandel",
+        link: "https://github.com/Vineet-Chandel",
+        verified: true,
+        displayName: "GitHub",
+        isPublic: true,
+        stats: [
+            { label: "contributions", value: "3,180" },
+            { label: "repositories", value: "62" },
+            { label: "followers", value: "840" },
+            { label: "stars", value: "1,420" },
+        ],
+    },
+    {
+        portal: "geeksforgeeks",
+        portalUsername: "Vineet-Chandel",
+        link: "https://auth.geeksforgeeks.org/user/Vineet-Chandel",
+        verified: true,
+        displayName: "GeeksforGeeks",
+        isPublic: true,
+        stats: [
+            { label: "solved", value: "410" },
+            { label: "submissions", value: "720" },
+            { label: "active days", value: "130" },
+        ],
+    },
+    {
+        portal: "hackerrank",
+        portalUsername: "Vineet-Chandel",
+        link: "https://www.hackerrank.com/Vineet-Chandel",
+        verified: true,
+        displayName: "HackerRank",
+        isPublic: true,
+        stats: [
+            { label: "solved", value: "245" },
+            { label: "submissions", value: "410" },
+            { label: "active days", value: "82" },
+        ],
+    },
+    {
+        portal: "atcoder",
+        portalUsername: "Vineet-Chandel",
+        link: "https://atcoder.jp/users/Vineet-Chandel",
+        verified: true,
+        displayName: "AtCoder",
+        isPublic: true,
+        stats: [
+            { label: "solved", value: "140" },
+            { label: "rating", value: "1,640" },
+            { label: "tier", value: "1-Kyu" },
+            { label: "contests", value: "18" },
+        ],
+    },
+    {
+        portal: "code360",
+        portalUsername: "Vineet-Chandel",
+        link: "https://naukri.com/code360/profile/Vineet-Chandel",
+        verified: true,
+        displayName: "Code360",
+        isPublic: true,
+        stats: [
+            { label: "solved", value: "165" },
+            { label: "submissions", value: "290" },
+        ],
+    },
+    {
+        portal: "interviewbit",
+        portalUsername: "Vineet-Chandel",
+        link: "https://www.interviewbit.com/profile/Vineet-Chandel",
+        verified: true,
+        displayName: "InterviewBit",
+        isPublic: true,
+        stats: [
+            { label: "solved", value: "130" },
+            { label: "score", value: "3,840" },
+        ],
+    },
+];
+
+export const demoPublicProfile: PublicProfileData = {
+    id: "demo-vineet-chandel",
+    username: DEMO_USERNAME,
+    displayName: "Vineet Chandel",
+    firstName: "Vineet",
+    lastName: "Chandel",
+    headline: "Full Stack Engineer & Competitive Programmer | Grandmaster Track",
+    bio: "Passionate Full Stack Engineer & Systems Architect with 1,680+ algorithmic problems solved across global platforms. Specializing in high-throughput distributed systems, scalable web applications, and developer productivity tooling. Top 0.5% Guardian on LeetCode and Candidate Master on Codeforces.",
+    location: "Bengaluru, India",
+    photoUrl: "/avatar.png",
+    avatarUrl: "/avatar.png",
+    website: "https://orbix.dev/profile/u/Vineet-Chandel",
+    linkedin: "https://linkedin.com/in/Vineet-Chandel",
+    github: "https://github.com/Vineet-Chandel",
+    customLink: "https://leetcode.com/u/Vineet-Chandel",
+    isOpenToWork: true,
+    isHireable: true,
+    isPublic: true,
+    isOwner: false,
+    resumeUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+    resumeFilename: "Vineet_Chandel_Resume.pdf",
+    resumeFilesize: 1420000,
+    resumeUpdatedAt: "2026-02-15T00:00:00.000Z",
+    isResumePublic: true,
+    createdAt: "2024-01-15T00:00:00.000Z",
+    skills: [
+        "TypeScript",
+        "React",
+        "Next.js",
+        "Node.js",
+        "Python",
+        "C++",
+        "Go",
+        "PostgreSQL",
+        "Redis",
+        "Docker",
+        "GraphQL",
+        "Distributed Systems",
+        "System Design",
+        "Tailwind CSS",
+    ],
+    links: [
+        { label: "GitHub", url: "https://github.com/Vineet-Chandel", platform: "github" },
+        { label: "LinkedIn", url: "https://linkedin.com/in/Vineet-Chandel", platform: "linkedin" },
+        { label: "Portfolio", url: "https://orbix.dev/profile/u/Vineet-Chandel", platform: "portfolio" },
+        { label: "LeetCode", url: "https://leetcode.com/u/Vineet-Chandel", platform: "leetcode" },
+    ],
+    platforms: demoPublicProfilePlatforms,
+};
+
+// ---------------------------------------------------------------------------
+// 2. CONNECTED PORTALS MAP (FOR STATS & HEATMAP ENGINE)
+// ---------------------------------------------------------------------------
+export const demoConnectedPortals: Record<string, any> = {
+    leetcode: {
+        portal: "leetcode",
+        username: DEMO_USERNAME,
+        name: "LeetCode",
+        displayName: "LeetCode",
+        link: "https://leetcode.com/u/Vineet-Chandel",
+        profileUrl: "https://leetcode.com/u/Vineet-Chandel",
+        verified: true,
+        isPublic: true,
+        currentRating: 2340,
+        rating: 2340,
+        peakRating: 2385,
+        tier: "Guardian",
+        tierColor: "#F59E0B",
+        officialRank: 620,
+        percentile: 99.6,
+        contestsCount: 56,
+        ratedContestsCount: 56,
+        solvedCount: 912,
+        submissionsCount: 1840,
+        activeDays: 280,
+        submissionCalendar: generateFullYearCalendar(11),
+        stats: [
+            { label: "solved", value: "912" },
+            { label: "rating", value: "2,340" },
+            { label: "submissions", value: "1,840" },
+            { label: "active days", value: "280" },
+        ],
+    },
+    codeforces: {
+        portal: "codeforces",
+        username: DEMO_USERNAME,
+        name: "Codeforces",
+        displayName: "Codeforces",
+        link: "https://codeforces.com/profile/Vineet-Chandel",
+        profileUrl: "https://codeforces.com/profile/Vineet-Chandel",
+        verified: true,
+        isPublic: true,
+        currentRating: 2045,
+        rating: 2045,
+        peakRating: 2090,
+        tier: "Candidate Master",
+        tierColor: "#aa00aa",
+        officialRank: 1980,
+        percentile: 98.4,
+        contestsCount: 38,
+        ratedContestsCount: 38,
+        solvedCount: 468,
+        submissionsCount: 890,
+        activeDays: 145,
+        submissionCalendar: generateFullYearCalendar(22),
+        stats: [
+            { label: "solved", value: "468" },
+            { label: "rating", value: "2,045" },
+            { label: "submissions", value: "890" },
+            { label: "active days", value: "145" },
+        ],
+    },
+    codechef: {
+        portal: "codechef",
+        username: DEMO_USERNAME,
+        name: "CodeChef",
+        displayName: "CodeChef",
+        link: "https://www.codechef.com/users/Vineet-Chandel",
+        profileUrl: "https://www.codechef.com/users/Vineet-Chandel",
+        verified: true,
+        isPublic: true,
+        currentRating: 2215,
+        rating: 2215,
+        peakRating: 2250,
+        tier: "6 Star",
+        tierColor: "#eed000",
+        officialRank: 840,
+        percentile: 99.1,
+        contestsCount: 26,
+        ratedContestsCount: 26,
+        solvedCount: 342,
+        submissionsCount: 680,
+        activeDays: 112,
+        submissionCalendar: generateFullYearCalendar(33),
+        stats: [
+            { label: "solved", value: "342" },
+            { label: "rating", value: "2,215" },
+            { label: "submissions", value: "680" },
+            { label: "active days", value: "112" },
+        ],
+    },
+    geeksforgeeks: {
+        portal: "geeksforgeeks",
+        username: DEMO_USERNAME,
+        name: "GeeksforGeeks",
+        displayName: "GeeksforGeeks",
+        link: "https://auth.geeksforgeeks.org/user/Vineet-Chandel",
+        profileUrl: "https://auth.geeksforgeeks.org/user/Vineet-Chandel",
+        verified: true,
+        isPublic: true,
+        solvedCount: 410,
+        submissionsCount: 720,
+        activeDays: 130,
+        submissionCalendar: generateFullYearCalendar(44),
+        stats: [
+            { label: "solved", value: "410" },
+            { label: "submissions", value: "720" },
+            { label: "active days", value: "130" },
+        ],
+    },
+    hackerrank: {
+        portal: "hackerrank",
+        username: DEMO_USERNAME,
+        name: "HackerRank",
+        displayName: "HackerRank",
+        link: "https://www.hackerrank.com/Vineet-Chandel",
+        profileUrl: "https://www.hackerrank.com/Vineet-Chandel",
+        verified: true,
+        isPublic: true,
+        solvedCount: 245,
+        submissionsCount: 410,
+        activeDays: 82,
+        submissionCalendar: generateFullYearCalendar(55),
+        stats: [
+            { label: "solved", value: "245" },
+            { label: "submissions", value: "410" },
+            { label: "active days", value: "82" },
+        ],
+    },
+    atcoder: {
+        portal: "atcoder",
+        username: DEMO_USERNAME,
+        name: "AtCoder",
+        displayName: "AtCoder",
+        link: "https://atcoder.jp/users/Vineet-Chandel",
+        profileUrl: "https://atcoder.jp/users/Vineet-Chandel",
+        verified: true,
+        isPublic: true,
+        currentRating: 1640,
+        rating: 1640,
+        peakRating: 1680,
+        tier: "1-Kyu",
+        tierColor: "#00c0c0",
+        contestsCount: 18,
+        ratedContestsCount: 18,
+        solvedCount: 140,
+        submissionsCount: 210,
+        submissionCalendar: generateFullYearCalendar(66),
+        stats: [
+            { label: "solved", value: "140" },
+            { label: "rating", value: "1,640" },
+        ],
+    },
+    code360: {
+        portal: "code360",
+        username: DEMO_USERNAME,
+        name: "Code360",
+        displayName: "Code360",
+        link: "https://naukri.com/code360/profile/Vineet-Chandel",
+        profileUrl: "https://naukri.com/code360/profile/Vineet-Chandel",
+        verified: true,
+        isPublic: true,
+        solvedCount: 165,
+        submissionsCount: 290,
+        submissionCalendar: generateFullYearCalendar(77),
+        stats: [
+            { label: "solved", value: "165" },
+            { label: "submissions", value: "290" },
+        ],
+    },
+    interviewbit: {
+        portal: "interviewbit",
+        username: DEMO_USERNAME,
+        name: "InterviewBit",
+        displayName: "InterviewBit",
+        link: "https://www.interviewbit.com/profile/Vineet-Chandel",
+        profileUrl: "https://www.interviewbit.com/profile/Vineet-Chandel",
+        verified: true,
+        isPublic: true,
+        solvedCount: 130,
+        submissionsCount: 230,
+        submissionCalendar: generateFullYearCalendar(88),
+        stats: [
+            { label: "solved", value: "130" },
+        ],
+    },
+    github: {
+        portal: "github",
+        username: DEMO_USERNAME,
+        name: "GitHub",
+        displayName: "GitHub",
+        link: "https://github.com/Vineet-Chandel",
+        profileUrl: "https://github.com/Vineet-Chandel",
+        verified: true,
+        isPublic: true,
+        publicRepos: 62,
+        followers: 840,
+        contributions: 3180,
+        commits: 3180,
+        bestWorkingDay: "Wednesday",
+        submissionCalendar: generateFullYearCalendar(99),
+        stats: [
+            { label: "contributions", value: "3,180" },
+            { label: "repositories", value: "62" },
+            { label: "followers", value: "840" },
+            { label: "stars", value: "1,420" },
+        ],
+    },
+};
+
+// ---------------------------------------------------------------------------
+// 3. UNIFIED PRACTICE SUBMISSIONS (FOR CODING SUBMISSIONS TABLE & HEATMAP)
+// ---------------------------------------------------------------------------
+const mergedDailyPractice: Record<string, { count: number; platforms: string[] }> = {};
+const practicePlatforms = ["leetcode", "codeforces", "codechef", "geeksforgeeks", "hackerrank", "atcoder", "code360", "interviewbit"];
+
+for (const pKey of practicePlatforms) {
+    const cal = demoConnectedPortals[pKey]?.submissionCalendar || {};
+    for (const [dStr, cnt] of Object.entries(cal)) {
+        const count = typeof cnt === "number" ? cnt : 0;
+        if (count <= 0) continue;
+        if (!mergedDailyPractice[dStr]) {
+            mergedDailyPractice[dStr] = { count: 0, platforms: [] };
+        }
+        mergedDailyPractice[dStr].count += count;
+        if (!mergedDailyPractice[dStr].platforms.includes(pKey)) {
+            mergedDailyPractice[dStr].platforms.push(pKey);
+        }
+    }
+}
+
+export const demoUnifiedSubmissions: UnifiedSubmissionsData = {
+    username: DEMO_USERNAME,
+    totalSubmissions: 4540,
+    totalSolved: 1680,
+    activeDays: 312,
+    dayStreak: 48,
+    connectedPlatformsCount: 8,
+    dailyMerged: mergedDailyPractice,
+    platformBreakdown: {
+        leetcode: {
+            name: "LeetCode",
+            portal: "leetcode",
+            username: DEMO_USERNAME,
+            solved: 912,
+            submissions: 1840,
+            activeDays: 280,
+            brandColor: "#FFA116",
+        },
+        codeforces: {
+            name: "Codeforces",
+            portal: "codeforces",
+            username: DEMO_USERNAME,
+            solved: 468,
+            submissions: 890,
+            activeDays: 145,
+            brandColor: "#1F8ACB",
+        },
+        codechef: {
+            name: "CodeChef",
+            portal: "codechef",
+            username: DEMO_USERNAME,
+            solved: 342,
+            submissions: 680,
+            activeDays: 112,
+            brandColor: "#5B4638",
+        },
+        geeksforgeeks: {
+            name: "GeeksforGeeks",
+            portal: "geeksforgeeks",
+            username: DEMO_USERNAME,
+            solved: 410,
+            submissions: 720,
+            activeDays: 130,
+            brandColor: "#2F8D46",
+        },
+        hackerrank: {
+            name: "HackerRank",
+            portal: "hackerrank",
+            username: DEMO_USERNAME,
+            solved: 245,
+            submissions: 410,
+            activeDays: 82,
+            brandColor: "#00EA64",
+        },
+        atcoder: {
+            name: "AtCoder",
+            portal: "atcoder",
+            username: DEMO_USERNAME,
+            solved: 140,
+            submissions: 210,
+            activeDays: 45,
+            brandColor: "#222222",
+        },
+        code360: {
+            name: "Code360",
+            portal: "code360",
+            username: DEMO_USERNAME,
+            solved: 165,
+            submissions: 290,
+            activeDays: 60,
+            brandColor: "#FF5722",
+        },
+        interviewbit: {
+            name: "InterviewBit",
+            portal: "interviewbit",
+            username: DEMO_USERNAME,
+            solved: 130,
+            submissions: 230,
+            activeDays: 52,
+            brandColor: "#0D8BD9",
+        },
+    },
+    timestamp: new Date().toISOString(),
+};
+
+// ---------------------------------------------------------------------------
+// 4. PRACTICE ANALYTICS DATA (PROBLEMS, RECENT, TOPICS, RADAR)
+// ---------------------------------------------------------------------------
+export const demoPracticeAnalytics: PracticeAnalyticsData = {
+    username: DEMO_USERNAME,
+    totalSolved: 1680,
+    donutTotal: 1680,
+    difficulty: {
+        easy: 480,
+        medium: 890,
+        hard: 310,
+        total: 1680,
+    },
+    platformBreakdown: [
+        { portal: "leetcode", platformName: "LeetCode", count: 912, percentage: 54.3 },
+        { portal: "codeforces", platformName: "Codeforces", count: 468, percentage: 27.9 },
+        { portal: "codechef", platformName: "CodeChef", count: 342, percentage: 20.4 },
+        { portal: "geeksforgeeks", platformName: "GeeksforGeeks", count: 410, percentage: 24.4 },
+        { portal: "hackerrank", platformName: "HackerRank", count: 245, percentage: 14.6 },
+        { portal: "code360", platformName: "Code360", count: 165, percentage: 9.8 },
+        { portal: "atcoder", platformName: "AtCoder", count: 140, percentage: 8.3 },
+        { portal: "interviewbit", platformName: "InterviewBit", count: 130, percentage: 7.7 },
+    ],
+    recentlySolved: [
+        {
+            id: "rec-1",
+            title: "42. Trapping Rain Water",
+            portal: "leetcode",
+            platformName: "LeetCode",
+            timestamp: Date.now() - 1000 * 60 * 45,
+            solvedAt: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
+            url: "https://leetcode.com/problems/trapping-rain-water/",
+            relativeTime: "45m ago",
+        },
+        {
+            id: "rec-2",
+            title: "146. LRU Cache",
+            portal: "leetcode",
+            platformName: "LeetCode",
+            timestamp: Date.now() - 1000 * 60 * 60 * 3,
+            solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
+            url: "https://leetcode.com/problems/lru-cache/",
+            relativeTime: "3h ago",
+        },
+        {
+            id: "rec-3",
+            title: "1985C. Good Prefixes",
+            portal: "codeforces",
+            platformName: "Codeforces",
+            timestamp: Date.now() - 1000 * 60 * 60 * 12,
+            solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
+            url: "https://codeforces.com/problemset/problem/1985/C",
+            relativeTime: "12h ago",
+        },
+        {
+            id: "rec-4",
+            title: "126. Word Ladder II",
+            portal: "leetcode",
+            platformName: "LeetCode",
+            timestamp: Date.now() - 1000 * 60 * 60 * 24,
+            solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
+            url: "https://leetcode.com/problems/word-ladder-ii/",
+            relativeTime: "1d ago",
+        },
+        {
+            id: "rec-5",
+            title: "MAKE_EQUAL. Array Equalizer",
+            portal: "codechef",
+            platformName: "CodeChef",
+            timestamp: Date.now() - 1000 * 60 * 60 * 36,
+            solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 36).toISOString(),
+            url: "https://www.codechef.com/problems/MAKE_EQUAL",
+            relativeTime: "1d ago",
+        },
+        {
+            id: "rec-6",
+            title: "210. Course Schedule II",
+            portal: "leetcode",
+            platformName: "LeetCode",
+            timestamp: Date.now() - 1000 * 60 * 60 * 48,
+            solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
+            url: "https://leetcode.com/problems/course-schedule-ii/",
+            relativeTime: "2d ago",
+        },
+        {
+            id: "rec-7",
+            title: "4. Median of Two Sorted Arrays",
+            portal: "leetcode",
+            platformName: "LeetCode",
+            timestamp: Date.now() - 1000 * 60 * 60 * 72,
+            solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
+            url: "https://leetcode.com/problems/median-of-two-sorted-arrays/",
+            relativeTime: "3d ago",
+        },
+        {
+            id: "rec-8",
+            title: "Tree Distances I",
+            portal: "codeforces",
+            platformName: "Codeforces",
+            timestamp: Date.now() - 1000 * 60 * 60 * 96,
+            solvedAt: new Date(Date.now() - 1000 * 60 * 60 * 96).toISOString(),
+            url: "https://codeforces.com/problemset/problem/1137/B",
+            relativeTime: "4d ago",
+        },
+    ],
+    dsaTopics: [
+        { topic: "Dynamic Programming", count: 340, percentage: 20.2 },
+        { topic: "Graph Theory & Trees", count: 295, percentage: 17.6 },
+        { topic: "Binary Search & Pointers", count: 260, percentage: 15.5 },
+        { topic: "Arrays & Hashing", count: 245, percentage: 14.6 },
+        { topic: "Greedy Algorithms", count: 210, percentage: 12.5 },
+        { topic: "Backtracking & Recursion", count: 145, percentage: 8.6 },
+        { topic: "Math & Number Theory", count: 110, percentage: 6.5 },
+        { topic: "String Manipulation", count: 75, percentage: 4.5 },
+    ],
+    topicStrength: [
+        { topic: "Dynamic Programming", axisLabel: "DP", score: 94, count: 340 },
+        { topic: "Graph Algorithms", axisLabel: "Graphs", score: 91, count: 295 },
+        { topic: "Data Structures", axisLabel: "Data Struct", score: 96, count: 380 },
+        { topic: "Math & Geometry", axisLabel: "Math", score: 82, count: 110 },
+        { topic: "Greedy & Sorting", axisLabel: "Greedy", score: 88, count: 210 },
+        { topic: "System Design", axisLabel: "System", score: 85, count: 95 },
+    ],
+    timestamp: new Date().toISOString(),
+};
+
+// ---------------------------------------------------------------------------
+// 5. CONTEST PERFORMANCE DATA
+// ---------------------------------------------------------------------------
+const leetcodeHistory: PlatformContestAnalytics["history"] = [
+    { contestId: "wc-415", contestName: "Weekly Contest 415", date: "2024-09-15", timestamp: 1726365600, rating: 2210, ratingChange: 35, rank: 820 },
+    { contestId: "bwc-139", contestName: "Biweekly Contest 139", date: "2024-09-28", timestamp: 1727535600, rating: 2245, ratingChange: 35, rank: 640 },
+    { contestId: "wc-417", contestName: "Weekly Contest 417", date: "2024-10-06", timestamp: 1728180000, rating: 2270, ratingChange: 25, rank: 580 },
+    { contestId: "wc-419", contestName: "Weekly Contest 419", date: "2024-10-20", timestamp: 1729389600, rating: 2295, ratingChange: 25, rank: 490 },
+    { contestId: "bwc-141", contestName: "Biweekly Contest 141", date: "2024-10-26", timestamp: 1729954800, rating: 2315, ratingChange: 20, rank: 410 },
+    { contestId: "wc-421", contestName: "Weekly Contest 421", date: "2024-11-03", timestamp: 1730599200, rating: 2340, ratingChange: 25, rank: 360 },
+    { contestId: "wc-423", contestName: "Weekly Contest 423", date: "2024-11-17", timestamp: 1731808800, rating: 2360, ratingChange: 20, rank: 290 },
+    { contestId: "bwc-143", contestName: "Biweekly Contest 143", date: "2024-11-23", timestamp: 1732374000, rating: 2385, ratingChange: 25, rank: 240 },
+    { contestId: "wc-426", contestName: "Weekly Contest 426", date: "2024-12-08", timestamp: 1733623200, rating: 2370, ratingChange: -15, rank: 480 },
+    { contestId: "wc-428", contestName: "Weekly Contest 428", date: "2024-12-22", timestamp: 1734832800, rating: 2355, ratingChange: -15, rank: 510 },
+    { contestId: "bwc-145", contestName: "Biweekly Contest 145", date: "2024-12-28", timestamp: 1735398000, rating: 2340, ratingChange: -15, rank: 620 },
+];
+
+const codeforcesHistory: PlatformContestAnalytics["history"] = [
+    { contestId: "cfr-945", contestName: "Codeforces Round 945 (Div. 2)", date: "2024-05-17", timestamp: 1715961600, rating: 1880, ratingChange: 45, rank: 480 },
+    { contestId: "cfr-950", contestName: "Codeforces Round 950 (Div. 3)", date: "2024-06-03", timestamp: 1717430400, rating: 1925, ratingChange: 45, rank: 180 },
+    { contestId: "cfr-955", contestName: "Codeforces Round 955 (Div. 2)", date: "2024-06-25", timestamp: 1719331200, rating: 1960, ratingChange: 35, rank: 390 },
+    { contestId: "cfr-962", contestName: "Codeforces Round 962 (Div. 3)", date: "2024-07-26", timestamp: 1722009600, rating: 1995, ratingChange: 35, rank: 140 },
+    { contestId: "cfr-968", contestName: "Codeforces Round 968 (Div. 2)", date: "2024-08-25", timestamp: 1724601600, rating: 2025, ratingChange: 30, rank: 310 },
+    { contestId: "cfr-973", contestName: "Codeforces Round 973 (Div. 2)", date: "2024-09-20", timestamp: 1726848000, rating: 2060, ratingChange: 35, rank: 260 },
+    { contestId: "cfr-978", contestName: "Codeforces Round 978 (Div. 2)", date: "2024-10-13", timestamp: 1728835200, rating: 2090, ratingChange: 30, rank: 210 },
+    { contestId: "cfr-982", contestName: "Codeforces Round 982 (Div. 2)", date: "2024-10-26", timestamp: 1729958400, rating: 2070, ratingChange: -20, rank: 450 },
+    { contestId: "cfr-988", contestName: "Codeforces Round 988 (Div. 3)", date: "2024-11-17", timestamp: 1731859200, rating: 2055, ratingChange: -15, rank: 220 },
+    { contestId: "cfr-992", contestName: "Codeforces Round 992 (Div. 2)", date: "2024-12-08", timestamp: 1733673600, rating: 2045, ratingChange: -10, rank: 490 },
+];
+
+const codechefHistory: PlatformContestAnalytics["history"] = [
+    { contestId: "starters-135", contestName: "Starters 135 (Div 1)", date: "2024-05-22", timestamp: 1716393600, rating: 2080, ratingChange: 40, rank: 320 },
+    { contestId: "starters-140", contestName: "Starters 140 (Div 1)", date: "2024-06-26", timestamp: 1719417600, rating: 2130, ratingChange: 50, rank: 240 },
+    { contestId: "starters-145", contestName: "Starters 145 (Div 1)", date: "2024-07-31", timestamp: 1722441600, rating: 2175, ratingChange: 45, rank: 190 },
+    { contestId: "starters-150", contestName: "Starters 150 (Div 1)", date: "2024-09-04", timestamp: 1725465600, rating: 2210, ratingChange: 35, rank: 160 },
+    { contestId: "starters-155", contestName: "Starters 155 (Div 1)", date: "2024-10-09", timestamp: 1728489600, rating: 2250, ratingChange: 40, rank: 110 },
+    { contestId: "starters-160", contestName: "Starters 160 (Div 1)", date: "2024-11-13", timestamp: 1731513600, rating: 2235, ratingChange: -15, rank: 210 },
+    { contestId: "starters-165", contestName: "Starters 165 (Div 1)", date: "2024-12-18", timestamp: 1734537600, rating: 2215, ratingChange: -20, rank: 260 },
+];
+
+const unifiedRecentContestsList: UnifiedRecentContestItem[] = [
+    {
+        portal: "leetcode",
+        portalName: "LeetCode",
+        contestId: "wc-428",
+        contestName: "Weekly Contest 428",
+        contestUrl: "https://leetcode.com/contest/weekly-contest-428",
+        date: "2024-12-22",
+        timestamp: 1734832800,
+        rank: 510,
+        rating: 2355,
+        ratingBefore: 2370,
+        ratingChange: -15,
+        problemsSolved: 4,
+        totalProblems: 4,
+    },
+    {
+        portal: "codechef",
+        portalName: "CodeChef",
+        contestId: "starters-165",
+        contestName: "Starters 165 (Div 1)",
+        contestUrl: "https://www.codechef.com/START165A",
+        date: "2024-12-18",
+        timestamp: 1734537600,
+        rank: 260,
+        rating: 2215,
+        ratingBefore: 2235,
+        ratingChange: -20,
+        problemsSolved: 5,
+        totalProblems: 6,
+    },
+    {
+        portal: "codeforces",
+        portalName: "Codeforces",
+        contestId: "cfr-992",
+        contestName: "Codeforces Round 992 (Div. 2)",
+        contestUrl: "https://codeforces.com/contest/2040",
+        date: "2024-12-08",
+        timestamp: 1733673600,
+        rank: 490,
+        rating: 2045,
+        ratingBefore: 2055,
+        ratingChange: -10,
+        problemsSolved: 4,
+        totalProblems: 6,
+    },
+    {
+        portal: "leetcode",
+        portalName: "LeetCode",
+        contestId: "bwc-143",
+        contestName: "Biweekly Contest 143",
+        contestUrl: "https://leetcode.com/contest/biweekly-contest-143",
+        date: "2024-11-23",
+        timestamp: 1732374000,
+        rank: 240,
+        rating: 2385,
+        ratingBefore: 2360,
+        ratingChange: 25,
+        problemsSolved: 4,
+        totalProblems: 4,
+    },
+    {
+        portal: "codeforces",
+        portalName: "Codeforces",
+        contestId: "cfr-988",
+        contestName: "Codeforces Round 988 (Div. 3)",
+        contestUrl: "https://codeforces.com/contest/2036",
+        date: "2024-11-17",
+        timestamp: 1731859200,
+        rank: 220,
+        rating: 2055,
+        ratingBefore: 2070,
+        ratingChange: -15,
+        problemsSolved: 6,
+        totalProblems: 7,
+    },
+    {
+        portal: "codechef",
+        portalName: "CodeChef",
+        contestId: "starters-160",
+        contestName: "Starters 160 (Div 1)",
+        contestUrl: "https://www.codechef.com/START160A",
+        date: "2024-11-13",
+        timestamp: 1731513600,
+        rank: 210,
+        rating: 2235,
+        ratingBefore: 2250,
+        ratingChange: -15,
+        problemsSolved: 4,
+        totalProblems: 6,
+    },
+    {
+        portal: "leetcode",
+        portalName: "LeetCode",
+        contestId: "wc-421",
+        contestName: "Weekly Contest 421",
+        contestUrl: "https://leetcode.com/contest/weekly-contest-421",
+        date: "2024-11-03",
+        timestamp: 1730599200,
+        rank: 360,
+        rating: 2340,
+        ratingBefore: 2315,
+        ratingChange: 25,
+        problemsSolved: 4,
+        totalProblems: 4,
+    },
+    {
+        portal: "codeforces",
+        portalName: "Codeforces",
+        contestId: "cfr-982",
+        contestName: "Codeforces Round 982 (Div. 2)",
+        contestUrl: "https://codeforces.com/contest/2027",
+        date: "2024-10-26",
+        timestamp: 1729958400,
+        rank: 450,
+        rating: 2070,
+        ratingBefore: 2090,
+        ratingChange: -20,
+        problemsSolved: 3,
+        totalProblems: 5,
+    },
+];
+
+export const demoContestsData: UnifiedContestData = {
+    username: DEMO_USERNAME,
+    timestamp: new Date().toISOString(),
+    platforms: [
+        {
+            portal: "leetcode",
+            portalName: "LeetCode",
+            portalUsername: DEMO_USERNAME,
+            profileUrl: "https://leetcode.com/u/Vineet-Chandel",
+            connected: true,
+            currentRating: 2340,
+            peakRating: 2385,
+            tier: "Guardian",
+            tierColor: "#F59E0B",
+            tierInfo: {
+                name: "Guardian",
+                color: "#F59E0B",
+                badgeBg: "rgba(245, 158, 11, 0.15)",
+                description: "Top 0.5% of competitive programmers on LeetCode.",
+            },
+            officialRank: 620,
+            percentile: 99.6,
+            ratedContestsCount: 56,
+            history: leetcodeHistory,
+            recentChange90d: 45,
+            lastSyncAt: new Date().toISOString(),
+            status: "valid",
+            exploreContestsUrl: "https://leetcode.com/contest/",
+        },
+        {
+            portal: "codeforces",
+            portalName: "Codeforces",
+            portalUsername: DEMO_USERNAME,
+            profileUrl: "https://codeforces.com/profile/Vineet-Chandel",
+            connected: true,
+            currentRating: 2045,
+            peakRating: 2090,
+            tier: "Candidate Master",
+            tierColor: "#aa00aa",
+            tierInfo: {
+                name: "Candidate Master",
+                color: "#aa00aa",
+                badgeBg: "rgba(170, 0, 170, 0.15)",
+                description: "Rated 1900-2099 on Codeforces international rating.",
+            },
+            officialRank: 1980,
+            percentile: 98.4,
+            ratedContestsCount: 38,
+            history: codeforcesHistory,
+            recentChange90d: 20,
+            lastSyncAt: new Date().toISOString(),
+            status: "valid",
+            exploreContestsUrl: "https://codeforces.com/contests",
+        },
+        {
+            portal: "codechef",
+            portalName: "CodeChef",
+            portalUsername: DEMO_USERNAME,
+            profileUrl: "https://www.codechef.com/users/Vineet-Chandel",
+            connected: true,
+            currentRating: 2215,
+            peakRating: 2250,
+            tier: "6 Star",
+            tierColor: "#eed000",
+            tierInfo: {
+                name: "6 Star",
+                color: "#eed000",
+                badgeBg: "rgba(238, 208, 0, 0.15)",
+                description: "Division 1 Grandmaster tier on CodeChef.",
+            },
+            officialRank: 840,
+            percentile: 99.1,
+            ratedContestsCount: 26,
+            history: codechefHistory,
+            recentChange90d: 40,
+            lastSyncAt: new Date().toISOString(),
+            status: "valid",
+            exploreContestsUrl: "https://www.codechef.com/contests",
+        },
+        {
+            portal: "atcoder",
+            portalName: "AtCoder",
+            portalUsername: DEMO_USERNAME,
+            profileUrl: "https://atcoder.jp/users/Vineet-Chandel",
+            connected: true,
+            currentRating: 1640,
+            peakRating: 1680,
+            tier: "1-Kyu",
+            tierColor: "#00c0c0",
+            tierInfo: {
+                name: "1-Kyu",
+                color: "#00c0c0",
+                description: "Cyan tier on AtCoder Regular Contests.",
+            },
+            officialRank: 1240,
+            percentile: 95.8,
+            ratedContestsCount: 18,
+            history: [],
+            lastSyncAt: new Date().toISOString(),
+            status: "valid",
+            exploreContestsUrl: "https://atcoder.jp/contests/",
+        },
+    ],
+    recentContests: unifiedRecentContestsList,
+    summary: {
+        totalRatedContests: 138,
+        platformContestCounts: {
+            leetcode: 56,
+            codeforces: 38,
+            codechef: 26,
+            atcoder: 18,
+        },
+    },
+};
+
+// ---------------------------------------------------------------------------
+// 6. DEVELOPMENT DATA & GITHUB COMMITS (52 WEEKS HEATMAP & CHARTS)
+// ---------------------------------------------------------------------------
+const githubCommitCalendar = generateFullYearCalendar(99);
+const githubDailyMerged: Record<string, { count: number; platforms: string[] }> = {};
+
+for (const [dStr, cnt] of Object.entries(githubCommitCalendar)) {
+    githubDailyMerged[dStr] = { count: cnt, platforms: ["github"] };
+}
+
+export const demoDevelopmentData: UnifiedDevelopmentData = {
+    username: DEMO_USERNAME,
+    totalContributions: 3180,
+    totalSubmissions: 3180,
+    activeDays: 290,
+    dayStreak: 34,
+    connectedPlatformsCount: 1,
+    dailyMerged: githubDailyMerged,
+    platformBreakdown: {
+        github: {
+            name: "GitHub",
+            portal: "github",
+            username: DEMO_USERNAME,
+            solved: 0,
+            submissions: 3180,
+            activeDays: 290,
+            brandColor: "#24292e",
+        },
+    },
+    timestamp: new Date().toISOString(),
+};
+
+export const demoDevelopmentAnalytics: DevelopmentAnalyticsData = {
+    username: DEMO_USERNAME,
+    githubHandle: DEMO_USERNAME,
+    contributions: 3180,
+    repos: 62,
+    stars: 1420,
+    followers: 840,
+    languages: [
+        { name: "TypeScript", percentage: 42, color: "#3178C6", bytes: 4200000, formattedSize: "4.2 MB" },
+        { name: "Python", percentage: 25, color: "#3572A5", bytes: 2500000, formattedSize: "2.5 MB" },
+        { name: "Go", percentage: 15, color: "#00ADD8", bytes: 1500000, formattedSize: "1.5 MB" },
+        { name: "Rust", percentage: 11, color: "#dea584", bytes: 1100000, formattedSize: "1.1 MB" },
+        { name: "C++", percentage: 7, color: "#f34b7d", bytes: 700000, formattedSize: "700 KB" },
+    ],
+    topRepositories: [
+        {
+            name: "orbix-core",
+            description: "High-performance developer profile analytics engine and multi-platform aggregator.",
+            stars: 680,
+            forks: 124,
+            language: "TypeScript",
+            languageColor: "#3178C6",
+            url: "https://github.com/Vineet-Chandel/orbix-core",
+        },
+        {
+            name: "distributed-cache-engine",
+            description: "In-memory distributed key-value store with Raft consensus and LRU eviction.",
+            stars: 410,
+            forks: 86,
+            language: "Go",
+            languageColor: "#00ADD8",
+            url: "https://github.com/Vineet-Chandel/distributed-cache-engine",
+        },
+        {
+            name: "algorithm-forge",
+            description: "Production implementations of 1,200+ advanced data structures and graph algorithms.",
+            stars: 215,
+            forks: 49,
+            language: "C++",
+            languageColor: "#f34b7d",
+            url: "https://github.com/Vineet-Chandel/algorithm-forge",
+        },
+        {
+            name: "next-cloud-runtime",
+            description: "Serverless microservice deployment framework with zero-cold-start edge routing.",
+            stars: 115,
+            forks: 22,
+            language: "Rust",
+            languageColor: "#dea584",
+            url: "https://github.com/Vineet-Chandel/next-cloud-runtime",
+        },
+    ],
+    mostStarred: {
+        name: "orbix-core",
+        stars: 680,
+        url: "https://github.com/Vineet-Chandel/orbix-core",
+    },
+    latestWork: {
+        name: "orbix-core",
+        pushedAt: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
+        relativeTime: "4 hours ago",
+        url: "https://github.com/Vineet-Chandel/orbix-core",
+    },
+    timestamp: new Date().toISOString(),
+};
+
+// ---------------------------------------------------------------------------
+// 7. UNIFIED BADGES
+// ---------------------------------------------------------------------------
+export const demoBadgesData: UnifiedBadgesData = {
+    username: DEMO_USERNAME,
+    totalEarned: 18,
+    platformCounts: {
+        leetcode: 8,
+        codeforces: 4,
+        codechef: 3,
+        github: 2,
+        hackerrank: 1,
+    },
+    badges: [
+        {
+            id: "lc-guardian",
+            platform: "leetcode",
+            platformName: "LeetCode",
+            name: "Guardian",
+            displayName: "Guardian Badge",
+            category: "Contest",
+            icon: "https://assets.leetcode.com/static_assets/public/images/badges/guardian.png",
+            hoverText: "Top 0.5% contest rating (2340)",
+            description: "Awarded to programmers who maintain a Guardian tier contest rating.",
+            creationDate: "2024-06-15",
+            earnedTimestamp: 1718409600,
+            profileUrl: "https://leetcode.com/u/Vineet-Chandel",
+        },
+        {
+            id: "lc-knight",
+            platform: "leetcode",
+            platformName: "LeetCode",
+            name: "Knight",
+            displayName: "Knight Badge",
+            category: "Contest",
+            icon: "https://assets.leetcode.com/static_assets/public/images/badges/knight.png",
+            hoverText: "Knight tier rating (1850+)",
+            description: "Awarded to contestants who surpass Knight rank.",
+            creationDate: "2024-02-10",
+            earnedTimestamp: 1707523200,
+            profileUrl: "https://leetcode.com/u/Vineet-Chandel",
+        },
+        {
+            id: "lc-500",
+            platform: "leetcode",
+            platformName: "LeetCode",
+            name: "500 Days Streak",
+            displayName: "500 Days Badge",
+            category: "Streak",
+            icon: "https://assets.leetcode.com/static_assets/public/images/badges/500_days.png",
+            hoverText: "500 consecutive days of coding",
+            description: "Maintained daily coding practice for 500 days.",
+            creationDate: "2024-08-01",
+            earnedTimestamp: 1722470400,
+            profileUrl: "https://leetcode.com/u/Vineet-Chandel",
+        },
+        {
+            id: "lc-annual-2024",
+            platform: "leetcode",
+            platformName: "LeetCode",
+            name: "Annual Badge 2024",
+            displayName: "Annual Badge 2024",
+            category: "Annual",
+            icon: "https://assets.leetcode.com/static_assets/public/images/badges/annual_badge_2024.png",
+            hoverText: "Solved > 300 problems in 2024",
+            description: "Consistently solved problems throughout the 2024 calendar year.",
+            creationDate: "2024-12-31",
+            earnedTimestamp: 1735603200,
+            profileUrl: "https://leetcode.com/u/Vineet-Chandel",
+        },
+        {
+            id: "cf-cm",
+            platform: "codeforces",
+            platformName: "Codeforces",
+            name: "Candidate Master",
+            displayName: "Candidate Master",
+            category: "Contest",
+            icon: "https://codeforces.org/s/0/images/badges/candidate_master.png",
+            hoverText: "Rating >= 1900 on Codeforces",
+            description: "Achieved Candidate Master division rank on Codeforces.",
+            creationDate: "2024-07-20",
+            earnedTimestamp: 1721433600,
+            profileUrl: "https://codeforces.com/profile/Vineet-Chandel",
+        },
+        {
+            id: "cf-expert",
+            platform: "codeforces",
+            platformName: "Codeforces",
+            name: "Expert",
+            displayName: "Expert Rank",
+            category: "Contest",
+            icon: "https://codeforces.org/s/0/images/badges/expert.png",
+            hoverText: "Rating >= 1600 on Codeforces",
+            description: "Achieved Expert rank on Codeforces.",
+            creationDate: "2024-03-12",
+            earnedTimestamp: 1710201600,
+            profileUrl: "https://codeforces.com/profile/Vineet-Chandel",
+        },
+        {
+            id: "cc-6star",
+            platform: "codechef",
+            platformName: "CodeChef",
+            name: "6-Star Division 1",
+            displayName: "6-Star Coder",
+            category: "Contest",
+            icon: "https://cdn.codechef.com/images/badges/6star.png",
+            hoverText: "Rating >= 2200 on CodeChef",
+            description: "Grandmaster tier Division 1 contender.",
+            creationDate: "2024-09-04",
+            earnedTimestamp: 1725408000,
+            profileUrl: "https://www.codechef.com/users/Vineet-Chandel",
+        },
+        {
+            id: "gh-arctic",
+            platform: "github",
+            platformName: "GitHub",
+            name: "Arctic Code Vault",
+            displayName: "Arctic Code Vault Contributor",
+            category: "Open Source",
+            icon: "https://github.githubassets.com/images/modules/profile/badge--arctic-code-vault.png",
+            hoverText: "Contributed code to the 2020 GitHub Archive",
+            description: "Recognized as an Arctic Code Vault contributor.",
+            creationDate: "2020-02-02",
+            earnedTimestamp: 1580601600,
+            profileUrl: "https://github.com/Vineet-Chandel",
+        },
+        {
+            id: "gh-pull-shark",
+            platform: "github",
+            platformName: "GitHub",
+            name: "Pull Shark",
+            displayName: "Pull Shark x2",
+            category: "Open Source",
+            icon: "https://github.githubassets.com/images/modules/profile/badge--pull-shark.png",
+            hoverText: "Opened 100+ merged Pull Requests",
+            description: "High volume of merged Pull Requests in open-source projects.",
+            creationDate: "2024-04-10",
+            earnedTimestamp: 1712707200,
+            profileUrl: "https://github.com/Vineet-Chandel",
+        },
+        {
+            id: "hr-6star",
+            platform: "hackerrank",
+            platformName: "HackerRank",
+            name: "Problem Solving 6-Star",
+            displayName: "Problem Solving ★★★★★★",
+            category: "Practice",
+            icon: "https://hrcdn.net/community-frontend/assets/badges/problem-solving-6star.png",
+            hoverText: "Mastered all algorithms & data structure tracks",
+            description: "Achieved maximum 6-star gold tier in Problem Solving.",
+            creationDate: "2024-05-01",
+            earnedTimestamp: 1714521600,
+            profileUrl: "https://www.hackerrank.com/Vineet-Chandel",
+        },
+    ],
+    timestamp: new Date().toISOString(),
+};
+
+// ---------------------------------------------------------------------------
+// 8. CARD STUDIO EXPORTS (LINKEDINCARD & INSTAGRAM STORY)
+// ---------------------------------------------------------------------------
+export const demoUser = {
+    firstName: "Vineet",
+    lastName: "Chandel",
+    username: DEMO_USERNAME,
+    headline: "Full Stack Engineer & Competitive Programmer",
+    photoUrl: "/avatar.png",
+    avatarUrl: "/avatar.png",
+    linkedin: "https://linkedin.com/in/Vineet-Chandel",
+    github: "https://github.com/Vineet-Chandel",
+    website: "https://orbix.dev/profile/u/Vineet-Chandel",
+    links: {
+        github: "https://github.com/Vineet-Chandel",
+        linkedin: "https://linkedin.com/in/Vineet-Chandel",
+        portfolio: "https://orbix.dev/profile/u/Vineet-Chandel",
+        leetcode: "https://leetcode.com/u/Vineet-Chandel",
+    },
+};
+
+export const demoStats: AggregatedCodingStats = {
+    totalSolved: 1680,
+    easy: 480,
+    medium: 890,
+    hard: 310,
+    activeDays: 520,
+    contests: 96,
+    dayStreak: 48,
+    eligiblePlatformsCount: 8,
+    synchronizedCount: 8,
+    incompleteSync: false,
+    qualificationNote: "Grandmaster Track",
+};
+
+export const demoCoderType: CoderTypeBadge = {
+    title: "The Explorer",
+    tagline: "Codes on 8 platforms",
+    level: "Grandmaster",
+    badgeColor: "#6366F1",
+};
+
+export const demoTopPlatforms: RankedPlatform[] = [
+    {
+        id: "github",
+        name: "GitHub",
+        username: DEMO_USERNAME,
+        profileUrl: "https://github.com/Vineet-Chandel",
+        brandColor: "#24292e",
+        isGitHub: true,
+        category: "dev",
+        contributionsOrCommits: 3180,
+        publicRepos: 62,
+        bestWorkingDay: "Wednesday",
+        isVerified: true,
+        solvedCount: 0,
+    },
+    {
+        id: "leetcode",
+        name: "LeetCode",
+        username: DEMO_USERNAME,
+        profileUrl: "https://leetcode.com/u/Vineet-Chandel",
+        brandColor: "#FFA116",
+        solvedCount: 912,
+        rating: 2340,
+        peakRating: 2385,
+        tier: "Guardian",
+        tierColor: "#F59E0B",
+        contestsCount: 56,
+        hasGoodRating: true,
+        isVerified: true,
+        category: "practice",
+    },
+    {
+        id: "codeforces",
+        name: "Codeforces",
+        username: DEMO_USERNAME,
+        profileUrl: "https://codeforces.com/profile/Vineet-Chandel",
+        brandColor: "#1F8ACB",
+        solvedCount: 468,
+        rating: 2045,
+        peakRating: 2090,
+        tier: "Candidate Master",
+        tierColor: "#aa00aa",
+        contestsCount: 38,
+        hasGoodRating: true,
+        isVerified: true,
+        category: "practice",
+    },
+    {
+        id: "codechef",
+        name: "CodeChef",
+        username: DEMO_USERNAME,
+        profileUrl: "https://www.codechef.com/users/Vineet-Chandel",
+        brandColor: "#5B4638",
+        solvedCount: 342,
+        rating: 2215,
+        peakRating: 2250,
+        tier: "6 Star",
+        tierColor: "#eed000",
+        contestsCount: 26,
+        hasGoodRating: true,
+        isVerified: true,
+        category: "practice",
+    },
+    {
+        id: "geeksforgeeks",
+        name: "GeeksforGeeks",
+        username: DEMO_USERNAME,
+        profileUrl: "https://auth.geeksforgeeks.org/user/Vineet-Chandel",
+        brandColor: "#2F8D46",
+        solvedCount: 410,
+        isVerified: true,
+        category: "practice",
+    },
+    {
+        id: "hackerrank",
+        name: "HackerRank",
+        username: DEMO_USERNAME,
+        profileUrl: "https://www.hackerrank.com/Vineet-Chandel",
+        brandColor: "#00EA64",
+        solvedCount: 245,
+        isVerified: true,
+        category: "practice",
+    },
+];
+
+export const demoAllConnectedPlatforms: ConnectedPlatformBadge[] = [
+    {
+        id: "leetcode",
+        name: "LeetCode",
+        username: DEMO_USERNAME,
+        profileUrl: "https://leetcode.com/u/Vineet-Chandel",
+        brandColor: "#FFA116",
+        solvedCount: 912,
+        isVerified: true,
+    },
+    {
+        id: "codeforces",
+        name: "Codeforces",
+        username: DEMO_USERNAME,
+        profileUrl: "https://codeforces.com/profile/Vineet-Chandel",
+        brandColor: "#1F8ACB",
+        solvedCount: 468,
+        isVerified: true,
+    },
+    {
+        id: "codechef",
+        name: "CodeChef",
+        username: DEMO_USERNAME,
+        profileUrl: "https://www.codechef.com/users/Vineet-Chandel",
+        brandColor: "#5B4638",
+        solvedCount: 342,
+        isVerified: true,
+    },
+    {
+        id: "geeksforgeeks",
+        name: "GeeksforGeeks",
+        username: DEMO_USERNAME,
+        profileUrl: "https://auth.geeksforgeeks.org/user/Vineet-Chandel",
+        brandColor: "#2F8D46",
+        solvedCount: 410,
+        isVerified: true,
+    },
+    {
+        id: "hackerrank",
+        name: "HackerRank",
+        username: DEMO_USERNAME,
+        profileUrl: "https://www.hackerrank.com/Vineet-Chandel",
+        brandColor: "#00EA64",
+        solvedCount: 245,
+        isVerified: true,
+    },
+    {
+        id: "atcoder",
+        name: "AtCoder",
+        username: DEMO_USERNAME,
+        profileUrl: "https://atcoder.jp/users/Vineet-Chandel",
+        brandColor: "#222222",
+        solvedCount: 140,
+        isVerified: true,
+    },
+    {
+        id: "code360",
+        name: "Code360",
+        username: DEMO_USERNAME,
+        profileUrl: "https://naukri.com/code360/profile/Vineet-Chandel",
+        brandColor: "#FF5722",
+        solvedCount: 165,
+        isVerified: true,
+    },
+    {
+        id: "interviewbit",
+        name: "InterviewBit",
+        username: DEMO_USERNAME,
+        profileUrl: "https://www.interviewbit.com/profile/Vineet-Chandel",
+        brandColor: "#0D8BD9",
+        solvedCount: 130,
+        isVerified: true,
+    },
+];
+
+export const demoGithubStats: GitHubCardStats = {
+    connected: true,
+    username: DEMO_USERNAME,
+    name: "Vineet Chandel",
+    avatarUrl: "/avatar.png",
+    publicRepos: 62,
+    contributionsOrCommits: 3180,
+    followers: 840,
+    profileUrl: "https://github.com/Vineet-Chandel",
+    bestWorkingDay: "Wednesday",
+};
+
+export const demoTopContests: RankedContestPlatform[] = [
+    {
+        id: "leetcode",
+        name: "LeetCode",
+        username: DEMO_USERNAME,
+        rating: 2340,
+        peakRating: 2385,
+        tier: "Guardian",
+        tierColor: "#F59E0B",
+        officialRank: 620,
+        ratedContestsCount: 56,
+        isVerified: true,
+    },
+    {
+        id: "codeforces",
+        name: "Codeforces",
+        username: DEMO_USERNAME,
+        rating: 2045,
+        peakRating: 2090,
+        tier: "Candidate Master",
+        tierColor: "#aa00aa",
+        officialRank: 1980,
+        ratedContestsCount: 38,
+        isVerified: true,
+    },
+    {
+        id: "codechef",
+        name: "CodeChef",
+        username: DEMO_USERNAME,
+        rating: 2215,
+        peakRating: 2250,
+        tier: "6 Star",
+        tierColor: "#eed000",
+        officialRank: 840,
+        ratedContestsCount: 26,
+        isVerified: true,
+    },
+];
+
+export const demoTheme: CardThemeConfig = CARD_THEMES.indigo;
+export const demoPublicProfileUrl = `https://orbix.dev/profile/u/${DEMO_USERNAME}`;

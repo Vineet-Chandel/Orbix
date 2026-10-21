@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import { isDemoProfileUsername, demoDevelopmentAnalytics } from "../data/demoProfileData";
 
 export interface LanguageItem {
     name: string;
@@ -88,6 +89,15 @@ export const fetchDevelopmentAnalytics = createAsyncThunk<
         const effectiveUser = username.trim();
         if (!effectiveUser) {
             return rejectWithValue("Username is required to fetch development analytics");
+        }
+
+        // Instantly return enhanced mock data for demo profile
+        if (isDemoProfileUsername(effectiveUser)) {
+            return {
+                ...demoDevelopmentAnalytics,
+                username: effectiveUser,
+                githubHandle: githubHandle || effectiveUser,
+            };
         }
         const state = getState().developmentAnalytics;
         const existing = state.dataByUser[effectiveUser];

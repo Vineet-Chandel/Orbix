@@ -1,3 +1,5 @@
+import { demoPublicProfile, isDemoProfileUsername } from "../data/demoProfileData";
+
 export interface PublicProfilePlatform {
     portal: string;
     portalUsername: string;
@@ -33,6 +35,11 @@ export interface PublicProfileData {
     isOpenToWork?: boolean;
     isHireable?: boolean;
     isPublic: boolean;
+    resumeUrl?: string | null;
+    resumeFilename?: string | null;
+    resumeFilesize?: number | null;
+    resumeUpdatedAt?: string | null;
+    isResumePublic?: boolean;
     createdAt?: string;
     isOwner: boolean;
     platforms: PublicProfilePlatform[];
@@ -125,6 +132,11 @@ async function apiFetch<T = any>(
  */
 export async function fetchPublicProfile(username: string, force = false): Promise<PublicProfileData> {
     const key = username.toLowerCase().trim();
+
+    // Instant return for verified demo showcase profile
+    if (isDemoProfileUsername(key)) {
+        return demoPublicProfile;
+    }
 
     // Check client-side memory cache if not forced
     if (!force) {
@@ -535,4 +547,151 @@ export async function useDefaultAvatar(): Promise<PhotoOperationResult> {
     invalidatePublicProfileClientCache();
     return json;
 }
+
+// ============================================================================
+// RESUME API ENGINE (Under 5 MB, Cloudinary, Full CRUD, PDF Viewer, Recruiter Checks)
+// ============================================================================
+
+export interface ResumeCheckItem {
+    id: string;
+    label: string;
+    status: "pass" | "warn" | "tip";
+    description: string;
+}
+
+export interface ResumeData {
+    hasResume: boolean;
+    resumeUrl: string | null;
+    resumeFilename: string | null;
+    resumeFilesize: number | null;
+    resumeUpdatedAt: string | null;
+    isResumePublic: boolean;
+    checks?: ResumeCheckItem[];
+}
+
+/**
+ * Fetch authenticated user's current resume details and recruiter checks
+ */
+export async function fetchMyResume(): Promise<ResumeData> {
+    const json = await apiFetch<{ success: boolean } & ResumeData>("/api/profile/resume", {
+        method: "GET",
+    });
+    return json;
+}
+
+/**
+ * Direct upload of resume PDF (under 5 MB) with progress monitoring
+ */
+export async function uploadResume(
+    file: File,
+    onProgress?: (percent: number) => void
+): Promise<{ success: boolean; resume: ResumeData; message: string }> {
+    const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
+    const formData = new FormData();
+    formData.append("resume", file);
+
+    const endpoints = [
+        "/api/profile/resume/upload",
+        "http://localhost:3000/api/profile/resume/upload",
+    ];
+
+    let lastError = "Failed to upload resume";
+
+    for (const url of endpoints) {
+        try {
+            const result = await new Promise<{ success: boolean; resume: ResumeData; message: string }>(
+                (resolve, reject) => {
+                    const xhr = new XMLHttpRequest();
+                    xhr.withCredentials = true;
+
+                    xhr.upload.onprogress = (event) => {
+                        if (event.lengthComputable && onProgress) {
+                            const percent = Math.round((event.loaded / event.total) * 100);
+                            onProgress(percent);
+                        }
+                    };
+
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 300) {
+                            try {
+                                const parsed = JSON.parse(xhr.responseText);
+                                resolve(parsed);
+                            } catch {
+                                resolve({ success: true, resume: {} as ResumeData, message: "Uploaded" });
+                            }
+                        } else {
+                            try {
+                                const parsed = JSON.parse(xhr.responseText);
+                                reject(new Error(parsed.message || `Upload failed with status ${xhr.status}`));
+                            } catch {
+                                reject(new Error(`Upload failed with status ${xhr.status}`));
+                            }
+                        }
+                    };
+
+                    xhr.onerror = () => {
+                        reject(new Error("Network error during resume upload"));
+                    };
+
+                    xhr.open("POST", url, true);
+                    if (token) {
+                        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+                    }
+                    xhr.send(formData);
+                }
+            );
+
+            invalidatePublicProfileClientCache();
+            return result;
+        } catch (err: any) {
+            lastError = err?.message || lastError;
+            continue;
+        }
+    }
+
+    throw new Error(lastError);
+}
+
+/**
+ * Delete resume from Cloudinary and database
+ */
+export async function deleteResume(): Promise<{ success: boolean; message: string }> {
+    const json = await apiFetch<{ success: boolean; message: string }>("/api/profile/resume", {
+        method: "DELETE",
+    });
+    invalidatePublicProfileClientCache();
+    return json;
+}
+
+/**
+ * Toggle whether resume download button is visible on the public profile
+ */
+export async function updateResumeVisibility(
+    isPublic: boolean
+): Promise<{ success: boolean; isResumePublic: boolean; message: string }> {
+    const json = await apiFetch<{ success: boolean; isResumePublic: boolean; message: string }>(
+        "/api/profile/resume/visibility",
+        {
+            method: "PATCH",
+            body: JSON.stringify({ isPublic }),
+        }
+    );
+    invalidatePublicProfileClientCache();
+    return json;
+}
+
+/**
+ * Fetch a user's publicly shared resume
+ */
+export async function fetchPublicResume(username: string): Promise<ResumeData> {
+    const encoded = encodeURIComponent(username.toLowerCase().trim());
+    const json = await apiFetch<{ success: boolean } & ResumeData>(
+        `/api/profile/resume/public/${encoded}`,
+        {
+            method: "GET",
+        }
+    );
+    return json;
+}
+
 

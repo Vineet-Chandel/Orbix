@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import { isDemoProfileUsername, demoBadgesData } from "../data/demoProfileData";
 
 export interface UnifiedBadgeRecord {
     id: string;
@@ -66,6 +67,14 @@ export const fetchUnifiedBadges = createAsyncThunk<
         const effectiveUser = username.trim();
         if (!effectiveUser) {
             return rejectWithValue("Username is required to fetch badges");
+        }
+
+        // Instantly return enhanced mock data for demo profile
+        if (isDemoProfileUsername(effectiveUser)) {
+            return {
+                ...demoBadgesData,
+                username: effectiveUser,
+            };
         }
         const state = getState().badges;
         const existing = state.dataByUser[effectiveUser];

@@ -57,6 +57,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
 }) => {
     const displayName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "Developer";
     const username = user?.username || "developer";
+    const location = user?.location;
     const avatarSrc = user?.photoUrl || user?.avatarUrl;
     const tagline = user?.headline || coderType.tagline || "Software Engineer & Builder";
 
@@ -172,10 +173,10 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
 
 
     const isLightBanner = theme.id === "gold";
-    const bannerTextColor = isLightBanner ? "text-black" : "text-white";
-    const bannerSubtextColor = isLightBanner ? "text-black/75" : "text-white/80";
-    const bannerFill = isLightBanner ? "black" : "white";
-    const bannerStroke = isLightBanner ? "black" : "white";
+    const bannerTextColor = isLightBanner ? "text-black" : "text-black";
+    const bannerSubtextColor = isLightBanner ? "text-black/75" : "text-black/80";
+    const bannerFill = isLightBanner ? "black" : "black";
+    const bannerStroke = isLightBanner ? "black" : "black";
 
     return (
         <div
@@ -335,7 +336,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                     </div>
 
                                     {/* Line 2: Tagline · @username */}
-                                    <div className="flex items-center gap-2 text-md text-neutral-300 font-medium leading-none">
+                                    <div className="flex items-center gap-3 text-md text-neutral-300 font-medium leading-none">
                                         <span className="text-neutral-200 font-medium truncate max-w-[480px]">
                                             {tagline}
                                         </span>
@@ -343,26 +344,40 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                         <span className="font-mono text-neutral-400">
                                             @{username}
                                         </span>
+                                        {location && location.trim().length > 0 && (
+                                            <>
+                                                <span className="text-neutral-500 font-bold">·</span>
+                                                <span className="font-mono text-neutral-400 flex items-center gap-1">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
+                                                        <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}>
+                                                            <circle cx={12} cy={10} r={3}></circle>
+                                                            <path d="M12 2a8 8 0 0 0-8 8c0 1.892.402 3.13 1.5 4.5L12 22l6.5-7.5c1.098-1.37 1.5-2.608 1.5-4.5a8 8 0 0 0-8-8"></path>
+                                                        </g>
+                                                    </svg>
+                                                    <span>{location.trim().charAt(0).toUpperCase() + location.trim().slice(1)}</span>
+                                                </span>
+                                            </>
+                                        )}
                                     </div>
 
                                     {/* Line 3: Classification of Questions (Easy / Medium / Hard) */}
                                     <div className="flex items-center gap-4 text-md font-semibold pt-0.5">
                                         <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-white/[0.05]">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF] shadow-[0_0_8px_#00E5FF]" />
+                                            <span className="w-2.5 h-2.5 rounded-full bg-[#00E5FF] " />
                                             <span className="text-neutral-300 font-medium">Easy</span>
                                             <span className="text-sm font-black text-white font-mono ml-0.5">
                                                 {stats.easy.toLocaleString()}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-white/[0.05]">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-[#FFD600] shadow-[0_0_8px_#FFD600]" />
+                                            <span className="w-2.5 h-2.5 rounded-full bg-[#FFD600] " />
                                             <span className="text-neutral-300 font-medium">Medium</span>
                                             <span className="text-sm font-black text-white font-mono ml-0.5">
                                                 {stats.medium.toLocaleString()}
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-white/[0.05]">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-[#FF383C] shadow-[0_0_8px_#FF383C]" />
+                                            <span className="w-2.5 h-2.5 rounded-full bg-[#FF383C] " />
                                             <span className="text-neutral-300 font-medium">Hard</span>
                                             <span className="text-sm font-black text-white font-mono ml-0.5">
                                                 {stats.hard.toLocaleString()}

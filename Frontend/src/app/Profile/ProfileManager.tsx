@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Briefcase, Mail, Trash2, Plus } from "lucide-react";
+import { Briefcase, Mail, Trash2, Plus, FileText } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { updateProfile } from "../../utils/profileApi";
@@ -491,6 +491,14 @@ export default function ProfileManager() {
                         {/* Quick Profile Link & Share Controls */}
                         <div className="flex items-center gap-2.5 flex-wrap">
                             <NotificationBell variant="light" />
+                            <Link
+                                to="/resume"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-800 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                                title="Upload & manage your resume"
+                            >
+                                <FileText className="w-4 h-4 text-neutral-600" />
+                                <span>Resume</span>
+                            </Link>
                             <Link
                                 to={publicUrl}
                                 className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold transition-all cursor-pointer"

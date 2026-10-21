@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { getUserDetailsCache } from "../redis/cache/cache-auth.js";
+import { getUserDetailsCache, userDetailsCache } from "../redis/cache/cache-auth.js";
 import { query } from "../database/client.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -66,6 +66,20 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
                 [userId || null, userGmail || null, username || null]
             );
             user = result.rows[0];
+
+            if (user && user.gmail) {
+                // Prime Redis cache for instant future lookups
+                userDetailsCache({
+                    id: user.id,
+                    firstName: user.firstName,
+                    middleName: user.middleName,
+                    lastName: user.lastName,
+                    gmail: user.gmail,
+                    username: user.username,
+                    password_hash: "",
+                    termsAccepted: user.termsAccepted
+                }).catch(() => {});
+            }
         }
 
         if (!user) {
@@ -136,6 +150,19 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
                 [userId || null, userGmail || null, username || null]
             );
             user = result.rows[0];
+
+            if (user && user.gmail) {
+                userDetailsCache({
+                    id: user.id,
+                    firstName: user.firstName,
+                    middleName: user.middleName,
+                    lastName: user.lastName,
+                    gmail: user.gmail,
+                    username: user.username,
+                    password_hash: "",
+                    termsAccepted: user.termsAccepted
+                }).catch(() => {});
+            }
         }
 
         if (user) {

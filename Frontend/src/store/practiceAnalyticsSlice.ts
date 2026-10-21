@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import { isDemoProfileUsername, demoPracticeAnalytics } from "../data/demoProfileData";
 
 export interface DifficultyBreakdown {
     easy: number;
@@ -131,6 +132,14 @@ export const fetchPracticeAnalytics = createAsyncThunk<
         const effectiveUser = username.trim();
         if (!effectiveUser) {
             return rejectWithValue("Username is required to fetch practice analytics");
+        }
+
+        // Instantly return enhanced mock data for demo profile
+        if (isDemoProfileUsername(effectiveUser)) {
+            return {
+                ...demoPracticeAnalytics,
+                username: effectiveUser,
+            };
         }
         const state = getState().practiceAnalytics;
         const existing = state.dataByUser[effectiveUser];

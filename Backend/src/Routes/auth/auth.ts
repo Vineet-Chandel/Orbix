@@ -235,7 +235,9 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
         }
 
         // Password verification
-        const isPasswordValid = await bcrypt.compare(validatedData.password, user.password_hash);
+        const isPasswordValid = user.password_hash
+            ? await bcrypt.compare(validatedData.password, user.password_hash)
+            : false;
 
         if (!isPasswordValid) {
             await failsOccursSignin({ email: validatedData.gmail, ip: req.ip || "unknown" });

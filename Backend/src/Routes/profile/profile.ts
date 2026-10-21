@@ -11,11 +11,15 @@ import {
 } from "../../redis/cache/cache-profile.js";
 import { verifyAndFetchPortal, extractPortalUsername } from "../portals/portals.js";
 import photoRouter from "./photo.js";
+import resumeRouter, { generateSignedResumeUrl } from "./resume.js";
 
 const profileRouter = express.Router();
 
 // Mount dedicated profile photo management router (/api/profile/photo & /profile/photo)
 profileRouter.use("/photo", photoRouter);
+
+// Mount dedicated resume management router (/api/profile/resume)
+profileRouter.use("/resume", resumeRouter);
 
 /**
  * Helper to normalize skills input
@@ -107,6 +111,11 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 is_open_to_work AS "isOpenToWork",
                 is_hireable AS "isHireable",
                 is_public AS "isPublic",
+                resume_url AS "resumeUrl",
+                resume_filename AS "resumeFilename",
+                resume_filesize AS "resumeFilesize",
+                resume_updated_at AS "resumeUpdatedAt",
+                is_resume_public AS "isResumePublic",
                 created_at AS "createdAt"
             FROM users
             WHERE id = $1 OR email = $2
@@ -517,6 +526,169 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             (viewer.username?.toLowerCase() === username ||
                 viewer.gmail?.toLowerCase() === username);
 
+        // Immediate mock handler for the public demo profile
+        if (username === "vineet-chandel" || username === "demo") {
+            const demoProfile: PublicProfilePayload = {
+                id: "demo-vineet-chandel",
+                username: "Vineet-Chandel",
+                displayName: "Vineet Chandel",
+                firstName: "Vineet",
+                lastName: "Chandel",
+                avatarUrl: "/avatar.png",
+                photoUrl: "/avatar.png",
+                headline: "Full Stack Engineer & Competitive Programmer | Grandmaster Track",
+                bio: "Passionate Full Stack Engineer & Systems Architect with 1,680+ algorithmic problems solved across global platforms. Specializing in high-throughput distributed systems, scalable web applications, and developer productivity tooling. Top 0.5% Guardian on LeetCode and Candidate Master on Codeforces.",
+                location: "Bengaluru, India",
+                website: "https://orbix.dev/profile/u/Vineet-Chandel",
+                linkedin: "https://linkedin.com/in/Vineet-Chandel",
+                github: "https://github.com/Vineet-Chandel",
+                customLink: "https://leetcode.com/u/Vineet-Chandel",
+                isOpenToWork: true,
+                isHireable: true,
+                isPublic: true,
+                resumeUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+                resumeFilename: "Vineet_Chandel_FullStack_Resume.pdf",
+                resumeFilesize: 1420000,
+                resumeUpdatedAt: "2026-02-15T00:00:00.000Z",
+                isResumePublic: true,
+                createdAt: "2024-01-15T00:00:00.000Z",
+                skills: [
+                    "TypeScript", "React", "Next.js", "Node.js", "Python", "C++", "Go",
+                    "PostgreSQL", "Redis", "Docker", "GraphQL", "Distributed Systems",
+                    "System Design", "Tailwind CSS"
+                ],
+                links: [
+                    { label: "GitHub", url: "https://github.com/Vineet-Chandel", platform: "github" },
+                    { label: "LinkedIn", url: "https://linkedin.com/in/Vineet-Chandel", platform: "linkedin" },
+                    { label: "Portfolio", url: "https://orbix.dev/profile/u/Vineet-Chandel", platform: "portfolio" },
+                    { label: "LeetCode", url: "https://leetcode.com/u/Vineet-Chandel", platform: "leetcode" },
+                ],
+                platforms: [
+                    {
+                        portal: "leetcode",
+                        portalUsername: "Vineet-Chandel",
+                        link: "https://leetcode.com/u/Vineet-Chandel",
+                        verified: true,
+                        displayName: "LeetCode",
+                        stats: [
+                            { label: "solved", value: "912" },
+                            { label: "rating", value: "2,340" },
+                            { label: "tier", value: "Guardian" },
+                            { label: "contests", value: "56" },
+                            { label: "active days", value: "280" },
+                        ],
+                    },
+                    {
+                        portal: "codeforces",
+                        portalUsername: "Vineet-Chandel",
+                        link: "https://codeforces.com/profile/Vineet-Chandel",
+                        verified: true,
+                        displayName: "Codeforces",
+                        stats: [
+                            { label: "solved", value: "468" },
+                            { label: "rating", value: "2,045" },
+                            { label: "tier", value: "Candidate Master" },
+                            { label: "contests", value: "38" },
+                            { label: "active days", value: "145" },
+                        ],
+                    },
+                    {
+                        portal: "codechef",
+                        portalUsername: "Vineet-Chandel",
+                        link: "https://www.codechef.com/users/Vineet-Chandel",
+                        verified: true,
+                        displayName: "CodeChef",
+                        stats: [
+                            { label: "solved", value: "342" },
+                            { label: "rating", value: "2,215" },
+                            { label: "tier", value: "6 Star" },
+                            { label: "contests", value: "26" },
+                            { label: "active days", value: "112" },
+                        ],
+                    },
+                    {
+                        portal: "github",
+                        portalUsername: "Vineet-Chandel",
+                        link: "https://github.com/Vineet-Chandel",
+                        verified: true,
+                        displayName: "GitHub",
+                        stats: [
+                            { label: "contributions", value: "3,180" },
+                            { label: "repositories", value: "62" },
+                            { label: "followers", value: "840" },
+                            { label: "stars", value: "1,420" },
+                        ],
+                    },
+                    {
+                        portal: "geeksforgeeks",
+                        portalUsername: "Vineet-Chandel",
+                        link: "https://auth.geeksforgeeks.org/user/Vineet-Chandel",
+                        verified: true,
+                        displayName: "GeeksforGeeks",
+                        stats: [
+                            { label: "solved", value: "410" },
+                            { label: "submissions", value: "720" },
+                            { label: "active days", value: "130" },
+                        ],
+                    },
+                    {
+                        portal: "hackerrank",
+                        portalUsername: "Vineet-Chandel",
+                        link: "https://www.hackerrank.com/Vineet-Chandel",
+                        verified: true,
+                        displayName: "HackerRank",
+                        stats: [
+                            { label: "solved", value: "245" },
+                            { label: "submissions", value: "410" },
+                            { label: "active days", value: "82" },
+                        ],
+                    },
+                    {
+                        portal: "atcoder",
+                        portalUsername: "Vineet-Chandel",
+                        link: "https://atcoder.jp/users/Vineet-Chandel",
+                        verified: true,
+                        displayName: "AtCoder",
+                        stats: [
+                            { label: "solved", value: "140" },
+                            { label: "rating", value: "1,640" },
+                            { label: "tier", value: "1-Kyu" },
+                            { label: "contests", value: "18" },
+                        ],
+                    },
+                    {
+                        portal: "code360",
+                        portalUsername: "Vineet-Chandel",
+                        link: "https://naukri.com/code360/profile/Vineet-Chandel",
+                        verified: true,
+                        displayName: "Code360",
+                        stats: [
+                            { label: "solved", value: "165" },
+                            { label: "submissions", value: "290" },
+                        ],
+                    },
+                    {
+                        portal: "interviewbit",
+                        portalUsername: "Vineet-Chandel",
+                        link: "https://www.interviewbit.com/profile/Vineet-Chandel",
+                        verified: true,
+                        displayName: "InterviewBit",
+                        stats: [
+                            { label: "solved", value: "130" },
+                        ],
+                    },
+                ],
+            };
+
+            return res.status(200).json({
+                success: true,
+                profile: {
+                    ...demoProfile,
+                    isOwner: !!isOwner,
+                },
+            });
+        }
+
         // Check Redis cache first (only for public visitors, not owners who see private details)
         if (!isOwner) {
             const cached = await getCachedPublicProfile(username);
@@ -553,6 +725,11 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 is_open_to_work AS "isOpenToWork",
                 is_hireable AS "isHireable",
                 is_public AS "isPublic",
+                resume_url AS "resumeUrl",
+                resume_filename AS "resumeFilename",
+                resume_filesize AS "resumeFilesize",
+                resume_updated_at AS "resumeUpdatedAt",
+                is_resume_public AS "isResumePublic",
                 created_at AS "createdAt"
             FROM users
             WHERE LOWER(username) = $1
@@ -613,6 +790,11 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             isOpenToWork: userRow.isOpenToWork === true,
             isHireable: userRow.isHireable === true,
             isPublic: userRow.isPublic !== false,
+            resumeUrl: userRow.isResumePublic !== false ? (userRow.resumeUrl || null) : null,
+            resumeFilename: userRow.isResumePublic !== false ? (userRow.resumeFilename || null) : null,
+            resumeFilesize: userRow.isResumePublic !== false ? (userRow.resumeFilesize || null) : null,
+            resumeUpdatedAt: userRow.isResumePublic !== false ? (userRow.resumeUpdatedAt || null) : null,
+            isResumePublic: userRow.isResumePublic !== false,
             createdAt: userRow.createdAt,
             platforms: linksResult.rows || [],
         };

@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import { isDemoProfileUsername, demoContestsData } from "../data/demoProfileData";
 
 export interface ContestHistoryPoint {
     contestId: string | number;
@@ -118,6 +119,14 @@ export const fetchContestPerformance = createAsyncThunk<
         const effectiveUser = username.trim();
         if (!effectiveUser) {
             return rejectWithValue("Username is required to fetch contest performance");
+        }
+
+        // Instantly return enhanced mock data for demo profile
+        if (isDemoProfileUsername(effectiveUser)) {
+            return {
+                ...demoContestsData,
+                username: effectiveUser,
+            };
         }
         const state = getState().contests;
         const existing = state.dataByUser[effectiveUser] || state.dataByUser[effectiveUser.toLowerCase()];

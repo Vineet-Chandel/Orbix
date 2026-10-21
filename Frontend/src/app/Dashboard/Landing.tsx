@@ -12,6 +12,7 @@ import { PracticeMonthlyStatsCards } from "./PracticeMonthlyStatsCards";
 import { DevelopmentAnalyticsSection } from "./DevelopmentAnalytics/DevelopmentAnalyticsSection";
 import { NotificationsView } from "../Notifications/NotificationsView";
 import { TrendsView } from "../Trends/TrendsView";
+import { ResumeManager } from "../Resume/ResumeManager";
 
 export default function Dashboard() {
     const location = useLocation();
@@ -375,52 +376,8 @@ export default function Dashboard() {
 
                 {/* Sub-view: Resume */}
                 {activeTab === "resume" && (
-                    <div className="rounded-2xl bg-white border border-neutral-200/90 p-6 sm:p-8 shadow-xs space-y-6 flex-1">
-                        <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
-                            <div>
-                                <h2 className="text-xl font-extrabold text-neutral-900 tracking-tight">
-                                    Developer Resume & Credentials
-                                </h2>
-                                <p className="text-xs text-neutral-500 mt-1">
-                                    Auto-curated resume summarizing your verified contest ratings and problem solving track.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => alert("Downloading PDF resume...")}
-                                className="px-4 py-2 rounded-full bg-black text-white hover:bg-neutral-800 text-xs font-bold transition-all shadow-md"
-                            >
-                                Download PDF
-                            </button>
-                        </div>
-
-                        <div className="border border-neutral-200 rounded-2xl p-6 bg-neutral-50/50 space-y-6">
-                            <div>
-                                <h3 className="text-lg font-extrabold text-neutral-900">{displayName}</h3>
-                                <p className="text-xs text-neutral-500 font-mono">@{user?.username} • {user?.gmail}</p>
-                            </div>
-
-                            <div className="space-y-2">
-                                <h4 className="text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                                    Competitive Programming & Platform Badges
-                                </h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                                    {Object.entries(connectedPortals).map(([pId, p]: [string, any]) => (
-                                        <div key={pId} className="p-3 bg-white rounded-xl border border-neutral-200 shadow-2xs">
-                                            <p className="text-xs font-bold text-neutral-900 capitalize">{pId}</p>
-                                            <p className="text-[11px] font-mono text-neutral-500">@{p.username}</p>
-                                            <div className="mt-1 flex flex-wrap gap-1">
-                                                {p.stats?.map((st: any, idx: number) => (
-                                                    <span key={idx} className="text-[10px] bg-neutral-100 px-1.5 py-0.5 rounded-md font-medium text-neutral-700">
-                                                        {st.value}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
+                    <div className="flex-1 w-full animate-in fade-in duration-200">
+                        <ResumeManager />
                     </div>
                 )}
 

@@ -5,17 +5,19 @@ import { performance } from "node:perf_hooks";
 
 const { Pool } = pg;
 
-const DATABASE_URL = process.env.SUPABASE_DB_URL;
+const DATABASE_URL = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
 
 if (!DATABASE_URL) {
-    throw new Error("SUPABASE_DB_URL is not configured");
+    throw new Error("SUPABASE_DB_URL (or DATABASE_URL) is not configured");
 }
 
 export const pool = new Pool({
     connectionString: DATABASE_URL,
-    connectionTimeoutMillis: 5000,
-    idleTimeoutMillis: 30000,
-    max: 10,
+    connectionTimeoutMillis: 20000,
+    idleTimeoutMillis: 60000,
+    max: 20,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000,
     ssl: { rejectUnauthorized: false },
 });
 
@@ -23,7 +25,7 @@ export const pool = new Pool({
 pool.on("error", (error) => {
     console.error(
         "Unexpected PostgreSQL pool error:",
-        error
+        error.message || error
     );
 });
 
@@ -105,9 +107,47 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS platform_ratings JSONB DEFAULT '{}'::jsonb;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_open_to_work BOOLEAN DEFAULT false;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_hireable BOOLEAN DEFAULT false;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_url TEXT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_public_id TEXT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_filename VARCHAR(255) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_filesize INT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_updated_at TIMESTAMPTZ NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS is_resume_public BOOLEAN DEFAULT true;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_metadata JSONB DEFAULT '{}'::jsonb;
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
             CREATE INDEX IF NOT EXISTS idx_users_orbix_score ON users(orbix_score DESC, username ASC);
             CREATE INDEX IF NOT EXISTS idx_users_is_public ON users(is_public);
+
+            -- Ensure resume upload intent tracking & cleanup queues exist
+            CREATE TABLE IF NOT EXISTS resume_upload_intents (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID,
+                username VARCHAR(100),
+                user_email VARCHAR(255),
+                public_id TEXT NOT NULL UNIQUE,
+                signature TEXT NOT NULL,
+                timestamp BIGINT NOT NULL,
+                folder TEXT NOT NULL,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                expires_at TIMESTAMPTZ NOT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_resume_upload_intents_public_id ON resume_upload_intents(public_id);
+            CREATE INDEX IF NOT EXISTS idx_resume_upload_intents_user ON resume_upload_intents(username, status);
+
+            CREATE TABLE IF NOT EXISTS resume_cleanup_queue (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                public_id TEXT NOT NULL,
+                resource_type VARCHAR(20) NOT NULL DEFAULT 'raw',
+                reason VARCHAR(50) NOT NULL,
+                attempts INT NOT NULL DEFAULT 0,
+                status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                last_error TEXT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_resume_cleanup_queue_status ON resume_cleanup_queue(status);
 
             -- Ensure recruiter messages and notifications tables exist
             CREATE TABLE IF NOT EXISTS recruiter_messages (
@@ -211,9 +251,47 @@ export const testDatabaseConnection = async () => {
     }
 };
 
-export const query = (
-    text: string,
-    params?: any[]
-) => {
-    return pool.query(text, params);
+const isRetryableError = (error: any): boolean => {
+    if (!error) return false;
+    const msg = String(error.message || "").toLowerCase();
+    const code = String(error.code || "");
+    return (
+        msg.includes("timeout") ||
+        msg.includes("connection terminated") ||
+        msg.includes("connection reset") ||
+        msg.includes("econnreset") ||
+        msg.includes("etimedout") ||
+        msg.includes("epipe") ||
+        code === "57P01" || // admin_shutdown
+        code === "57P02" || // crash_shutdown
+        code === "57P03" || // cannot_connect_now
+        code === "08006" || // connection_failure
+        code === "08001" || // sqlclient_unable_to_establish_sqlconnection
+        code === "08004"    // sqlserver_rejected_establishment_of_sqlconnection
+    );
 };
+
+export const query = async (
+    text: string,
+    params?: any[],
+    maxRetries = 2
+): Promise<pg.QueryResult<any>> => {
+    let attempt = 0;
+    while (true) {
+        try {
+            return await pool.query(text, params);
+        } catch (error: any) {
+            attempt++;
+            if (attempt <= maxRetries && isRetryableError(error)) {
+                const delayMs = attempt * 500;
+                console.warn(
+                    `[Database] Transient query error (attempt ${attempt}/${maxRetries}): ${error.message}. Retrying in ${delayMs}ms...`
+                );
+                await new Promise((res) => setTimeout(res, delayMs));
+                continue;
+            }
+            throw error;
+        }
+    }
+};
+

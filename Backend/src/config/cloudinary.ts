@@ -9,6 +9,10 @@ export type AllowedPhotoFormat = (typeof ALLOWED_PHOTO_FORMATS)[number];
 export const DEFAULT_AVATAR_FOLDER = process.env.CLOUDINARY_AVATAR_FOLDER || "orbix/avatars";
 export const DEFAULT_AVATAR_MAX_BYTES = parseInt(process.env.CLOUDINARY_AVATAR_MAX_BYTES || "5242880", 10); // 5 MB default
 
+export const DEFAULT_RESUME_FOLDER = process.env.CLOUDINARY_RESUME_FOLDER || "orbix/resumes";
+export const DEFAULT_RESUME_MAX_BYTES = 5 * 1024 * 1024; // 5 MB strict limit
+export const ALLOWED_RESUME_FORMATS = ["pdf"] as const;
+
 /**
  * Returns true if all essential Cloudinary credentials are configured
  */
@@ -86,14 +90,27 @@ export function getOptimizedAvatarUrl(publicId: string, version?: number | strin
 /**
  * Safely delete an asset from Cloudinary by public ID
  */
-export async function destroyCloudinaryAsset(publicId: string): Promise<boolean> {
+export async function destroyCloudinaryAsset(
+    publicId: string,
+    resourceType: "image" | "raw" | "auto" = "image"
+): Promise<boolean> {
     if (!publicId || !isCloudinaryConfigured()) return false;
     try {
         assertCloudinaryConfigured();
-        const result = await cloudinary.uploader.destroy(publicId, {
+        // If resourceType is auto or raw, try raw first, then fallback to image if needed
+        const primaryType = resourceType === "auto" ? "raw" : resourceType;
+        let result = await cloudinary.uploader.destroy(publicId, {
             invalidate: true,
-            resource_type: "image",
+            resource_type: primaryType,
         });
+
+        if (result?.result !== "ok" && (resourceType === "auto" || resourceType === "raw")) {
+            result = await cloudinary.uploader.destroy(publicId, {
+                invalidate: true,
+                resource_type: "image",
+            });
+        }
+
         return result?.result === "ok" || result?.result === "not found";
     } catch (err: any) {
         console.warn(`[Cloudinary Cleanup] Failed to destroy asset ${publicId}:`, err?.message || err);
