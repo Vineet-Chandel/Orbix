@@ -546,7 +546,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 isOpenToWork: true,
                 isHireable: true,
                 isPublic: true,
-                resumeUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+                resumeUrl: "/sample-resume.pdf",
                 resumeFilename: "Vineet_Chandel_FullStack_Resume.pdf",
                 resumeFilesize: 1420000,
                 resumeUpdatedAt: "2026-02-15T00:00:00.000Z",

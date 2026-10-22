@@ -414,7 +414,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             onClick={(e) => e.stopPropagation()}
-                                            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#121824]/90 hover:bg-[#1c2436] border border-white/15 hover:border-white/35 text-white text-xs font-semibold tracking-wide transition-all duration-150 cursor-pointer shadow-md hover:scale-[1.03] active:scale-95 group/btn select-none"
+                                            className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.0der border-white/15 hover:border-white/35 text-white text-xs font-semibold tracking-wide transition-all duration-150 cursor-pointer shadow-md hover:scale-[1.03] active:scale-95 group/btn select-none"
                                             title={`Open ${item.label}`}
                                         >
                                             {item.icon}
@@ -441,7 +441,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                 {/* 4 Key Stats Row */}
                                 <div className="grid grid-cols-4 gap-3">
                                     {/* Total Solved */}
-                                    <div className="rounded-2xl bg-[#121824]/90 border border-white/10 p-3.5 flex flex-col items-center justify-center text-center shadow-md">
+                                    <div className="rounded-2xl bg-white/[0.05] p-3.5 flex flex-col items-center justify-center text-center shadow-md">
                                         <span className="text-2xl font-black text-white tracking-tight font-mono">
                                             {stats.totalSolved.toLocaleString()}
                                         </span>
@@ -457,7 +457,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                     </div>
 
                                     {/* Active Days */}
-                                    <div className="rounded-2xl bg-[#121824]/90 border border-white/10 p-3.5 flex flex-col items-center justify-center text-center shadow-md">
+                                    <div className="rounded-2xl bg-white/[0.05] p-3.5 flex flex-col items-center justify-center text-center shadow-md">
                                         <span className="text-2xl font-black text-white tracking-tight font-mono">
                                             {stats.activeDays.toLocaleString()}
                                         </span>
@@ -475,7 +475,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                     </div>
 
                                     {/* Contests */}
-                                    <div className="rounded-2xl bg-[#121824]/90 border border-white/10 p-3.5 flex flex-col items-center justify-center text-center shadow-md">
+                                    <div className="rounded-2xl bg-white/[0.05] p-3.5 flex flex-col items-center justify-center text-center shadow-md">
                                         <span className="text-2xl font-black text-white tracking-tight font-mono">
                                             {stats.contests.toLocaleString()}
                                         </span>
@@ -488,7 +488,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                     </div>
 
                                     {/* Day Streak */}
-                                    <div className="rounded-2xl bg-[#121824]/90 border border-white/10 p-3.5 flex flex-col items-center justify-center text-center shadow-md">
+                                    <div className="rounded-2xl bg-white/[0.05] p-3.5 flex flex-col items-center justify-center text-center shadow-md">
                                         <span className="text-2xl font-black text-white tracking-tight font-mono">
                                             {stats.dayStreak}
                                         </span>
@@ -517,7 +517,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                         </div>
 
                                         {topContests.length === 0 ? (
-                                            <div className="rounded-2xl bg-[#121824]/90 border border-white/10 p-4 text-center flex-1 flex items-center justify-center">
+                                            <div className="rounded-2xl bg-white/[0.05] p-4 text-center flex-1 flex items-center justify-center">
                                                 <p className="text-xs text-neutral-400">No contest standings available.</p>
                                             </div>
                                         ) : (
@@ -526,7 +526,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                 return (
                                                     <div
                                                         key={contest.id}
-                                                        className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1"
+                                                        className="rounded-2xl bg-white/[0.05] px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1"
                                                     >
                                                         <div className="flex items-center gap-3 min-w-0">
                                                             <div className="w-9 h-9 rounded-xl bg-white/5 border border-white/5 flex items-center justify-center flex-shrink-0 p-1.5">
@@ -600,7 +600,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                         </div>
 
                                         {topPlatforms.length === 0 ? (
-                                            <div className="rounded-2xl bg-[#121824]/90 border border-white/10 p-4 text-center flex-1 flex items-center justify-center">
+                                            <div className="rounded-2xl bg-white/[0.05] p-4 text-center flex-1 flex items-center justify-center">
                                                 <p className="text-xs text-neutral-400">No platforms selected.</p>
                                             </div>
                                         ) : slotCategory === "dev" && topPlatforms.length === 1 ? (
@@ -615,7 +615,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                 return (
                                                     <div className="flex-1 flex flex-col justify-between gap-2">
                                                         {/* Primary Hero Dev Slot */}
-                                                        <div className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md">
+                                                        <div className="rounded-2xl bg-white/[0.05] px-4 py-3 flex items-center justify-between gap-3 shadow-md">
                                                             <div className="flex items-center gap-3 min-w-0">
                                                                 <div className="w-9 h-9 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center flex-shrink-0 text-white shadow-xs p-1.5">
                                                                     {getPortalIcon(plat.id || "github", "w-5 h-5 text-white")}
@@ -665,7 +665,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
 
                                                         {/* 3-Column Engineering Metrics Grid */}
                                                         <div className="grid grid-cols-3 gap-2 flex-1">
-                                                            <div className="rounded-xl bg-[#121824]/80 border border-white/10 p-2.5 flex flex-col justify-between">
+                                                            <div className="rounded-xl bg-white/[0.05] p-2.5 flex flex-col justify-between">
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="text-[10px] font-mono uppercase text-neutral-400 font-bold">Commits</span>
                                                                     <GitCommit className="w-3.5 h-3.5 text-emerald-400" />
@@ -678,7 +678,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                                 </div>
                                                             </div>
 
-                                                            <div className="rounded-xl bg-[#121824]/80 border border-white/10 p-2.5 flex flex-col justify-between">
+                                                            <div className="rounded-xl bg-white/[0.05] p-2.5 flex flex-col justify-between">
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="text-[10px] font-mono uppercase text-neutral-400 font-bold">Repositories</span>
                                                                     <FolderGit2 className="w-3.5 h-3.5 text-sky-400" />
@@ -691,7 +691,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                                 </div>
                                                             </div>
 
-                                                            <div className="rounded-xl bg-[#121824]/80 border border-white/10 p-2.5 flex flex-col justify-between">
+                                                            <div className="rounded-xl bg-white/[0.05] p-2.5 flex flex-col justify-between">
                                                                 <div className="flex items-center justify-between">
                                                                     <span className="text-[10px] font-mono uppercase text-neutral-400 font-bold">Peak Day</span>
                                                                     <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -729,7 +729,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                     return (
                                                         <div
                                                             key={plat.id || "github"}
-                                                            className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1 transition-all"
+                                                            className="rounded-2xl bg-white/[0.05] px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1 transition-all"
                                                         >
                                                             <div className="flex items-center gap-3 min-w-0">
                                                                 <div className="w-9 h-9 rounded-xl bg-white/[0.08] border border-white/10 flex items-center justify-center flex-shrink-0 text-white shadow-xs p-1.5">
@@ -787,7 +787,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                 return (
                                                     <div
                                                         key={plat.id}
-                                                        className="rounded-2xl bg-[#121824]/90 border border-white/10 px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1"
+                                                        className="rounded-2xl bg-white/[0.05] px-4 py-3 flex items-center justify-between gap-3 shadow-md flex-1"
                                                     >
                                                         <div className="flex items-center gap-3 min-w-0">
                                                             <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0 p-1.5">

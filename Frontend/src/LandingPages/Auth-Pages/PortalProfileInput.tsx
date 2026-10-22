@@ -14,6 +14,65 @@ interface PortalProfileInputProps {
     onDisconnectProfile?: (portalId: string) => void;
 }
 
+// Sub-component for rendering Connected Profile Avatar with Platform SVG Fallback
+const ConnectedInputAvatar = ({
+    portalId,
+    avatarUrl,
+    name,
+    username,
+    brandColor,
+}: {
+    portalId: string;
+    avatarUrl?: string | null;
+    name?: string;
+    username?: string;
+    brandColor: string;
+}) => {
+    const [imgFailed, setImgFailed] = useState(false);
+
+    const cleanAvatar =
+        !imgFailed &&
+        avatarUrl &&
+        typeof avatarUrl === "string" &&
+        avatarUrl.trim().length > 5 &&
+        !avatarUrl.includes("ui-avatars.com")
+            ? avatarUrl.trim()
+            : null;
+
+    return (
+        <div className="relative flex-shrink-0">
+            <div
+                className="h-12 w-12 sm:h-13 sm:w-13 rounded-full border-2 p-0.5 bg-neutral-900 shadow-md flex items-center justify-center overflow-hidden"
+                style={{ borderColor: brandColor }}
+            >
+                {cleanAvatar ? (
+                    <img
+                        src={cleanAvatar}
+                        alt={name || username || portalId}
+                        referrerPolicy="no-referrer"
+                        className="h-full w-full rounded-full object-cover"
+                        onError={() => setImgFailed(true)}
+                    />
+                ) : (
+                    <div className="w-full h-full rounded-full bg-neutral-800 flex items-center justify-center p-2 text-white">
+                        {getPortalIcon(portalId, "w-full h-full object-contain")}
+                    </div>
+                )}
+            </div>
+
+            {/* Platform badge at bottom-right (only when displaying custom photo) */}
+            {cleanAvatar && (
+                <div
+                    className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white p-0.5 shadow-md border"
+                    style={{ borderColor: brandColor }}
+                >
+                    {getPortalIcon(portalId, "h-3.5 w-3.5")}
+                </div>
+            )}
+        </div>
+    );
+};
+
 export const PortalProfileInput = ({
     portalId,
     value,
@@ -42,28 +101,28 @@ export const PortalProfileInput = ({
     // When the account is connected, REMOVE the input field and display the connected account state
     if (isConnected && connectedProfile) {
         const brandColor = config.brandColor || "#0D8BD9";
+        const avatarSrc =
+            connectedProfile.avatar ||
+            (connectedProfile as any).avatarUrl ||
+            (connectedProfile as any).avatar_url;
+        const displayName =
+            connectedProfile.name ||
+            (connectedProfile as any).displayName ||
+            (connectedProfile as any).display_name ||
+            connectedProfile.username;
+
         return (
             <div className="w-full rounded-2xl border border-neutral-800 bg-[#0b0f19] p-4 text-white shadow-xl transition-all duration-300 animate-fadeIn">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
                     {/* Left: Avatar with Brand ring & Portal icon badge + User info + Stats */}
                     <div className="flex items-center gap-3.5 min-w-0">
-                        <div className="relative flex-shrink-0">
-                            <img
-                                src={connectedProfile.avatar}
-                                alt={connectedProfile.name}
-                                referrerPolicy="no-referrer"
-                                className="h-12 w-12 sm:h-13 sm:w-13 rounded-full object-cover border-2 p-0.5 bg-neutral-900 shadow-md"
-                                style={{ borderColor: brandColor }}
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                        connectedProfile.name || connectedProfile.username
-                                    )}&background=${brandColor.replace("#", "")}&color=fff&size=128&bold=true`;
-                                }}
-                            />
-                            <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white p-0.5 shadow-md">
-                                {getPortalIcon(portalId, "h-3.5 w-3.5")}
-                            </div>
-                        </div>
+                        <ConnectedInputAvatar
+                            portalId={portalId}
+                            avatarUrl={avatarSrc}
+                            name={displayName}
+                            username={connectedProfile.username}
+                            brandColor={brandColor}
+                        />
 
                         <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
@@ -81,7 +140,7 @@ export const PortalProfileInput = ({
 
                             <div className="flex items-center gap-2 flex-wrap mt-0.5">
                                 <h4 className="truncate text-sm sm:text-base font-bold text-white tracking-tight">
-                                    {connectedProfile.name}
+                                    {displayName}
                                 </h4>
                                 <span className="text-xs font-mono text-neutral-400 truncate">
                                     @{connectedProfile.username}

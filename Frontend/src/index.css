@@ -45,6 +45,7 @@ body::-webkit-scrollbar,
 }
 
 @layer utilities {
+
   .no-scrollbar::-webkit-scrollbar,
   .scrollbar-none::-webkit-scrollbar {
     display: none !important;
@@ -52,6 +53,7 @@ body::-webkit-scrollbar,
     height: 0 !important;
     background: transparent !important;
   }
+
   .no-scrollbar,
   .scrollbar-none {
     -ms-overflow-style: none !important;
@@ -60,13 +62,27 @@ body::-webkit-scrollbar,
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideRight {
-  from { opacity: 0; transform: translateX(-16px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .animate-fadeIn {
@@ -75,4 +91,257 @@ body::-webkit-scrollbar,
 
 .animate-slideRight {
   animation: slideRight 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@font-face {
+  font-family: "MyCustomFont";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-black.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont1";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-black.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont2";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-blackitalic.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont3";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-bold.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont4";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-bolditalic.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont5";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-book.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont6";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-bookitalic.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont7";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-extltita.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont8";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-extrabold.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont9";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-extrabolditalic.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont10";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-extralight.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont11";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-light.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont12";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-lightitalic.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont13";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-medium.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont14";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-mediumitalic.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont15";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-regular.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont16";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-regularitalic.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont17";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-semibold.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont18";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-semibolditalic.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont19";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-thin.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "MyCustomFont20";
+  src: url("./assets/fonts/fontspring-demo-cubrongrotesk-thinitalic.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Custom Font Utilities */
+.font-MyCustomFont {
+  font-family: "MyCustomFont", sans-serif;
+}
+
+.font-MyCustomFont1 {
+  font-family: "MyCustomFont1", sans-serif;
+}
+
+.font-MyCustomFont2 {
+  font-family: "MyCustomFont2", sans-serif;
+}
+
+.font-MyCustomFont3 {
+  font-family: "MyCustomFont3", sans-serif;
+}
+
+.font-MyCustomFont4 {
+  font-family: "MyCustomFont4", sans-serif;
+}
+
+.font-MyCustomFont5 {
+  font-family: "MyCustomFont5", sans-serif;
+}
+
+.font-MyCustomFont6 {
+  font-family: "MyCustomFont6", sans-serif;
+}
+
+.font-MyCustomFont7 {
+  font-family: "MyCustomFont7", sans-serif;
+}
+
+.font-MyCustomFont8 {
+  font-family: "MyCustomFont8", sans-serif;
+}
+
+.font-MyCustomFont9 {
+  font-family: "MyCustomFont9", sans-serif;
+}
+
+.font-MyCustomFont10 {
+  font-family: "MyCustomFont10", sans-serif;
+}
+
+.font-MyCustomFont11 {
+  font-family: "MyCustomFont11", sans-serif;
+}
+
+.font-MyCustomFont12 {
+  font-family: "MyCustomFont12", sans-serif;
+}
+
+.font-MyCustomFont13 {
+  font-family: "MyCustomFont13", sans-serif;
+}
+
+.font-MyCustomFont14 {
+  font-family: "MyCustomFont14", sans-serif;
+}
+
+.font-MyCustomFont15 {
+  font-family: "MyCustomFont15", sans-serif;
+}
+
+.font-MyCustomFont16 {
+  font-family: "MyCustomFont16", sans-serif;
+}
+
+.font-MyCustomFont17 {
+  font-family: "MyCustomFont17", sans-serif;
+}
+
+.font-MyCustomFont18 {
+  font-family: "MyCustomFont18", sans-serif;
+}
+
+.font-MyCustomFont19 {
+  font-family: "MyCustomFont19", sans-serif;
+}
+
+.font-MyCustomFont20 {
+  font-family: "MyCustomFont20", sans-serif;
 }

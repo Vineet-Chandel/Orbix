@@ -281,28 +281,28 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
 
                         {/* 4 Core Metrics Grid */}
                         <div className="grid grid-cols-4 gap-2">
-                            <div className="rounded-3xl bg-[#131924]/90 border border-white/10 p-6 flex flex-col items-center justify-center text-center shadow-xl">
+                            <div className="rounded-3xl bg-white/[0.05] p-6 flex flex-col items-center justify-center text-center shadow-xl">
                                 <span className="text-5xl font-black text-white font-mono tracking-tight">{stats.totalSolved.toLocaleString()}</span>
                                 <div className="flex items-center gap-2 text-sm font-bold text-neutral-400 mt-2 uppercase tracking-wider">
                                     <span className="w-2 h-2 rounded-full bg-emerald-400" />
                                     <span>Solved</span>
                                 </div>
                             </div>
-                            <div className="rounded-3xl bg-[#131924]/90 border border-white/10 p-6 flex flex-col items-center justify-center text-center shadow-xl">
+                            <div className="rounded-3xl bg-white/[0.05] p-6 flex flex-col items-center justify-center text-center shadow-xl">
                                 <span className="text-5xl font-black text-white font-mono tracking-tight">{stats.activeDays.toLocaleString()}</span>
                                 <div className="flex items-center gap-2 text-sm font-bold text-neutral-400 mt-2 uppercase tracking-wider">
                                     <span className="w-2 h-2 rounded-full bg-sky-400" />
                                     <span>Active Days</span>
                                 </div>
                             </div>
-                            <div className="rounded-3xl bg-[#131924]/90 border border-white/10 p-6 flex flex-col items-center justify-center text-center shadow-xl">
+                            <div className="rounded-3xl bg-white/[0.05] p-6 flex flex-col items-center justify-center text-center shadow-xl">
                                 <span className="text-5xl font-black text-white font-mono tracking-tight">{stats.contests.toLocaleString()}</span>
                                 <div className="flex items-center gap-2 text-sm font-bold text-neutral-400 mt-2 uppercase tracking-wider">
                                     <span className="w-2 h-2 rounded-full bg-amber-400" />
                                     <span>Contests</span>
                                 </div>
                             </div>
-                            <div className="rounded-3xl bg-[#131924]/90 border border-white/10 p-6 flex flex-col items-center justify-center text-center shadow-xl">
+                            <div className="rounded-3xl bg-white/[0.05] p-6 flex flex-col items-center justify-center text-center shadow-xl">
                                 <span className="text-5xl font-black text-white font-mono tracking-tight">{stats.dayStreak}d</span>
                                 <div className="flex items-center gap-2 text-sm font-bold text-neutral-400 mt-2 uppercase tracking-wider">
                                     <span className="w-2 h-2 rounded-full bg-rose-500" />
@@ -324,7 +324,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
 
                                     <div className="space-y-3.5">
                                         {topContests.length === 0 ? (
-                                            <div className="rounded-3xl bg-[#131924]/90 border border-white/10 p-8 text-center shadow-xl">
+                                            <div className="rounded-3xl bg-white/[0.05] p-8 text-center shadow-xl">
                                                 <p className="text-lg text-neutral-400 font-medium">No contest standings available.</p>
                                             </div>
                                         ) : (
@@ -333,7 +333,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                                 return (
                                                     <div
                                                         key={contest.id}
-                                                        className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 flex items-center justify-between shadow-xl"
+                                                        className="rounded-3xl bg-white/[0.05]  px-8 py-5 flex items-center justify-between shadow-xl"
                                                     >
                                                         <div className="flex items-center gap-5 min-w-0">
                                                             <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/5 flex items-center justify-center p-3 flex-shrink-0">
@@ -409,7 +409,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
 
                                     <div className="space-y-3.5">
                                         {topPlatforms.length === 0 ? (
-                                            <div className="rounded-3xl bg-[#131924]/90 border border-white/10 p-8 text-center flex items-center justify-center">
+                                            <div className="rounded-3xl bg-white/[0.05] p-8 text-center flex items-center justify-center">
                                                 <p className="text-lg text-neutral-400">No platforms selected.</p>
                                             </div>
                                         ) : slotCategory === "dev" && topPlatforms.length === 1 ? (
@@ -424,7 +424,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                                 return (
                                                     <div className="space-y-3.5">
                                                         {/* Primary Hero Dev Slot */}
-                                                        <div className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 flex items-center justify-between shadow-xl">
+                                                        <div className="rounded-3xl bg-white/[0.05] px-8 py-5 flex items-center justify-between shadow-xl">
                                                             <div className="flex items-center gap-5 min-w-0">
                                                                 <div className="w-16 h-16 rounded-2xl bg-white/[0.08] border border-white/10 flex items-center justify-center p-3 text-white flex-shrink-0 shadow-md">
                                                                     {getPortalIcon(plat.id || "github", "w-8 h-8 text-white")}
@@ -475,7 +475,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
 
                                                         {/* 3-Column Engineering Metrics Grid */}
                                                         <div className="grid grid-cols-3 gap-3">
-                                                            <div className="rounded-2xl bg-[#131924]/80 border border-white/10 p-5 flex flex-col justify-between">
+                                                            <div className="rounded-2xl bg-white/[0.05] p-5 flex flex-col justify-between">
                                                                 <div className="flex items-center justify-between mb-3">
                                                                     <span className="text-xs font-mono uppercase text-neutral-400 font-bold">Commits</span>
                                                                     <GitCommit className="w-5 h-5 text-emerald-400" />
@@ -488,7 +488,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                                                 </div>
                                                             </div>
 
-                                                            <div className="rounded-2xl bg-[#131924]/80 border border-white/10 p-5 flex flex-col justify-between">
+                                                            <div className="rounded-2xl bg-white/[0.05] p-5 flex flex-col justify-between">
                                                                 <div className="flex items-center justify-between mb-3">
                                                                     <span className="text-xs font-mono uppercase text-neutral-400 font-bold">Repositories</span>
                                                                     <FolderGit2 className="w-5 h-5 text-sky-400" />
@@ -501,7 +501,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                                                 </div>
                                                             </div>
 
-                                                            <div className="rounded-2xl bg-[#131924]/80 border border-white/10 p-5 flex flex-col justify-between">
+                                                            <div className="rounded-2xl bg-white/[0.05] p-5 flex flex-col justify-between">
                                                                 <div className="flex items-center justify-between mb-3">
                                                                     <span className="text-xs font-mono uppercase text-neutral-400 font-bold">Best Day</span>
                                                                     <Sparkles className="w-5 h-5 text-amber-400" />
@@ -539,7 +539,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                                     return (
                                                         <div
                                                             key={plat.id || "github"}
-                                                            className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 flex items-center justify-between shadow-xl"
+                                                            className="rounded-3xl bg-white/[0.05]  px-8 py-5 flex items-center justify-between shadow-xl"
                                                         >
                                                             <div className="flex items-center gap-5 min-w-0">
                                                                 <div className="w-16 h-16 rounded-2xl bg-white/[0.08] border border-white/10 flex items-center justify-center p-3 text-white flex-shrink-0 shadow-md">
@@ -597,7 +597,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                                 return (
                                                     <div
                                                         key={plat.id}
-                                                        className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 flex items-center justify-between shadow-xl"
+                                                        className="rounded-3xl bg-white/[0.05]  px-8 py-5 flex items-center justify-between shadow-xl"
                                                     >
                                                         <div className="flex items-center gap-5 min-w-0">
                                                             <div className="w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center p-3 flex-shrink-0">
@@ -666,7 +666,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                 <span className="text-base font-mono">{connectedList.length} verified</span>
                             </div>
 
-                            <div className="rounded-3xl bg-[#131924]/90 border border-white/10 px-8 py-5 shadow-xl flex items-center justify-between gap-6">
+                            <div className="rounded-3xl bg-white/[0.05]  px-8 py-5 shadow-xl flex items-center justify-between gap-6">
                                 <div className="flex items-center gap-3 flex-shrink-0">
                                     <span className="text-sm font-mono font-bold tracking-wider uppercase text-neutral-400">
                                         Connected:

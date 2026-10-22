@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../../utils/portalParser";
+import { getPortalIcon } from "../../../utils/portalIcons";
 import { PortalProfileInput } from "../PortalProfileInput";
 import type { PortalProfileData } from "../PortalProfileCard";
 import { useAppDispatch, useAppSelector, setPortalProfiles } from "../../../store";
@@ -10,6 +11,119 @@ import { disconnectPlatform } from "../../../utils/profileApi";
 import { invalidateConnectedPlatformCaches } from "../../../utils/cacheManager";
 
 type CategoryFilter = "all" | "cp" | "practice" | "dev";
+
+// Dedicated Platform Avatar Component with Automatic Fallback to Real Platform SVG Icon
+const ConnectedPlatformAvatar = ({
+    portalId,
+    avatarUrl,
+    name,
+    username,
+    brandColor,
+    size = "md",
+}: {
+    portalId: string;
+    avatarUrl?: string | null;
+    name?: string;
+    username?: string;
+    brandColor: string;
+    size?: "sm" | "md" | "lg";
+}) => {
+    const [imgFailed, setImgFailed] = useState(false);
+
+    useEffect(() => {
+        setImgFailed(false);
+    }, [avatarUrl]);
+
+    const cleanAvatar =
+        !imgFailed &&
+        avatarUrl &&
+        typeof avatarUrl === "string" &&
+        avatarUrl.trim().length > 5 &&
+        !avatarUrl.includes("ui-avatars.com")
+            ? avatarUrl.trim()
+            : null;
+
+    const dimClasses =
+        size === "sm"
+            ? "h-8 w-8"
+            : size === "lg"
+            ? "h-11 w-11 sm:h-12 sm:w-12"
+            : "h-9 w-9 sm:h-10 sm:w-10";
+
+    return (
+        <div className="relative flex-shrink-0">
+            <div
+                className={`${dimClasses} rounded-full border-2 p-0.5 bg-white shadow-2xs flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105`}
+                style={{ borderColor: brandColor }}
+            >
+                {cleanAvatar ? (
+                    <img
+                        src={cleanAvatar}
+                        alt={name || username || portalId}
+                        referrerPolicy="no-referrer"
+                        className="h-full w-full rounded-full object-cover"
+                        onError={() => setImgFailed(true)}
+                    />
+                ) : (
+                    <div className="w-full h-full rounded-full bg-neutral-50 flex items-center justify-center p-1.5">
+                        {getPortalIcon(portalId, "w-full h-full object-contain")}
+                    </div>
+                )}
+            </div>
+
+            {/* Mini Platform Badge at Bottom-Right (rendered when displaying user's photo) */}
+            {cleanAvatar && (
+                <div
+                    className="absolute -bottom-1 -right-1 flex h-4 w-4 sm:h-4.5 sm:w-4.5 items-center justify-center rounded-full bg-white p-0.5 shadow-xs border"
+                    style={{ borderColor: brandColor }}
+                    title={PORTALS[portalId]?.name || portalId}
+                >
+                    {getPortalIcon(portalId, "w-2.5 h-2.5 sm:w-3 sm:h-3")}
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Sub-component for Mobile floating pill icons
+const MobilePillAvatar = ({
+    portalId,
+    avatarUrl,
+    name,
+}: {
+    portalId: string;
+    avatarUrl?: string | null;
+    name?: string;
+}) => {
+    const [failed, setFailed] = useState(false);
+
+    useEffect(() => {
+        setFailed(false);
+    }, [avatarUrl]);
+
+    const hasAvatar =
+        !failed &&
+        avatarUrl &&
+        typeof avatarUrl === "string" &&
+        avatarUrl.trim().length > 5 &&
+        !avatarUrl.includes("ui-avatars.com");
+
+    return (
+        <div className="inline-block h-4 w-4 rounded-full ring-1 ring-white bg-white overflow-hidden flex items-center justify-center p-0.5">
+            {hasAvatar ? (
+                <img
+                    src={avatarUrl.trim()}
+                    alt={name || portalId}
+                    referrerPolicy="no-referrer"
+                    className="h-full w-full object-cover rounded-full"
+                    onError={() => setFailed(true)}
+                />
+            ) : (
+                getPortalIcon(portalId, "w-full h-full object-contain")
+            )}
+        </div>
+    );
+};
 
 export default function ProfilesOnboardingPage() {
     const navigate = useNavigate();
@@ -22,10 +136,27 @@ export default function ProfilesOnboardingPage() {
     const [connectedProfiles, setConnectedProfiles] = useState<Record<string, PortalProfileData>>(() => {
         try {
             const saved = localStorage.getItem("orbix_connected_portals");
-            return saved ? JSON.parse(saved) : {};
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                const normalized: Record<string, PortalProfileData> = {};
+                for (const [k, v] of Object.entries(parsed)) {
+                    if (!v || typeof v !== "object") continue;
+                    const p = v as any;
+                    const av = p.avatar || p.avatarUrl || p.avatar_url || "";
+                    normalized[k] = {
+                        ...p,
+                        portal: p.portal || k,
+                        name: p.name || p.displayName || p.display_name || p.username || k,
+                        avatar: av,
+                        avatarUrl: av,
+                    };
+                }
+                return normalized;
+            }
         } catch {
             return {};
         }
+        return {};
     });
 
     // Raw input values for each portal
@@ -50,10 +181,27 @@ export default function ProfilesOnboardingPage() {
     const [recentProfilesHistory, setRecentProfilesHistory] = useState<Record<string, PortalProfileData>>(() => {
         try {
             const saved = localStorage.getItem("orbix_connected_portals");
-            return saved ? JSON.parse(saved) : {};
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                const normalized: Record<string, PortalProfileData> = {};
+                for (const [k, v] of Object.entries(parsed)) {
+                    if (!v || typeof v !== "object") continue;
+                    const p = v as any;
+                    const av = p.avatar || p.avatarUrl || p.avatar_url || "";
+                    normalized[k] = {
+                        ...p,
+                        portal: p.portal || k,
+                        name: p.name || p.displayName || p.display_name || p.username || k,
+                        avatar: av,
+                        avatarUrl: av,
+                    };
+                }
+                return normalized;
+            }
         } catch {
             return {};
         }
+        return {};
     });
 
     const [judgments, setJudgments] = useState<Record<string, JudgmentResult>>({});
@@ -122,7 +270,7 @@ export default function ProfilesOnboardingPage() {
                             portal: pId,
                             username: pUsername,
                             name: pName,
-                            avatar: link.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(pName)}&background=0D8BD9&color=fff&size=80&bold=true`,
+                            avatar: link.avatar_url || link.avatarUrl || link.avatar || "",
                             stats: parsedStats,
                             profileUrl: link.link || "",
                             verified: link.verified !== false,
@@ -151,6 +299,72 @@ export default function ProfilesOnboardingPage() {
 
         return () => {
             isMounted = false;
+        };
+    }, []);
+
+    // Background enrich any connected accounts that lack a custom avatar
+    useEffect(() => {
+        let isMounted = true;
+        const enrichMissingAvatars = async () => {
+            const updates: Record<string, string> = {};
+            let hasUpdates = false;
+
+            for (const [pId, p] of Object.entries(connectedProfiles)) {
+                const currentAvatar = p.avatar || (p as any).avatarUrl || (p as any).avatar_url;
+                if (!currentAvatar || currentAvatar.includes("ui-avatars.com")) {
+                    const uname = p.username || (p as any).portal_username || (p as any).portalUsername;
+                    if (!uname) continue;
+
+                    try {
+                        const endpoints = [
+                            `/api/portals/fetch?portal=${encodeURIComponent(pId)}&username=${encodeURIComponent(uname)}`,
+                            `http://localhost:3000/api/portals/fetch?portal=${encodeURIComponent(pId)}&username=${encodeURIComponent(uname)}`,
+                        ];
+                        for (const url of endpoints) {
+                            try {
+                                const res = await fetch(url);
+                                if (res.ok) {
+                                    const json = await res.json();
+                                    if (json && json.success && json.avatar && !json.avatar.includes("ui-avatars.com")) {
+                                        updates[pId] = json.avatar;
+                                        hasUpdates = true;
+                                        break;
+                                    }
+                                }
+                            } catch {
+                                // try next endpoint
+                            }
+                        }
+                    } catch {
+                        // ignore
+                    }
+                }
+            }
+
+            if (hasUpdates && isMounted) {
+                setConnectedProfiles((prev) => {
+                    const next = { ...prev };
+                    for (const [pId, newAvatar] of Object.entries(updates)) {
+                        if (next[pId]) {
+                            next[pId] = {
+                                ...next[pId],
+                                avatar: newAvatar,
+                                avatarUrl: newAvatar,
+                            };
+                        }
+                    }
+                    try {
+                        localStorage.setItem("orbix_connected_portals", JSON.stringify(next));
+                    } catch {}
+                    return next;
+                });
+            }
+        };
+
+        const timer = setTimeout(enrichMissingAvatars, 300);
+        return () => {
+            isMounted = false;
+            clearTimeout(timer);
         };
     }, []);
 
@@ -708,24 +922,14 @@ export default function ProfilesOnboardingPage() {
                                                         className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-xl border border-neutral-200/80 bg-white shadow-2xs hover:shadow-xs hover:border-neutral-300 transition-all group"
                                                     >
                                                         <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                                                            <div className="relative flex-shrink-0">
-                                                                <img
-                                                                    src={profile.avatar}
-                                                                    alt={profile.name}
-                                                                    referrerPolicy="no-referrer"
-                                                                    className="h-9 w-9 sm:h-10 sm:w-10 rounded-full object-cover border-2 p-0.5 bg-neutral-50 shadow-2xs"
-                                                                    style={{ borderColor: brandColor }}
-                                                                    onError={(e) => {
-                                                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                                                            profile.name || profile.username
-                                                                        )}&background=${brandColor.replace("#", "")}&color=fff&size=80&bold=true`;
-                                                                    }}
-                                                                />
-                                                                <span
-                                                                    className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white shadow-2xs"
-                                                                    style={{ backgroundColor: brandColor }}
-                                                                />
-                                                            </div>
+                                                            <ConnectedPlatformAvatar
+                                                                portalId={pId}
+                                                                avatarUrl={profile.avatar || (profile as any).avatarUrl || (profile as any).avatar_url}
+                                                                name={profile.name}
+                                                                username={profile.username}
+                                                                brandColor={brandColor}
+                                                                size="md"
+                                                            />
                                                             <div className="min-w-0">
                                                                 <div className="flex items-center gap-1.5">
                                                                     <span className="text-xs font-bold text-neutral-900 truncate">
@@ -829,12 +1033,12 @@ export default function ProfilesOnboardingPage() {
                     >
                         <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                         <div className="flex -space-x-1.5 overflow-hidden">
-                            {Object.values(connectedProfiles).slice(0, 3).map((p) => (
-                                <img
-                                    key={p.portal}
-                                    src={p.avatar}
-                                    alt={p.name}
-                                    className="inline-block h-4 w-4 rounded-full ring-1 ring-white object-cover"
+                            {Object.entries(connectedProfiles).slice(0, 3).map(([pId, p]) => (
+                                <MobilePillAvatar
+                                    key={pId}
+                                    portalId={pId}
+                                    avatarUrl={p.avatar || (p as any).avatarUrl || (p as any).avatar_url}
+                                    name={p.name}
                                 />
                             ))}
                         </div>
@@ -888,24 +1092,14 @@ export default function ProfilesOnboardingPage() {
                                         className="flex items-center justify-between gap-3 p-3 rounded-xl border border-neutral-800 bg-neutral-900/80"
                                     >
                                         <div className="flex items-center gap-3 min-w-0">
-                                            <div className="relative flex-shrink-0">
-                                                <img
-                                                    src={profile.avatar}
-                                                    alt={profile.name}
-                                                    referrerPolicy="no-referrer"
-                                                    className="h-10 w-10 rounded-full object-cover border-2 p-0.5 bg-neutral-950"
-                                                    style={{ borderColor: brandColor }}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                                            profile.name || profile.username
-                                                        )}&background=${brandColor.replace("#", "")}&color=fff&size=96&bold=true`;
-                                                    }}
-                                                />
-                                                <span
-                                                    className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-neutral-900"
-                                                    style={{ backgroundColor: brandColor }}
-                                                />
-                                            </div>
+                                            <ConnectedPlatformAvatar
+                                                portalId={pId}
+                                                avatarUrl={profile.avatar || (profile as any).avatarUrl || (profile as any).avatar_url}
+                                                name={profile.name}
+                                                username={profile.username}
+                                                brandColor={brandColor}
+                                                size="md"
+                                            />
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-1.5">
                                                     <span className="text-xs font-bold text-white truncate">

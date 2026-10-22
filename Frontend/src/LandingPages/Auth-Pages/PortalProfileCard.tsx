@@ -8,6 +8,7 @@ export interface PortalProfileData {
     username: string;
     name: string;
     avatar: string;
+    avatarUrl?: string;
     stats: Array<{ label: string; value: string }>;
     profileUrl: string;
     verified: boolean;
@@ -40,6 +41,11 @@ export const PortalProfileCard = ({
     const [profile, setProfile] = useState<PortalProfileData | null>(initialProfile || null);
     const [loading, setLoading] = useState(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
+    const [avatarFailed, setAvatarFailed] = useState(false);
+
+    useEffect(() => {
+        setAvatarFailed(false);
+    }, [profile?.avatar]);
 
     useEffect(() => {
         if (!username || username.trim().length < 2) {
@@ -164,22 +170,33 @@ export const PortalProfileCard = ({
                 <div className="flex items-center gap-3.5 min-w-0">
                     {/* Avatar with Platform Mini Badge at bottom-right */}
                     <div className="relative flex-shrink-0">
-                        <img
-                            src={profile.avatar}
-                            alt={profile.name}
-                            referrerPolicy="no-referrer"
-                            className="h-12 w-12 sm:h-14 sm:w-14 rounded-full object-cover border-2 p-0.5 bg-neutral-900 shadow-md"
+                        <div
+                            className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 p-0.5 bg-neutral-900 shadow-md flex items-center justify-center overflow-hidden"
                             style={{ borderColor: brandColor }}
-                            onError={(e) => {
-                                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                    profile.name || username
-                                )}&background=${brandColor.replace("#", "")}&color=fff&size=128&bold=true`;
-                            }}
-                        />
-                        {/* Mini portal badge in the bottom-right corner matching user screenshot */}
-                        <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white p-0.5 shadow-md">
-                            {getPortalIcon(portalId, "h-3.5 w-3.5")}
+                        >
+                            {!avatarFailed && profile.avatar && profile.avatar.trim().length > 5 && !profile.avatar.includes("ui-avatars.com") ? (
+                                <img
+                                    src={profile.avatar.trim()}
+                                    alt={profile.name || username}
+                                    referrerPolicy="no-referrer"
+                                    className="h-full w-full rounded-full object-cover"
+                                    onError={() => setAvatarFailed(true)}
+                                />
+                            ) : (
+                                <div className="w-full h-full rounded-full bg-neutral-800 flex items-center justify-center p-2 text-white">
+                                    {getPortalIcon(portalId, "w-full h-full object-contain")}
+                                </div>
+                            )}
                         </div>
+                        {/* Mini portal badge in the bottom-right corner */}
+                        {!avatarFailed && profile.avatar && profile.avatar.trim().length > 5 && !profile.avatar.includes("ui-avatars.com") && (
+                            <div
+                                className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white p-0.5 shadow-md border"
+                                style={{ borderColor: brandColor }}
+                            >
+                                {getPortalIcon(portalId, "h-3.5 w-3.5")}
+                            </div>
+                        )}
                     </div>
 
                     {/* Info and Stats Pills */}

@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
 
 export type SidebarTab =
+    | "home"
     | "dashboard"
     | "trends"
     | "notifications"
@@ -173,12 +174,26 @@ export const Sidebar = ({
     // 1 dashboard, 2 leaderboard, 3 event tracker, 4 connect platform, 5 profile, 6 resume, 7 projects
     const mainNavItems = [
         {
+            id: "home" as SidebarTab,
+            label: "Home",
+            icon: (
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                    <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}>
+                        <path d="M21 19v-6.733a4 4 0 0 0-1.245-2.9L13.378 3.31a2 2 0 0 0-2.755 0L4.245 9.367A4 4 0 0 0 3 12.267V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2"></path>
+                        <path d="M9 15a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6H9z"></path>
+                    </g>
+                </svg>
+            ),
+            path: "/",
+        },
+        {
             id: "dashboard" as SidebarTab,
             label: "Dashboard",
             icon: (
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
+
+
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                    <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 5a2 2 0 0 1 2-2h6v18H4a2 2 0 0 1-2-2zm12-2h6a2 2 0 0 1 2 2v5h-8zm0 11h8v5a2 2 0 0 1-2 2h-6z"></path>
                 </svg>
             ),
             path: "/dashboard",
@@ -314,14 +329,14 @@ export const Sidebar = ({
             onMouseLeave={() => {
                 setIsHovered(false);
             }}
-            className={`h-[calc(100vh-1.5rem)] sm:h-[calc(100vh-2rem)] flex flex-col justify-between rounded-[32px] bg-black border border-neutral-800 text-white p-3.5 select-none transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-3 sm:top-4 left-3 sm:left-4 z-50 overflow-x-hidden will-change-[width] ${isExpanded
+            className={`h-[calc(100vh-1rem)] sm:h-[calc(100vh-1.5rem)] flex flex-col justify-between rounded-[36px] bg-black border border-neutral-800 text-white px-2 py-2.5 sm:px-2 sm:py-3 select-none transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-2 sm:top-3 left-2 sm:left-3 z-50 overflow-x-hidden will-change-[width] ${isExpanded
                 ? "w-64 sm:w-[264px] shadow-2xl shadow-black/80 ring-1 ring-white/10"
-                : "w-[72px] shadow-lg shadow-black/40"
+                : "w-[68px] sm:w-[72px] shadow-lg shadow-black/40"
                 }`}
         >
             {/* Top Brand Header without border or bg around logo */}
             <div className="flex-1 min-h-0 flex flex-col overflow-y-auto no-scrollbar overflow-x-hidden">
-                <div className={`flex items-center pb-4 pt-1 border-b border-white/[0.07] overflow-x-hidden ${isExpanded ? "px-1 justify-start" : "justify-center"}`}>
+                <div className={`flex items-center pb-3 pt-0.5 border-b border-white/[0.07] overflow-x-hidden ${isExpanded ? "px-1 justify-start" : "justify-center"}`}>
                     <Link
                         to="/dashboard"
                         onClick={() => handleItemClick("dashboard")}
@@ -487,39 +502,73 @@ export const Sidebar = ({
             </div>
 
             {/* Bottom Section: Profile Card (DEAD CENTER avatar when collapsed) */}
-            <div ref={profileMenuRef} className="pt-3 border-t border-white/[0.07] relative flex-shrink-0">
+            <div ref={profileMenuRef} className="pt-2.5 border-t border-white/[0.07] relative flex-shrink-0">
                 <button
                     type="button"
                     onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                    className="w-full h-12 flex items-center rounded-2xl hover:bg-white/[0.05] transition-colors cursor-pointer group text-left overflow-hidden relative"
+                    className="w-full h-14 flex items-center rounded-2xl hover:bg-white/[0.05] transition-colors cursor-pointer group text-left overflow-hidden relative"
                     title={`${displayName} (${displayEmail})`}
                     aria-expanded={isProfileMenuOpen}
                     aria-haspopup="menu"
                 >
-                    <div className="flex items-center overflow-hidden w-full">
-                        {/* Circular Avatar: DEAD CENTER in 44px container with glowing amber ring */}
-                        <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                            <img
-                                src={avatarSrc}
-                                alt={displayName}
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                        displayName
-                                    )}&background=1f293d&color=fff&size=128&bold=true`;
-                                }}
-                                className="w-9 h-9 rounded-full object-cover ring-2 ring-amber-500/40"
-                            />
-                            {unreadNotificationsCount > 0 && (
-                                <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-500 ring-2 ring-[#0c0d10]" />
-                                </span>
-                            )}
+                    <div className={`flex items-center overflow-hidden w-full ${isExpanded ? "justify-start" : "justify-center"}`}>
+                        {/* Circular Avatar: Prominent & Centered with glowing segmented ring */}
+                        <div className="flex items-center justify-center flex-shrink-0">
+                            <div className="relative flex-shrink-0 w-12 h-12 sm:w-[50px] sm:h-[50px]">
+                                {/* Segmented outer ring */}
+                                <div
+                                    className="absolute inset-0 rounded-full"
+                                    style={{
+                                        background: `
+                conic-gradient(
+                    from -75deg,
+                    #C084FC 0deg 98deg,
+                    #17191f 98deg 103deg,
+                    #38BDF8 103deg 190deg,
+                    #17191f 190deg 195deg,
+                    #ff80d7ff 195deg 355deg,
+                    #17191f 355deg 360deg
+                )
+            `,
+                                        padding: "2.5px",
+                                    }}
+                                >
+                                    {/* Dark separator / inner ring */}
+                                    <div className="w-full h-full rounded-full bg-[#17191f] p-[2px]">
+                                        {/* Avatar image */}
+                                        <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900">
+                                            {avatarSrc ? (
+                                                <img
+                                                    src={avatarSrc}
+                                                    alt={displayName}
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                                            displayName
+                                                        )}&background=1f293d&color=fff&size=128&bold=true`;
+                                                    }}
+                                                    className="w-full h-full rounded-full object-cover"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full bg-neutral-900 flex items-center justify-center font-bold text-base text-white">
+                                                    {displayName.slice(0, 2).toUpperCase()}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {unreadNotificationsCount > 0 && (
+                                    <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 ring-2 ring-[#0c0d10]" />
+                                    </span>
+                                )}
+                            </div>
                         </div>
 
                         {/* Name & Email fade in */}
                         {isExpanded && (
-                            <div className="min-w-0 flex-1 overflow-hidden animate-fadeIn pl-2">
+                            <div className="min-w-0 flex-1 overflow-hidden animate-fadeIn pl-2.5">
                                 <h4 className="text-xs sm:text-sm font-bold text-white whitespace-nowrap truncate group-hover:text-neutral-100">
                                     {displayName}
                                 </h4>
@@ -532,9 +581,8 @@ export const Sidebar = ({
                         {isExpanded && (
                             <div className="text-neutral-400 group-hover:text-white transition-colors p-1 flex-shrink-0 pr-2 ml-auto">
                                 <svg
-                                    className={`w-4 h-4 transition-transform duration-200 ${
-                                        isProfileMenuOpen ? "rotate-180 text-white" : ""
-                                    }`}
+                                    className={`w-4 h-4 transition-transform duration-200 ${isProfileMenuOpen ? "rotate-180 text-white" : ""
+                                        }`}
                                     viewBox="0 0 24 24"
                                     fill="none"
                                     stroke="currentColor"
