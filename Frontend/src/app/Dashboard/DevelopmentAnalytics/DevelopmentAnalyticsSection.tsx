@@ -77,19 +77,15 @@ export const DevelopmentAnalyticsSection: React.FC<DevelopmentAnalyticsSectionPr
     return (
         <section
             aria-label="Development Analytics"
-            className="w-full rounded-3xl bg-black border border-neutral-800 text-white p-6 sm:p-8 shadow-2xl relative overflow-hidden select-none font-sans"
+            className="w-full rounded-3xl bg-white border border-neutral-300 text-neutral-900 p-6 sm:p-8 shadow-sm relative overflow-hidden select-none font-sans"
         >
-            {/* Ambient Lighting Glows */}
-            <div className="absolute -top-32 -left-32 w-96 h-96 bg-blue-500/[0.04] rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-indigo-500/[0.04] rounded-full blur-3xl pointer-events-none" />
-
             <div className="relative z-10">
                 {/* Languages (left) & Top Repositories (right) */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
-                    <div className="flex flex-col justify-between">
+                    <div className="flex flex-col justify-between h-full">
                         <LanguagesCard languages={data?.languages} isLoading={isLoading} />
                     </div>
-                    <div className="flex flex-col justify-between lg:border-l lg:border-white/[0.08] lg:pl-8 pt-6 lg:pt-0 border-t lg:border-t-0 border-white/[0.08]">
+                    <div className="flex flex-col justify-between h-full lg:border-l lg:border-neutral-300 lg:pl-8 pt-6 lg:pt-0 border-t lg:border-t-0 border-neutral-300">
                         <DevelopmentHighlightsCard
                             repositories={data?.topRepositories}
                             githubHandle={data?.githubHandle || githubHandle}

@@ -66,11 +66,32 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
     // Document Viewer Controls (Below-the-screen viewer)
     const [zoomLevel, setZoomLevel] = useState<number>(100);
     const [isCopiedCdnLink, setIsCopiedCdnLink] = useState(false);
+    const [isIframeLoaded, setIsIframeLoaded] = useState(false);
+    const [iframeError, setIframeError] = useState(false);
 
     // Modals
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isChecksModalOpen, setIsChecksModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+
+    // Light-dismiss dialogs on Escape key press (Modern Web Guidelines)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setIsPreviewOpen(false);
+                setIsChecksModalOpen(false);
+                setIsDeleteModalOpen(false);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
+
+    // Reset iframe loaded state when resume URL changes
+    useEffect(() => {
+        setIsIframeLoaded(false);
+        setIframeError(false);
+    }, [resumeData.resumeUrl]);
 
     // "For your resume" snippet controls
     const [snippetTab, setSnippetTab] = useState<SnippetTab>("bullets");
@@ -1013,15 +1034,98 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                             </div>
                         </div>
 
-                        {/* Live Embedded PDF Viewer Viewport */}
+                        {/* Live Embedded PDF Viewer Viewport with Smooth Scale Zoom & Skeleton Placeholder */}
                         <div className="w-full rounded-2xl bg-[#07090F] border border-neutral-800 overflow-hidden shadow-[inset_0_2px_12px_rgba(0,0,0,0.8)] relative flex flex-col items-center justify-center min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px]">
-                            <iframe
-                                key={`${resumeData.resumeUrl}-${zoomLevel}`}
-                                src={`${resumeData.resumeUrl}#toolbar=1&navpanes=0&zoom=${zoomLevel}`}
-                                title={resumeData.resumeFilename || "Resume Document Viewer"}
-                                className="w-full h-full min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px] border-0 rounded-2xl bg-white shadow-2xl"
-                                loading="lazy"
-                            />
+                            {/* Ambient Skeleton Loading State */}
+                            {!isIframeLoaded && !iframeError && (
+                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#07090F] space-y-4">
+                                    <div className="relative">
+                                        <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-400 shadow-[0_0_25px_rgba(99,102,241,0.2)]">
+                                            <FileText className="w-7 h-7 text-indigo-400 animate-pulse" />
+                                        </div>
+                                        <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-indigo-500 animate-ping" />
+                                    </div>
+                                    <div className="text-center space-y-1">
+                                        <p className="text-sm font-bold text-white tracking-tight">Rendering ATS Document...</p>
+                                        <p className="text-xs text-neutral-400 font-mono">Cloudinary CDN verified stream</p>
+                                    </div>
+                                    <div className="w-48 h-1.5 rounded-full bg-neutral-900 overflow-hidden border border-neutral-800">
+                                        <div className="h-full bg-gradient-to-r from-indigo-600 via-indigo-400 to-cyan-400 w-full animate-pulse" />
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Error Fallback if PDF Viewer is Blocked */}
+                            {iframeError && (
+                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#07090F] p-6 text-center space-y-3">
+                                    <AlertCircle className="w-10 h-10 text-amber-400" />
+                                    <h3 className="text-base font-bold text-white">Browser Preview Blocked</h3>
+                                    <p className="text-xs text-neutral-400 max-w-md">
+                                        Your browser or extension prevented inline PDF rendering. You can still open or download your resume directly.
+                                    </p>
+                                    <div className="flex items-center gap-3 pt-2">
+                                        <a
+                                            href={resumeData.resumeUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold border border-neutral-800"
+                                        >
+                                            Open in Tab
+                                        </a>
+                                        <a
+                                            href={resumeData.resumeUrl}
+                                            download={resumeData.resumeFilename || "resume.pdf"}
+                                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
+                                        >
+                                            Download PDF
+                                        </a>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Scalable Container with Smooth CSS Transform Zoom (ZERO Network Re-fetch on Zoom) */}
+                            <div className="w-full h-full min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px] overflow-auto flex justify-center items-start">
+                                <div
+                                    style={{
+                                        width: "100%",
+                                        height: "100%",
+                                        minHeight: "750px",
+                                        transform: `scale(${zoomLevel / 100})`,
+                                        transformOrigin: "top center",
+                                        transition: "transform 0.15s ease-out",
+                                    }}
+                                    className="w-full h-full min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px]"
+                                >
+                                    <iframe
+                                        key={resumeData.resumeUrl || "active-resume"}
+                                        src={`${resumeData.resumeUrl}#toolbar=1&navpanes=0`}
+                                        title={resumeData.resumeFilename || "Resume Document Viewer"}
+                                        className={`w-full h-full min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px] border-0 rounded-2xl bg-white shadow-2xl transition-opacity duration-300 ${
+                                            isIframeLoaded ? "opacity-100" : "opacity-0"
+                                        }`}
+                                        onLoad={() => setIsIframeLoaded(true)}
+                                        onError={() => {
+                                            setIsIframeLoaded(true);
+                                            setIframeError(true);
+                                        }}
+                                        loading="lazy"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Mobile Helper Callout Bar */}
+                            <div className="w-full flex sm:hidden items-center justify-between px-4 py-2 bg-indigo-950/40 border-t border-indigo-500/20 text-xs text-indigo-200">
+                                <span className="truncate">Viewing on mobile?</span>
+                                <a
+                                    href={resumeData.resumeUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="ml-2 font-bold underline flex items-center gap-1 text-white flex-shrink-0"
+                                >
+                                    <span>Open PDF</span>
+                                    <ExternalLink className="w-3 h-3" />
+                                </a>
+                            </div>
                         </div>
 
                         {/* Bottom Insights Strip below the Viewer */}
@@ -1096,10 +1200,18 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
             </div>
 
             {/* ========================================================================= */}
-            {/* MODAL 1: Interactive Full-Screen PDF Viewer Modal */}
+            {/* MODAL 1: Interactive Full-Screen PDF Viewer Modal with Light-Dismiss */}
             {/* ========================================================================= */}
             {isPreviewOpen && resumeData.resumeUrl && (
-                <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="previewModalTitle"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setIsPreviewOpen(false);
+                    }}
+                    className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+                >
                     <div className="w-full max-w-6xl h-[90vh] bg-black border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800 bg-[#06080F]">
@@ -1108,7 +1220,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                     <FileText className="w-4 h-4 text-indigo-400" />
                                 </div>
                                 <div className="min-w-0">
-                                    <h3 className="text-sm font-bold text-white truncate max-w-sm">
+                                    <h3 id="previewModalTitle" className="text-sm font-bold text-white truncate max-w-sm">
                                         {resumeData.resumeFilename || "Resume.pdf"}
                                     </h3>
                                     <p className="text-[11px] text-neutral-400 font-mono">
@@ -1140,7 +1252,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                     type="button"
                                     onClick={() => setIsPreviewOpen(false)}
                                     className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 transition-colors cursor-pointer"
-                                    title="Close preview"
+                                    title="Close preview (Esc)"
                                 >
                                     <X className="w-4 h-4" />
                                 </button>
@@ -1160,10 +1272,18 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
             )}
 
             {/* ========================================================================= */}
-            {/* MODAL 2: Eight Recruiter Checks Modal */}
+            {/* MODAL 2: Eight Recruiter Checks Modal with Light-Dismiss */}
             {/* ========================================================================= */}
             {isChecksModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="checksModalTitle"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setIsChecksModalOpen(false);
+                    }}
+                    className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+                >
                     <div className="w-full max-w-xl bg-black border border-neutral-800 rounded-3xl p-6 shadow-2xl space-y-5">
                         <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
                             <div className="flex items-center gap-2.5">
@@ -1171,7 +1291,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                     <FileCheck2 className="w-4 h-4" />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-bold text-white tracking-tight">
+                                    <h3 id="checksModalTitle" className="text-base font-bold text-white tracking-tight">
                                         Eight Quick Recruiter Checks
                                     </h3>
                                     <p className="text-xs text-neutral-400">
@@ -1183,6 +1303,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                 type="button"
                                 onClick={() => setIsChecksModalOpen(false)}
                                 className="p-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 cursor-pointer"
+                                title="Close checks (Esc)"
                             >
                                 <X className="w-4 h-4" />
                             </button>
@@ -1234,16 +1355,24 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
             )}
 
             {/* ========================================================================= */}
-            {/* MODAL 3: Delete Confirmation Modal */}
+            {/* MODAL 3: Delete Confirmation Modal with Light-Dismiss */}
             {/* ========================================================================= */}
             {isDeleteModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn">
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="deleteModalTitle"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget && !isDeleting) setIsDeleteModalOpen(false);
+                    }}
+                    className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+                >
                     <div className="w-full max-w-md bg-black border border-neutral-800 rounded-3xl p-6 shadow-2xl space-y-4 text-center">
                         <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 mx-auto flex items-center justify-center">
                             <Trash2 className="w-6 h-6" />
                         </div>
                         <div>
-                            <h3 className="text-base font-bold text-white tracking-tight">
+                            <h3 id="deleteModalTitle" className="text-base font-bold text-white tracking-tight">
                                 Delete Resume?
                             </h3>
                             <p className="text-xs text-neutral-400 mt-1 leading-relaxed">

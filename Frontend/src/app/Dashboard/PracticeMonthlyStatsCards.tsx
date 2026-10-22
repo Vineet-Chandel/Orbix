@@ -181,7 +181,7 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
     const cards = [
         {
             title: "Problems solved",
-            icon: <Target className="w-4 h-4 text-neutral-300" />,
+            icon: <Target className="w-5 h-5 text-neutral-800" />,
             value: problemsSolved,
             delta: submissionsThisMonth,
             subtext: "submissions this month",
@@ -189,7 +189,7 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
         },
         {
             title: "Contest rating",
-            icon: <Trophy className="w-4 h-4 text-neutral-300" />,
+            icon: <Trophy className="w-5 h-5 text-neutral-800" />,
             value: contestRating,
             delta: null,
             subtext: contestRatingSubtext,
@@ -197,7 +197,7 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
         },
         {
             title: "Active days",
-            icon: <Calendar className="w-4 h-4 text-neutral-300" />,
+            icon: <Calendar className="w-5 h-5 text-neutral-800" />,
             value: activeDays,
             delta: activeDaysThisMonth,
             subtext: "this month",
@@ -205,7 +205,7 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
         },
         {
             title: "Contests",
-            icon: <Gauge className="w-4 h-4 text-neutral-300" />,
+            icon: <Gauge className="w-5 h-5 text-neutral-800" />,
             value: contestsTotal,
             delta: null,
             subtext: `${contestsThisMonth} this month`,
@@ -216,22 +216,22 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
     return (
         <section
             aria-label="Monthly Practice Analytics"
-            className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 select-none font-sans"
+            className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 select-none font-sans"
         >
             {cards.map((card, idx) => (
                 <div
                     key={idx}
-                    className="relative group rounded-2xl bg-black border border-neutral-800 hover:border-neutral-700 p-5 sm:p-6 flex flex-col justify-between transition-all duration-200 shadow-xl overflow-hidden"
+                    className="relative group rounded-2xl bg-white border border-neutral-300 hover:border-neutral-400 p-5 sm:p-6 flex flex-col justify-between transition-all duration-200 shadow-sm overflow-hidden"
                 >
                     {/* Subtle top edge highlight */}
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent pointer-events-none" />
+                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-black/[0.04] to-transparent pointer-events-none" />
 
                     {/* Top Row: Icon container + Title */}
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center flex-shrink-0 shadow-xs">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center flex-shrink-0 shadow-2xs">
                             {card.icon}
                         </div>
-                        <h4 className="text-xs sm:text-sm font-medium text-neutral-300 tracking-tight">
+                        <h4 className="text-base sm:text-lg font-bold text-neutral-800 tracking-tight">
                             {card.title}
                         </h4>
                     </div>
@@ -239,12 +239,12 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
                     {/* Bottom Row: Big Bold Metric Value, Delta Subtitle, and Sparkline */}
                     <div className="flex items-end justify-between gap-3 mt-4 sm:mt-5">
                         <div className="min-w-0">
-                            <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight leading-none block font-sans">
+                            <span className="text-4xl sm:text-5xl font-black text-neutral-900 tracking-tight leading-none block font-sans">
                                 {card.value}
                             </span>
-                            <div className="flex items-center gap-1.5 text-xs text-neutral-400 mt-2 sm:mt-2.5 whitespace-nowrap">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-neutral-600 mt-2.5 sm:mt-3 whitespace-nowrap font-medium">
                                 {card.delta !== null && (
-                                    <span className="text-emerald-400 font-bold inline-flex items-center">
+                                    <span className="text-neutral-950 font-black inline-flex items-center">
                                         ↗ {card.delta}
                                     </span>
                                 )}
@@ -255,24 +255,24 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
                         {card.sparkline && (
                             <div className="flex-shrink-0 pb-0.5">
                                 <svg
-                                    className="w-20 h-7 sm:w-24 sm:h-8 overflow-visible"
+                                    className="w-24 h-8 sm:w-28 sm:h-9 overflow-visible"
                                     viewBox="0 0 100 32"
                                 >
                                     <path
                                         d={card.sparkline.d}
                                         fill="none"
-                                        stroke="#f59e0b"
-                                        strokeWidth="2.2"
+                                        stroke="#000000"
+                                        strokeWidth="2.4"
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                     />
                                     <circle
                                         cx={card.sparkline.last.x}
                                         cy={card.sparkline.last.y}
-                                        r="3"
-                                        fill="#000000"
-                                        stroke="#f59e0b"
-                                        strokeWidth="2.2"
+                                        r="3.5"
+                                        fill="#ffffff"
+                                        stroke="#000000"
+                                        strokeWidth="2.4"
                                     />
                                 </svg>
                             </div>

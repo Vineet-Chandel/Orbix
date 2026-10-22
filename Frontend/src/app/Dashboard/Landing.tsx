@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Code2, GitBranch } from "lucide-react";
 import { useAppDispatch, useAppSelector, clearUser, fetchUserProfile } from "../../store";
 import { NotificationBell } from "../../components/NotificationBell";
 import { Sidebar, type SidebarTab } from "./Sidebar";
@@ -73,7 +72,7 @@ export default function Dashboard() {
         try {
             const raw = localStorage.getItem("orbix_connected_portals");
             if (raw) return JSON.parse(raw);
-        } catch {}
+        } catch { }
         return {};
     });
 
@@ -105,7 +104,7 @@ export default function Dashboard() {
                 if (hasChanges) {
                     try {
                         localStorage.setItem("orbix_connected_portals", JSON.stringify(next));
-                    } catch {}
+                    } catch { }
                     return next;
                 }
                 return prev;
@@ -141,8 +140,8 @@ export default function Dashboard() {
     }).format(new Date());
 
     return (
-        <div className="min-h-screen bg-[#F0F2F6] text-neutral-900 font-sans flex antialiased selection:bg-neutral-900 selection:text-white">
-            {/* Left Sidebar (Matching Prodexa Floating Style with Black Color Scheme) */}
+        <div className="min-h-screen bg-[#F5F5F7] text-neutral-900 font-sans flex antialiased selection:bg-neutral-900 selection:text-white">
+            {/* Left Sidebar (Apple-inspired floating sidebar) */}
             <Sidebar
                 activeTab={activeTab}
                 onTabChange={(tab) => {
@@ -160,14 +159,14 @@ export default function Dashboard() {
 
             {/* Right Main Dashboard Workspace */}
             <div className="flex-1 min-w-0 flex flex-col min-h-screen p-3 sm:p-4 lg:pl-0">
-                {/* Top Header Bar matching Prodexa style */}
-                <header className="h-16 w-full rounded-2xl bg-white border border-neutral-200/90 shadow-xs px-4 sm:px-6 flex items-center justify-between gap-4 mb-4 flex-shrink-0">
+                {/* Top Header Bar matching Apple design language */}
+                <header className="h-16 w-full rounded-2xl bg-white border border-neutral-300 shadow-sm px-4 sm:px-6 flex items-center justify-between gap-4 mb-4 flex-shrink-0">
                     {/* Left: Mobile Toggle & Page Title */}
                     <div className="flex items-center gap-3">
                         <button
                             type="button"
                             onClick={() => setIsMobileSidebarOpen(true)}
-                            className="lg:hidden p-2 text-neutral-600 hover:text-neutral-950 rounded-xl hover:bg-neutral-100 transition-colors"
+                            className="lg:hidden p-2 text-neutral-600 hover:text-neutral-950 rounded-xl hover:bg-black/[0.04] transition-colors"
                             aria-label="Open sidebar"
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -180,20 +179,20 @@ export default function Dashboard() {
                             {activeTab === "trends"
                                 ? "Trends & Performance Reports"
                                 : activeTab === "notifications"
-                                ? "Inbox & Inquiries"
-                                : activeTab === "profile"
-                                ? "Developer Profile"
-                                : activeTab === "resume"
-                                ? "Resume & Credentials"
-                                : activeTab === "projects"
-                                ? "Projects & Code"
-                                : activeTab === "connect-platform"
-                                ? "Connect Coding Platforms"
-                                : "Orbix Dashboard"}
+                                    ? "Inbox & Inquiries"
+                                    : activeTab === "profile"
+                                        ? "Developer Profile"
+                                        : activeTab === "resume"
+                                            ? "Resume & Credentials"
+                                            : activeTab === "projects"
+                                                ? "Projects & Code"
+                                                : activeTab === "connect-platform"
+                                                    ? "Connect Coding Platforms"
+                                                    : "Orbix Dashboard"}
                         </h1>
                     </div>
 
-                    {/* Center: Search input with ⌘ + / badge matching screenshot */}
+                    {/* Center: Search input with ⌘ + / badge */}
                     <div className="hidden md:flex items-center flex-1 max-w-md mx-4">
                         <div className="relative w-full">
                             <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
@@ -207,10 +206,10 @@ export default function Dashboard() {
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Search or jump to..."
-                                className="w-full pl-9 pr-14 py-2 bg-neutral-100/80 hover:bg-neutral-100 focus:bg-white text-xs rounded-full border border-neutral-200/80 focus:border-neutral-900 focus:outline-none transition-colors"
+                                className="w-full pl-9 pr-14 py-2 bg-black/[0.03] hover:bg-black/[0.05] focus:bg-white text-xs sm:text-sm rounded-full border border-neutral-300 focus:border-black text-neutral-900 focus:outline-none transition-colors"
                             />
                             <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                <span className="text-[10px] font-mono text-neutral-400 bg-white border border-neutral-200 px-1.5 py-0.5 rounded-md shadow-2xs">
+                                <span className="text-[10px] font-mono text-neutral-400 bg-white border border-neutral-300 px-1.5 py-0.5 rounded-md shadow-2xs">
                                     ⌘ + /
                                 </span>
                             </div>
@@ -223,14 +222,14 @@ export default function Dashboard() {
                         <Link
                             to="/profile"
                             title="Profile Settings"
-                            className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full hover:bg-neutral-100 transition-colors"
+                            className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full hover:bg-black/[0.04] transition-colors"
                         >
                             <img
                                 src={user?.photoUrl || user?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=111827&color=fff&size=64&bold=true`}
                                 alt={displayName}
                                 className="w-7 h-7 rounded-full object-cover border border-neutral-200"
                             />
-                            <span className="hidden sm:inline text-xs font-semibold text-neutral-700">
+                            <span className="hidden sm:inline text-xs sm:text-sm font-semibold text-neutral-700">
                                 {displayName}
                             </span>
                         </Link>
@@ -246,36 +245,32 @@ export default function Dashboard() {
                                 <h2 className="text-xl sm:text-2xl font-extrabold text-neutral-900 tracking-tight">
                                     Welcome {displayName}!
                                 </h2>
-                                <p className="text-xs text-neutral-500 font-medium">
+                                <p className="text-xs sm:text-sm text-neutral-500 font-medium">
                                     Today, {formattedDate}
                                 </p>
                             </div>
 
                             {/* Two Dashboard Fields: Practice & Development */}
-                            <div className="inline-flex items-center p-1 rounded-2xl bg-white border border-neutral-200/90 shadow-xs self-start sm:self-auto">
+                            <div className="inline-flex items-center p-1 rounded-2xl bg-white border border-neutral-300 shadow-sm self-start sm:self-auto">
                                 <button
                                     type="button"
                                     onClick={() => setActiveDashboardField("practice")}
-                                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                        activeDashboardField === "practice"
-                                            ? "bg-black text-white shadow-sm"
-                                            : "text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80"
-                                    }`}
+                                    className={`inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeDashboardField === "practice"
+                                        ? "bg-black text-white shadow-xs"
+                                        : "text-neutral-600 hover:text-neutral-950 hover:bg-black/[0.04]"
+                                        }`}
                                 >
-                                    <Code2 className="w-3.5 h-3.5 text-emerald-400" />
                                     <span>Practice</span>
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={() => setActiveDashboardField("development")}
-                                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                        activeDashboardField === "development"
-                                            ? "bg-black text-white shadow-sm"
-                                            : "text-neutral-600 hover:text-neutral-950 hover:bg-neutral-100/80"
-                                    }`}
+                                    className={`inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${activeDashboardField === "development"
+                                        ? "bg-black text-white shadow-xs"
+                                        : "text-neutral-600 hover:text-neutral-950 hover:bg-black/[0.04]"
+                                        }`}
                                 >
-                                    <GitBranch className="w-3.5 h-3.5 text-indigo-400" />
                                     <span>Development</span>
                                 </button>
                             </div>
@@ -324,8 +319,8 @@ export default function Dashboard() {
 
                 {/* Sub-view: Profile */}
                 {activeTab === "profile" && (
-                    <div className="rounded-2xl bg-white border border-neutral-200/90 p-6 sm:p-8 shadow-xs space-y-6 flex-1">
-                        <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+                    <div className="rounded-2xl bg-white border border-black/[0.06] p-6 sm:p-8 shadow-xs space-y-6 flex-1">
+                        <div className="flex items-center justify-between pb-4 border-b border-black/[0.06]">
                             <div>
                                 <h2 className="text-xl font-extrabold text-neutral-900 tracking-tight">
                                     Developer Profile
@@ -337,26 +332,26 @@ export default function Dashboard() {
                             <button
                                 type="button"
                                 onClick={handleSignOut}
-                                className="px-4 py-2 rounded-full border border-neutral-300 hover:border-neutral-900 text-xs font-bold text-neutral-900 transition-colors"
+                                className="px-4 py-2 rounded-full border border-black/10 hover:border-black text-xs font-bold text-neutral-900 hover:bg-black/[0.04] transition-colors"
                             >
                                 Sign Out
                             </button>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-100 space-y-1">
+                            <div className="p-4 rounded-xl bg-black/[0.02] border border-black/[0.06] space-y-1">
                                 <span className="text-[11px] font-bold text-neutral-400 uppercase">Display Name</span>
                                 <p className="text-sm font-extrabold text-neutral-900">{displayName}</p>
                             </div>
-                            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-100 space-y-1">
+                            <div className="p-4 rounded-xl bg-black/[0.02] border border-black/[0.06] space-y-1">
                                 <span className="text-[11px] font-bold text-neutral-400 uppercase">Username</span>
                                 <p className="text-sm font-extrabold text-neutral-900">@{user?.username || "developer"}</p>
                             </div>
-                            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-100 space-y-1">
+                            <div className="p-4 rounded-xl bg-black/[0.02] border border-black/[0.06] space-y-1">
                                 <span className="text-[11px] font-bold text-neutral-400 uppercase">Registered Email</span>
                                 <p className="text-sm font-extrabold text-neutral-900">{user?.gmail || "Not specified"}</p>
                             </div>
-                            <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-100 space-y-1">
+                            <div className="p-4 rounded-xl bg-black/[0.02] border border-black/[0.06] space-y-1">
                                 <span className="text-[11px] font-bold text-neutral-400 uppercase">Connected Platforms</span>
                                 <p className="text-sm font-extrabold text-neutral-900">{connectedPortalsCount} Portals Saved</p>
                             </div>
@@ -365,7 +360,7 @@ export default function Dashboard() {
                         <div className="pt-4">
                             <Link
                                 to="/onboarding"
-                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-black text-white hover:bg-neutral-800 text-xs font-bold transition-all shadow-md"
+                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-black text-white hover:bg-neutral-800 text-xs font-bold transition-all shadow-xs"
                             >
                                 <span>Manage Coding Portals Bucket</span>
                                 <span>→</span>
@@ -383,8 +378,8 @@ export default function Dashboard() {
 
                 {/* Sub-view: Projects */}
                 {activeTab === "projects" && (
-                    <div className="rounded-2xl bg-white border border-neutral-200/90 p-6 sm:p-8 shadow-xs space-y-6 flex-1">
-                        <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+                    <div className="rounded-2xl bg-white border border-black/[0.06] p-6 sm:p-8 shadow-xs space-y-6 flex-1">
+                        <div className="flex items-center justify-between pb-4 border-b border-black/[0.06]">
                             <div>
                                 <h2 className="text-xl font-extrabold text-neutral-900 tracking-tight">
                                     Projects & Repositories
@@ -396,7 +391,7 @@ export default function Dashboard() {
                             <button
                                 type="button"
                                 onClick={() => alert("Creating new repository integration...")}
-                                className="px-4 py-2 rounded-full bg-black text-white hover:bg-neutral-800 text-xs font-bold transition-all shadow-md"
+                                className="px-4 py-2 rounded-full bg-black text-white hover:bg-neutral-800 text-xs font-bold transition-all shadow-xs"
                             >
                                 + New Project
                             </button>
@@ -408,7 +403,7 @@ export default function Dashboard() {
                                 { name: "orbix-engine", desc: "Model Context Protocol real-time reviewer and analysis pipeline", stars: 89, lang: "Go" },
                                 { name: "orbix-ui", desc: "Clean modern dashboard with responsive sidebar and widgets", stars: 64, lang: "React" },
                             ].map((proj, idx) => (
-                                <div key={idx} className="p-4 rounded-xl border border-neutral-200 hover:border-neutral-900 transition-colors bg-white shadow-2xs space-y-2">
+                                <div key={idx} className="p-4 rounded-xl border border-black/[0.06] hover:border-black/20 transition-colors bg-white shadow-2xs space-y-2">
                                     <div className="flex items-center justify-between">
                                         <h4 className="text-sm font-bold text-neutral-900">{proj.name}</h4>
                                         <span className="text-[11px] font-mono text-neutral-400">★ {proj.stars}</span>

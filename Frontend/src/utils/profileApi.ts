@@ -569,14 +569,61 @@ export interface ResumeData {
     checks?: ResumeCheckItem[];
 }
 
+// In-memory client-side cache and request deduplication for resumes
+let cachedMyResume: { data: ResumeData; timestamp: number } | null = null;
+let myResumeInFlight: Promise<ResumeData> | null = null;
+const publicResumeCache = new Map<string, { data: ResumeData; timestamp: number }>();
+const publicResumeInFlight = new Map<string, Promise<ResumeData>>();
+
+const MY_RESUME_CLIENT_CACHE_TTL_MS = 60 * 1000; // 60s client freshness window
+const PUBLIC_RESUME_CLIENT_CACHE_TTL_MS = 3 * 60 * 1000; // 3 min public resume cache
+
+export const invalidateResumeClientCache = () => {
+    cachedMyResume = null;
+    myResumeInFlight = null;
+    publicResumeCache.clear();
+    publicResumeInFlight.clear();
+};
+
 /**
- * Fetch authenticated user's current resume details and recruiter checks
+ * Fetch authenticated user's current resume details and recruiter checks with SWR caching
  */
-export async function fetchMyResume(): Promise<ResumeData> {
-    const json = await apiFetch<{ success: boolean } & ResumeData>("/api/profile/resume", {
-        method: "GET",
-    });
-    return json;
+export async function fetchMyResume(options?: { forceRefresh?: boolean }): Promise<ResumeData> {
+    const now = Date.now();
+
+    // 1. Return fresh client cache if available and not forced
+    if (!options?.forceRefresh && cachedMyResume && now - cachedMyResume.timestamp < MY_RESUME_CLIENT_CACHE_TTL_MS) {
+        return cachedMyResume.data;
+    }
+
+    // 2. Share inflight request if one is already running
+    if (myResumeInFlight) {
+        return myResumeInFlight;
+    }
+
+    // 3. Initiate request with inflight tracking
+    myResumeInFlight = (async () => {
+        try {
+            const json = await apiFetch<{ success: boolean } & ResumeData>("/api/profile/resume", {
+                method: "GET",
+            });
+            cachedMyResume = {
+                data: json,
+                timestamp: Date.now(),
+            };
+            return json;
+        } catch (err) {
+            // Gracefully fallback to stale cache if available
+            if (cachedMyResume) {
+                return cachedMyResume.data;
+            }
+            throw err;
+        } finally {
+            myResumeInFlight = null;
+        }
+    })();
+
+    return myResumeInFlight;
 }
 
 /**
@@ -641,7 +688,15 @@ export async function uploadResume(
                 }
             );
 
+            // Invalidate caches and prime with new data
             invalidatePublicProfileClientCache();
+            invalidateResumeClientCache();
+            if (result?.resume) {
+                cachedMyResume = {
+                    data: result.resume,
+                    timestamp: Date.now(),
+                };
+            }
             return result;
         } catch (err: any) {
             lastError = err?.message || lastError;
@@ -660,6 +715,7 @@ export async function deleteResume(): Promise<{ success: boolean; message: strin
         method: "DELETE",
     });
     invalidatePublicProfileClientCache();
+    invalidateResumeClientCache();
     return json;
 }
 
@@ -677,21 +733,49 @@ export async function updateResumeVisibility(
         }
     );
     invalidatePublicProfileClientCache();
+    invalidateResumeClientCache();
     return json;
 }
 
 /**
- * Fetch a user's publicly shared resume
+ * Fetch a user's publicly shared resume with client-side caching & deduplication
  */
-export async function fetchPublicResume(username: string): Promise<ResumeData> {
-    const encoded = encodeURIComponent(username.toLowerCase().trim());
-    const json = await apiFetch<{ success: boolean } & ResumeData>(
-        `/api/profile/resume/public/${encoded}`,
-        {
-            method: "GET",
+export async function fetchPublicResume(username: string, options?: { forceRefresh?: boolean }): Promise<ResumeData> {
+    const normalized = username.toLowerCase().trim();
+    const now = Date.now();
+
+    if (!options?.forceRefresh) {
+        const cached = publicResumeCache.get(normalized);
+        if (cached && now - cached.timestamp < PUBLIC_RESUME_CLIENT_CACHE_TTL_MS) {
+            return cached.data;
         }
-    );
-    return json;
+    }
+
+    if (publicResumeInFlight.has(normalized)) {
+        return publicResumeInFlight.get(normalized)!;
+    }
+
+    const reqPromise = (async () => {
+        try {
+            const encoded = encodeURIComponent(normalized);
+            const json = await apiFetch<{ success: boolean } & ResumeData>(
+                `/api/profile/resume/public/${encoded}`,
+                {
+                    method: "GET",
+                }
+            );
+            publicResumeCache.set(normalized, {
+                data: json,
+                timestamp: Date.now(),
+            });
+            return json;
+        } finally {
+            publicResumeInFlight.delete(normalized);
+        }
+    })();
+
+    publicResumeInFlight.set(normalized, reqPromise);
+    return reqPromise;
 }
 
 

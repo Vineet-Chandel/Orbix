@@ -98,14 +98,13 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
 
     if (isDark) {
         return (
-            <div className="rounded-2xl border border-neutral-800 bg-[#1e1e24] p-4 text-white shadow-xl animate-fadeIn space-y-3">
+            <div className="rounded-2xl border border-white/10 bg-[#121214] p-4 text-white shadow-xl animate-fadeIn space-y-3">
                 {/* Header: Title and Legend */}
-                <div className="flex items-center justify-between pb-2 border-b border-neutral-800/80">
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
                     <div className="flex items-center gap-2">
                         {brandColor && (
                             <span
-                                className="w-2 h-2 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: brandColor }}
+                                className="w-2 h-2 rounded-full flex-shrink-0 bg-white"
                             />
                         )}
                         <span className="text-xs font-bold text-neutral-300">
@@ -114,16 +113,16 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                     </div>
 
                     <div className="flex items-center gap-2.5 text-[10px] font-semibold">
-                        <span className="flex items-center gap-1 text-[#00b8a3]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#00b8a3]" />
+                        <span className="flex items-center gap-1 text-neutral-400">
+                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-500" />
                             <span>Easy</span>
                         </span>
-                        <span className="flex items-center gap-1 text-[#ffc01e]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#ffc01e]" />
+                        <span className="flex items-center gap-1 text-neutral-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-300" />
                             <span>Med.</span>
                         </span>
-                        <span className="flex items-center gap-1 text-[#ef4743]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#ef4743]" />
+                        <span className="flex items-center gap-1 text-white">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white" />
                             <span>Hard</span>
                         </span>
                     </div>
@@ -132,17 +131,17 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                 {/* SVG Gauge */}
                 <div className="flex justify-center items-center py-1">
                     <svg viewBox="0 0 240 185" className="w-56 sm:w-60 h-auto overflow-visible select-none drop-shadow-md">
-                        <path d={describeArc(cx, cy, r, 130, 218)} fill="none" stroke="rgba(0, 184, 163, 0.22)" strokeWidth={strokeWidth} strokeLinecap="round" />
-                        <path d={describeArc(cx, cy, r, 226, 314)} fill="none" stroke="rgba(255, 192, 30, 0.22)" strokeWidth={strokeWidth} strokeLinecap="round" />
-                        <path d={describeArc(cx, cy, r, 322, 50)} fill="none" stroke="rgba(239, 71, 67, 0.22)" strokeWidth={strokeWidth} strokeLinecap="round" />
+                        <path d={describeArc(cx, cy, r, 130, 218)} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth={strokeWidth} strokeLinecap="round" />
+                        <path d={describeArc(cx, cy, r, 226, 314)} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth={strokeWidth} strokeLinecap="round" />
+                        <path d={describeArc(cx, cy, r, 322, 50)} fill="none" stroke="rgba(255, 255, 255, 0.08)" strokeWidth={strokeWidth} strokeLinecap="round" />
 
-                        {easyProgressAngle > 0 && <path d={describeArc(cx, cy, r, 130, easyEndAngle)} fill="none" stroke="#00b8a3" strokeWidth={strokeWidth} strokeLinecap="round" />}
-                        {medProgressAngle > 0 && <path d={describeArc(cx, cy, r, 226, medEndAngle)} fill="none" stroke="#ffc01e" strokeWidth={strokeWidth} strokeLinecap="round" />}
-                        {hardProgressAngle > 0 && <path d={describeArc(cx, cy, r, 322, hardEndAngle)} fill="none" stroke="#ef4743" strokeWidth={strokeWidth} strokeLinecap="round" />}
+                        {easyProgressAngle > 0 && <path d={describeArc(cx, cy, r, 130, easyEndAngle)} fill="none" stroke="#3B82F6" strokeWidth={strokeWidth} strokeLinecap="round" />}
+                        {medProgressAngle > 0 && <path d={describeArc(cx, cy, r, 226, medEndAngle)} fill="none" stroke="#F59E0B" strokeWidth={strokeWidth} strokeLinecap="round" />}
+                        {hardProgressAngle > 0 && <path d={describeArc(cx, cy, r, 322, hardEndAngle)} fill="none" stroke="#EF4444" strokeWidth={strokeWidth} strokeLinecap="round" />}
 
-                        {easyDot && <circle cx={easyDot.x} cy={easyDot.y} r={strokeWidth / 2} fill="#00b8a3" />}
-                        {medDot && <circle cx={medDot.x} cy={medDot.y} r={strokeWidth / 2} fill="#ffc01e" />}
-                        {hardDot && <circle cx={hardDot.x} cy={hardDot.y} r={strokeWidth / 2} fill="#ef4743" />}
+                        {easyDot && <circle cx={easyDot.x} cy={easyDot.y} r={strokeWidth / 2} fill="#3B82F6" />}
+                        {medDot && <circle cx={medDot.x} cy={medDot.y} r={strokeWidth / 2} fill="#F59E0B" />}
+                        {hardDot && <circle cx={hardDot.x} cy={hardDot.y} r={strokeWidth / 2} fill="#EF4444" />}
 
                         <text x={cx} y={cy - 6} textAnchor="middle" dominantBaseline="middle">
                             <tspan className="text-3xl font-black fill-white tracking-tight">{total}</tspan>
@@ -150,7 +149,7 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                         </text>
 
                         <g transform={`translate(${cx - 30}, ${cy + 13})`}>
-                            <path d="M2 7l3 3 6-6" fill="none" stroke="#22c55e" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M2 7l3 3 6-6" fill="none" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
                             <text x="16" y="9" fill="#f3f4f6" fontSize="13" fontWeight="700" dominantBaseline="middle">Solved</text>
                         </g>
 
@@ -159,21 +158,21 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                 </div>
 
                 {/* Cards */}
-                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-neutral-800/80">
-                    <div className="p-2.5 rounded-xl bg-neutral-900/80 border border-teal-500/20 text-center space-y-1">
-                        <div className="flex items-center justify-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#00b8a3]" /><span className="text-[11px] font-bold text-neutral-300">Easy</span></div>
+                <div className="grid grid-cols-3 gap-2 pt-1 border-t border-white/10">
+                    <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-center space-y-1">
+                        <div className="flex items-center justify-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#3B82F6]" /><span className="text-[11px] font-bold text-neutral-300">Easy</span></div>
                         <p className="text-xs font-black text-white">{easy} <span className="text-[10px] text-neutral-400 font-normal">/{easyTotal}</span></p>
-                        <div className="w-full bg-neutral-800 rounded-full h-1 overflow-hidden mt-1"><div className="bg-[#00b8a3] h-full rounded-full" style={{ width: `${easyPct}%` }} /></div>
+                        <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden mt-1"><div className="bg-[#3B82F6] h-full rounded-full" style={{ width: `${easyPct}%` }} /></div>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-neutral-900/80 border border-amber-500/20 text-center space-y-1">
-                        <div className="flex items-center justify-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#ffc01e]" /><span className="text-[11px] font-bold text-neutral-300">Medium</span></div>
+                    <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-center space-y-1">
+                        <div className="flex items-center justify-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#F59E0B]" /><span className="text-[11px] font-bold text-neutral-300">Medium</span></div>
                         <p className="text-xs font-black text-white">{medium} <span className="text-[10px] text-neutral-400 font-normal">/{mediumTotal}</span></p>
-                        <div className="w-full bg-neutral-800 rounded-full h-1 overflow-hidden mt-1"><div className="bg-[#ffc01e] h-full rounded-full" style={{ width: `${medPct}%` }} /></div>
+                        <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden mt-1"><div className="bg-[#F59E0B] h-full rounded-full" style={{ width: `${medPct}%` }} /></div>
                     </div>
-                    <div className="p-2.5 rounded-xl bg-neutral-900/80 border border-rose-500/20 text-center space-y-1">
-                        <div className="flex items-center justify-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#ef4743]" /><span className="text-[11px] font-bold text-neutral-300">Hard</span></div>
+                    <div className="p-2.5 rounded-xl bg-white/[0.04] border border-white/10 text-center space-y-1">
+                        <div className="flex items-center justify-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#EF4444]" /><span className="text-[11px] font-bold text-neutral-300">Hard</span></div>
                         <p className="text-xs font-black text-white">{hard} <span className="text-[10px] text-neutral-400 font-normal">/{hardTotal}</span></p>
-                        <div className="w-full bg-neutral-800 rounded-full h-1 overflow-hidden mt-1"><div className="bg-[#ef4743] h-full rounded-full" style={{ width: `${hardPct}%` }} /></div>
+                        <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden mt-1"><div className="bg-[#EF4444] h-full rounded-full" style={{ width: `${hardPct}%` }} /></div>
                     </div>
                 </div>
             </div>
@@ -182,14 +181,13 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
 
     // Default: Elegant Modern Light Theme Box matching the modal
     return (
-        <div className="rounded-2xl border border-neutral-200/90 bg-white p-4 sm:p-5 text-neutral-900 shadow-xs animate-fadeIn space-y-3.5">
+        <div className="rounded-2xl border border-black/[0.06] bg-white p-4 sm:p-5 text-neutral-900 shadow-xs animate-fadeIn space-y-3.5">
             {/* Header: Title and Legend */}
-            <div className="flex items-center justify-between pb-2.5 border-b border-neutral-100">
+            <div className="flex items-center justify-between pb-2.5 border-b border-black/[0.06]">
                 <div className="flex items-center gap-2">
                     {brandColor && (
                         <span
-                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                            style={{ backgroundColor: brandColor }}
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-neutral-900"
                         />
                     )}
                     <span className="text-xs font-extrabold text-neutral-900 tracking-tight">
@@ -197,18 +195,18 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                     </span>
                 </div>
 
-                {/* Color Legend (Cyan: Easy, Yellow: Medium, Red: Hard) */}
+                {/* Color Legend (Monochrome: Easy, Medium, Hard) */}
                 <div className="flex items-center gap-2.5 sm:gap-3 text-[11px] font-bold">
-                    <span className="flex items-center gap-1.5 text-[#008f7e]">
-                        <span className="w-2 h-2 rounded-full bg-[#00b8a3]" />
+                    <span className="flex items-center gap-1.5 text-neutral-500">
+                        <span className="w-2 h-2 rounded-full bg-neutral-300" />
                         <span>Easy</span>
                     </span>
-                    <span className="flex items-center gap-1.5 text-[#b45309]">
-                        <span className="w-2 h-2 rounded-full bg-[#ffc01e]" />
+                    <span className="flex items-center gap-1.5 text-neutral-600">
+                        <span className="w-2 h-2 rounded-full bg-neutral-500" />
                         <span>Med.</span>
                     </span>
-                    <span className="flex items-center gap-1.5 text-[#dc2626]">
-                        <span className="w-2 h-2 rounded-full bg-[#ef4743]" />
+                    <span className="flex items-center gap-1.5 text-neutral-900">
+                        <span className="w-2 h-2 rounded-full bg-black" />
                         <span>Hard</span>
                     </span>
                 </div>
@@ -220,39 +218,36 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                     viewBox="0 0 240 185"
                     className="w-56 sm:w-60 h-auto overflow-visible select-none"
                 >
-                    {/* 1. Background Inactive Tracks (Light Theme Tinted Tracks) */}
-                    {/* Easy Track (Cyan muted tint) */}
+                    {/* 1. Background Inactive Tracks (Light Theme Neutral Tracks) */}
                     <path
                         d={describeArc(cx, cy, r, 130, 218)}
                         fill="none"
-                        stroke="rgba(0, 184, 163, 0.16)"
+                        stroke="rgba(0, 0, 0, 0.06)"
                         strokeWidth={strokeWidth}
                         strokeLinecap="round"
                     />
-                    {/* Medium Track (Yellow muted tint) */}
                     <path
                         d={describeArc(cx, cy, r, 226, 314)}
                         fill="none"
-                        stroke="rgba(255, 192, 30, 0.22)"
+                        stroke="rgba(0, 0, 0, 0.06)"
                         strokeWidth={strokeWidth}
                         strokeLinecap="round"
                     />
-                    {/* Hard Track (Red muted tint) */}
                     <path
                         d={describeArc(cx, cy, r, 322, 50)}
                         fill="none"
-                        stroke="rgba(239, 71, 67, 0.16)"
+                        stroke="rgba(0, 0, 0, 0.06)"
                         strokeWidth={strokeWidth}
                         strokeLinecap="round"
                     />
 
                     {/* 2. Active Progress Arcs */}
-                    {/* Easy Progress (Cyan) */}
+                    {/* Easy Progress (Blue) */}
                     {easyProgressAngle > 0 && (
                         <path
                             d={describeArc(cx, cy, r, 130, easyEndAngle)}
                             fill="none"
-                            stroke="#00b8a3"
+                            stroke="#3B82F6"
                             strokeWidth={strokeWidth}
                             strokeLinecap="round"
                         />
@@ -262,7 +257,7 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                         <path
                             d={describeArc(cx, cy, r, 226, medEndAngle)}
                             fill="none"
-                            stroke="#ffc01e"
+                            stroke="#F59E0B"
                             strokeWidth={strokeWidth}
                             strokeLinecap="round"
                         />
@@ -272,7 +267,7 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                         <path
                             d={describeArc(cx, cy, r, 322, hardEndAngle)}
                             fill="none"
-                            stroke="#ef4743"
+                            stroke="#EF4444"
                             strokeWidth={strokeWidth}
                             strokeLinecap="round"
                         />
@@ -284,7 +279,7 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                             cx={easyDot.x}
                             cy={easyDot.y}
                             r={strokeWidth / 2}
-                            fill="#00b8a3"
+                            fill="#3B82F6"
                             className="transition-all duration-300"
                         />
                     )}
@@ -293,7 +288,7 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                             cx={medDot.x}
                             cy={medDot.y}
                             r={strokeWidth / 2}
-                            fill="#ffc01e"
+                            fill="#F59E0B"
                             className="transition-all duration-300"
                         />
                     )}
@@ -302,7 +297,7 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                             cx={hardDot.x}
                             cy={hardDot.y}
                             r={strokeWidth / 2}
-                            fill="#ef4743"
+                            fill="#EF4444"
                             className="transition-all duration-300"
                         />
                     )}
@@ -322,7 +317,7 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                         <path
                             d="M2 7l3 3 6-6"
                             fill="none"
-                            stroke="#16a34a"
+                            stroke="#171717"
                             strokeWidth="2.4"
                             strokeLinecap="round"
                             strokeLinejoin="round"
@@ -330,7 +325,7 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                         <text
                             x="16"
                             y="9"
-                            fill="#111827"
+                            fill="#171717"
                             fontSize="13"
                             fontWeight="700"
                             dominantBaseline="middle"
@@ -344,7 +339,7 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                         x={cx}
                         y={cy + 68}
                         textAnchor="middle"
-                        fill="#6b7280"
+                        fill="#737373"
                         fontSize="12"
                         fontWeight="600"
                     >
@@ -353,63 +348,63 @@ export const PlatformDifficultyGauge: React.FC<PlatformDifficultyGaugeProps> = (
                 </svg>
             </div>
 
-            {/* 5. Difficulty Breakdown Cards (Light Theme with Tinted Cards) */}
-            <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-2 border-t border-neutral-100">
+            {/* 5. Difficulty Breakdown Cards (Light Theme Cards) */}
+            <div className="grid grid-cols-3 gap-2 sm:gap-2.5 pt-2 border-t border-neutral-200">
                 {/* Easy Box */}
-                <div className="p-2.5 rounded-xl bg-teal-50/70 border border-teal-200/70 text-center space-y-1 shadow-2xs">
+                <div className="p-2.5 rounded-xl bg-neutral-50/80 border border-neutral-200 text-center space-y-1 shadow-2xs">
                     <div className="flex items-center justify-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#00b8a3]" />
-                        <span className="text-[11px] font-bold text-teal-800">Easy</span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#3B82F6]" />
+                        <span className="text-[11px] font-bold text-neutral-700">Easy</span>
                     </div>
                     <p className="text-xs font-black text-neutral-900">
                         {easy}{" "}
-                        <span className="text-[10px] text-neutral-500 font-semibold">
+                        <span className="text-[10px] text-neutral-400 font-semibold">
                             /{easyTotal}
                         </span>
                     </p>
-                    <div className="w-full bg-teal-100/90 rounded-full h-1.5 overflow-hidden mt-1">
+                    <div className="w-full bg-neutral-200 rounded-full h-1.5 overflow-hidden mt-1">
                         <div
-                            className="bg-[#00b8a3] h-full rounded-full transition-all duration-500"
+                            className="bg-[#3B82F6] h-full rounded-full transition-all duration-500"
                             style={{ width: `${easyPct}%` }}
                         />
                     </div>
                 </div>
 
                 {/* Medium Box */}
-                <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/70 text-center space-y-1 shadow-2xs">
+                <div className="p-2.5 rounded-xl bg-neutral-50/80 border border-neutral-200 text-center space-y-1 shadow-2xs">
                     <div className="flex items-center justify-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#ffc01e]" />
-                        <span className="text-[11px] font-bold text-amber-800">Medium</span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#F59E0B]" />
+                        <span className="text-[11px] font-bold text-neutral-700">Medium</span>
                     </div>
                     <p className="text-xs font-black text-neutral-900">
                         {medium}{" "}
-                        <span className="text-[10px] text-neutral-500 font-semibold">
+                        <span className="text-[10px] text-neutral-400 font-semibold">
                             /{mediumTotal}
                         </span>
                     </p>
-                    <div className="w-full bg-amber-100/90 rounded-full h-1.5 overflow-hidden mt-1">
+                    <div className="w-full bg-neutral-200 rounded-full h-1.5 overflow-hidden mt-1">
                         <div
-                            className="bg-[#ffc01e] h-full rounded-full transition-all duration-500"
+                            className="bg-[#F59E0B] h-full rounded-full transition-all duration-500"
                             style={{ width: `${medPct}%` }}
                         />
                     </div>
                 </div>
 
                 {/* Hard Box */}
-                <div className="p-2.5 rounded-xl bg-rose-50/70 border border-rose-200/70 text-center space-y-1 shadow-2xs">
+                <div className="p-2.5 rounded-xl bg-neutral-50/80 border border-neutral-200 text-center space-y-1 shadow-2xs">
                     <div className="flex items-center justify-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#ef4743]" />
-                        <span className="text-[11px] font-bold text-rose-800">Hard</span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#EF4444]" />
+                        <span className="text-[11px] font-bold text-neutral-700">Hard</span>
                     </div>
                     <p className="text-xs font-black text-neutral-900">
                         {hard}{" "}
-                        <span className="text-[10px] text-neutral-500 font-semibold">
+                        <span className="text-[10px] text-neutral-400 font-semibold">
                             /{hardTotal}
                         </span>
                     </p>
-                    <div className="w-full bg-rose-100/90 rounded-full h-1.5 overflow-hidden mt-1">
+                    <div className="w-full bg-neutral-200 rounded-full h-1.5 overflow-hidden mt-1">
                         <div
-                            className="bg-[#ef4743] h-full rounded-full transition-all duration-500"
+                            className="bg-[#EF4444] h-full rounded-full transition-all duration-500"
                             style={{ width: `${hardPct}%` }}
                         />
                     </div>

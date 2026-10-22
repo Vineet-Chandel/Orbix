@@ -203,7 +203,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
             <nav
                 ref={navRef}
                 aria-label="Main Navigation"
-                className="w-[80%] pointer-events-auto relative flex items-center justify-between gap-1.5 sm:gap-2.5 p-[3px] pl-3.5 sm:pl-4 pr-[3px] rounded-full bg-[#0d111c]/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.45),0_1px_1px_0_rgba(255,255,255,0.08)_inset] transition-all duration-300 h-[52px]"
+                className="w-[80%] pointer-events-auto relative flex items-center justify-between gap-1.5 sm:gap-2.5 p-[3px] pl-3.5 sm:pl-4 pr-[3px] rounded-full bg-[#000000]/80 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_0_rgba(0,0,0,0.45),0_1px_1px_0_rgba(255,255,255,0.08)_inset] transition-all duration-300 h-[52px]"
             >
                 {/* Brand Logo & Title */}
                 <Link
@@ -332,38 +332,34 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         Demo Profile
                     </Link>
 
-                    {/* Authenticated User Notification Bell & Rounded Profile Picture */}
-                    {isLoggedIn && (
-                        <>
-                            <NotificationBell variant="dark" />
-                            <Link
-                                to="/dashboard"
-                                title={`${displayName} - Open Dashboard`}
-                                className="group relative flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 transition-transform hover:scale-105 active:scale-95 focus:outline-none"
-                            >
-                                <img
-                                    src={avatarSrc}
-                                    alt={displayName}
-                                    onError={(e) => {
-                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                            displayName
-                                        )}&background=111827&color=fff&size=128&bold=true`;
-                                    }}
-                                    className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover border border-white/20 ring-2 ring-white/10 group-hover:ring-amber-400/50 shadow-sm transition-all"
-                                />
-                            </Link>
-                        </>
-                    )}
+                    {/* Authenticated User Notification Bell */}
+                    {isLoggedIn && <NotificationBell variant="dark" />}
 
-                    {/* Primary CTA Button: Workspace with dynamic auth redirection and loader */}
+                    {/* Primary CTA Button: Workspace (with Avatar when logged in) or Sign in (when logged out) */}
                     <button
                         type="button"
                         onClick={handleWorkspaceClick}
                         disabled={loading}
-                        className="group relative inline-flex items-center h-[46px] gap-1.5 pl-3.5 sm:pl-4 pr-2 sm:pr-2.5 rounded-full bg-gradient-to-b from-white to-[#dfe3ef] text-neutral-950 font-semibold text-xs sm:text-sm shadow-sm hover:from-white hover:to-white transition-all duration-200 hover:shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:scale-[1.02] active:scale-[0.98] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden"
+                        title={isLoggedIn ? `${displayName} - Open Workspace` : "Sign in to Orbix"}
+                        className={`group relative inline-flex items-center h-[46px] gap-2 rounded-full bg-gradient-to-b from-white to-[#dfe3ef] text-neutral-950 font-semibold text-xs sm:text-sm shadow-sm hover:from-white hover:to-white transition-all duration-200 hover:shadow-[0_0_20px_rgba(255,255,255,0.25)] hover:scale-[1.02] active:scale-[0.98] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden ${isLoggedIn ? "pl-1.5 sm:pl-2 pr-2.5 sm:pr-3" : "pl-4 sm:pl-5 pr-2.5 sm:pr-3"
+                            }`}
                     >
-                        <span>Workspace</span>
-                        <span className="w-5 h-5 rounded-full bg-neutral-950/10 flex items-center justify-center transition-transform duration-200 group-hover:translate-x-0.5">
+                        {isLoggedIn && (
+                            <img
+                                src={avatarSrc}
+                                alt={displayName}
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                        displayName
+                                    )}&background=111827&color=fff&size=128&bold=true`;
+                                }}
+                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover ring-1 ring-black/15 shadow-xs flex-shrink-0"
+                            />
+                        )}
+
+                        <span>{isLoggedIn ? "Workspace" : "Sign in"}</span>
+
+                        <span className="w-5 h-5 rounded-full bg-neutral-950/10 flex items-center justify-center transition-transform duration-200 group-hover:translate-x-0.5 flex-shrink-0">
                             <svg
                                 className="w-3 h-3 text-neutral-950"
                                 viewBox="0 0 24 24"
@@ -378,7 +374,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                             </svg>
                         </span>
 
-                        {/* Loader overlay over the workspace button while auth is verifying */}
+                        {/* Loader overlay over the button while auth is verifying */}
                         {loading && (
                             <div className="absolute inset-0 rounded-full bg-white/90 backdrop-blur-xs flex items-center justify-center z-10 transition-opacity">
                                 <svg

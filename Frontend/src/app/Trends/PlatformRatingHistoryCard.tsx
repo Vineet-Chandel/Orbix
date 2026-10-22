@@ -201,17 +201,17 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                 : "—";
 
     return (
-        <div className="w-full relative  rounded-3xl bg-black  p-5 sm:p-6 text-white font-sans select-none flex flex-col justify-between transition-all hover:border-neutral-700 shadow-xl relative overflow-hidden group">
+        <div className="w-full rounded-3xl bg-white border border-black/[0.06] p-5 sm:p-6 text-neutral-900 font-sans select-none flex flex-col justify-between transition-all hover:border-black/10 shadow-xs relative overflow-hidden group">
             {/* Top Card Header */}
             <div>
                 <div className="flex items-center justify-between gap-3 pb-2.5">
                     {/* Platform Logo + Name */}
                     <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center flex-shrink-0 text-white">
+                        <div className="w-7 h-7 rounded-lg bg-black/[0.04] border border-black/10 flex items-center justify-center flex-shrink-0 text-neutral-800">
                             {getPortalIcon(platform.portal, "w-4 h-4")}
                         </div>
                         <div className="min-w-0 flex items-center gap-2">
-                            <h3 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
+                            <h3 className="text-base sm:text-lg font-extrabold text-neutral-900 tracking-tight truncate">
                                 {platform.portalName}
                             </h3>
                             {platform.profileUrl && (
@@ -219,7 +219,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                     href={platform.profileUrl}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="text-neutral-500 hover:text-white transition-colors p-0.5 rounded"
+                                    className="text-neutral-400 hover:text-black transition-colors p-0.5 rounded"
                                     title={`View ${platform.portalUsername} on ${platform.portalName}`}
                                 >
                                     <ExternalLink className="w-3.5 h-3.5" />
@@ -229,31 +229,31 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                     </div>
 
                     {/* Total Contests Count (e.g. "11 contests") */}
-                    <div className="flex-shrink-0 bg-white absolute right-14 top-2 px-3 rounded-xl">
-                        <span className="text-xs sm:text-sm font-medium text-black">
+                    <div className="flex-shrink-0 bg-black/[0.04] border border-black/10 px-3 py-1 rounded-full">
+                        <span className="text-xs font-semibold text-neutral-800">
                             {platform.ratedContestsCount} {platform.ratedContestsCount === 1 ? "contest" : "contests"}
                         </span>
                     </div>
                 </div>
 
                 {/* Subheader: Now | Best | Last 90 days */}
-                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-neutral-400 font-medium pb-5 flex-wrap">
+                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-neutral-500 font-medium pb-4 flex-wrap">
                     <span>
-                        Now <strong className="text-white font-bold ml-1">{currentRating !== null && currentRating !== undefined ? currentRating : "—"}</strong>
+                        Now <strong className="text-neutral-900 font-bold ml-1">{currentRating !== null && currentRating !== undefined ? currentRating : "—"}</strong>
                     </span>
-                    <span className="text-neutral-700 font-mono">•</span>
+                    <span className="text-neutral-300 font-mono">•</span>
                     <span>
-                        Best <strong className="text-white font-bold ml-1">{peakRating !== null && peakRating !== undefined ? peakRating : "—"}</strong>
+                        Best <strong className="text-neutral-900 font-bold ml-1">{peakRating !== null && peakRating !== undefined ? peakRating : "—"}</strong>
                     </span>
-                    <span className="text-neutral-700 font-mono">•</span>
+                    <span className="text-neutral-300 font-mono">•</span>
                     <span>
                         Last 90 days{" "}
                         <strong
                             className={`ml-1 font-bold ${typeof change90d === "number" && change90d > 0
-                                ? "text-emerald-400"
+                                ? "text-neutral-900"
                                 : typeof change90d === "number" && change90d < 0
-                                    ? "text-rose-400"
-                                    : "text-neutral-300"
+                                    ? "text-neutral-500"
+                                    : "text-neutral-600"
                                 }`}
                         >
                             {changeFormatted}
@@ -262,11 +262,11 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                 </div>
 
                 {/* Active / Hover Contest Row */}
-                <div className="flex items-baseline justify-between gap-3 pb-3 border-b border-neutral-900 min-h-[36px]">
+                <div className="flex items-baseline justify-between gap-3 pb-3 border-b border-black/[0.06] min-h-[36px]">
                     {/* Left: Rating value */}
                     <div className="flex items-baseline gap-2 flex-shrink-0">
-                        <span className="text-xs sm:text-sm font-medium text-neutral-400">Rating</span>
-                        <span className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                        <span className="text-xs sm:text-sm font-medium text-neutral-500">Rating</span>
+                        <span className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
                             {activePoint ? activePoint.rating : currentRating ?? "—"}
                         </span>
                     </div>
@@ -274,43 +274,22 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                     {/* Right: Date and Contest Name */}
                     {activePoint ? (
                         <div className="flex items-center gap-2 text-right min-w-0 truncate">
-                            <span className="text-xs sm:text-sm text-neutral-400 flex-shrink-0 font-medium">
+                            <span className="text-xs sm:text-sm text-neutral-500 flex-shrink-0 font-medium">
                                 {formatDate(activePoint.date || activePoint.timestamp)}
                             </span>
                             <span
-                                className="text-xs sm:text-sm text-white font-medium truncate max-w-[160px] sm:max-w-xs"
+                                className="text-xs sm:text-sm text-neutral-900 font-medium truncate max-w-[160px] sm:max-w-xs"
                                 title={activePoint.contestName}
                             >
                                 {activePoint.contestName}
                             </span>
                         </div>
                     ) : (
-                        <div className="text-xs text-neutral-500 font-medium">
+                        <div className="text-xs text-neutral-400 font-medium">
                             No contest data
                         </div>
                     )}
                 </div>
-            </div>
-
-            {/* Full-width folder outline */}
-            <div className="absolute inset-0 z-0 pointer-events-none">
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="absolute inset-0 w-full h-full"
-                    viewBox="0 0 827 787"
-                    preserveAspectRatio="none"
-                    fill="none"
-                >
-                    <path
-                        d="M0.534388 88.5V702.5C1.37149 765.707 16.5914 787.069 85.0344 785.5L748.534 782C809.208 781.551 826.318 761.151 826.034 689V149C825.154 89.9777 803.25 78.3333 744.534 78.5H600.034C560.105 77.6164 545.291 65.9329 526.034 34.5C510.033 10.0413 495.709 0.764389 458.034 0.5H80.0344C20.1286 2.70061 -0.463685 18.3914 0.534388 88.5Z"
-                        stroke="white"
-                        strokeOpacity="0.45"
-                        strokeWidth="3"
-                        vectorEffect="non-scaling-stroke"
-                    />
-                </svg>
-
-
             </div>
 
             {/* Sparkline / Area Curve Chart */}
@@ -325,9 +304,9 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                         >
                             <defs>
                                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#F59E0B" stopOpacity="0.22" />
-                                    <stop offset="85%" stopColor="#F59E0B" stopOpacity="0.02" />
-                                    <stop offset="100%" stopColor="#F59E0B" stopOpacity="0.0" />
+                                    <stop offset="0%" stopColor="#000000" stopOpacity="0.08" />
+                                    <stop offset="85%" stopColor="#000000" stopOpacity="0.01" />
+                                    <stop offset="100%" stopColor="#000000" stopOpacity="0.0" />
                                 </linearGradient>
                             </defs>
 
@@ -339,7 +318,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                     y1={grid.y}
                                     x2={chartData.svgWidth - chartData.padRight}
                                     y2={grid.y}
-                                    stroke="#262626"
+                                    stroke="rgba(0,0,0,0.06)"
                                     strokeDasharray="4 4"
                                     strokeWidth="1"
                                 />
@@ -350,12 +329,12 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                 <path d={chartData.areaD} fill={`url(#${gradientId})`} />
                             )}
 
-                            {/* Golden Amber Line */}
+                            {/* Primary Rating Progression Line */}
                             {chartData.pathD && (
                                 <path
                                     d={chartData.pathD}
                                     fill="none"
-                                    stroke="#F59E0B"
+                                    stroke="#000000"
                                     strokeWidth="2.5"
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
@@ -369,7 +348,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                     x={tick.x}
                                     y={chartData.svgHeight - 6}
                                     textAnchor="middle"
-                                    fill="#737373"
+                                    fill="#9ca3af"
                                     fontSize="10"
                                     fontFamily="sans-serif"
                                     fontWeight="500"
@@ -378,7 +357,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                 </text>
                             ))}
 
-                            {/* Hover Crosshair & Glowing Indicator */}
+                            {/* Hover Crosshair & Indicator */}
                             {chartData.points.map((pt) => {
                                 const isCurrent = activePoint?.contestId === pt.point.contestId;
                                 if (!isCurrent) return null;
@@ -390,7 +369,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                             y1={chartData.padTop}
                                             x2={pt.x}
                                             y2={chartData.svgHeight - chartData.padBottom}
-                                            stroke="#525252"
+                                            stroke="rgba(0,0,0,0.3)"
                                             strokeDasharray="3 3"
                                             strokeWidth="1"
                                         />
@@ -399,16 +378,16 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                             cx={pt.x}
                                             cy={pt.y}
                                             r="7"
-                                            fill="#FACC15"
-                                            fillOpacity="0.25"
+                                            fill="#000000"
+                                            fillOpacity="0.1"
                                         />
-                                        {/* Glowing Yellow Dot matching screenshot */}
+                                        {/* Dot */}
                                         <circle
                                             cx={pt.x}
                                             cy={pt.y}
                                             r="4.5"
-                                            fill="#FACC15"
-                                            stroke="#000000"
+                                            fill="#000000"
+                                            stroke="#ffffff"
                                             strokeWidth="2"
                                         />
                                     </g>
@@ -418,12 +397,12 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                     </div>
                 ) : (
                     /* Clean empty state for connected platform with 0 contests */
-                    <div className="w-full h-36 flex flex-col items-center justify-center text-center p-4 rounded-2xl bg-neutral-950 border border-neutral-900 border-dashed">
-                        <Award className="w-8 h-8 text-neutral-600 mb-2" />
-                        <p className="text-xs font-semibold text-neutral-400">
+                    <div className="w-full h-36 flex flex-col items-center justify-center text-center p-4 rounded-2xl bg-black/[0.02] border border-black/10 border-dashed">
+                        <Award className="w-8 h-8 text-neutral-400 mb-2" />
+                        <p className="text-xs font-semibold text-neutral-700">
                             No rated contests recorded yet on {platform.portalName}
                         </p>
-                        <p className="text-[11px] text-neutral-600 mt-1 max-w-xs">
+                        <p className="text-[11px] text-neutral-400 mt-1 max-w-xs">
                             Compete in a rated contest to begin plotting your dynamic rating progression.
                         </p>
                     </div>

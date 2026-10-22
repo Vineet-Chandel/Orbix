@@ -736,9 +736,9 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                     )}
 
                     {/* Connected Pill */}
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
-                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                        <span className="text-xs font-bold text-amber-600">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/[0.04] border border-black/10">
+                        <span className="w-1.5 h-1.5 rounded-full bg-neutral-900" />
+                        <span className="text-xs font-bold text-neutral-800">
                             {connectedCount} of 16 connected
                         </span>
                     </div>
@@ -1068,7 +1068,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                         }
                                         if (judgment.badgeVariant === "error") {
                                             return (
-                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200">
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold text-neutral-700 bg-neutral-100 px-2.5 py-0.5 rounded-full border border-neutral-300">
                                                     ⚠️ {judgment.badgeLabel}
                                                 </span>
                                             );
@@ -1142,7 +1142,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
 
                             {/* Interactive Verified Preview Card — Appears ONLY when verified! */}
                             {verifiedProfile && !isVerifying && (
-                                <div className="rounded-2xl border border-neutral-800 bg-[#0b0f19] p-4 text-white shadow-xl animate-fadeIn">
+                                <div className="rounded-2xl border border-black/10 bg-black/[0.03] p-4 text-neutral-900 shadow-sm animate-fadeIn">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
                                         {/* Left: Avatar with Brand ring & Portal badge + User info + Stats */}
                                         <div className="flex items-center gap-3 min-w-0">
@@ -1151,7 +1151,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                                     src={verifiedProfile.avatar}
                                                     alt={verifiedProfile.name}
                                                     referrerPolicy="no-referrer"
-                                                    className="h-12 w-12 rounded-full object-cover border-2 p-0.5 bg-neutral-900 shadow-md"
+                                                    className="h-12 w-12 rounded-full object-cover border-2 p-0.5 bg-white shadow-md"
                                                     style={{ borderColor: activeConnectingConfig.brandColor }}
                                                     onError={(e) => {
                                                         (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
@@ -1166,10 +1166,10 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
 
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                    <h4 className="truncate text-sm sm:text-base font-bold text-white tracking-tight">
+                                                    <h4 className="truncate text-sm sm:text-base font-bold text-neutral-900 tracking-tight">
                                                         {verifiedProfile.name}
                                                     </h4>
-                                                    <span className="text-xs font-mono text-neutral-400 truncate">
+                                                    <span className="text-xs font-mono text-neutral-500 truncate">
                                                         @{verifiedProfile.username}
                                                     </span>
                                                 </div>
@@ -1180,7 +1180,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                                         {verifiedProfile.stats.map((st, idx) => (
                                                             <span
                                                                 key={idx}
-                                                                className="inline-flex items-center rounded-md bg-neutral-800/90 px-2 py-0.5 text-[10px] sm:text-xs font-medium text-neutral-200 border border-neutral-700/60 shadow-2xs"
+                                                                className="inline-flex items-center rounded-md bg-white px-2 py-0.5 text-[10px] sm:text-xs font-medium text-neutral-700 border border-black/10 shadow-2xs"
                                                             >
                                                                 {st.value}
                                                             </span>
@@ -1191,16 +1191,15 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                         </div>
 
                                         {/* Right: Confirmation prompt + Yes, connect button */}
-                                        <div className="flex items-center justify-end gap-2.5 flex-shrink-0 pt-2 sm:pt-0 border-t border-neutral-800/80 sm:border-t-0">
-                                            <span className="text-xs font-medium text-neutral-400 hidden sm:inline-block">
+                                        <div className="flex items-center justify-end gap-2.5 flex-shrink-0 pt-2 sm:pt-0 border-t border-black/10 sm:border-t-0">
+                                            <span className="text-xs font-medium text-neutral-500 hidden sm:inline-block">
                                                 Is this you?
                                             </span>
                                             <button
                                                 type="button"
                                                 onClick={() => handleConfirmVerifiedConnect(verifiedProfile)}
                                                 disabled={isSavingConnect}
-                                                className="flex items-center gap-1.5 rounded-full px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold text-white shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer disabled:opacity-50"
-                                                style={{ backgroundColor: activeConnectingConfig.brandColor }}
+                                                className="flex items-center gap-1.5 rounded-full px-4 sm:px-5 py-2 text-xs sm:text-sm font-bold text-white bg-black hover:bg-neutral-800 shadow-md transition-all active:scale-95 cursor-pointer disabled:opacity-50"
                                             >
                                                 {isSavingConnect ? (
                                                     <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

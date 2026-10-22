@@ -7,18 +7,17 @@ import Hero from './Hero/Landing';
 
 export default function MainLanding() {
   return (
-    <div className="bg-white text-slate-900 selection:bg-slate-900 selection:text-white relative overflow-hidden font-sans p-1 min-h-screen">
+    <div className="bg-white text-slate-900 selection:bg-slate-900 selection:text-white relative overflow-x-clip font-sans p-1 min-h-screen">
 
       <NavBar />
 
 
-      <section className="min-h-[99vh] flex flex-col items-center justify-center text-center px-4 pt-32 pb-20 mx-auto bg text-white rounded-[40px] sm:rounded-[48px] shadow-2xl relative overflow-hidden ">
-        <Hero />
-      </section>
-      {/* Flagship Connected Ecosystem Showcase: All Connectable Platforms Orbiting Orbix */}
-      <section className="w-full my-6 rounded-[40px] sm:rounded-[48px] overflow-hidden shadow-2xl">
-        <Platform />
-      </section>
+
+      <Hero />
+
+
+      <Platform />
+
       {/* Flagship Profile Card Showcase: One Card Every Place That Matters (Full Screen) */}
       <section className="w-full my-6 rounded-[40px] sm:rounded-[48px] overflow-hidden shadow-2xl">
         <Card />

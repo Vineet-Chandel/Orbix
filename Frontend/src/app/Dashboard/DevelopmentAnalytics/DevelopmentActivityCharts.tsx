@@ -162,43 +162,43 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
         return (
             <div className="flex flex-col gap-4 sm:gap-6 w-full font-sans select-none animate-pulse">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 w-full">
-                    <div className="rounded-2xl bg-black border border-neutral-800 p-5 sm:p-6 h-56 flex flex-col justify-between">
-                        <div className="h-4 w-40 bg-white/[0.08] rounded" />
+                    <div className="rounded-3xl bg-white border border-neutral-300 p-5 sm:p-6 h-56 flex flex-col justify-between shadow-xs">
+                        <div className="h-4 w-40 bg-neutral-200 rounded" />
                         <div className="grid grid-cols-12 gap-2 items-end h-36">
                             {Array.from({ length: 12 }).map((_, i) => (
-                                <div key={i} className="h-24 bg-white/[0.05] rounded-t-lg" />
+                                <div key={i} className="h-24 bg-neutral-100 rounded-t-lg" />
                             ))}
                         </div>
                     </div>
-                    <div className="rounded-2xl bg-black border border-neutral-800 p-5 sm:p-6 h-56 flex flex-col justify-between">
-                        <div className="h-4 w-48 bg-white/[0.08] rounded" />
+                    <div className="rounded-3xl bg-white border border-neutral-300 p-5 sm:p-6 h-56 flex flex-col justify-between shadow-xs">
+                        <div className="h-4 w-48 bg-neutral-200 rounded" />
                         <div className="grid grid-cols-7 gap-3 items-end h-36">
                             {Array.from({ length: 7 }).map((_, i) => (
-                                <div key={i} className="h-24 bg-white/[0.05] rounded-t-lg" />
+                                <div key={i} className="h-24 bg-neutral-100 rounded-t-lg" />
                             ))}
                         </div>
                     </div>
                 </div>
-                <div className="w-full rounded-2xl bg-black p-5 sm:p-6 flex flex-col gap-4">
+                <div className="w-full rounded-3xl bg-white border border-neutral-300 p-5 sm:p-6 flex flex-col gap-4 shadow-xs">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <div className="h-3 w-20 bg-white/[0.08] rounded" />
-                            <div className="h-4 w-48 bg-white/[0.05] rounded" />
+                            <div className="h-3 w-20 bg-neutral-200 rounded" />
+                            <div className="h-4 w-48 bg-neutral-100 rounded" />
                         </div>
                         <div className="space-y-2">
-                            <div className="h-3 w-20 bg-white/[0.08] rounded" />
-                            <div className="h-4 w-48 bg-white/[0.05] rounded" />
+                            <div className="h-3 w-20 bg-neutral-200 rounded" />
+                            <div className="h-4 w-48 bg-neutral-100 rounded" />
                         </div>
                     </div>
-                    <div className="h-px bg-white/[0.08]" />
+                    <div className="h-px bg-neutral-200" />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <div className="h-3 w-24 bg-white/[0.08] rounded" />
-                            <div className="h-4 w-52 bg-white/[0.05] rounded" />
+                            <div className="h-3 w-24 bg-neutral-200 rounded" />
+                            <div className="h-4 w-52 bg-neutral-100 rounded" />
                         </div>
                         <div className="space-y-2">
-                            <div className="h-3 w-24 bg-white/[0.08] rounded" />
-                            <div className="h-4 w-52 bg-white/[0.05] rounded" />
+                            <div className="h-3 w-24 bg-neutral-200 rounded" />
+                            <div className="h-4 w-52 bg-neutral-100 rounded" />
                         </div>
                     </div>
                 </div>
@@ -211,11 +211,13 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
             {/* Top Charts: Contributions by month & Your coding days */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 w-full">
                 {/* Card 1: Contributions by month */}
-                <div className="rounded-2xl bg-black p-5 sm:p-6 shadow-xl relative overflow-hidden flex flex-col justify-between transition-all hover:border-neutral-700">
+                <div className="rounded-3xl bg-white border border-neutral-300 p-5 sm:p-6 shadow-sm relative overflow-hidden flex flex-col justify-between transition-all hover:border-neutral-400">
                     {/* Header */}
-                    <div className="flex items-center gap-2 mb-4">
-                        <Calendar className="w-4 h-4 text-neutral-400 flex-shrink-0" />
-                        <h4 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-9 h-9 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs flex-shrink-0">
+                            <Calendar className="w-4.5 h-4.5 text-neutral-900" />
+                        </div>
+                        <h4 className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
                             Contributions by month
                         </h4>
                     </div>
@@ -236,7 +238,7 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                         }`}
                                 >
                                     {/* Value directly above bar */}
-                                    <span className="text-[10px] sm:text-xs font-bold text-neutral-300 text-center mb-1.5 transition-transform group-hover:scale-110">
+                                    <span className="text-xs font-bold text-neutral-900 text-center mb-1.5 transition-transform group-hover:scale-110">
                                         {item.count}
                                     </span>
 
@@ -245,14 +247,14 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                         <div
                                             style={{ height: `${heightPct}%` }}
                                             className={`w-full max-w-[26px] sm:max-w-[32px] rounded-t-lg sm:rounded-t-xl transition-all duration-500 ease-out ${item.isMax
-                                                ? "bg-[#22c55e]"
-                                                : "bg-[#E6EDF3] group-hover:bg-white"
+                                                ? "bg-black shadow-xs"
+                                                : "bg-neutral-200 group-hover:bg-neutral-300"
                                                 }`}
                                         />
                                     </div>
 
                                     {/* Month label below */}
-                                    <span className="text-[10px] sm:text-xs font-medium text-neutral-400 text-center mt-2 truncate w-full">
+                                    <span className="text-xs font-semibold text-neutral-500 text-center mt-2 truncate w-full">
                                         {item.label}
                                     </span>
                                 </div>
@@ -262,16 +264,20 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                 </div>
 
                 {/* Card 2: Your coding days */}
-                <div className="rounded-2xl bg-black p-5 sm:p-6 shadow-xl relative overflow-hidden flex flex-col justify-between transition-all hover:border-neutral-700">
+                <div className="rounded-3xl bg-white border border-neutral-300 p-5 sm:p-6 shadow-sm relative overflow-hidden flex flex-col justify-between transition-all hover:border-neutral-400">
                     {/* Header with dynamic busiest day */}
-                    <div className="flex items-center gap-1.5 mb-4 flex-wrap">
-                        <Flame className="w-4 h-4 text-neutral-400 flex-shrink-0" />
-                        <h4 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                            Your coding days
-                        </h4>
-                        <span className="text-xs sm:text-sm font-normal text-neutral-400">
-                            · busiest on {busiestDay}
-                        </span>
+                    <div className="flex items-center gap-3 mb-4 flex-wrap">
+                        <div className="w-9 h-9 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs flex-shrink-0">
+                            <Flame className="w-4.5 h-4.5 text-neutral-900" />
+                        </div>
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                            <h4 className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
+                                Your coding days
+                            </h4>
+                            <span className="text-xs sm:text-sm font-semibold text-neutral-500">
+                                · busiest on {busiestDay}
+                            </span>
+                        </div>
                     </div>
 
                     {/* 7 Days Bar Chart */}
@@ -290,7 +296,7 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                         }`}
                                 >
                                     {/* Value directly above bar */}
-                                    <span className="text-[11px] sm:text-xs font-bold text-neutral-300 text-center mb-1.5 transition-transform group-hover:scale-110">
+                                    <span className="text-xs font-bold text-neutral-900 text-center mb-1.5 transition-transform group-hover:scale-110">
                                         {item.count}
                                     </span>
 
@@ -299,14 +305,14 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                         <div
                                             style={{ height: `${heightPct}%` }}
                                             className={`w-full max-w-[36px] sm:max-w-[44px] rounded-t-lg sm:rounded-t-xl transition-all duration-500 ease-out ${item.isMax
-                                                ? "bg-[#22c55e]"
-                                                : "bg-[#E6EDF3] group-hover:bg-white"
+                                                ? "bg-black shadow-xs"
+                                                : "bg-neutral-200 group-hover:bg-neutral-300"
                                                 }`}
                                         />
                                     </div>
 
                                     {/* Day label below */}
-                                    <span className="text-[11px] sm:text-xs font-medium text-neutral-400 text-center mt-2">
+                                    <span className="text-xs font-semibold text-neutral-500 text-center mt-2">
                                         {item.label}
                                     </span>
                                 </div>
@@ -317,38 +323,38 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
             </div>
 
             {/* Profile Activity Highlights Section: Best month, Best day, Most starred, Latest work */}
-            <div className="w-full rounded-2xl bg-black p-5 sm:p-6 select-none border-none">
+            <div className="w-full rounded-3xl bg-white border border-neutral-300 p-6 sm:p-7 shadow-sm select-none">
                 {/* Row 1: Best month & Best day */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
                     <div>
-                        <div className="text-xs sm:text-sm font-medium text-neutral-400">
+                        <div className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider">
                             Best month
                         </div>
-                        <div className="mt-1 text-sm sm:text-base font-normal text-white">
+                        <div className="mt-1.5 text-base sm:text-lg font-black text-neutral-900">
                             {bestMonthText}
                         </div>
                     </div>
 
                     <div>
-                        <div className="text-xs sm:text-sm font-medium text-neutral-400">
+                        <div className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider">
                             Best day
                         </div>
-                        <div className="mt-1 text-sm sm:text-base font-normal text-white">
+                        <div className="mt-1.5 text-base sm:text-lg font-black text-neutral-900">
                             {bestDayText}
                         </div>
                     </div>
                 </div>
 
                 {/* Horizontal Divider Line */}
-                <div className="h-px bg-white/[0.08] my-4 sm:my-5" />
+                <div className="h-px bg-neutral-200 my-4 sm:my-5" />
 
                 {/* Row 2: Most starred & Latest work */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
                     <div>
-                        <div className="text-xs sm:text-sm font-medium text-neutral-400">
+                        <div className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider">
                             Most starred
                         </div>
-                        <div className="mt-1 text-sm sm:text-base font-normal text-white truncate">
+                        <div className="mt-1.5 text-base sm:text-lg font-black text-neutral-900 truncate">
                             {mostStarred ? (
                                 <span>
                                     {mostStarred.url ? (
@@ -356,7 +362,7 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                             href={mostStarred.url}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="hover:underline hover:text-white transition-colors"
+                                            className="hover:underline hover:text-black transition-colors"
                                         >
                                             {mostStarred.name}
                                         </a>
@@ -366,16 +372,16 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                     with {mostStarred.stars} star{mostStarred.stars === 1 ? "" : "s"}
                                 </span>
                             ) : (
-                                <span className="text-neutral-500">No public repositories</span>
+                                <span className="text-neutral-400 font-medium text-sm">No public repositories</span>
                             )}
                         </div>
                     </div>
 
                     <div>
-                        <div className="text-xs sm:text-sm font-medium text-neutral-400">
+                        <div className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider">
                             Latest work
                         </div>
-                        <div className="mt-1 text-sm sm:text-base font-normal text-white truncate">
+                        <div className="mt-1.5 text-base sm:text-lg font-black text-neutral-900 truncate">
                             {latestWork ? (
                                 <span>
                                     {latestWork.url ? (
@@ -383,7 +389,7 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                             href={latestWork.url}
                                             target="_blank"
                                             rel="noreferrer"
-                                            className="hover:underline hover:text-white transition-colors"
+                                            className="hover:underline hover:text-black transition-colors"
                                         >
                                             {latestWork.name}
                                         </a>
@@ -393,7 +399,7 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                     {latestWork.relativeTime ? `, pushed ${latestWork.relativeTime}` : ""}
                                 </span>
                             ) : (
-                                <span className="text-neutral-500">No recent activity</span>
+                                <span className="text-neutral-400 font-medium text-sm">No recent activity</span>
                             )}
                         </div>
                     </div>

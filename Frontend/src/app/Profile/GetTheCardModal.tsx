@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
+import { motion } from "framer-motion";
 import { X, Download, Repeat, Loader2 } from "lucide-react";
 import { toPng } from "html-to-image";
 import { useToast } from "../../context/ToastContext";
@@ -266,57 +267,142 @@ export const GetTheCardModal: React.FC<GetTheCardModalProps> = ({
                         }}
                     />
 
-                    {/* Scaled Preview Frame */}
-                    <div
-                        style={{
-                            width: previewWidth,
-                            height: previewHeight,
-                        }}
-                        className="relative overflow-hidden rounded-[20px] shadow-2xl transition-all duration-300 flex-shrink-0 cursor-pointer"
-                        onClick={handleFlip}
-                        title="Click card to flip"
-                    >
-                        <div
+                    {/* 3D Perspective Card Stage */}
+                    <div style={{ perspective: 1800 }} className="relative flex items-center justify-center flex-shrink-0">
+                        <motion.div
+                            className="relative cursor-pointer select-none flex-shrink-0"
                             style={{
-                                width: format === "linkedin" ? 1200 : 1080,
-                                height: format === "linkedin" ? 627 : 1920,
-                                transform: `scale(${previewScale})`,
-                                transformOrigin: "top left",
+                                width: previewWidth,
+                                height: previewHeight,
+                                transformStyle: "preserve-3d",
+                                WebkitTransformStyle: "preserve-3d",
+                            }}
+                            animate={{ rotateY: face === "back" ? 180 : 0 }}
+                            transition={{ duration: 0.75, ease: [0.23, 1, 0.32, 1] }}
+                            onClick={handleFlip}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Flip ${format === "linkedin" ? "LinkedIn Card" : "Instagram Story Card"} in 3D`}
+                            title="Click card to flip"
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    handleFlip();
+                                }
                             }}
                         >
-                            {format === "linkedin" ? (
-                                <LinkedInCard
-                                    user={user}
-                                    stats={stats}
-                                    coderType={coderType}
-                                    topPlatforms={showcasedPlatformsLinkedIn}
-                                    allConnectedPlatforms={allConnectedPlatforms}
-                                    githubStats={githubStats}
-                                    includeGitHub={false}
-                                    theme={theme}
-                                    face={face}
-                                    publicProfileUrl={publicProfileUrl}
-                                    connectedPortals={connectedPortals}
-                                    topContests={showcasedContests}
-                                    showSocialLinks={false}
-                                />
-                            ) : (
-                                <InstagramStoryCard
-                                    user={user}
-                                    stats={stats}
-                                    coderType={coderType}
-                                    topPlatforms={showcasedPlatformsStory}
-                                    allConnectedPlatforms={allConnectedPlatforms}
-                                    githubStats={githubStats}
-                                    includeGitHub={false}
-                                    theme={theme}
-                                    face={face}
-                                    publicProfileUrl={publicProfileUrl}
-                                    connectedPortals={connectedPortals}
-                                    topContests={showcasedContests}
-                                />
-                            )}
-                        </div>
+                            {/* Front Face */}
+                            <div
+                                className={`absolute inset-0 w-full h-full overflow-hidden ${
+                                    format === "linkedin" ? "rounded-[20px]" : "rounded-[26px]"
+                                } shadow-2xl bg-[#0c1017]`}
+                                style={{
+                                    backfaceVisibility: "hidden",
+                                    WebkitBackfaceVisibility: "hidden",
+                                    transform: "rotateY(0deg)",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: format === "linkedin" ? 1200 : 1080,
+                                        height: format === "linkedin" ? 627 : 1920,
+                                        transform: `scale(${previewScale})`,
+                                        transformOrigin: "top left",
+                                    }}
+                                >
+                                    {format === "linkedin" ? (
+                                        <LinkedInCard
+                                            user={user}
+                                            stats={stats}
+                                            coderType={coderType}
+                                            topPlatforms={showcasedPlatformsLinkedIn}
+                                            allConnectedPlatforms={allConnectedPlatforms}
+                                            githubStats={githubStats}
+                                            includeGitHub={false}
+                                            theme={theme}
+                                            face="front"
+                                            publicProfileUrl={publicProfileUrl}
+                                            connectedPortals={connectedPortals}
+                                            topContests={showcasedContests}
+                                            showSocialLinks={false}
+                                            animate={false}
+                                        />
+                                    ) : (
+                                        <InstagramStoryCard
+                                            user={user}
+                                            stats={stats}
+                                            coderType={coderType}
+                                            topPlatforms={showcasedPlatformsStory}
+                                            allConnectedPlatforms={allConnectedPlatforms}
+                                            githubStats={githubStats}
+                                            includeGitHub={false}
+                                            theme={theme}
+                                            face="front"
+                                            publicProfileUrl={publicProfileUrl}
+                                            connectedPortals={connectedPortals}
+                                            topContests={showcasedContests}
+                                            animate={false}
+                                        />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Back Face */}
+                            <div
+                                className={`absolute inset-0 w-full h-full overflow-hidden ${
+                                    format === "linkedin" ? "rounded-[20px]" : "rounded-[26px]"
+                                } shadow-2xl bg-[#0c1017]`}
+                                style={{
+                                    backfaceVisibility: "hidden",
+                                    WebkitBackfaceVisibility: "hidden",
+                                    transform: "rotateY(180deg)",
+                                }}
+                            >
+                                <div
+                                    style={{
+                                        width: format === "linkedin" ? 1200 : 1080,
+                                        height: format === "linkedin" ? 627 : 1920,
+                                        transform: `scale(${previewScale})`,
+                                        transformOrigin: "top left",
+                                    }}
+                                >
+                                    {format === "linkedin" ? (
+                                        <LinkedInCard
+                                            user={user}
+                                            stats={stats}
+                                            coderType={coderType}
+                                            topPlatforms={showcasedPlatformsLinkedIn}
+                                            allConnectedPlatforms={allConnectedPlatforms}
+                                            githubStats={githubStats}
+                                            includeGitHub={false}
+                                            theme={theme}
+                                            face="back"
+                                            publicProfileUrl={publicProfileUrl}
+                                            connectedPortals={connectedPortals}
+                                            topContests={showcasedContests}
+                                            showSocialLinks={false}
+                                            animate={false}
+                                        />
+                                    ) : (
+                                        <InstagramStoryCard
+                                            user={user}
+                                            stats={stats}
+                                            coderType={coderType}
+                                            topPlatforms={showcasedPlatformsStory}
+                                            allConnectedPlatforms={allConnectedPlatforms}
+                                            githubStats={githubStats}
+                                            includeGitHub={false}
+                                            theme={theme}
+                                            face="back"
+                                            publicProfileUrl={publicProfileUrl}
+                                            connectedPortals={connectedPortals}
+                                            topContests={showcasedContests}
+                                            animate={false}
+                                        />
+                                    )}
+                                </div>
+                            </div>
+                        </motion.div>
                     </div>
                 </div>
 

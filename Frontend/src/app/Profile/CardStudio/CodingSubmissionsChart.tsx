@@ -11,7 +11,7 @@ interface CodingSubmissionsChartProps {
     variant?: "linkedin" | "story";
 }
 
-export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = ({
+export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = React.memo(({
     connectedPortals,
     username = "",
     variant = "linkedin",
@@ -257,4 +257,4 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = ({
             </div>
         </div>
     );
-};
+});

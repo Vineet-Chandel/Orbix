@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
+import { motion } from "framer-motion";
 import { Repeat, Code2, GitBranch, Briefcase, Mail, MapPin, ExternalLink, Share2, CreditCard, Check, ArrowRight, FileText, Download, Eye, X } from "lucide-react";
 import { fetchPublicProfile, type PublicProfileData } from "../../utils/profileApi";
 import { isDemoProfileUsername, demoPublicProfile, demoConnectedPortals } from "../../data/demoProfileData";
@@ -24,8 +25,14 @@ import { ContestPerformanceSection } from "../Dashboard/ContestPerformanceSectio
 import { DevelopmentContributionsTable } from "../Dashboard/DevelopmentContributionsTable";
 import { DevelopmentAnalyticsSection } from "../Dashboard/DevelopmentAnalytics/DevelopmentAnalyticsSection";
 
-export default function PublicProfilePage() {
-    const { username } = useParams<{ username: string }>();
+export interface PublicProfilePageProps {
+    overrideUsername?: string;
+    isEmbedded?: boolean;
+}
+
+export default function PublicProfilePage({ overrideUsername, isEmbedded = false }: PublicProfilePageProps = {}) {
+    const params = useParams<{ username: string }>();
+    const username = overrideUsername || params.username;
     const toast = useToast();
     const isDemo = isDemoProfileUsername(username);
 
@@ -80,7 +87,9 @@ export default function PublicProfilePage() {
             setProfile(demoPublicProfile);
             setLoading(false);
             setError(null);
-            document.title = `${demoPublicProfile.displayName} (@${demoPublicProfile.username}) — Orbix Demo Profile`;
+            if (!isEmbedded) {
+                document.title = `${demoPublicProfile.displayName} (@${demoPublicProfile.username}) — Orbix Demo Profile`;
+            }
             return;
         }
 
@@ -94,14 +103,18 @@ export default function PublicProfilePage() {
                     setProfile(data);
                     setLoading(false);
                     // Update document title for SEO
-                    document.title = `${data.displayName} (@${data.username}) — Orbix Profile`;
+                    if (!isEmbedded) {
+                        document.title = `${data.displayName} (@${data.username}) — Orbix Profile`;
+                    }
                 }
             })
             .catch((err: any) => {
                 if (isMounted) {
                     setError(err.message || "Failed to load profile");
                     setLoading(false);
-                    document.title = "Profile Not Found — Orbix";
+                    if (!isEmbedded) {
+                        document.title = "Profile Not Found — Orbix";
+                    }
                 }
             });
 
@@ -140,6 +153,7 @@ export default function PublicProfilePage() {
     }, [profile?.platforms, isDemo]);
 
     const userFallback = profile?.username || "developer";
+    const profilePageUrl = typeof window !== "undefined" ? `${window.location.origin}/profile/u/${username || userFallback}` : "";
     const stats = useMemo(() => aggregateCodingStats(connectedPortals), [connectedPortals]);
     const coderType = useMemo(() => getCoderType(stats.totalSolved), [stats.totalSolved]);
     const showcasedPlatforms = useMemo(
@@ -255,59 +269,61 @@ export default function PublicProfilePage() {
         )}&background=0c1017&color=fff&size=256&bold=true`;
 
     return (
-        <div className="min-h-screen bg-[#F0F2F6] text-neutral-900 font-sans antialiased selection:bg-neutral-900 selection:text-white pb-16">
-            {/* Minimal Orbix Button Only — Navigates to "/" */}
-            <div className="w-full px-4 sm:px-8 pt-4 pb-2 flex items-center justify-between">
-                <Link
-                    to="/"
-                    className="inline-flex items-center gap-2 group cursor-pointer select-none"
-                    title="Orbix — Home"
-                >
-                    <div className="w-14 h-14 flex items-center justify-center text-white font-black text-sm shadow-xs transition-transform group-hover:scale-105">
-                        <svg className="w-full h-full text-white" viewBox="0 0 271 270" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" fill="black" />
-                            <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" fill="black" />
-                            <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" fill="black" />
-                            <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" fill="black" />
-                            <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" fill="black" />
-                            <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" stroke="black" />
-                            <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" stroke="black" />
-                            <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" stroke="black" />
-                            <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" stroke="black" />
-                            <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" stroke="black" />
-                        </svg>
+        <div className={`min-h-screen bg-[#F0F2F6] text-neutral-900 font-sans antialiased selection:bg-neutral-900 selection:text-white pb-16 ${isEmbedded ? "embedded-showcase-container" : ""}`}>
+            {/* Minimal Orbix Button Only — Navigates to "/" (Hidden when embedded in hero showcase) */}
+            {!isEmbedded && (
+                <div className="w-full px-4 sm:px-8 pt-4 pb-2 flex items-center justify-between">
+                    <Link
+                        to="/"
+                        className="inline-flex items-center gap-2 group cursor-pointer select-none"
+                        title="Orbix — Home"
+                    >
+                        <div className="w-14 h-14 flex items-center justify-center text-white font-black text-sm shadow-xs transition-transform group-hover:scale-105">
+                            <svg className="w-full h-full text-white" viewBox="0 0 271 270" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" fill="black" />
+                                <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" fill="black" />
+                                <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" fill="black" />
+                                <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" fill="black" />
+                                <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" fill="black" />
+                                <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" stroke="black" />
+                                <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" stroke="black" />
+                                <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" stroke="black" />
+                                <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" stroke="black" />
+                                <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" stroke="black" />
+                            </svg>
+                        </div>
+                        <span className="font-extrabold text-neutral-900 text-3xl tracking-tight group-hover:text-black transition-colors">
+                            Orbix
+                        </span>
+                    </Link>
+                    {/* Navbar Action Button: Black button with white text displaying "Demo Profile" with redirection to Create Profile */}
+                    <div className="flex items-center gap-2.5 sm:gap-3">
+                        {isDemo ? (
+                            <Link
+                                to="/auth/signup"
+                                className="inline-flex items-center gap-2 sm:gap-2.5 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-xl transition-all duration-200 transform active:scale-95 cursor-pointer group select-none"
+                                title="Demo Profile — Click to create your own Orbix profile"
+                            >
+                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
+                                <span className="tracking-tight">Demo Profile</span>
+                                <span className="hidden sm:inline w-px h-3.5 bg-neutral-700 mx-0.5" />
+                                <span className="hidden sm:inline font-medium text-neutral-300 group-hover:text-white transition-colors">
+                                    Create your profile
+                                </span>
+                                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400 group-hover:text-white group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
+                            </Link>
+                        ) : (
+                            <Link
+                                to="/auth/signup"
+                                className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow-md transition-all active:scale-95 cursor-pointer select-none"
+                            >
+                                <span>Create your profile</span>
+                                <ArrowRight className="w-3.5 h-3.5 text-neutral-300" />
+                            </Link>
+                        )}
                     </div>
-                    <span className="font-extrabold text-neutral-900 text-3xl tracking-tight group-hover:text-black transition-colors">
-                        Orbix
-                    </span>
-                </Link>
-                {/* Navbar Action Button: Black button with white text displaying "Demo Profile" with redirection to Create Profile */}
-                <div className="flex items-center gap-2.5 sm:gap-3">
-                    {isDemo ? (
-                        <Link
-                            to="/auth/signup"
-                            className="inline-flex items-center gap-2 sm:gap-2.5 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold shadow-md hover:shadow-xl transition-all duration-200 transform active:scale-95 cursor-pointer group select-none"
-                            title="Demo Profile — Click to create your own Orbix profile"
-                        >
-                            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-                            <span className="tracking-tight">Demo Profile</span>
-                            <span className="hidden sm:inline w-px h-3.5 bg-neutral-700 mx-0.5" />
-                            <span className="hidden sm:inline font-medium text-neutral-300 group-hover:text-white transition-colors">
-                                Create your profile
-                            </span>
-                            <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400 group-hover:text-white group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
-                        </Link>
-                    ) : (
-                        <Link
-                            to="/auth/signup"
-                            className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold shadow-sm hover:shadow-md transition-all active:scale-95 cursor-pointer select-none"
-                        >
-                            <span>Create your profile</span>
-                            <ArrowRight className="w-3.5 h-3.5 text-neutral-300" />
-                        </Link>
-                    )}
                 </div>
-            </div>
+            )}
 
             {/* Profile Showcase Container - Full Width */}
             <main className="w-full px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16 min-w-0">
@@ -325,10 +341,10 @@ export default function PublicProfilePage() {
                             <button
                                 type="button"
                                 onClick={() => setCardFace((f) => (f === "front" ? "back" : "front"))}
-                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-900 hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-xs active:scale-95"
                                 title="Flip to view card back with QR code"
                             >
-                                <Repeat className="w-3.5 h-3.5" />
+                                <Repeat className={`w-3.5 h-3.5 transition-transform duration-500 ${cardFace === "back" ? "rotate-180" : ""}`} />
                                 <span>{cardFace === "front" ? "Flip To Back" : "Flip To Front"}</span>
                             </button>
                         </div>
@@ -336,41 +352,109 @@ export default function PublicProfilePage() {
 
                     {/* Split Layout: 3/4 Main Card + 1/4 Details, Bio & Links Card */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                        {/* LEFT (3/4 Screen Width on Large Screens): Main Developer Card */}
-                        <div className="lg:col-span-9 flex flex-col justify-center min-w-0">
-                            <div
-                                ref={cardContainerRef}
-                                className="w-full flex justify-center overflow-hidden rounded-[28px] shadow-2xl"
-                                style={{ height: 627 * cardScale }}
-                            >
-                                <div
+                        {/* LEFT (3/4 Screen Width on Large Screens): Main Developer Card with 3D Flip Animation */}
+                        <div ref={cardContainerRef} className="lg:col-span-9 flex flex-col justify-center items-center min-w-0">
+                            {/* 3D Motion Card Container (Matches Card.tsx from Main Landing Page) */}
+                            <div style={{ perspective: 1800 }} className="w-full flex justify-center">
+                                <motion.div
+                                    className="relative cursor-pointer select-none"
                                     style={{
-                                        width: 1200,
-                                        height: 627,
-                                        transform: `scale(${cardScale})`,
-                                        transformOrigin: "top center",
+                                        width: 1200 * cardScale,
+                                        height: 627 * cardScale,
+                                        transformStyle: "preserve-3d",
+                                    }}
+                                    animate={{ rotateY: cardFace === "back" ? 180 : 0 }}
+                                    transition={{ duration: 0.75, ease: [0.23, 1, 0.32, 1] }}
+                                    onClick={() => setCardFace((f) => (f === "front" ? "back" : "front"))}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label="Flip Developer Profile Card in 3D"
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === " ") {
+                                            e.preventDefault();
+                                            setCardFace((f) => (f === "front" ? "back" : "front"));
+                                        }
                                     }}
                                 >
-                                    <LinkedInCard
-                                        user={{
-                                            ...profile,
-                                            photoUrl: avatarSrc,
+                                    {/* Front Face */}
+                                    <div
+                                        className="absolute inset-0 w-full h-full rounded-[26px] sm:rounded-[32px] overflow-hidden border border-neutral-800 shadow-2xl"
+                                        style={{
+                                            backfaceVisibility: "hidden",
+                                            WebkitBackfaceVisibility: "hidden",
+                                            boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 50px -10px rgba(99, 102, 241, 0.35)",
                                         }}
-                                        stats={stats}
-                                        coderType={coderType}
-                                        topPlatforms={showcasedPlatforms}
-                                        allConnectedPlatforms={allConnectedPlatforms}
-                                        githubStats={githubStats}
-                                        includeGitHub={false}
-                                        theme={CARD_THEMES.indigo}
-                                        face={cardFace}
-                                        publicProfileUrl={window.location.href}
-                                        connectedPortals={connectedPortals}
-                                        topContests={showcasedContests}
-                                        showSocialLinks={false}
-                                        onHireMeClick={() => setIsHireModalOpen(true)}
-                                    />
-                                </div>
+                                    >
+                                        <div
+                                            style={{
+                                                width: 1200,
+                                                height: 627,
+                                                transform: `scale(${cardScale})`,
+                                                transformOrigin: "top left",
+                                            }}
+                                        >
+                                            <LinkedInCard
+                                                user={{
+                                                    ...profile,
+                                                    photoUrl: avatarSrc,
+                                                }}
+                                                stats={stats}
+                                                coderType={coderType}
+                                                topPlatforms={showcasedPlatforms}
+                                                allConnectedPlatforms={allConnectedPlatforms}
+                                                githubStats={githubStats}
+                                                includeGitHub={false}
+                                                theme={CARD_THEMES.indigo}
+                                                face="front"
+                                                publicProfileUrl={profilePageUrl}
+                                                connectedPortals={connectedPortals}
+                                                topContests={showcasedContests}
+                                                showSocialLinks={false}
+                                                onHireMeClick={() => setIsHireModalOpen(true)}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Back Face (Rotated 180 deg) */}
+                                    <div
+                                        className="absolute inset-0 w-full h-full rounded-[26px] sm:rounded-[32px] overflow-hidden border border-neutral-800 shadow-2xl"
+                                        style={{
+                                            backfaceVisibility: "hidden",
+                                            WebkitBackfaceVisibility: "hidden",
+                                            transform: "rotateY(180deg)",
+                                            boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 50px -10px rgba(99, 102, 241, 0.35)",
+                                        }}
+                                    >
+                                        <div
+                                            style={{
+                                                width: 1200,
+                                                height: 627,
+                                                transform: `scale(${cardScale})`,
+                                                transformOrigin: "top left",
+                                            }}
+                                        >
+                                            <LinkedInCard
+                                                user={{
+                                                    ...profile,
+                                                    photoUrl: avatarSrc,
+                                                }}
+                                                stats={stats}
+                                                coderType={coderType}
+                                                topPlatforms={showcasedPlatforms}
+                                                allConnectedPlatforms={allConnectedPlatforms}
+                                                githubStats={githubStats}
+                                                includeGitHub={false}
+                                                theme={CARD_THEMES.indigo}
+                                                face="back"
+                                                publicProfileUrl={profilePageUrl}
+                                                connectedPortals={connectedPortals}
+                                                topContests={showcasedContests}
+                                                showSocialLinks={false}
+                                                onHireMeClick={() => setIsHireModalOpen(true)}
+                                            />
+                                        </div>
+                                    </div>
+                                </motion.div>
                             </div>
                         </div>
 
@@ -504,18 +588,13 @@ export default function PublicProfilePage() {
                                     {/* Resume Button if public */}
                                     {profile.resumeUrl && profile.isResumePublic !== false && (
                                         <div className="p-2.5 rounded-xl bg-[#0d111c] text-white flex items-center justify-between gap-2.5 shadow-xs border border-neutral-800">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <div className="w-7 h-7 rounded-lg bg-rose-500/15 border border-rose-500/20 text-rose-400 flex items-center justify-center flex-shrink-0">
-                                                    <FileText className="w-3.5 h-3.5" />
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div className="w-7 h-7 rounded-lg bg-white/10 border border-white/20 text-white flex items-center justify-center flex-shrink-0">
+                                                    <FileText className="w-3.5 h-3.5 text-white" />
                                                 </div>
-                                                <div className="min-w-0">
-                                                    <p className="text-[11px] font-bold text-white truncate leading-tight">
-                                                        {profile.resumeFilename || "Resume.pdf"}
-                                                    </p>
-                                                    <p className="text-[9px] font-mono text-neutral-400 leading-tight">
-                                                        Verified Cloudinary PDF
-                                                    </p>
-                                                </div>
+                                                <span className="text-xs font-bold text-white tracking-tight">
+                                                    Resume
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-1.5 flex-shrink-0">
                                                 <button
@@ -696,7 +775,7 @@ export default function PublicProfilePage() {
                 githubStats={githubStats}
                 connectedPortals={connectedPortals}
                 showcasedContests={showcasedContests}
-                publicProfileUrl={window.location.href}
+                publicProfileUrl={profilePageUrl}
             />
 
             {/* Interactive PDF Resume Modal */}

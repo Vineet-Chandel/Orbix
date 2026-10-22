@@ -7,6 +7,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
+        sans: ["Poppins", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+        poppins: ["Poppins", "sans-serif"],
         MyCustomFont: ["MyCustomFont", "sans-serif"],
         MyCustomFont1: ["MyCustomFont1", "sans-serif"],
         MyCustomFont2: ["MyCustomFont2", "sans-serif"],

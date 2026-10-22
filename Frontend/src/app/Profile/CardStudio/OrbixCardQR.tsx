@@ -8,17 +8,25 @@ interface OrbixCardQRProps {
     showLogo?: boolean;
 }
 
-export const OrbixCardQR: React.FC<OrbixCardQRProps> = ({
+const qrCache = new Map<string, string>();
+
+export const OrbixCardQR: React.FC<OrbixCardQRProps> = React.memo(({
     value,
     size = 240,
     className = "",
     showLogo = true,
 }) => {
-    const [qrDataUrl, setQrDataUrl] = useState<string>("");
+    const cacheKey = `${value}_${size}`;
+    const [qrDataUrl, setQrDataUrl] = useState<string>(() => qrCache.get(cacheKey) || "");
 
     useEffect(() => {
-        let isMounted = true;
         if (!value) return;
+        if (qrCache.has(cacheKey)) {
+            setQrDataUrl(qrCache.get(cacheKey)!);
+            return;
+        }
+
+        let isMounted = true;
 
         QRCode.toDataURL(value, {
             errorCorrectionLevel: "H", // High error correction allows center logo without losing scanability
@@ -30,6 +38,7 @@ export const OrbixCardQR: React.FC<OrbixCardQRProps> = ({
             },
         })
             .then((url) => {
+                qrCache.set(cacheKey, url);
                 if (isMounted) setQrDataUrl(url);
             })
             .catch((err) => {
@@ -39,7 +48,7 @@ export const OrbixCardQR: React.FC<OrbixCardQRProps> = ({
         return () => {
             isMounted = false;
         };
-    }, [value, size]);
+    }, [value, size, cacheKey]);
 
     const centerLogoSize = Math.round(size * 0.15);
 
@@ -89,4 +98,4 @@ export const OrbixCardQR: React.FC<OrbixCardQRProps> = ({
             )}
         </div>
     );
-};
+});

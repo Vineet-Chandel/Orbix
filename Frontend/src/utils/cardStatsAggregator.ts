@@ -1,5 +1,9 @@
 import { PORTALS } from "./portalParser";
 import { PLATFORM_REGISTRY } from "./platformRegistry";
+import { resolveCodeforcesRank } from "./codeforcesRanks";
+import { resolveLeetCodeRank } from "./leetcodeRanks";
+import { resolveCodeChefRank } from "./codechefRanks";
+import { resolveAtCoderRank } from "./atcoderRanks";
 
 export interface AggregatedCodingStats {
     totalSolved: number;
@@ -938,45 +942,28 @@ export const CONTEST_ELIGIBLE_PORTALS = new Set([
 
 export function getPlatformTierColor(portal: string, tier: string | null, rating: number | null): string {
     const p = portal.toLowerCase();
-    const t = (tier || "").toLowerCase();
 
     if (p === "leetcode") {
-        if (t.includes("guardian") || (rating && rating >= 2150)) return "#8a2be2"; // Guardian Purple
-        if (t.includes("knight") || (rating && rating >= 1850)) return "#f59e0b"; // Knight Amber/Gold
-        return "#6366f1";
+        const lcRank = resolveLeetCodeRank(tier, rating);
+        if (lcRank) return lcRank.bgColor;
+        return "#8B877C";
     }
 
     if (p === "codeforces") {
-        if (t.includes("legendary") || (rating && rating >= 3000)) return "#ff0000";
-        if (t.includes("grandmaster") || (rating && rating >= 2400)) return "#ff0000";
-        if (t.includes("master") || (rating && rating >= 2100)) return "#ff8c00";
-        if (t.includes("candidate") || (rating && rating >= 1900)) return "#aa00aa";
-        if (t.includes("expert") || (rating && rating >= 1600)) return "#0000ff";
-        if (t.includes("specialist") || (rating && rating >= 1400)) return "#03a89e";
-        if (t.includes("pupil") || (rating && rating >= 1200)) return "#5cb85c";
-        if (t.includes("newbie") || (rating && rating > 0)) return "#cccccc";
-        return "#6366f1";
+        const cfRank = resolveCodeforcesRank(tier, rating);
+        if (cfRank) return cfRank.bgColor;
+        return "#808080";
     }
 
     if (p === "codechef") {
-        if (t.includes("7") || (rating && rating >= 2500)) return "#d0011b";
-        if (t.includes("6") || (rating && rating >= 2200)) return "#ff7f00";
-        if (t.includes("5") || (rating && rating >= 2000)) return "#fed813";
-        if (t.includes("4") || (rating && rating >= 1800)) return "#684273";
-        if (t.includes("3") || (rating && rating >= 1600)) return "#3375be";
-        if (t.includes("2") || (rating && rating >= 1400)) return "#1e7d34";
-        if (t.includes("1") || (rating && rating > 0)) return "#666666";
-        return "#3375be";
+        const ccRank = resolveCodeChefRank(tier, rating);
+        if (ccRank) return ccRank.bgColor;
+        return "#666666";
     }
 
     if (p === "atcoder") {
-        if (rating && rating >= 2800) return "#ff0000";
-        if (rating && rating >= 2400) return "#ff8000";
-        if (rating && rating >= 2000) return "#c0c000";
-        if (rating && rating >= 1600) return "#0000ff";
-        if (rating && rating >= 1200) return "#00c0c0";
-        if (rating && rating >= 800) return "#008000";
-        if (rating && rating >= 400) return "#804000";
+        const acRank = resolveAtCoderRank(tier, rating);
+        if (acRank) return acRank.bgColor;
         return "#808080";
     }
 
@@ -987,27 +974,20 @@ export function getFallbackTier(portal: string, rating: number | null): string |
     if (!rating || rating <= 0) return null;
     const p = portal.toLowerCase();
     if (p === "leetcode") {
-        if (rating >= 2150) return "GUARDIAN";
-        if (rating >= 1850) return "KNIGHT";
-        return null;
+        const lcRank = resolveLeetCodeRank(null, rating);
+        return lcRank ? lcRank.name : "Unranked";
     }
     if (p === "codeforces") {
-        if (rating >= 2400) return "GRANDMASTER";
-        if (rating >= 2100) return "MASTER";
-        if (rating >= 1900) return "CANDIDATE MASTER";
-        if (rating >= 1600) return "EXPERT";
-        if (rating >= 1400) return "SPECIALIST";
-        if (rating >= 1200) return "PUPIL";
-        return "NEWBIE";
+        const cfRank = resolveCodeforcesRank(null, rating);
+        return cfRank ? cfRank.name : "Newbie";
     }
     if (p === "codechef") {
-        if (rating >= 2500) return "7★";
-        if (rating >= 2200) return "6★";
-        if (rating >= 2000) return "5★";
-        if (rating >= 1800) return "4★";
-        if (rating >= 1600) return "3★";
-        if (rating >= 1400) return "2★";
-        return "1★";
+        const ccRank = resolveCodeChefRank(null, rating);
+        return ccRank ? ccRank.name : "1★";
+    }
+    if (p === "atcoder") {
+        const acRank = resolveAtCoderRank(null, rating);
+        return acRank ? acRank.name : "Gray";
     }
     return null;
 }

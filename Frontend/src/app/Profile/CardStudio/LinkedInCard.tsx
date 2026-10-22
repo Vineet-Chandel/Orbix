@@ -1,4 +1,5 @@
 import React, { useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { FolderGit2, GitCommit, Trophy, Sparkles, Code2 } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { OrbixCardQR } from "./OrbixCardQR";
@@ -6,6 +7,10 @@ import { CardBannerSVG } from "./CardBannerSVG";
 import { GitHubContributionTable } from "./GitHubContributionTable";
 import { CodingSubmissionsChart } from "./CodingSubmissionsChart";
 import { getPlatformIcon, sanitizePlatformUrl } from "../../../utils/platformLinks";
+import { CodeforcesBadge } from "../../../components/CodeforcesBadge";
+import { LeetCodeBadge } from "../../../components/LeetCodeBadge";
+import { CodeChefBadge } from "../../../components/CodeChefBadge";
+import { AtCoderBadge } from "../../../components/AtCoderBadge";
 import type { CardThemeConfig } from "./types";
 import type {
     AggregatedCodingStats,
@@ -34,9 +39,10 @@ interface LinkedInCardProps {
     topContests?: RankedContestPlatform[];
     showSocialLinks?: boolean;
     onHireMeClick?: () => void;
+    animate?: boolean;
 }
 
-export const LinkedInCard: React.FC<LinkedInCardProps> = ({
+export const LinkedInCard: React.FC<LinkedInCardProps> = React.memo(({
     user,
     stats,
     coderType,
@@ -54,6 +60,7 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
     topContests = [],
     showSocialLinks = false,
     onHireMeClick,
+    animate = true,
 }) => {
     const displayName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "Developer";
     const username = user?.username || "developer";
@@ -178,18 +185,9 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
     const bannerFill = isLightBanner ? "black" : "black";
     const bannerStroke = isLightBanner ? "black" : "black";
 
-    return (
-        <div
-            ref={cardRef}
-            className="relative w-[1200px] h-[627px] bg-[#0c1017] text-white overflow-hidden rounded-[28px] border border-neutral-800/90 shadow-2xl flex flex-col justify-between font-sans select-none flex-shrink-0"
-            style={{
-                boxShadow: `0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px -10px ${theme.borderGlow}`,
-            }}
-        >
-            {face === "front" ? (
-                /* ==================== FRONT FACE ==================== */
-                <>
-                    {/* Top Accent Textured Banner */}
+    const frontContent = (
+        <>
+            {/* Top Accent Textured Banner */}
 
                     <div
                         className={`relative h-[165px] w-full px-9 pt-5 flex items-start justify-between overflow-hidden flex-shrink-0 ${theme.id === "gold" ? "bg-[#ffc629]" : `bg-gradient-to-r ${theme.bannerGradient}`
@@ -548,14 +546,40 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                                     {hasRating ? contest.rating?.toLocaleString() : "—"}
                                                                 </span>
                                                                 {contest.tier && (
-                                                                    <span
-                                                                        style={{
-                                                                            backgroundColor: contest.tierColor || "#ea3943",
-                                                                        }}
-                                                                        className="px-2 py-0.5 rounded text-[10px] font-black text-white uppercase tracking-wider shadow-xs leading-tight"
-                                                                    >
-                                                                        {contest.tier}
-                                                                    </span>
+                                                                    (contest.id || "").toLowerCase() === "codeforces" ? (
+                                                                        <CodeforcesBadge
+                                                                            tier={contest.tier}
+                                                                            rating={contest.rating}
+                                                                            size="xs"
+                                                                        />
+                                                                    ) : (contest.id || "").toLowerCase() === "leetcode" ? (
+                                                                        <LeetCodeBadge
+                                                                            tier={contest.tier}
+                                                                            rating={contest.rating}
+                                                                            size="xs"
+                                                                        />
+                                                                    ) : (contest.id || "").toLowerCase() === "codechef" ? (
+                                                                        <CodeChefBadge
+                                                                            tier={contest.tier}
+                                                                            rating={contest.rating}
+                                                                            size="xs"
+                                                                        />
+                                                                    ) : (contest.id || "").toLowerCase() === "atcoder" ? (
+                                                                        <AtCoderBadge
+                                                                            tier={contest.tier}
+                                                                            rating={contest.rating}
+                                                                            size="xs"
+                                                                        />
+                                                                    ) : (
+                                                                        <span
+                                                                            style={{
+                                                                                backgroundColor: contest.tierColor || "#ea3943",
+                                                                            }}
+                                                                            className="px-2 py-0.5 rounded text-[10px] font-black text-white uppercase tracking-wider shadow-xs leading-tight"
+                                                                        >
+                                                                            {contest.tier}
+                                                                        </span>
+                                                                    )
                                                                 )}
                                                             </div>
                                                             {contest.officialRank ? (
@@ -811,14 +835,40 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                                                                         {plat.rating?.toLocaleString()}
                                                                     </span>
                                                                     {plat.tier && (
-                                                                        <span
-                                                                            style={{
-                                                                                backgroundColor: plat.tierColor || "#f59e0b",
-                                                                            }}
-                                                                            className="px-2 py-0.5 rounded text-[10px] font-black text-white uppercase tracking-wider shadow-xs leading-tight"
-                                                                        >
-                                                                            {plat.tier}
-                                                                        </span>
+                                                                        plat.id.toLowerCase() === "codeforces" ? (
+                                                                            <CodeforcesBadge
+                                                                                tier={plat.tier}
+                                                                                rating={plat.rating}
+                                                                                size="xs"
+                                                                            />
+                                                                        ) : plat.id.toLowerCase() === "leetcode" ? (
+                                                                            <LeetCodeBadge
+                                                                                tier={plat.tier}
+                                                                                rating={plat.rating}
+                                                                                size="xs"
+                                                                            />
+                                                                        ) : plat.id.toLowerCase() === "codechef" ? (
+                                                                            <CodeChefBadge
+                                                                                tier={plat.tier}
+                                                                                rating={plat.rating}
+                                                                                size="xs"
+                                                                            />
+                                                                        ) : plat.id.toLowerCase() === "atcoder" ? (
+                                                                            <AtCoderBadge
+                                                                                tier={plat.tier}
+                                                                                rating={plat.rating}
+                                                                                size="xs"
+                                                                            />
+                                                                        ) : (
+                                                                            <span
+                                                                                style={{
+                                                                                    backgroundColor: plat.tierColor || "#f59e0b",
+                                                                                }}
+                                                                                className="px-2 py-0.5 rounded text-[10px] font-black text-white uppercase tracking-wider shadow-xs leading-tight"
+                                                                            >
+                                                                                {plat.tier}
+                                                                            </span>
+                                                                        )
                                                                     )}
                                                                 </div>
 
@@ -902,11 +952,12 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                             </div>
                         </div>
                     </div>
-                </>
-            ) : (
-                /* ==================== BACK FACE ==================== */
-                <>
-                    {/* Top Header */}
+        </>
+    );
+
+    const backContent = (
+        <>
+            {/* Top Header */}
                     <div className="h-[110px] w-full px-9 pt-6 flex items-center justify-between border-b border-white/10 bg-[#0e131b]">
                         <div className="flex items-center gap-3.5">
                             <div className="w-11 h-11 rounded-2xl  flex items-center justify-center ">
@@ -1002,9 +1053,49 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = ({
                             </div>
                         </div>
                     </div>
-                </>
+        </>
+    );
+
+    return (
+        <div
+            ref={cardRef}
+            className="relative w-[1200px] h-[627px] bg-[#0c1017] text-white overflow-hidden rounded-[28px] border border-neutral-800/90 shadow-2xl flex flex-col justify-between font-sans select-none flex-shrink-0"
+            style={{
+                boxShadow: `0 25px 60px -15px rgba(0, 0, 0, 0.7), 0 0 40px -10px ${theme.borderGlow}`,
+            }}
+        >
+            {animate ? (
+                <AnimatePresence mode="wait" initial={false}>
+                    {face === "front" ? (
+                        <motion.div
+                            key="li-front"
+                            initial={{ opacity: 0, scale: 0.985 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.985 }}
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                            className="w-full h-full flex flex-col justify-between"
+                        >
+                            {frontContent}
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="li-back"
+                            initial={{ opacity: 0, scale: 0.985 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.985 }}
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                            className="w-full h-full flex flex-col justify-between"
+                        >
+                            {backContent}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            ) : face === "front" ? (
+                <div className="w-full h-full flex flex-col justify-between">{frontContent}</div>
+            ) : (
+                <div className="w-full h-full flex flex-col justify-between">{backContent}</div>
             )}
         </div>
     );
-};
+});
 

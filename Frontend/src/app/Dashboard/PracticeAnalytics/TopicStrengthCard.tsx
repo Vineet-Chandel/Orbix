@@ -21,9 +21,9 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
     const hasScores = rawAxes.some((a) => a.score > 0);
 
     const radar = useMemo(() => {
-        const cx = 160;
-        const cy = 150;
-        const r = 90;
+        const cx = 230;
+        const cy = 210;
+        const r = 138;
         const totalAxes = 6;
 
         // Concentric hexagon levels
@@ -62,14 +62,14 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
         }
         const dataPolygonPoints = dataPoints.map((p) => `${p.x},${p.y}`).join(" ");
 
-        // Label positions (placed neatly around the perimeter)
-        const labelPositions = [
-            { text: "Array", x: 160, y: 38 },
-            { text: "String", x: 266, y: 98 },
-            { text: "Hash Table", x: 266, y: 218 },
-            { text: "Math", x: 160, y: 272 },
-            { text: "DP", x: 54, y: 218 },
-            { text: "Sorting", x: 54, y: 98 },
+        // Label positions placed neatly around the perimeter with custom text anchors
+        const labelPositions: Array<{ text: string; x: number; y: number; textAnchor: "middle" | "start" | "end" }> = [
+            { text: "Array", x: 230, y: 44, textAnchor: "middle" },
+            { text: "String", x: 362, y: 146, textAnchor: "start" },
+            { text: "Hash Table", x: 362, y: 284, textAnchor: "start" },
+            { text: "Math", x: 230, y: 384, textAnchor: "middle" },
+            { text: "DP", x: 98, y: 284, textAnchor: "end" },
+            { text: "Sorting", x: 98, y: 146, textAnchor: "end" },
         ];
 
         return {
@@ -81,34 +81,34 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
             dataPolygonPoints,
             labelPositions,
         };
-    }, [rawAxes]);
+    }, [rawAxes, hasScores]);
 
     return (
         <div
             aria-labelledby="topic-strength-title"
-            className="w-full text-white select-none flex flex-col justify-between h-full"
+            className="w-full text-neutral-900 select-none flex flex-col justify-between h-full"
         >
             <div>
                 {/* Header Row */}
-                <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] relative z-10">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-amber-400 shadow-sm">
-                            <Compass className="w-4 h-4 text-amber-400" />
+                <div className="flex items-center justify-between pb-4 border-b border-neutral-300 relative z-10">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs">
+                            <Compass className="w-5 h-5 text-neutral-800" />
                         </div>
-                        <h3 id="topic-strength-title" className="text-base sm:text-lg font-black text-white tracking-tight">
+                        <h3 id="topic-strength-title" className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
                             Topic strength
                         </h3>
                     </div>
                 </div>
 
                 {/* Body: SVG Radar Chart */}
-                <div className="pt-2 relative z-10 flex items-center justify-center min-h-[300px]">
+                <div className="pt-4 pb-2 relative z-10 flex-1 flex items-center justify-center min-h-[360px] sm:min-h-[400px]">
                     {isLoading && !data ? (
-                        <div className="w-44 h-44 rounded-full border border-white/[0.05] animate-pulse" />
+                        <div className="w-56 h-56 rounded-full border border-neutral-200 animate-pulse" />
                     ) : (
-                        <div className="w-full max-w-[320px] aspect-square flex items-center justify-center">
+                        <div className="w-full max-w-[420px] sm:max-w-[460px] aspect-square flex items-center justify-center">
                             <svg
-                                viewBox="0 0 320 300"
+                                viewBox="0 0 460 420"
                                 className="w-full h-full overflow-visible select-none"
                             >
                                 {/* Concentric Hexagons */}
@@ -117,8 +117,8 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
                                         key={idx}
                                         points={pts}
                                         fill="none"
-                                        stroke="rgba(255, 255, 255, 0.08)"
-                                        strokeWidth="1"
+                                        stroke="rgba(0, 0, 0, 0.12)"
+                                        strokeWidth="1.2"
                                     />
                                 ))}
 
@@ -130,17 +130,17 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
                                         y1={spoke.y1}
                                         x2={spoke.x2}
                                         y2={spoke.y2}
-                                        stroke="rgba(255, 255, 255, 0.08)"
-                                        strokeWidth="1"
+                                        stroke="rgba(0, 0, 0, 0.12)"
+                                        strokeWidth="1.2"
                                     />
                                 ))}
 
-                                {/* Filled Radar Data Area */}
+                                {/* Filled Radar Data Area (Apple Monochrome) */}
                                 <polygon
                                     points={radar.dataPolygonPoints}
-                                    fill="rgba(250, 204, 21, 0.18)"
-                                    stroke="#facc15"
-                                    strokeWidth="2"
+                                    fill="rgba(0, 0, 0, 0.08)"
+                                    stroke="#000000"
+                                    strokeWidth="2.5"
                                     strokeLinejoin="round"
                                     className="transition-all duration-700"
                                 />
@@ -151,22 +151,23 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
                                         key={idx}
                                         cx={pt.x}
                                         cy={pt.y}
-                                        r="3.5"
-                                        fill="#facc15"
-                                        stroke="#000000"
-                                        strokeWidth="1.5"
+                                        r="4.5"
+                                        fill="#000000"
+                                        stroke="#ffffff"
+                                        strokeWidth="2"
                                         className="transition-all duration-700"
                                     />
                                 ))}
 
-                                {/* Perimeter Axis Labels */}
+                                {/* Perimeter Axis Labels with Increased Font Size */}
                                 {radar.labelPositions.map((lbl, idx) => (
                                     <text
                                         key={idx}
                                         x={lbl.x}
                                         y={lbl.y}
-                                        textAnchor="middle"
-                                        className="text-[11px] sm:text-xs font-semibold fill-neutral-400 select-none"
+                                        textAnchor={lbl.textAnchor}
+                                        dominantBaseline="middle"
+                                        className="text-sm sm:text-base font-extrabold fill-neutral-900 select-none tracking-tight"
                                     >
                                         {lbl.text}
                                     </text>

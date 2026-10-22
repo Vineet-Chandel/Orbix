@@ -124,6 +124,8 @@ export const invalidateAllUserCaches = async (user: { id?: string; username?: st
                 promises.push(redis.del(`user:submissions:unified:${keyVar}`));
                 promises.push(redis.del(`user:development:unified:${keyVar}`));
                 promises.push(redis.del(`user:contests:unified:${keyVar}`));
+                promises.push(redis.del(`resume:private:${keyVar}`));
+                promises.push(redis.del(`resume:public:${keyVar}`));
             }
         }
 
@@ -133,6 +135,7 @@ export const invalidateAllUserCaches = async (user: { id?: string; username?: st
             promises.push(redis.del(`user:submissions:unified:${user.id}`));
             promises.push(redis.del(`user:development:unified:${user.id}`));
             promises.push(redis.del(`user:contests:unified:${user.id}`));
+            promises.push(redis.del(`resume:private:${user.id}`));
         }
 
         if (user.gmail) {
@@ -140,6 +143,89 @@ export const invalidateAllUserCaches = async (user: { id?: string; username?: st
         }
 
         await Promise.allSettled(promises);
+    } catch {
+        // Safe fallback
+    }
+};
+
+const RESUME_PRIVATE_TTL = 30 * 60; // 30 minutes
+const RESUME_PUBLIC_TTL = 60 * 60; // 60 minutes
+
+export const getCachedResume = async (identifier: string): Promise<any | null> => {
+    try {
+        if (!redis || redis.status !== "ready") return null;
+        const key = `resume:private:${identifier.toLowerCase().trim()}`;
+        const data = await redis.get(key);
+        if (!data) return null;
+        return JSON.parse(data);
+    } catch {
+        return null;
+    }
+};
+
+export const setCachedResume = async (
+    identifier: string,
+    data: any,
+    ttlSeconds: number = RESUME_PRIVATE_TTL
+): Promise<void> => {
+    try {
+        if (!redis || redis.status !== "ready") return;
+        const key = `resume:private:${identifier.toLowerCase().trim()}`;
+        await redis.set(key, JSON.stringify(data), "EX", ttlSeconds);
+    } catch {
+        // Safe fallback
+    }
+};
+
+export const getCachedPublicResume = async (username: string): Promise<any | null> => {
+    try {
+        if (!redis || redis.status !== "ready") return null;
+        const key = `resume:public:${username.toLowerCase().trim()}`;
+        const data = await redis.get(key);
+        if (!data) return null;
+        return JSON.parse(data);
+    } catch {
+        return null;
+    }
+};
+
+export const setCachedPublicResume = async (
+    username: string,
+    data: any,
+    ttlSeconds: number = RESUME_PUBLIC_TTL
+): Promise<void> => {
+    try {
+        if (!redis || redis.status !== "ready") return;
+        const key = `resume:public:${username.toLowerCase().trim()}`;
+        await redis.set(key, JSON.stringify(data), "EX", ttlSeconds);
+    } catch {
+        // Safe fallback
+    }
+};
+
+export const invalidateResumeCache = async (identifiers: {
+    id?: string | null;
+    username?: string | null;
+}): Promise<void> => {
+    try {
+        if (!redis || redis.status !== "ready") return;
+        const keys: string[] = [];
+        if (identifiers.id) {
+            keys.push(`resume:private:${identifiers.id.toLowerCase().trim()}`);
+        }
+        if (identifiers.username) {
+            const rawUser = identifiers.username.trim();
+            const lowerUser = rawUser.toLowerCase();
+            keys.push(`resume:private:${lowerUser}`);
+            keys.push(`resume:public:${lowerUser}`);
+            if (rawUser !== lowerUser) {
+                keys.push(`resume:private:${rawUser}`);
+                keys.push(`resume:public:${rawUser}`);
+            }
+        }
+        if (keys.length > 0) {
+            await redis.del(...keys);
+        }
     } catch {
         // Safe fallback
     }

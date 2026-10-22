@@ -22,7 +22,7 @@ interface DayCell {
     level: 0 | 1 | 2 | 3 | 4;
 }
 
-export const GitHubContributionTable: React.FC<GitHubContributionTableProps> = ({
+export const GitHubContributionTable: React.FC<GitHubContributionTableProps> = React.memo(({
     username,
     githubUsername,
     totalContributions = 0,
@@ -259,4 +259,4 @@ export const GitHubContributionTable: React.FC<GitHubContributionTableProps> = (
             </div>
         </div>
     );
-};
+});

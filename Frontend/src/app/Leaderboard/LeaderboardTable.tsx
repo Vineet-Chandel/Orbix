@@ -2,6 +2,10 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Flame, Award } from "lucide-react";
 import type { LeaderboardEntry } from "./types";
+import { resolveCodeforcesRank } from "../../utils/codeforcesRanks";
+import { resolveLeetCodeRank } from "../../utils/leetcodeRanks";
+import { resolveCodeChefRank } from "../../utils/codechefRanks";
+import { resolveAtCoderRank } from "../../utils/atcoderRanks";
 
 interface LeaderboardTableProps {
     entries: LeaderboardEntry[];
@@ -179,43 +183,74 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                     {/* Ratings Chips */}
                                     <td className="py-3.5 px-4 hidden lg:table-cell">
                                         <div className="flex items-center gap-1 flex-wrap">
-                                            {ratings.codeforces && (
-                                                <span
-                                                    className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
-                                                    style={{
-                                                        color: ratings.codeforces.color || "#03a89e",
-                                                        backgroundColor: `${ratings.codeforces.color || "#03a89e"}15`,
-                                                        borderColor: `${ratings.codeforces.color || "#03a89e"}35`,
-                                                    }}
-                                                    title={`Codeforces: ${ratings.codeforces.rating} (${ratings.codeforces.tier || "Rated"})`}
-                                                >
-                                                    CF {ratings.codeforces.rating}
-                                                </span>
-                                            )}
-                                            {ratings.leetcode && (
-                                                <span
-                                                    className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-400"
-                                                    title={`LeetCode: ${ratings.leetcode.rating} (${ratings.leetcode.badge || "Rated"})`}
-                                                >
-                                                    LC {ratings.leetcode.rating}
-                                                </span>
-                                            )}
-                                            {ratings.codechef && (
-                                                <span
-                                                    className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-amber-600/30 bg-amber-600/10 text-amber-500"
-                                                    title={`CodeChef: ${ratings.codechef.rating}`}
-                                                >
-                                                    CC {ratings.codechef.rating}
-                                                </span>
-                                            )}
-                                            {ratings.atcoder && (
-                                                <span
-                                                    className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border border-blue-500/30 bg-blue-500/10 text-blue-400"
-                                                    title={`AtCoder: ${ratings.atcoder.rating}`}
-                                                >
-                                                    AC {ratings.atcoder.rating}
-                                                </span>
-                                            )}
+                                            {ratings.codeforces && (() => {
+                                                const cfRank = resolveCodeforcesRank(ratings.codeforces.tier, ratings.codeforces.rating);
+                                                const cfColor = cfRank ? cfRank.bgColor : (ratings.codeforces.color || "#808080");
+                                                return (
+                                                    <span
+                                                        className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
+                                                        style={{
+                                                            color: cfColor,
+                                                            backgroundColor: `${cfColor}15`,
+                                                            borderColor: `${cfColor}35`,
+                                                        }}
+                                                        title={`Codeforces: ${ratings.codeforces.rating} (${cfRank?.name || ratings.codeforces.tier || "Rated"})`}
+                                                    >
+                                                        CF {ratings.codeforces.rating}
+                                                    </span>
+                                                );
+                                            })()}
+                                            {ratings.leetcode && (() => {
+                                                const lcRank = resolveLeetCodeRank(ratings.leetcode.tier || ratings.leetcode.badge, ratings.leetcode.rating);
+                                                const lcColor = lcRank ? lcRank.bgColor : "#7A4AD8";
+                                                return (
+                                                    <span
+                                                        className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
+                                                        style={{
+                                                            color: lcColor,
+                                                            backgroundColor: `${lcColor}15`,
+                                                            borderColor: `${lcColor}35`,
+                                                        }}
+                                                        title={`LeetCode: ${ratings.leetcode.rating} (${lcRank?.name || ratings.leetcode.tier || ratings.leetcode.badge || "Rated"})`}
+                                                    >
+                                                        LC {ratings.leetcode.rating}
+                                                    </span>
+                                                );
+                                            })()}
+                                            {ratings.codechef && (() => {
+                                                const ccRank = resolveCodeChefRank(ratings.codechef.tier, ratings.codechef.rating);
+                                                const ccColor = ccRank ? ccRank.bgColor : "#FF7F00";
+                                                return (
+                                                    <span
+                                                        className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
+                                                        style={{
+                                                            color: ccColor,
+                                                            backgroundColor: `${ccColor}15`,
+                                                            borderColor: `${ccColor}35`,
+                                                        }}
+                                                        title={`CodeChef: ${ratings.codechef.rating} (${ccRank?.name || ratings.codechef.tier || "Rated"})`}
+                                                    >
+                                                        CC {ratings.codechef.rating}
+                                                    </span>
+                                                );
+                                            })()}
+                                            {ratings.atcoder && (() => {
+                                                const acRank = resolveAtCoderRank(ratings.atcoder.tier, ratings.atcoder.rating);
+                                                const acColor = acRank ? acRank.bgColor : "#01A0A0";
+                                                return (
+                                                    <span
+                                                        className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
+                                                        style={{
+                                                            color: acColor,
+                                                            backgroundColor: `${acColor}15`,
+                                                            borderColor: `${acColor}35`,
+                                                        }}
+                                                        title={`AtCoder: ${ratings.atcoder.rating} (${acRank?.name || ratings.atcoder.tier || "Rated"})`}
+                                                    >
+                                                        AC {ratings.atcoder.rating}
+                                                    </span>
+                                                );
+                                            })()}
                                             {Object.keys(ratings).length === 0 && (
                                                 <span className="text-[11px] text-neutral-400 font-mono">—</span>
                                             )}

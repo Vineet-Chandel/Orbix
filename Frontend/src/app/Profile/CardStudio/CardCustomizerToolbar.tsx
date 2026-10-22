@@ -1,4 +1,5 @@
 import React from "react";
+import { motion } from "framer-motion";
 import { Code2, FolderGit2, Sparkles } from "lucide-react";
 import { CARD_THEMES } from "./types";
 import type { CardFormat, CardFace, CardThemeId, SlotShowcaseCategory } from "./types";
@@ -91,75 +92,110 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
             {/* Format & Face Segmented Controls */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Format Selector */}
-                <div className="bg-neutral-100 p-1 rounded-xl flex items-center">
+                <div className="bg-neutral-100 p-1 rounded-xl flex items-center relative">
                     <button
                         type="button"
                         onClick={() => onFormatChange("linkedin")}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        className={`relative flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
                             format === "linkedin"
-                                ? "bg-white text-neutral-900 shadow-2xs"
+                                ? "text-neutral-900"
                                 : "text-neutral-500 hover:text-neutral-900"
                         }`}
                     >
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.62 1.62 0 1 0 0-3.24 1.62 1.62 0 0 0 0 3.24m1.39 9.74v-8.37H5.07v8.37h2.78z" />
-                        </svg>
-                        <span>LinkedIn Card</span>
+                        {format === "linkedin" && (
+                            <motion.div
+                                layoutId="activeFormatIndicator"
+                                className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                                transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                            />
+                        )}
+                        <span className="relative z-10 flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.28 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.75M6.46 8.76a1.62 1.62 0 1 0 0-3.24 1.62 1.62 0 0 0 0 3.24m1.39 9.74v-8.37H5.07v8.37h2.78z" />
+                            </svg>
+                            <span>LinkedIn Card</span>
+                        </span>
                     </button>
                     <button
                         type="button"
                         onClick={() => onFormatChange("instagram")}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        className={`relative flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
                             format === "instagram"
-                                ? "bg-white text-neutral-900 shadow-2xs"
+                                ? "text-neutral-900"
                                 : "text-neutral-500 hover:text-neutral-900"
                         }`}
                     >
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="5" y="2" width="14" height="20" rx="3" />
-                            <circle cx="12" cy="18" r="1" fill="currentColor" />
-                        </svg>
-                        <span>Story (9:16)</span>
+                        {format === "instagram" && (
+                            <motion.div
+                                layoutId="activeFormatIndicator"
+                                className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                                transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                            />
+                        )}
+                        <span className="relative z-10 flex items-center gap-1.5">
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="5" y="2" width="14" height="20" rx="3" />
+                                <circle cx="12" cy="18" r="1" fill="currentColor" />
+                            </svg>
+                            <span>Story (9:16)</span>
+                        </span>
                     </button>
                 </div>
 
                 {/* Face Selector + Quick Flip Button */}
                 <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-neutral-100 p-1 rounded-xl flex items-center">
+                    <div className="flex-1 bg-neutral-100 p-1 rounded-xl flex items-center relative">
                         <button
                             type="button"
                             onClick={() => onFaceChange("front")}
-                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            className={`relative flex-1 py-1.5 px-3 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
                                 face === "front"
-                                    ? "bg-white text-neutral-900 shadow-2xs"
+                                    ? "text-neutral-900"
                                     : "text-neutral-500 hover:text-neutral-900"
                             }`}
                         >
-                            Front Face
+                            {face === "front" && (
+                                <motion.div
+                                    layoutId="activeFaceIndicator"
+                                    className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                                    transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                                />
+                            )}
+                            <span className="relative z-10">Front Face</span>
                         </button>
                         <button
                             type="button"
                             onClick={() => onFaceChange("back")}
-                            className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            className={`relative flex-1 py-1.5 px-3 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
                                 face === "back"
-                                    ? "bg-white text-neutral-900 shadow-2xs"
+                                    ? "text-neutral-900"
                                     : "text-neutral-500 hover:text-neutral-900"
                             }`}
                         >
-                            Back (QR)
+                            {face === "back" && (
+                                <motion.div
+                                    layoutId="activeFaceIndicator"
+                                    className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                                    transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                                />
+                            )}
+                            <span className="relative z-10">Back (QR)</span>
                         </button>
                     </div>
 
-                    <button
+                    <motion.button
                         type="button"
                         onClick={onFlip}
+                        whileTap={{ scale: 0.9, rotate: 180 }}
+                        whileHover={{ scale: 1.05 }}
+                        transition={{ type: "spring", stiffness: 400, damping: 25 }}
                         title="Flip card between Front and Back"
-                        className="h-9 w-9 flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition-all cursor-pointer flex-shrink-0"
+                        className="h-9 w-9 flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition-colors cursor-pointer flex-shrink-0"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <svg className={`w-4 h-4 transition-transform duration-500 ${face === "back" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
-                    </button>
+                    </motion.button>
                 </div>
             </div>
 
@@ -266,43 +302,36 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                     </div>
 
                     {/* 3-Way Slot Classification Category Switcher */}
-                    <div className="bg-neutral-200/80 p-0.5 rounded-xl flex items-center flex-shrink-0">
-                        <button
-                            type="button"
-                            onClick={() => onSlotCategoryChange("practice")}
-                            className={`flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                slotCategory === "practice"
-                                    ? "bg-white text-neutral-900 shadow-2xs"
-                                    : "text-neutral-600 hover:text-neutral-900"
-                            }`}
-                        >
-                            <Code2 className="w-3.5 h-3.5 text-indigo-600" />
-                            <span>Practice</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onSlotCategoryChange("dev")}
-                            className={`flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                slotCategory === "dev"
-                                    ? "bg-white text-neutral-900 shadow-2xs"
-                                    : "text-neutral-600 hover:text-neutral-900"
-                            }`}
-                        >
-                            <FolderGit2 className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Dev Slot</span>
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => onSlotCategoryChange("both")}
-                            className={`flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                slotCategory === "both"
-                                    ? "bg-white text-neutral-900 shadow-2xs"
-                                    : "text-neutral-600 hover:text-neutral-900"
-                            }`}
-                        >
-                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                            <span>Both</span>
-                        </button>
+                    <div className="bg-neutral-200/80 p-0.5 rounded-xl flex items-center flex-shrink-0 relative">
+                        {(["practice", "dev", "both"] as SlotShowcaseCategory[]).map((cat) => {
+                            const isSelected = slotCategory === cat;
+                            return (
+                                <button
+                                    key={cat}
+                                    type="button"
+                                    onClick={() => onSlotCategoryChange(cat)}
+                                    className={`relative flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                        isSelected
+                                            ? "text-neutral-900"
+                                            : "text-neutral-600 hover:text-neutral-900"
+                                    }`}
+                                >
+                                    {isSelected && (
+                                        <motion.div
+                                            layoutId="activeCategoryIndicator"
+                                            className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                                            transition={{ type: "spring", stiffness: 450, damping: 35 }}
+                                        />
+                                    )}
+                                    <span className="relative z-10 flex items-center gap-1.5">
+                                        {cat === "practice" && <Code2 className="w-3.5 h-3.5 text-indigo-600" />}
+                                        {cat === "dev" && <FolderGit2 className="w-3.5 h-3.5 text-emerald-600" />}
+                                        {cat === "both" && <Sparkles className="w-3.5 h-3.5 text-amber-500" />}
+                                        <span className="capitalize">{cat === "dev" ? "Dev Slot" : cat}</span>
+                                    </span>
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 
@@ -353,7 +382,12 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                         const platformsToDisplay = filteredPlatforms.length > 0 ? filteredPlatforms : availablePlatforms;
 
                         return (
-                            <div
+                            <motion.div
+                                layout
+                                initial={{ opacity: 0, y: 6 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -6 }}
+                                transition={{ duration: 0.18 }}
                                 key={slotIdx}
                                 className="flex items-center gap-2 bg-white p-2 rounded-lg border border-neutral-200 shadow-2xs"
                             >
@@ -444,7 +478,7 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                                         </svg>
                                     </button>
                                 </div>
-                            </div>
+                            </motion.div>
                         );
                     })}
                 </div>

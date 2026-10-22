@@ -115,6 +115,7 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_resume_public BOOLEAN DEFAULT true;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_metadata JSONB DEFAULT '{}'::jsonb;
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+            CREATE INDEX IF NOT EXISTS idx_users_lower_username ON users(LOWER(username));
             CREATE INDEX IF NOT EXISTS idx_users_orbix_score ON users(orbix_score DESC, username ASC);
             CREATE INDEX IF NOT EXISTS idx_users_is_public ON users(is_public);
 

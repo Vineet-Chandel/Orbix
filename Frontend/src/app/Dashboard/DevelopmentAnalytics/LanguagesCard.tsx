@@ -33,39 +33,39 @@ export const LanguagesCard: React.FC<LanguagesCardProps> = ({
     });
 
     return (
-        <div className="w-full text-white select-none flex flex-col justify-between h-full">
+        <div className="w-full text-neutral-900 select-none flex flex-col justify-between h-full">
             {/* Top Header */}
             <div className="flex items-center justify-between pb-1">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-neutral-300 shadow-sm flex-shrink-0">
-                        <LanguagesIcon className="w-5 h-5 text-neutral-300" />
+                    <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-800 shadow-2xs flex-shrink-0">
+                        <LanguagesIcon className="w-5 h-5 text-neutral-800" />
                     </div>
-                    <h3 className="text-lg font-bold text-white tracking-tight leading-none">
+                    <h3 className="text-lg font-extrabold text-neutral-900 tracking-tight leading-none">
                         Languages
                     </h3>
                 </div>
-                <span className="text-xs sm:text-sm font-normal text-neutral-400">
+                <span className="text-xs sm:text-sm font-medium text-neutral-500">
                     by code size
                 </span>
             </div>
 
             {isLoading && list.length === 0 ? (
                 <div className="space-y-4 my-6">
-                    <div className="w-full h-2.5 rounded-full bg-white/[0.06] animate-pulse" />
+                    <div className="w-full h-3 rounded-full bg-neutral-200 animate-pulse" />
                     <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                            <div className="w-24 h-3 bg-white/[0.04] rounded-md animate-pulse" />
-                            <div className="w-20 h-3 bg-white/[0.04] rounded-md animate-pulse" />
+                            <div className="w-24 h-3 bg-neutral-200 rounded-md animate-pulse" />
+                            <div className="w-20 h-3 bg-neutral-100 rounded-md animate-pulse" />
                         </div>
                         <div className="space-y-2">
-                            <div className="w-24 h-3 bg-white/[0.04] rounded-md animate-pulse" />
-                            <div className="w-20 h-3 bg-white/[0.04] rounded-md animate-pulse" />
+                            <div className="w-24 h-3 bg-neutral-200 rounded-md animate-pulse" />
+                            <div className="w-20 h-3 bg-neutral-100 rounded-md animate-pulse" />
                         </div>
                     </div>
                 </div>
             ) : list.length === 0 ? (
                 <div className="py-12 text-center max-w-xs mx-auto space-y-2">
-                    <p className="text-xs text-neutral-400">
+                    <p className="text-xs sm:text-sm text-neutral-500">
                         No language data detected on connected GitHub repositories.
                     </p>
                 </div>
@@ -73,7 +73,7 @@ export const LanguagesCard: React.FC<LanguagesCardProps> = ({
                 <>
                     {/* Horizontal Progress Bar */}
                     <div className="w-full my-6">
-                        <div className="w-full h-2.5 rounded-full bg-neutral-900 border border-neutral-800 overflow-hidden flex">
+                        <div className="w-full h-3 rounded-full bg-neutral-100 border border-neutral-300 overflow-hidden flex">
                             {list.map((lang, idx) => (
                                 <div
                                     key={idx}
@@ -100,14 +100,14 @@ export const LanguagesCard: React.FC<LanguagesCardProps> = ({
                                 >
                                     <div className="flex items-center gap-2.5 min-w-0">
                                         <span
-                                            className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
+                                            className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-2xs"
                                             style={{ backgroundColor: lang.color }}
                                         />
-                                        <span className="text-xs sm:text-sm font-medium text-neutral-200 group-hover:text-white transition-colors truncate">
+                                        <span className="text-xs sm:text-sm font-semibold text-neutral-800 group-hover:text-black transition-colors truncate">
                                             {formatName(lang.name)}
                                         </span>
                                     </div>
-                                    <span className="text-xs sm:text-sm font-mono text-neutral-400 font-medium tabular-nums ml-2 flex-shrink-0">
+                                    <span className="text-xs sm:text-sm font-mono text-neutral-500 font-medium tabular-nums ml-2 flex-shrink-0">
                                         {lang.percentage.toFixed(1)}%
                                     </span>
                                 </div>
@@ -124,14 +124,14 @@ export const LanguagesCard: React.FC<LanguagesCardProps> = ({
                                 >
                                     <div className="flex items-center gap-2.5 min-w-0">
                                         <span
-                                            className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-sm"
+                                            className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-2xs"
                                             style={{ backgroundColor: lang.color }}
                                         />
-                                        <span className="text-xs sm:text-sm font-medium text-neutral-200 group-hover:text-white transition-colors truncate">
+                                        <span className="text-xs sm:text-sm font-semibold text-neutral-800 group-hover:text-black transition-colors truncate">
                                             {formatName(lang.name)}
                                         </span>
                                     </div>
-                                    <span className="text-xs sm:text-sm font-mono text-neutral-400 font-medium tabular-nums ml-2 flex-shrink-0">
+                                    <span className="text-xs sm:text-sm font-mono text-neutral-500 font-medium tabular-nums ml-2 flex-shrink-0">
                                         {lang.percentage.toFixed(1)}%
                                     </span>
                                 </div>

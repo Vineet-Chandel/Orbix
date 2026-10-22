@@ -232,20 +232,20 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
         };
     }, [remoteData, clientAgg, platformBreakdown, selectedPortal, weeksCount]);
 
-    // Circular Curvy Green Shader mapping
+    // Circular Curvy Green Accent Shader mapping
     const getCellColor = (level: 0 | 1 | 2 | 3 | 4) => {
         switch (level) {
             case 4:
-                return "bg-[#39d353] border-[#72ff8f] shadow-[0_0_12px_rgba(57,211,83,0.85)]";
+                return "bg-[#216e39] border-[#17562a] shadow-2xs";
             case 3:
-                return "bg-[#26a641] border-[#3ee667] shadow-[0_0_8px_rgba(38,166,65,0.6)]";
+                return "bg-[#30a14e] border-[#248941]";
             case 2:
-                return "bg-[#006d32] border-[#20964c] shadow-[0_0_5px_rgba(0,109,50,0.45)]";
+                return "bg-[#40c463] border-[#33b255]";
             case 1:
-                return "bg-[#0e4429] border-[#1b7342]/70 shadow-[0_0_3px_rgba(14,68,41,0.35)]";
+                return "bg-[#9be9a8] border-[#7cd88c]";
             case 0:
             default:
-                return "bg-[#141b25] border-white/[0.08]";
+                return "bg-neutral-100 border-neutral-200/90 hover:border-emerald-300";
         }
     };
 
@@ -255,24 +255,21 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
 
     if (!hasConnectedPlatforms) {
         return (
-            <div className="w-full rounded-3xl bg-black text-white p-8 sm:p-12 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
-                <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-                <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
+            <div className="w-full rounded-3xl bg-white text-neutral-900 p-8 sm:p-12 border border-neutral-300 shadow-sm relative overflow-hidden select-none">
                 <div className="relative z-10 flex flex-col items-center justify-center text-center max-w-lg mx-auto py-8 space-y-5">
-                    <div className="w-16 h-16 rounded-3xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 shadow-xl">
-                        <Code2 className="w-8 h-8" />
+                    <div className="w-16 h-16 rounded-3xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs">
+                        <Code2 className="w-8 h-8 text-neutral-900" />
                     </div>
 
                     <div className="space-y-2">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[11px] font-bold text-emerald-400 uppercase tracking-wider">
-                            <Sparkles className="w-3.5 h-3.5" />
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/[0.04] border border-neutral-300 text-[11px] font-bold text-neutral-600 uppercase tracking-wider">
+                            <Sparkles className="w-3.5 h-3.5 text-neutral-500" />
                             <span>Practice Field</span>
                         </div>
-                        <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                        <h3 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
                             No Practice Platforms Connected
                         </h3>
-                        <p className="text-sm text-neutral-400 leading-relaxed max-w-md">
+                        <p className="text-sm text-neutral-500 leading-relaxed max-w-md font-medium">
                             Connect your coding handles (LeetCode, Codeforces, HackerRank, CodeChef, AtCoder & more) to track daily submissions, active streaks, and solve metrics.
                         </p>
                     </div>
@@ -280,14 +277,14 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                     <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
                         <Link
                             to="/onboarding"
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-black hover:bg-neutral-800 text-white font-extrabold text-xs shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
                         >
                             <span>Connect Coding Platforms</span>
                             <ArrowRight className="w-4 h-4" />
                         </Link>
                         <Link
                             to="/profile"
-                            className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-white/[0.06] hover:bg-white/[0.1] text-neutral-300 font-bold text-xs border border-white/10 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-black/[0.04] hover:bg-black/[0.08] text-neutral-700 font-bold text-xs border border-neutral-300 transition-all cursor-pointer"
                         >
                             <span>Manage Profile</span>
                         </Link>
@@ -298,28 +295,24 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     }
 
     return (
-        <div className="w-full rounded-3xl bg-black text-white p-6 sm:p-8 border border-neutral-800 shadow-2xl relative overflow-hidden select-none">
-            {/* Ambient background glow */}
-            <div className="absolute -top-24 -right-24 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-
+        <div className="w-full rounded-3xl bg-white text-neutral-900 p-6 sm:p-8 border border-neutral-300 shadow-sm relative overflow-hidden select-none">
             {/* Top Header Row */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
-                <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 flex-shrink-0 shadow-lg">
-                        <Code2 className="w-6 h-6" />
+                <div className="flex items-center gap-3.5">
+                    <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs flex-shrink-0">
+                        <Code2 className="w-5 h-5 text-neutral-900" />
                     </div>
                     <div>
-                        <div className="flex items-center gap-2.5">
-                            <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-tight">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                            <h3 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight leading-tight">
                                 Practice Activity
                             </h3>
-                            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-                                <Sparkles className="w-3 h-3 text-emerald-400 animate-pulse" />
+                            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/[0.04] border border-neutral-300 text-[11px] font-bold text-neutral-600 uppercase tracking-wider">
+                                <Sparkles className="w-3 h-3 text-neutral-500" />
                                 <span>Multi-Platform Practice</span>
                             </span>
                         </div>
-                        <p className="text-xs text-neutral-400 font-medium mt-1">
+                        <p className="text-xs sm:text-sm text-neutral-500 font-medium mt-1">
                             Merged problem solving and practice submissions from all connected platforms (excluding GitHub)
                         </p>
                     </div>
@@ -327,12 +320,12 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
 
                 <div className="flex items-center gap-5 flex-shrink-0">
                     {/* Total Submissions Metric */}
-                    <div className="text-right">
-                        <span className="text-3xl sm:text-4xl font-mono font-black text-emerald-400 block leading-none">
+                    <div className="text-left md:text-right">
+                        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-900 block leading-none">
                             {totalSubmissions.toLocaleString()}
                         </span>
-                        <div className="flex items-center justify-end gap-1 text-[11px] font-bold uppercase tracking-wider text-neutral-400 mt-1">
-                            <GitCommit className="w-3.5 h-3.5 text-emerald-400" />
+                        <div className="flex items-center md:justify-end gap-1.5 text-xs font-bold uppercase tracking-wider text-neutral-500 mt-1.5">
+                            <GitCommit className="w-3.5 h-3.5 text-neutral-700" />
                             <span>Submissions Done</span>
                         </div>
                     </div>
@@ -340,14 +333,14 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
             </div>
 
             {/* Platform Filter Chips Row */}
-            <div className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y border-white/[0.06] relative z-10 scrollbar-none">
+            <div className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y border-neutral-200 relative z-10 scrollbar-none">
                 <button
                     type="button"
                     onClick={() => setSelectedPortal("all")}
-                    className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex-shrink-0 ${
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex-shrink-0 ${
                         selectedPortal === "all"
-                            ? "bg-emerald-500 text-black shadow-[0_0_12px_rgba(16,185,129,0.4)]"
-                            : "bg-white/[0.05] hover:bg-white/[0.09] text-neutral-300 border border-white/10"
+                            ? "bg-black text-white shadow-xs font-black"
+                            : "bg-black/[0.04] hover:bg-black/[0.08] text-neutral-700 border border-neutral-300"
                     }`}
                 >
                     <Layers className="w-3.5 h-3.5" />
@@ -361,17 +354,19 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                             key={plat.portal}
                             type="button"
                             onClick={() => setSelectedPortal(plat.portal)}
-                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all cursor-pointer flex-shrink-0 ${
+                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex-shrink-0 ${
                                 isSelected
-                                    ? "bg-white text-black shadow-md font-black"
-                                    : "bg-white/[0.05] hover:bg-white/[0.09] text-neutral-300 border border-white/10"
+                                    ? "bg-black text-white shadow-xs font-black"
+                                    : "bg-black/[0.04] hover:bg-black/[0.08] text-neutral-700 border border-neutral-300"
                             }`}
                         >
                             <div className="w-4 h-4 flex items-center justify-center">
                                 {getPortalIcon(plat.portal, "w-full h-full object-contain")}
                             </div>
                             <span className="capitalize">{plat.portal}</span>
-                            <span className="text-[10px] font-mono opacity-70 px-1.5 py-0.5 rounded-md bg-white/10">
+                            <span className={`text-xs font-mono font-semibold px-1.5 py-0.5 rounded-md ${
+                                isSelected ? "bg-white/20 text-white" : "bg-black/5 text-neutral-600"
+                            }`}>
                                 {Math.max(plat.submissions || 0, plat.solved || 0)}
                             </span>
                         </button>
@@ -379,12 +374,12 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                 })}
             </div>
 
-            {/* Heatmap Area: Uncovered, Circular Curvy Green Dots with Spaces */}
+            {/* Heatmap Area: Uncovered, Circular Curvy Monochrome Dots with Spaces */}
             <div className="py-4 relative z-10 overflow-x-auto scrollbar-none">
                 <div className="min-w-[700px] flex flex-col space-y-2">
                     {/* Month Labels Row aligned across columns */}
                     <div
-                        className="grid text-[11px] font-mono text-neutral-300 font-semibold select-none pl-7 pr-1"
+                        className="grid text-xs font-mono text-neutral-500 font-semibold select-none pl-7 pr-1"
                         style={{ gridTemplateColumns: `repeat(${monthNames.length}, minmax(0, 1fr))` }}
                     >
                         {monthNames.map((m, idx) => (
@@ -397,7 +392,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                     {/* Day Labels Column + Week Columns Grid */}
                     <div className="flex items-center gap-2.5">
                         {/* Day labels (Sun through Sat, showing Mon, Wed, Fri aligned with square rows) */}
-                        <div className="flex flex-col gap-1.5 text-[10px] font-mono text-neutral-400 select-none w-5 flex-shrink-0 text-right">
+                        <div className="flex flex-col gap-1.5 text-[11px] font-mono text-neutral-400 select-none w-5 flex-shrink-0 text-right">
                             <div className="aspect-square flex items-center justify-end leading-none" />
                             <div className="aspect-square flex items-center justify-end leading-none">Mon</div>
                             <div className="aspect-square flex items-center justify-end leading-none" />
@@ -419,7 +414,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                                             title={`${day.count} submissions on ${day.displayDate}${
                                                 day.platforms.length > 0 ? ` (${day.platforms.join(", ")})` : ""
                                             }`}
-                                            className={`w-full aspect-square rounded-full border transition-all duration-200 hover:scale-140 cursor-pointer ${getCellColor(
+                                            className={`w-full aspect-square rounded-full border transition-all duration-200 hover:scale-130 cursor-pointer ${getCellColor(
                                                 day.level
                                             )}`}
                                         />
@@ -432,56 +427,56 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
             </div>
 
             {/* Hover Tooltip Info Banner if cell is hovered */}
-            <div className="min-h-[26px] flex items-center text-xs font-mono text-neutral-300 pt-1">
+            <div className="min-h-[28px] flex items-center text-xs sm:text-sm font-mono text-neutral-700 pt-1">
                 {hoveredCell ? (
                     <div className="flex items-center gap-2">
-                        <span className="font-bold text-white">{hoveredCell.displayDate}:</span>
-                        <span className="text-emerald-400 font-bold">
+                        <span className="font-bold text-neutral-900">{hoveredCell.displayDate}:</span>
+                        <span className="text-emerald-800 font-extrabold bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-300">
                             {hoveredCell.count === 0
                                 ? "No submissions"
                                 : `${hoveredCell.count} ${hoveredCell.count === 1 ? "submission" : "submissions"}`}
                         </span>
                         {hoveredCell.platforms.length > 0 && (
-                            <span className="text-neutral-400">
-                                via <span className="capitalize text-neutral-200">{hoveredCell.platforms.join(", ")}</span>
+                            <span className="text-neutral-500 font-sans font-medium">
+                                via <span className="capitalize text-neutral-800 font-bold">{hoveredCell.platforms.join(", ")}</span>
                             </span>
                         )}
                     </div>
                 ) : (
-                    <span className="text-neutral-500 text-[11px]">Hover over any circular dot to view daily submission breakdown.</span>
+                    <span className="text-neutral-400 text-xs font-sans">Hover over any circular dot to view daily submission breakdown.</span>
                 )}
             </div>
 
             {/* Bottom Footer Row with Metrics and Circular Curvy Legend */}
-            <div className="pt-4 mt-2 border-t border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono text-neutral-400 relative z-10">
+            <div className="pt-4 mt-2 border-t border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono text-neutral-500 relative z-10">
                 <div className="flex items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-1.5 text-neutral-300 font-semibold">
-                        <Flame className="w-4 h-4 text-amber-400 fill-amber-400/20" />
+                    <div className="flex items-center gap-1.5 text-neutral-800 font-bold">
+                        <Flame className="w-4 h-4 text-neutral-900" />
                         <span>{dayStreak} day streak</span>
                     </div>
-                    <span className="text-neutral-700">•</span>
-                    <div className="flex items-center gap-1.5 text-neutral-300 font-semibold">
-                        <Calendar className="w-4 h-4 text-emerald-400" />
+                    <span className="text-neutral-300">•</span>
+                    <div className="flex items-center gap-1.5 text-neutral-800 font-bold">
+                        <Calendar className="w-4 h-4 text-neutral-900" />
                         <span>{activeDays} active coding days</span>
                     </div>
-                    <span className="text-neutral-700">•</span>
-                    <div className="flex items-center gap-1.5 text-neutral-300 font-semibold">
-                        <CheckCircle2 className="w-4 h-4 text-indigo-400" />
-                        <span>{connectedPlatformsList.length} platforms synced</span>
+                    <span className="text-neutral-300">•</span>
+                    <div className="flex items-center gap-1.5 text-neutral-800 font-bold">
+                        <CheckCircle2 className="w-4 h-4 text-neutral-900" />
+                        <span>{connectedPlatformsList.length} platform{connectedPlatformsList.length === 1 ? "" : "s"} synced</span>
                     </div>
                 </div>
 
                 {/* Circular Curvy Legend: Less (o)(o)(o)(o)(o) More */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[10px] uppercase font-bold text-neutral-400">Less</span>
+                    <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider">Less</span>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-full bg-[#141b25] border border-white/[0.08]" />
-                        <span className="w-3 h-3 rounded-full bg-[#0e4429] border border-[#1b7342]" />
-                        <span className="w-3 h-3 rounded-full bg-[#006d32] border border-[#20964c]" />
-                        <span className="w-3 h-3 rounded-full bg-[#26a641] border border-[#3ee667]" />
-                        <span className="w-3 h-3 rounded-full bg-[#39d353] border border-[#72ff8f] shadow-[0_0_8px_rgba(57,211,83,0.7)]" />
+                        <span className="w-3 h-3 rounded-full bg-neutral-100 border border-neutral-300" />
+                        <span className="w-3 h-3 rounded-full bg-[#9be9a8] border border-[#7cd88c]" />
+                        <span className="w-3 h-3 rounded-full bg-[#40c463] border border-[#33b255]" />
+                        <span className="w-3 h-3 rounded-full bg-[#30a14e] border border-[#248941]" />
+                        <span className="w-3 h-3 rounded-full bg-[#216e39] border border-[#17562a] shadow-xs" />
                     </div>
-                    <span className="text-[10px] uppercase font-bold text-neutral-400">More</span>
+                    <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider">More</span>
                 </div>
             </div>
         </div>

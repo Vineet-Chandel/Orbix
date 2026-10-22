@@ -1,0 +1,80 @@
+import React from "react";
+import {
+    resolveCodeforcesRank,
+    type CodeforcesRankDefinition,
+} from "../utils/codeforcesRanks";
+
+export interface CodeforcesBadgeProps {
+    tier?: string | null;
+    rating?: number | null;
+    size?: "xs" | "sm" | "md" | "lg";
+    showRatingRange?: boolean;
+    className?: string;
+    style?: React.CSSProperties;
+    fallbackLabel?: string;
+}
+
+/**
+ * Pixel-accurate Codeforces Contest Rating Tag Badge
+ * Uses the exact colors, rounded boxes, and white typography from official rating tags reference.
+ */
+export const CodeforcesBadge: React.FC<CodeforcesBadgeProps> = ({
+    tier,
+    rating,
+    size = "sm",
+    showRatingRange = false,
+    className = "",
+    style = {},
+    fallbackLabel,
+}) => {
+    const rank: CodeforcesRankDefinition | null = resolveCodeforcesRank(tier, rating);
+
+    // Fallback if rank cannot be resolved
+    if (!rank) {
+        const displayLabel = fallbackLabel || tier || (typeof rating === "number" ? `CF ${rating}` : "Codeforces");
+        return (
+            <span
+                style={{ backgroundColor: "#808080", color: "#FFFFFF", ...style }}
+                className={`inline-flex items-center justify-center font-bold text-white rounded-lg shadow-xs select-none tracking-tight ${
+                    size === "xs"
+                        ? "px-2 py-0.5 text-[10px]"
+                        : size === "md"
+                        ? "px-3.5 py-1.5 text-sm"
+                        : size === "lg"
+                        ? "px-4 py-2 text-base"
+                        : "px-2.5 py-1 text-xs"
+                } ${className}`}
+            >
+                {displayLabel}
+            </span>
+        );
+    }
+
+    const sizeClasses = {
+        xs: "px-2 py-0.5 text-[10px] rounded-md leading-tight",
+        sm: "px-2.5 py-1 text-xs rounded-lg leading-tight",
+        md: "px-3.5 py-1.5 text-sm rounded-lg leading-snug",
+        lg: "px-4 py-2 text-base rounded-xl leading-normal",
+    }[size];
+
+    return (
+        <span
+            style={{
+                backgroundColor: rank.bgColor,
+                color: rank.textColor,
+                ...style,
+            }}
+            title={`Codeforces: ${rank.name} (${rank.ratingRangeLabel})`}
+            className={`inline-flex items-center justify-center font-bold text-white shadow-xs select-none tracking-tight transition-transform duration-150 ${sizeClasses} ${className}`}
+        >
+            <span>{rank.name}</span>
+            {showRatingRange && (
+                <span className="ml-1.5 opacity-90 text-[0.85em] font-normal">
+                    ({rank.ratingRangeLabel})
+                </span>
+            )}
+        </span>
+    );
+};
+
+export default CodeforcesBadge;

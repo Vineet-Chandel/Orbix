@@ -1,10 +1,15 @@
 import React, { useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { FolderGit2, GitCommit, Trophy, Sparkles, Code2 } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { OrbixCardQR } from "./OrbixCardQR";
 import { CardBannerSVG } from "./CardBannerSVG";
 import { GitHubContributionTable } from "./GitHubContributionTable";
 import { CodingSubmissionsChart } from "./CodingSubmissionsChart";
+import { CodeforcesBadge } from "../../../components/CodeforcesBadge";
+import { LeetCodeBadge } from "../../../components/LeetCodeBadge";
+import { CodeChefBadge } from "../../../components/CodeChefBadge";
+import { AtCoderBadge } from "../../../components/AtCoderBadge";
 import type { CardThemeConfig } from "./types";
 import type {
     AggregatedCodingStats,
@@ -31,9 +36,10 @@ interface InstagramStoryCardProps {
     showcaseMode?: "problems" | "contests";
     slotCategory?: "practice" | "dev" | "both";
     topContests?: RankedContestPlatform[];
+    animate?: boolean;
 }
 
-export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
+export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = React.memo(({
     user,
     stats,
     coderType,
@@ -49,6 +55,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
     showcaseMode = "problems",
     slotCategory = "both",
     topContests = [],
+    animate = true,
 }) => {
     const displayName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "Developer";
     const username = user?.username || "developer";
@@ -94,18 +101,9 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
     const bannerFill = isLightBanner ? "black" : "black";
     const bannerStroke = isLightBanner ? "black" : "black";
 
-    return (
-        <div
-            ref={cardRef}
-            className="relative w-[1080px] h-[1920px] bg-[#0c1017] text-white overflow-hidden rounded-[40px] border border-neutral-800/90 shadow-2xl flex flex-col justify-between font-sans select-none flex-shrink-0"
-            style={{
-                boxShadow: `0 35px 80px -20px rgba(0, 0, 0, 0.8), 0 0 50px -15px ${theme.borderGlow}`,
-            }}
-        >
-            {face === "front" ? (
-                /* ==================== INSTAGRAM FRONT FACE ==================== */
-                <>
-                    {/* Top Textured Accent Banner with Safe Margin (Compact, Unstretched Height) */}
+    const frontContent = (
+        <>
+            {/* Top Textured Accent Banner with Safe Margin (Compact, Unstretched Height) */}
                     <div
                         className={`relative h-[260px] w-full px-14 pt-12 flex items-start justify-between overflow-hidden flex-shrink-0 ${theme.id === "gold" ? "bg-[#ffc629]" : `bg-gradient-to-r ${theme.bannerGradient}`
                             }`}
@@ -353,14 +351,40 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                                                     {hasRating ? contest.rating?.toLocaleString() : "—"}
                                                                 </span>
                                                                 {contest.tier && (
-                                                                    <span
-                                                                        style={{
-                                                                            backgroundColor: contest.tierColor || "#ea3943",
-                                                                        }}
-                                                                        className="px-3.5 py-1 rounded-xl text-sm font-black text-white uppercase tracking-wider shadow-md leading-none"
-                                                                    >
-                                                                        {contest.tier}
-                                                                    </span>
+                                                                    (contest.id || "").toLowerCase() === "codeforces" ? (
+                                                                        <CodeforcesBadge
+                                                                            tier={contest.tier}
+                                                                            rating={contest.rating}
+                                                                            size="sm"
+                                                                        />
+                                                                    ) : (contest.id || "").toLowerCase() === "leetcode" ? (
+                                                                        <LeetCodeBadge
+                                                                            tier={contest.tier}
+                                                                            rating={contest.rating}
+                                                                            size="sm"
+                                                                        />
+                                                                    ) : (contest.id || "").toLowerCase() === "codechef" ? (
+                                                                        <CodeChefBadge
+                                                                            tier={contest.tier}
+                                                                            rating={contest.rating}
+                                                                            size="sm"
+                                                                        />
+                                                                    ) : (contest.id || "").toLowerCase() === "atcoder" ? (
+                                                                        <AtCoderBadge
+                                                                            tier={contest.tier}
+                                                                            rating={contest.rating}
+                                                                            size="sm"
+                                                                        />
+                                                                    ) : (
+                                                                        <span
+                                                                            style={{
+                                                                                backgroundColor: contest.tierColor || "#ea3943",
+                                                                            }}
+                                                                            className="px-3.5 py-1 rounded-xl text-sm font-black text-white uppercase tracking-wider shadow-md leading-none"
+                                                                        >
+                                                                            {contest.tier}
+                                                                        </span>
+                                                                    )
                                                                 )}
                                                             </div>
                                                             {contest.officialRank ? (
@@ -618,14 +642,40 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                                                                         {plat.rating?.toLocaleString()}
                                                                     </span>
                                                                     {plat.tier && (
-                                                                        <span
-                                                                            style={{
+                                                                        plat.id.toLowerCase() === "codeforces" ? (
+                                                                            <CodeforcesBadge
+                                                                                tier={plat.tier}
+                                                                                rating={plat.rating}
+                                                                                size="xs"
+                                                                            />
+                                                                        ) : plat.id.toLowerCase() === "leetcode" ? (
+                                                                            <LeetCodeBadge
+                                                                                tier={plat.tier}
+                                                                                rating={plat.rating}
+                                                                                size="xs"
+                                                                            />
+                                                                        ) : plat.id.toLowerCase() === "codechef" ? (
+                                                                            <CodeChefBadge
+                                                                                tier={plat.tier}
+                                                                                rating={plat.rating}
+                                                                                size="xs"
+                                                                            />
+                                                                        ) : plat.id.toLowerCase() === "atcoder" ? (
+                                                                            <AtCoderBadge
+                                                                                tier={plat.tier}
+                                                                                rating={plat.rating}
+                                                                                size="xs"
+                                                                            />
+                                                                        ) : (
+                                                                            <span
+                                                                                style={{
                                                                                 backgroundColor: plat.tierColor || "#f59e0b",
-                                                                            }}
-                                                                            className="px-3 py-1 rounded-xl text-xs font-black text-white uppercase tracking-wider shadow-md leading-none"
-                                                                        >
-                                                                            {plat.tier}
-                                                                        </span>
+                                                                                }}
+                                                                                className="px-3 py-1 rounded-xl text-xs font-black text-white uppercase tracking-wider shadow-md leading-none"
+                                                                            >
+                                                                                {plat.tier}
+                                                                            </span>
+                                                                        )
                                                                     )}
                                                                 </div>
 
@@ -706,11 +756,12 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                             <span className="font-bold text-neutral-300">Live • {todayDate}</span>
                         </div>
                     </div>
-                </>
-            ) : (
-                /* ==================== INSTAGRAM BACK FACE ==================== */
-                <>
-                    {/* Top Header */}
+        </>
+    );
+
+    const backContent = (
+        <>
+            {/* Top Header */}
                     <div className="h-[160px] w-full px-14 pt-8 flex items-center justify-between border-b border-white/10 bg-[#0e131b]">
                         <div className="flex items-center gap-5">
                             <div className="w-[100px] h-[100px] rounded-2xl flex items-center justify-center">
@@ -826,8 +877,48 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = ({
                             <span className="font-bold text-neutral-300">Live • {todayDate}</span>
                         </div>
                     </div>
-                </>
+        </>
+    );
+
+    return (
+        <div
+            ref={cardRef}
+            className="relative w-[1080px] h-[1920px] bg-[#0c1017] text-white overflow-hidden rounded-[40px] border border-neutral-800/90 shadow-2xl flex flex-col justify-between font-sans select-none flex-shrink-0"
+            style={{
+                boxShadow: `0 35px 80px -20px rgba(0, 0, 0, 0.8), 0 0 50px -15px ${theme.borderGlow}`,
+            }}
+        >
+            {animate ? (
+                <AnimatePresence mode="wait" initial={false}>
+                    {face === "front" ? (
+                        <motion.div
+                            key="ig-front"
+                            initial={{ opacity: 0, scale: 0.985 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.985 }}
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                            className="w-full h-full flex flex-col justify-between"
+                        >
+                            {frontContent}
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="ig-back"
+                            initial={{ opacity: 0, scale: 0.985 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.985 }}
+                            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                            className="w-full h-full flex flex-col justify-between"
+                        >
+                            {backContent}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            ) : face === "front" ? (
+                <div className="w-full h-full flex flex-col justify-between">{frontContent}</div>
+            ) : (
+                <div className="w-full h-full flex flex-col justify-between">{backContent}</div>
             )}
         </div>
     );
-};
+});

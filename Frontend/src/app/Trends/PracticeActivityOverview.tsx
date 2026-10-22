@@ -255,16 +255,16 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
     }, [activeChartData]);
 
     return (
-        <div className="space-y-6 text-white font-sans select-none">
+        <div className="space-y-6 text-neutral-900 font-sans select-none">
             {/* ROW 1: Top 3 Solved Metric Cards (Last 7 days, Last 30 days, Last 12 months) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                 {/* Last 7 days */}
-                <div className="rounded-3xl bg-black border border-neutral-800 p-6 shadow-xl flex flex-col justify-between transition-all hover:border-neutral-700">
-                    <span className="text-xs sm:text-sm font-medium text-neutral-400">
+                <div className="rounded-3xl bg-white border border-black/[0.06] p-6 shadow-xs flex flex-col justify-between transition-all hover:border-black/10">
+                    <span className="text-xs sm:text-sm font-semibold text-neutral-500">
                         Last 7 days
                     </span>
                     <div className="my-2">
-                        <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                        <span className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
                             {trends.last7Days}
                         </span>
                     </div>
@@ -274,12 +274,12 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                 </div>
 
                 {/* Last 30 days */}
-                <div className="rounded-3xl bg-black border border-neutral-800 p-6 shadow-xl flex flex-col justify-between transition-all hover:border-neutral-700">
-                    <span className="text-xs sm:text-sm font-medium text-neutral-400">
+                <div className="rounded-3xl bg-white border border-black/[0.06] p-6 shadow-xs flex flex-col justify-between transition-all hover:border-black/10">
+                    <span className="text-xs sm:text-sm font-semibold text-neutral-500">
                         Last 30 days
                     </span>
                     <div className="my-2">
-                        <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                        <span className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
                             {trends.last30Days}
                         </span>
                     </div>
@@ -289,12 +289,12 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                 </div>
 
                 {/* Last 12 months */}
-                <div className="rounded-3xl bg-black border border-neutral-800 p-6 shadow-xl flex flex-col justify-between transition-all hover:border-neutral-700">
-                    <span className="text-xs sm:text-sm font-medium text-neutral-400">
+                <div className="rounded-3xl bg-white border border-black/[0.06] p-6 shadow-xs flex flex-col justify-between transition-all hover:border-black/10">
+                    <span className="text-xs sm:text-sm font-semibold text-neutral-500">
                         Last 12 months
                     </span>
                     <div className="my-2">
-                        <span className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+                        <span className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
                             {trends.last12Months}
                         </span>
                     </div>
@@ -305,11 +305,11 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
             </div>
 
             {/* ROW 2: Month So Far Card (<Month> <Year> so far) */}
-            <div className="rounded-3xl bg-black border border-neutral-800 p-6 sm:p-7 shadow-xl space-y-6">
+            <div className="rounded-3xl bg-white border border-black/[0.06] p-6 sm:p-7 shadow-xs space-y-6">
                 {/* Header */}
                 <div className="flex items-center gap-2.5 pb-2">
-                    <FileText className="w-4 h-4 text-neutral-400" />
-                    <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                    <FileText className="w-4 h-4 text-neutral-800" />
+                    <h3 className="text-base sm:text-lg font-extrabold text-neutral-900 tracking-tight">
                         {trends.monthSoFar.monthName}
                     </h3>
                 </div>
@@ -317,63 +317,63 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                 {/* 4 Sub-stat Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                     {/* Problems solved */}
-                    <div className="rounded-2xl bg-neutral-950 border border-neutral-800/80 p-4 space-y-1.5 flex flex-col justify-between">
-                        <span className="text-xs text-neutral-400 font-medium">Problems solved</span>
-                        <div className="text-2xl sm:text-3xl font-black text-white">
+                    <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-1.5 flex flex-col justify-between">
+                        <span className="text-xs text-neutral-500 font-medium">Problems solved</span>
+                        <div className="text-2xl sm:text-3xl font-black text-neutral-900">
                             {trends.monthSoFar.problemsSolved}
                         </div>
-                        <div className="text-xs font-semibold text-sky-400 flex items-center gap-1">
+                        <div className="text-xs font-semibold text-neutral-600 flex items-center gap-1">
                             <span>{trends.monthSoFar.problemsSolvedDelta}</span>
                         </div>
                     </div>
 
                     {/* Active days */}
-                    <div className="rounded-2xl bg-neutral-950 border border-neutral-800/80 p-4 space-y-1.5 flex flex-col justify-between">
-                        <span className="text-xs text-neutral-400 font-medium">Active days</span>
-                        <div className="text-2xl sm:text-3xl font-black text-white">
+                    <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-1.5 flex flex-col justify-between">
+                        <span className="text-xs text-neutral-500 font-medium">Active days</span>
+                        <div className="text-2xl sm:text-3xl font-black text-neutral-900">
                             {trends.monthSoFar.activeDays}
                         </div>
-                        <div className="text-xs font-semibold text-sky-400 flex items-center gap-1">
+                        <div className="text-xs font-semibold text-neutral-600 flex items-center gap-1">
                             <span>{trends.monthSoFar.activeDaysDelta}</span>
                         </div>
                     </div>
 
                     {/* Hard problems */}
-                    <div className="rounded-2xl bg-neutral-950 border border-neutral-800/80 p-4 space-y-1.5 flex flex-col justify-between">
-                        <span className="text-xs text-neutral-400 font-medium">Hard problems</span>
-                        <div className="text-2xl sm:text-3xl font-black text-white">
+                    <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-1.5 flex flex-col justify-between">
+                        <span className="text-xs text-neutral-500 font-medium">Hard problems</span>
+                        <div className="text-2xl sm:text-3xl font-black text-neutral-900">
                             {trends.monthSoFar.hardProblems}
                         </div>
-                        <div className="text-xs font-semibold text-sky-400 flex items-center gap-1">
+                        <div className="text-xs font-semibold text-neutral-600 flex items-center gap-1">
                             <span>{trends.monthSoFar.hardProblemsDelta}</span>
                         </div>
                     </div>
 
                     {/* Contests */}
-                    <div className="rounded-2xl bg-neutral-950 border border-neutral-800/80 p-4 space-y-1.5 flex flex-col justify-between">
-                        <span className="text-xs text-neutral-400 font-medium">Contests</span>
-                        <div className="text-2xl sm:text-3xl font-black text-white">
+                    <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-1.5 flex flex-col justify-between">
+                        <span className="text-xs text-neutral-500 font-medium">Contests</span>
+                        <div className="text-2xl sm:text-3xl font-black text-neutral-900">
                             {trends.monthSoFar.contests}
                         </div>
-                        <div className="text-xs font-medium text-neutral-400 flex items-center gap-1">
+                        <div className="text-xs font-medium text-neutral-600 flex items-center gap-1">
                             <span>{trends.monthSoFar.contestsDelta}</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Details Breakdown Row (2 columns) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-neutral-900">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-black/[0.06]">
                     {/* Left Column: Best day & Rating changes */}
                     <div className="space-y-4">
                         <div>
                             <span className="text-xs text-neutral-500 font-medium block">Best day</span>
-                            <span className="text-sm font-semibold text-white mt-0.5 block">
+                            <span className="text-sm font-semibold text-neutral-900 mt-0.5 block">
                                 {trends.monthSoFar.bestDay.text}
                             </span>
                         </div>
                         <div>
                             <span className="text-xs text-neutral-500 font-medium block">Rating changes</span>
-                            <span className="text-sm font-semibold text-white mt-0.5 block">
+                            <span className="text-sm font-semibold text-neutral-900 mt-0.5 block">
                                 {trends.monthSoFar.ratingChanges}
                             </span>
                         </div>
@@ -383,7 +383,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                     <div className="space-y-4">
                         <div>
                             <span className="text-xs text-neutral-500 font-medium block">Where you solved</span>
-                            <span className="text-sm font-semibold text-white mt-0.5 block">
+                            <span className="text-sm font-semibold text-neutral-900 mt-0.5 block">
                                 {trends.monthSoFar.whereYouSolved}
                             </span>
                         </div>
@@ -395,7 +395,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                 {trends.monthSoFar.topicsPracticedMost.map((item, idx) => (
                                     <span
                                         key={idx}
-                                        className="rounded-md bg-[#131b26] border border-neutral-800 px-2.5 py-1 text-xs text-neutral-300 font-medium inline-flex items-center gap-1.5 shadow-2xs hover:border-neutral-700 transition-colors"
+                                        className="rounded-md bg-black/[0.03] border border-black/[0.06] px-2.5 py-1 text-xs text-neutral-800 font-medium inline-flex items-center gap-1.5 shadow-2xs hover:border-black/10 transition-colors"
                                     >
                                         <span>{item.topic}</span>
                                         <span className="text-neutral-500 font-mono text-[11px]">{item.count}</span>
@@ -408,25 +408,25 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
             </div>
 
             {/* ROW 3: Problems Solved Stacked Bar Chart */}
-            <div className="rounded-3xl bg-black border border-neutral-800 p-6 sm:p-7 shadow-xl space-y-6">
+            <div className="rounded-3xl bg-white border border-black/[0.06] p-6 sm:p-7 shadow-xs space-y-6">
                 {/* Header with Switcher */}
                 <div className="flex items-center justify-between pb-2">
                     <div className="flex items-center gap-2.5">
-                        <Calendar className="w-4 h-4 text-neutral-400" />
-                        <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                        <Calendar className="w-4 h-4 text-neutral-800" />
+                        <h3 className="text-base sm:text-lg font-extrabold text-neutral-900 tracking-tight">
                             Problems solved
                         </h3>
                     </div>
 
                     {/* Weeks / Months toggle */}
-                    <div className="inline-flex items-center p-1 rounded-xl bg-neutral-950 border border-neutral-800">
+                    <div className="inline-flex items-center p-1 rounded-xl bg-black/[0.04] border border-black/[0.06]">
                         <button
                             type="button"
                             onClick={() => setChartMode("weeks")}
                             className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                 chartMode === "weeks"
-                                    ? "bg-[#1c2436] text-white border border-neutral-700 shadow-sm"
-                                    : "text-neutral-400 hover:text-white"
+                                    ? "bg-black text-white shadow-xs"
+                                    : "text-neutral-500 hover:text-black"
                             }`}
                         >
                             Weeks
@@ -436,8 +436,8 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                             onClick={() => setChartMode("months")}
                             className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                 chartMode === "months"
-                                    ? "bg-[#1c2436] text-white border border-neutral-700 shadow-sm"
-                                    : "text-neutral-400 hover:text-white"
+                                    ? "bg-black text-white shadow-xs"
+                                    : "text-neutral-500 hover:text-black"
                             }`}
                         >
                             Months
@@ -474,7 +474,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                 >
                                     {/* Number above the bar */}
                                     {!isZero && (
-                                        <span className="text-[10px] sm:text-[11px] font-bold text-neutral-300 font-mono mb-1 select-none">
+                                        <span className="text-[10px] sm:text-[11px] font-bold text-neutral-900 font-mono mb-1 select-none">
                                             {bucket.total}
                                         </span>
                                     )}
@@ -483,14 +483,14 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                     <div
                                         style={{ height: `${heightPercent}%` }}
                                         className={`w-full max-w-[20px] sm:max-w-[26px] rounded-t-md overflow-hidden flex flex-col-reverse transition-all duration-200 ${
-                                            isHovered ? "ring-2 ring-white/50 brightness-110" : ""
+                                            isHovered ? "ring-2 ring-black/20" : ""
                                         }`}
                                     >
                                         {/* Easy (Bottom) */}
                                         {bucket.easy > 0 && (
                                             <div
                                                 style={{ height: `${easyH}%` }}
-                                                className="w-full bg-[#38bdf8] transition-all"
+                                                className="w-full bg-[#d4d4d4] transition-all"
                                                 title={`Easy: ${bucket.easy}`}
                                             />
                                         )}
@@ -498,7 +498,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                         {bucket.medium > 0 && (
                                             <div
                                                 style={{ height: `${medH}%` }}
-                                                className="w-full bg-[#fbbf24] transition-all"
+                                                className="w-full bg-[#737373] transition-all"
                                                 title={`Medium: ${bucket.medium}`}
                                             />
                                         )}
@@ -506,7 +506,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                         {bucket.hard > 0 && (
                                             <div
                                                 style={{ height: `${hardH}%` }}
-                                                className="w-full bg-[#f43f5e] transition-all"
+                                                className="w-full bg-[#000000] transition-all"
                                                 title={`Hard: ${bucket.hard}`}
                                             />
                                         )}
@@ -514,7 +514,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                         {bucket.noLevel > 0 && (
                                             <div
                                                 style={{ height: `${noLevelH}%` }}
-                                                className="w-full bg-[#64748b] transition-all"
+                                                className="w-full bg-[#a3a3a3] transition-all"
                                                 title={`No Level: ${bucket.noLevel}`}
                                             />
                                         )}
@@ -531,22 +531,22 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
 
                                     {/* Hover Tooltip */}
                                     {isHovered && !isZero && (
-                                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-30 p-2.5 rounded-xl bg-neutral-900 border border-neutral-700 shadow-2xl text-[11px] whitespace-nowrap pointer-events-none">
-                                            <div className="font-bold text-white mb-1">{bucket.label}</div>
-                                            <div className="space-y-0.5 text-neutral-300">
+                                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-30 p-2.5 rounded-xl bg-white border border-black/10 shadow-2xl text-[11px] whitespace-nowrap pointer-events-none">
+                                            <div className="font-bold text-neutral-900 mb-1">{bucket.label}</div>
+                                            <div className="space-y-0.5 text-neutral-600">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full bg-[#38bdf8]" />
+                                                    <span className="w-2 h-2 rounded-full bg-[#d4d4d4]" />
                                                     <span>Easy: {bucket.easy}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full bg-[#fbbf24]" />
+                                                    <span className="w-2 h-2 rounded-full bg-[#737373]" />
                                                     <span>Medium: {bucket.medium}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full bg-[#f43f5e]" />
+                                                    <span className="w-2 h-2 rounded-full bg-[#000000]" />
                                                     <span>Hard: {bucket.hard}</span>
                                                 </div>
-                                                <div className="pt-1 mt-1 border-t border-neutral-800 font-bold text-white">
+                                                <div className="pt-1 mt-1 border-t border-black/[0.06] font-bold text-neutral-900">
                                                     Total: {bucket.total}
                                                 </div>
                                             </div>
@@ -559,21 +559,21 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                 </div>
 
                 {/* Legend at bottom-left matching screenshot */}
-                <div className="flex items-center gap-4 text-xs text-neutral-400 font-medium pt-2">
+                <div className="flex items-center gap-4 text-xs text-neutral-500 font-medium pt-2">
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#38bdf8]" />
+                        <span className="w-2 h-2 rounded-full bg-[#d4d4d4]" />
                         <span>Easy</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#fbbf24]" />
+                        <span className="w-2 h-2 rounded-full bg-[#737373]" />
                         <span>Medium</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#f43f5e]" />
+                        <span className="w-2 h-2 rounded-full bg-[#000000]" />
                         <span>Hard</span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#64748b]" />
+                        <span className="w-2 h-2 rounded-full bg-[#a3a3a3]" />
                         <span>No level</span>
                     </div>
                 </div>

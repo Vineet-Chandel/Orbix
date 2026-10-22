@@ -18,6 +18,14 @@ import {
 import { useAppDispatch, useAppSelector, fetchContestPerformance, type PlatformContestAnalytics, type ContestHistoryPoint } from "../../store";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { RecentContestsCard } from "./RecentContestsCard";
+import { CodeforcesBadge } from "../../components/CodeforcesBadge";
+import { CodeforcesRatingLadder } from "../../components/CodeforcesRatingLadder";
+import { LeetCodeBadge } from "../../components/LeetCodeBadge";
+import { LeetCodeRatingLadder } from "../../components/LeetCodeRatingLadder";
+import { CodeChefBadge } from "../../components/CodeChefBadge";
+import { CodeChefRatingLadder } from "../../components/CodeChefRatingLadder";
+import { AtCoderBadge } from "../../components/AtCoderBadge";
+import { AtCoderRatingLadder } from "../../components/AtCoderRatingLadder";
 
 interface ContestPerformanceSectionProps {
     connectedPortals: Record<string, any>;
@@ -395,13 +403,9 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     return (
         <section
-            className="w-full rounded-3xl bg-black border border-neutral-800 text-white p-6 sm:p-8 shadow-2xl relative overflow-hidden select-none font-sans"
+            className="w-full rounded-3xl bg-white border border-neutral-300 text-neutral-900 p-6 sm:p-8 shadow-sm relative overflow-hidden select-none font-sans"
             aria-label="Contest Performance Module"
         >
-            {/* Ambient Lighting Glows */}
-            <div className="absolute -top-32 -left-32 w-96 h-96 bg-amber-500/[0.04] rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-blue-500/[0.04] rounded-full blur-3xl pointer-events-none" />
-
             {/* ========================================================================= */}
             {/* TOP ROW — Contest Rating Graph (Left) & Total Contests Summary (Right)    */}
             {/* ========================================================================= */}
@@ -409,20 +413,20 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                 {/* Primary Column: Rating & Progression Graph (8 of 12 cols on desktop) */}
                 <div className="lg:col-span-8 flex flex-col justify-between">
                     {/* Section Header & Platform Selector */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-neutral-800/80">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-neutral-300">
                         {/* Title & Icon */}
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 shadow-sm">
-                                <ChartIcon className="w-4 h-4" />
+                            <div className="w-9 h-9 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs">
+                                <ChartIcon className="w-4.5 h-4.5 text-neutral-800" />
                             </div>
                             <div>
-                                <h3 className="text-base sm:text-lg font-black text-white tracking-tight flex items-center gap-2">
+                                <h3 className="text-base sm:text-lg font-bold text-neutral-900 tracking-tight flex items-center gap-2">
                                     <span>Contest rating</span>
                                     {isLoading && (
-                                        <RefreshCw className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                                        <RefreshCw className="w-3.5 h-3.5 text-neutral-500 animate-spin" />
                                     )}
                                 </h3>
-                                <p className="text-[11px] text-neutral-400">
+                                <p className="text-xs text-neutral-500">
                                     Rating progression over time
                                 </p>
                             </div>
@@ -433,7 +437,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                             <div
                                 role="tablist"
                                 aria-label="Connected Contest Platforms"
-                                className="flex items-center gap-1.5 p-1 rounded-xl bg-[#121824] border border-neutral-800 overflow-x-auto no-scrollbar self-start sm:self-auto max-w-full"
+                                className="flex items-center gap-1.5 p-1 rounded-xl bg-black/[0.04] border border-neutral-300 overflow-x-auto no-scrollbar self-start sm:self-auto max-w-full"
                             >
                                 {platformsList.map((platform) => {
                                     const isActive = platform.portal === selectedPortal;
@@ -448,10 +452,10 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                                 setHasUserSelected(true);
                                                 setHoveredPoint(null);
                                             }}
-                                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-amber-400/50 ${
+                                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap focus:outline-none focus:ring-1 focus:ring-black/20 ${
                                                 isActive
-                                                    ? "bg-[#1c2436] text-white border border-neutral-700 shadow-sm"
-                                                    : "text-neutral-400 hover:text-neutral-200 hover:bg-white/[0.03]"
+                                                    ? "bg-black text-white shadow-xs"
+                                                    : "text-neutral-600 hover:text-black hover:bg-black/[0.04]"
                                             }`}
                                         >
                                             <span className="w-3.5 h-3.5 flex items-center justify-center">
@@ -465,7 +469,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                         ) : (
                             <Link
                                 to="/profile"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 border border-amber-500/20 transition-all cursor-pointer"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-neutral-900 hover:bg-black/[0.05] bg-black/[0.03] border border-neutral-300 transition-all cursor-pointer"
                             >
                                 <span>Connect contest platform</span>
                                 <ChevronRight className="w-3.5 h-3.5" />
@@ -483,7 +487,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
                             <div className="flex flex-wrap items-center gap-3">
                                 {/* Current Rating */}
-                                <span className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                                <span className="text-4xl sm:text-5xl font-black text-neutral-900 tracking-tight font-sans">
                                     {activePlatform?.currentRating !== null && activePlatform?.currentRating !== undefined
                                         ? activePlatform.currentRating
                                         : "—"}
@@ -491,40 +495,66 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
                                 {/* Tier Badge */}
                                 {activePlatform?.tier && (
-                                    <span
-                                        style={{
-                                            backgroundColor: activePlatform.tierColor || "#ea3943",
-                                        }}
-                                        className="px-2.5 py-1 rounded-md text-xs font-black text-white uppercase tracking-wider shadow-sm"
-                                    >
-                                        {activePlatform.tier}
-                                    </span>
+                                    activePlatform.portal.toLowerCase() === "codeforces" ? (
+                                        <CodeforcesBadge
+                                            tier={activePlatform.tier}
+                                            rating={activePlatform.currentRating}
+                                            size="sm"
+                                        />
+                                    ) : activePlatform.portal.toLowerCase() === "leetcode" ? (
+                                        <LeetCodeBadge
+                                            tier={activePlatform.tier}
+                                            rating={activePlatform.currentRating}
+                                            size="sm"
+                                        />
+                                    ) : activePlatform.portal.toLowerCase() === "codechef" ? (
+                                        <CodeChefBadge
+                                            tier={activePlatform.tier}
+                                            rating={activePlatform.currentRating}
+                                            size="sm"
+                                        />
+                                    ) : activePlatform.portal.toLowerCase() === "atcoder" ? (
+                                        <AtCoderBadge
+                                            tier={activePlatform.tier}
+                                            rating={activePlatform.currentRating}
+                                            size="sm"
+                                        />
+                                    ) : (
+                                        <span
+                                            style={{
+                                                backgroundColor: activePlatform.tierColor || "#171717",
+                                            }}
+                                            className="px-2.5 py-1 rounded-md text-xs font-black text-white uppercase tracking-wider shadow-xs"
+                                        >
+                                            {activePlatform.tier}
+                                        </span>
+                                    )
                                 )}
 
                                 {/* Secondary Metrics: Max & Contests */}
-                                <div className="flex items-center gap-4 text-xs font-medium text-neutral-400 pl-1">
+                                <div className="flex items-center gap-4 text-xs font-medium text-neutral-500 pl-1">
                                     {activePlatform?.peakRating !== null && activePlatform?.peakRating !== undefined && (
                                         <div>
                                             <span>Max</span>{" "}
-                                            <strong className="text-white font-bold">{activePlatform.peakRating}</strong>
+                                            <strong className="text-neutral-900 font-bold">{activePlatform.peakRating}</strong>
                                         </div>
                                     )}
                                     <div>
                                         <span>Contests</span>{" "}
-                                        <strong className="text-white font-bold">{activePlatform?.ratedContestsCount || 0}</strong>
+                                        <strong className="text-neutral-900 font-bold">{activePlatform?.ratedContestsCount || 0}</strong>
                                     </div>
 
                                     {/* 90-Day Rating Change */}
                                     {typeof activePlatform?.recentChange90d === "number" && activePlatform.recentChange90d !== 0 && (
                                         <div
                                             className={`inline-flex items-center gap-1 font-bold ${
-                                                activePlatform.recentChange90d > 0 ? "text-emerald-400" : "text-rose-400"
+                                                activePlatform.recentChange90d > 0 ? "text-neutral-900" : "text-neutral-500"
                                             }`}
                                         >
                                             {activePlatform.recentChange90d > 0 ? (
-                                                <TrendingUp className="w-3.5 h-3.5" />
+                                                <TrendingUp className="w-3.5 h-3.5 text-neutral-900" />
                                             ) : (
-                                                <TrendingDown className="w-3.5 h-3.5" />
+                                                <TrendingDown className="w-3.5 h-3.5 text-neutral-500" />
                                             )}
                                             <span>
                                                 {activePlatform.recentChange90d > 0 ? `+${activePlatform.recentChange90d}` : activePlatform.recentChange90d} in 90d
@@ -539,7 +569,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                 <button
                                     type="button"
                                     onClick={() => setIsTierModalOpen(true)}
-                                    className="text-xs font-bold text-amber-400 hover:text-amber-300 transition-colors inline-flex items-center gap-1 cursor-pointer pt-1"
+                                    className="text-xs font-semibold text-neutral-600 hover:text-black transition-colors inline-flex items-center gap-1 cursor-pointer pt-1"
                                 >
                                     <span>What does {activePlatform.tier} mean?</span>
                                     <ChevronRight className="w-3.5 h-3.5" />
@@ -549,21 +579,21 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
                         {/* Top-Right Info Highlight on Hover / Latest Contest */}
                         {displayedPoint && (
-                            <div className="flex flex-col items-start md:items-end text-left md:text-right space-y-1 bg-[#121824]/60 md:bg-transparent p-3 md:p-0 rounded-xl border md:border-none border-neutral-800">
+                            <div className="flex flex-col items-start md:items-end text-left md:text-right space-y-1 bg-black/[0.02] md:bg-transparent p-3 md:p-0 rounded-xl border md:border-none border-black/[0.06]">
                                 <div className="flex items-center gap-2 md:justify-end">
                                     <span className="text-[11px] text-neutral-400">Rating</span>
-                                    <span className="text-xl sm:text-2xl font-black text-amber-400">
+                                    <span className="text-xl sm:text-2xl font-black text-neutral-900">
                                         {displayedPoint.rating}
                                     </span>
                                 </div>
-                                <div className="text-xs font-bold text-white max-w-xs truncate">
+                                <div className="text-xs font-bold text-neutral-800 max-w-xs truncate">
                                     {displayedPoint.contestName}
                                 </div>
                                 <div className="text-[11px] text-neutral-400 flex items-center gap-2 md:justify-end">
                                     <span>{formatDateStr(displayedPoint.date || displayedPoint.timestamp)}</span>
                                     {displayedPoint.rank && (
                                         <>
-                                            <span className="w-1 h-1 rounded-full bg-neutral-600" />
+                                            <span className="w-1 h-1 rounded-full bg-neutral-300" />
                                             <span>Rank {formatNumber(displayedPoint.rank)}</span>
                                         </>
                                     )}
@@ -574,7 +604,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
                     {/* Time Range Filters & Chart Area */}
                     <div className="w-full flex items-center justify-end pb-2 pt-1 relative z-10">
-                        <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-[#121824] border border-neutral-800 text-[11px] font-bold">
+                        <div className="inline-flex items-center gap-1 p-1 rounded-lg bg-black/[0.04] border border-black/[0.06] text-[11px] font-bold">
                             {(["6M", "1Y", "ALL"] as TimeRangeFilter[]).map((r) => (
                                 <button
                                     key={r}
@@ -582,8 +612,8 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                     onClick={() => setTimeRange(r)}
                                     className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                                         timeRange === r
-                                            ? "bg-amber-500/20 text-amber-300 font-extrabold shadow-xs"
-                                            : "text-neutral-400 hover:text-neutral-200"
+                                            ? "bg-black text-white shadow-xs font-extrabold"
+                                            : "text-neutral-500 hover:text-black"
                                     }`}
                                 >
                                     {r === "ALL" ? "All Time" : r}
@@ -599,17 +629,17 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                     >
                         {/* CASE A & B: Connected but no contests, or timeline unavailable */}
                         {(!activePlatform || activePlatform.status === "no_contests" || filteredHistory.length === 0) && (
-                            <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center text-center p-6 space-y-3 rounded-2xl bg-[#090d13]/60 border border-dashed border-neutral-800">
-                                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                            <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center text-center p-6 space-y-3 rounded-2xl bg-black/[0.02] border border-dashed border-black/10">
+                                <div className="w-12 h-12 rounded-2xl bg-black/[0.04] border border-black/10 flex items-center justify-center text-neutral-700">
                                     <Sparkles className="w-6 h-6" />
                                 </div>
                                 <div className="space-y-1 max-w-sm">
-                                    <h4 className="text-sm font-extrabold text-white">
+                                    <h4 className="text-sm font-extrabold text-neutral-900">
                                         {activePlatform?.status === "history_unavailable"
                                             ? "Rating history unavailable"
                                             : "No contest history yet"}
                                     </h4>
-                                    <p className="text-xs text-neutral-400 leading-relaxed">
+                                    <p className="text-xs text-neutral-500 leading-relaxed">
                                         {activePlatform?.statusMessage ||
                                             `Participate in a rated contest on ${activePlatform?.portalName} to start tracking your rating progression.`}
                                     </p>
@@ -619,7 +649,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                         href={activePlatform?.exploreContestsUrl || `https://${activePlatform?.portal}.com`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-xs font-bold transition-all cursor-pointer"
+                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
                                     >
                                         <span>Explore contests</span>
                                         <ExternalLink className="w-3.5 h-3.5" />
@@ -630,11 +660,11 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
                         {/* CASE C: Syncing state */}
                         {activePlatform?.status === "syncing" && filteredHistory.length === 0 && (
-                            <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center text-center p-6 space-y-3 rounded-2xl bg-[#090d13]/60 border border-neutral-800">
-                                <RefreshCw className="w-8 h-8 text-amber-400 animate-spin" />
+                            <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center text-center p-6 space-y-3 rounded-2xl bg-black/[0.02] border border-black/10">
+                                <RefreshCw className="w-8 h-8 text-neutral-800 animate-spin" />
                                 <div className="space-y-1">
-                                    <h4 className="text-sm font-extrabold text-white">Preparing contest data</h4>
-                                    <p className="text-xs text-neutral-400">
+                                    <h4 className="text-sm font-extrabold text-neutral-900">Preparing contest data</h4>
+                                    <p className="text-xs text-neutral-500">
                                         Synchronizing latest contest standings from {activePlatform?.portalName}...
                                     </p>
                                 </div>
@@ -643,18 +673,18 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
                         {/* CASE D: Sync error */}
                         {activePlatform?.status === "error" && filteredHistory.length === 0 && (
-                            <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center text-center p-6 space-y-3 rounded-2xl bg-[#090d13]/60 border border-neutral-800">
-                                <AlertCircle className="w-8 h-8 text-rose-400" />
+                            <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center text-center p-6 space-y-3 rounded-2xl bg-black/[0.02] border border-black/10">
+                                <AlertCircle className="w-8 h-8 text-neutral-700" />
                                 <div className="space-y-1 max-w-sm">
-                                    <h4 className="text-sm font-extrabold text-white">Unable to refresh contest data</h4>
-                                    <p className="text-xs text-neutral-400">
+                                    <h4 className="text-sm font-extrabold text-neutral-900">Unable to refresh contest data</h4>
+                                    <p className="text-xs text-neutral-500">
                                         {activePlatform?.statusMessage || "Could not retrieve contest history at this moment."}
                                     </p>
                                 </div>
                                 <button
                                     type="button"
                                     onClick={handleRefresh}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-bold transition-all cursor-pointer"
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
                                 >
                                     <RefreshCw className="w-3.5 h-3.5" />
                                     <span>Retry</span>
@@ -664,22 +694,22 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
                         {/* CASE E: Not Connected */}
                         {activePlatform?.connected === false && (
-                            <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center text-center p-6 space-y-3 rounded-2xl bg-[#090d13]/60 border border-dashed border-neutral-800">
-                                <div className="w-12 h-12 rounded-2xl bg-white/[0.05] border border-white/10 flex items-center justify-center text-neutral-400">
+                            <div className="w-full h-full min-h-[260px] flex flex-col items-center justify-center text-center p-6 space-y-3 rounded-2xl bg-black/[0.02] border border-dashed border-black/10">
+                                <div className="w-12 h-12 rounded-2xl bg-black/[0.04] border border-black/10 flex items-center justify-center text-neutral-700">
                                     {getPortalIcon(activePlatform.portal, "w-6 h-6")}
                                 </div>
                                 <div className="space-y-1 max-w-sm">
-                                    <h4 className="text-sm font-extrabold text-white">
+                                    <h4 className="text-sm font-extrabold text-neutral-900">
                                         Connect {activePlatform.portalName}
                                     </h4>
-                                    <p className="text-xs text-neutral-400">
+                                    <p className="text-xs text-neutral-500">
                                         Connect your {activePlatform.portalName} handle in your profile to track your contest rating progression and official rank.
                                     </p>
                                 </div>
                                 <div className="pt-2">
                                     <Link
                                         to="/profile"
-                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-extrabold transition-all cursor-pointer shadow-md shadow-amber-500/20"
+                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-extrabold transition-all cursor-pointer shadow-xs"
                                     >
                                         <span>Connect platform</span>
                                         <ArrowRight className="w-3.5 h-3.5" />
@@ -699,12 +729,12 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                 >
                                     <defs>
                                         <linearGradient id="contestAreaGrad" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.18" />
-                                            <stop offset="85%" stopColor="#f59e0b" stopOpacity="0.01" />
-                                            <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.0" />
+                                            <stop offset="0%" stopColor="#000000" stopOpacity="0.08" />
+                                            <stop offset="85%" stopColor="#000000" stopOpacity="0.01" />
+                                            <stop offset="100%" stopColor="#000000" stopOpacity="0.0" />
                                         </linearGradient>
                                         <filter id="glowPoint" x="-50%" y="-50%" width="200%" height="200%">
-                                            <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#f59e0b" floodOpacity="0.8" />
+                                            <feDropShadow dx="0" dy="0" stdDeviation="2" floodColor="#000000" floodOpacity="0.3" />
                                         </filter>
                                     </defs>
 
@@ -716,16 +746,15 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                                 y1={grid.y}
                                                 x2={chartData.svgWidth - chartData.padRight}
                                                 y2={grid.y}
-                                                stroke="#263044"
+                                                stroke="rgba(0,0,0,0.06)"
                                                 strokeDasharray="4 4"
                                                 strokeWidth="1"
-                                                opacity="0.6"
                                             />
                                             <text
                                                 x={chartData.padLeft - 8}
                                                 y={grid.y + 3.5}
                                                 textAnchor="end"
-                                                fill="#64748b"
+                                                fill="#9ca3af"
                                                 fontSize="10"
                                                 fontFamily="sans-serif"
                                                 fontWeight="600"
@@ -745,7 +774,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                         <path
                                             d={chartData.pathD}
                                             fill="none"
-                                            stroke="#f59e0b"
+                                            stroke="#000000"
                                             strokeWidth="2.5"
                                             strokeLinecap="round"
                                             strokeLinejoin="round"
@@ -759,7 +788,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                             x={tick.x}
                                             y={chartData.svgHeight - chartData.padBottom + 18}
                                             textAnchor="middle"
-                                            fill="#64748b"
+                                            fill="#9ca3af"
                                             fontSize="10"
                                             fontFamily="sans-serif"
                                             fontWeight="600"
@@ -780,8 +809,8 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                                     y1={chartData.padTop}
                                                     x2={pt.x}
                                                     y2={chartData.svgHeight - chartData.padBottom}
-                                                    stroke="#f59e0b"
-                                                    strokeOpacity="0.4"
+                                                    stroke="#000000"
+                                                    strokeOpacity="0.3"
                                                     strokeWidth="1.5"
                                                     strokeDasharray="3 3"
                                                 />
@@ -791,8 +820,8 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                                     cx={pt.x}
                                                     cy={pt.y}
                                                     r="8"
-                                                    fill="#f59e0b"
-                                                    fillOpacity="0.25"
+                                                    fill="#000000"
+                                                    fillOpacity="0.1"
                                                 />
 
                                                 {/* Inner Dot with Glow */}
@@ -800,7 +829,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                                     cx={pt.x}
                                                     cy={pt.y}
                                                     r="4.5"
-                                                    fill="#f59e0b"
+                                                    fill="#000000"
                                                     stroke="#ffffff"
                                                     strokeWidth="2"
                                                     filter="url(#glowPoint)"
@@ -820,14 +849,14 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                                         cx={lastPt.x}
                                                         cy={lastPt.y}
                                                         r="6"
-                                                        fill="#f59e0b"
-                                                        fillOpacity="0.25"
+                                                        fill="#000000"
+                                                        fillOpacity="0.1"
                                                     />
                                                     <circle
                                                         cx={lastPt.x}
                                                         cy={lastPt.y}
                                                         r="3.5"
-                                                        fill="#f59e0b"
+                                                        fill="#000000"
                                                         stroke="#ffffff"
                                                         strokeWidth="1.5"
                                                     />
@@ -842,71 +871,114 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                 </div>
 
                 {/* Secondary Column: Contests Total Summary (4 of 12 cols on desktop) */}
-                <div className="lg:col-span-4 flex flex-col justify-between lg:border-l lg:border-white/[0.08] lg:pl-8 pt-6 lg:pt-0 border-t lg:border-t-0 border-white/[0.08]">
-                    <div className="space-y-6">
+                <div className="lg:col-span-4 flex flex-col justify-between lg:border-l lg:border-neutral-300 lg:pl-8 pt-6 lg:pt-0 border-t lg:border-t-0 border-neutral-300">
+                    <div className="space-y-5">
                         {/* Card Header: Trophy icon + Contests */}
                         <div className="flex items-center gap-2.5">
-                            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                                <Trophy className="w-4 h-4" />
+                            <div className="w-9 h-9 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-800 shadow-2xs">
+                                <Trophy className="w-4.5 h-4.5" />
                             </div>
-                            <h3 className="text-base font-extrabold text-white tracking-tight">
+                            <h3 className="text-base sm:text-lg font-extrabold text-neutral-900 tracking-tight">
                                 Contests
                             </h3>
                         </div>
 
                         {/* Big Count: Total Rated Contests */}
                         <div className="space-y-1">
-                            <div className="text-4xl sm:text-5xl font-black text-white tracking-tight">
+                            <div className="text-4xl sm:text-5xl font-black text-neutral-900 tracking-tight">
                                 {totalRatedContests}
                             </div>
-                            <p className="text-xs text-neutral-400 font-medium">
+                            <p className="text-xs sm:text-sm text-neutral-500 font-medium">
                                 rated contests in total
                             </p>
                         </div>
 
-                        {/* Platform Breakdown with Proportional Progress Bars */}
-                        <div className="space-y-3.5 pt-2">
+                        {/* Platform Breakdown with Proportional Progress Bars & Badges */}
+                        <div className="space-y-3 pt-1">
                             {contestBreakdown.map((item) => (
                                 <button
                                     key={item.portal}
                                     type="button"
                                     onClick={() => setSelectedPortal(item.portal)}
-                                    className="w-full flex flex-col gap-1.5 p-2 rounded-xl hover:bg-white/[0.05] transition-colors cursor-pointer group text-left"
+                                    className={`w-full flex flex-col gap-2 p-3 rounded-xl border transition-all cursor-pointer group text-left ${
+                                        selectedPortal === item.portal
+                                            ? "bg-neutral-100/90 border-neutral-400 shadow-xs"
+                                            : "bg-neutral-50/70 border-neutral-200 hover:border-neutral-300 hover:bg-neutral-100/60"
+                                    }`}
                                 >
-                                    <div className="flex items-center justify-between text-xs">
-                                        <div className="flex items-center gap-2 font-bold text-neutral-300 group-hover:text-white transition-colors">
-                                            <span className="w-4 h-4 flex items-center justify-center">
-                                                {getPortalIcon(item.portal, "w-4 h-4")}
+                                    <div className="flex items-center justify-between text-xs sm:text-sm">
+                                        <div className="flex items-center gap-2 font-bold text-neutral-800 group-hover:text-black transition-colors">
+                                            <span className="w-4.5 h-4.5 flex items-center justify-center">
+                                                {getPortalIcon(item.portal, "w-4.5 h-4.5")}
                                             </span>
                                             <span>{item.portalName}</span>
                                         </div>
-                                        <span className="font-extrabold text-white">
-                                            {item.count}
-                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] font-semibold text-neutral-500 bg-neutral-200/80 px-1.5 py-0.5 rounded">
+                                                {item.percentage}%
+                                            </span>
+                                            <span className="font-black text-neutral-900 font-mono">
+                                                {item.count}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     {/* Horizontal Bar */}
-                                    <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                                    <div className="w-full h-2 rounded-full bg-neutral-200/80 overflow-hidden">
                                         <div
                                             style={{ width: `${item.percentage}%` }}
-                                            className="h-full bg-amber-400 rounded-full transition-all duration-500 group-hover:bg-amber-300"
+                                            className="h-full bg-black rounded-full transition-all duration-500 group-hover:bg-neutral-800"
                                         />
                                     </div>
                                 </button>
                             ))}
                         </div>
+
+                        {/* Contest Highlights Panel to beautifully fill vertical space and provide rich insights */}
+                        <div className="p-4 rounded-2xl bg-neutral-50 border border-neutral-200 space-y-3">
+                            <div className="text-xs font-bold text-neutral-700 uppercase tracking-wider flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-neutral-800" />
+                                <span>Contest Highlights</span>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3 text-xs">
+                                <div className="space-y-0.5">
+                                    <span className="text-neutral-500 font-medium text-[11px]">Primary Platform</span>
+                                    <div className="font-bold text-neutral-900 truncate">
+                                        {contestBreakdown[0]?.portalName || "All Connected"}
+                                    </div>
+                                </div>
+                                <div className="space-y-0.5">
+                                    <span className="text-neutral-500 font-medium text-[11px]">Best Peak Rating</span>
+                                    <div className="font-bold text-neutral-900">
+                                        {Math.max(...platformsList.map((p) => p.peakRating || p.currentRating || 0), 0) || "—"}
+                                    </div>
+                                </div>
+                                <div className="space-y-0.5">
+                                    <span className="text-neutral-500 font-medium text-[11px]">Platforms Synced</span>
+                                    <div className="font-bold text-neutral-900">
+                                        {platformsList.length} Active
+                                    </div>
+                                </div>
+                                <div className="space-y-0.5">
+                                    <span className="text-neutral-500 font-medium text-[11px]">Contest Standing</span>
+                                    <div className="font-bold text-neutral-900 truncate">
+                                        {activePlatform?.tier || "Ranked"}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Footer synchronization note */}
-                    <div className="pt-4 mt-6 border-t border-white/[0.08] flex items-center justify-between text-[11px] text-neutral-500">
+                    <div className="pt-4 mt-6 border-t border-neutral-200 flex items-center justify-between text-xs text-neutral-500">
                         <span>Dynamic Multi-Platform Sync</span>
                         <button
                             type="button"
                             onClick={handleRefresh}
-                            className="text-neutral-400 hover:text-amber-400 transition-colors cursor-pointer flex items-center gap-1"
+                            className="text-neutral-600 hover:text-black transition-colors cursor-pointer flex items-center gap-1 font-semibold"
                             title="Refresh contest performance"
                         >
-                            <RefreshCw className="w-3 h-3" />
+                            <RefreshCw className="w-3.5 h-3.5" />
                             <span>Sync</span>
                         </button>
                     </div>
@@ -916,7 +988,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
             {/* ========================================================================= */}
             {/* HORIZONTAL DIVIDER                                                        */}
             {/* ========================================================================= */}
-            <div className="w-full h-px bg-white/[0.08] my-7 relative z-10" />
+            <div className="w-full h-px bg-neutral-200 my-7 relative z-10" />
 
             {/* ========================================================================= */}
             {/* SECTION 2 — Platform Ranks and Recent Contests (Parallel in same block)   */}
@@ -925,15 +997,15 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                 {/* Left Side: Platform ranks */}
                 <div className="space-y-4">
                     {/* Header: Trophy/Award icon + Platform ranks */}
-                    <div className="flex items-center gap-3 pb-3 border-b border-white/[0.08]">
-                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-                            <Award className="w-4 h-4" />
+                    <div className="flex items-center gap-3 pb-3 border-b border-neutral-300">
+                        <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-800 shadow-2xs">
+                            <Award className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-base sm:text-lg font-extrabold text-white tracking-tight">
+                            <h3 className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
                                 Platform ranks
                             </h3>
-                            <p className="text-[11px] text-neutral-400">
+                            <p className="text-xs sm:text-sm text-neutral-500 font-medium">
                                 Current contest standings and rank progress across eligible platforms
                             </p>
                         </div>
@@ -958,25 +1030,31 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                         }}
                                         className={`flex flex-col justify-between p-4 sm:p-5 rounded-2xl transition-all cursor-pointer text-left relative overflow-hidden border ${
                                             isSelected
-                                                ? "bg-[#141b28] border-amber-500/50 shadow-lg shadow-amber-500/5 ring-1 ring-amber-500/30"
-                                                : "bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/[0.06]"
+                                                ? "bg-black text-white border-black shadow-md ring-1 ring-black"
+                                                : "bg-neutral-50/80 border-neutral-300 hover:border-neutral-400 hover:bg-neutral-100/80 shadow-2xs"
                                         }`}
                                     >
                                         {/* Top: Platform Icon + Name + Verified Badge */}
                                         <div className="space-y-3">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex items-center gap-2.5">
-                                                    <div className="w-7 h-7 rounded-lg bg-white/[0.06] border border-white/10 flex items-center justify-center">
-                                                        {getPortalIcon(platform.portal, "w-4 h-4")}
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                                                        isSelected
+                                                            ? "bg-white/10 border border-white/15"
+                                                            : "bg-white border border-neutral-300 shadow-2xs"
+                                                    }`}>
+                                                        {getPortalIcon(platform.portal, "w-4.5 h-4.5")}
                                                     </div>
-                                                    <span className="font-extrabold text-sm text-white">
+                                                    <span className={`font-extrabold text-sm sm:text-base ${isSelected ? "text-white" : "text-neutral-900"}`}>
                                                         {platform.portalName}
                                                     </span>
                                                 </div>
 
                                                 {platform.connected && (
                                                     <div
-                                                        className="w-4 h-4 rounded-full bg-sky-500/20 text-sky-400 flex items-center justify-center"
+                                                        className={`w-4.5 h-4.5 rounded-full flex items-center justify-center ${
+                                                            isSelected ? "bg-white/20 text-white" : "bg-neutral-200 text-neutral-700"
+                                                        }`}
                                                         title="Verified Connected Profile"
                                                     >
                                                         <CheckCircle2 className="w-3.5 h-3.5" />
@@ -986,64 +1064,102 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
                                             {/* Middle: Rating & Tier Badge */}
                                             <div className="flex items-baseline gap-2 pt-1">
-                                                <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                                                <span className={`text-3xl sm:text-4xl font-black tracking-tight ${
+                                                    isSelected ? "text-white" : "text-neutral-900"
+                                                }`}>
                                                     {hasRating ? platform.currentRating : "—"}
                                                 </span>
 
                                                 {platform.tier && (
-                                                    <span
-                                                        style={{
-                                                            backgroundColor: platform.tierColor || "#ea3943",
-                                                        }}
-                                                        className="px-2 py-0.5 rounded text-[11px] font-black text-white uppercase tracking-wider"
-                                                    >
-                                                        {platform.tier}
-                                                    </span>
+                                                    platform.portal.toLowerCase() === "codeforces" ? (
+                                                        <CodeforcesBadge
+                                                            tier={platform.tier}
+                                                            rating={platform.currentRating}
+                                                            size="sm"
+                                                        />
+                                                    ) : platform.portal.toLowerCase() === "leetcode" ? (
+                                                        <LeetCodeBadge
+                                                            tier={platform.tier}
+                                                            rating={platform.currentRating}
+                                                            size="sm"
+                                                        />
+                                                    ) : platform.portal.toLowerCase() === "codechef" ? (
+                                                        <CodeChefBadge
+                                                            tier={platform.tier}
+                                                            rating={platform.currentRating}
+                                                            size="sm"
+                                                        />
+                                                    ) : platform.portal.toLowerCase() === "atcoder" ? (
+                                                        <AtCoderBadge
+                                                            tier={platform.tier}
+                                                            rating={platform.currentRating}
+                                                            size="sm"
+                                                        />
+                                                    ) : (
+                                                        <span
+                                                            className={`px-2.5 py-1 rounded text-xs font-black uppercase tracking-wider ${
+                                                                isSelected ? "bg-white text-black" : "bg-black text-white"
+                                                            }`}
+                                                        >
+                                                            {platform.tier}
+                                                        </span>
+                                                    )
                                                 )}
                                             </div>
                                         </div>
 
                                         {/* Bottom: Tier Progress or Platform Rank Milestone */}
-                                        <div className="pt-4 space-y-1.5 border-t border-neutral-800/60 mt-3">
+                                        <div className={`pt-4 space-y-1.5 border-t mt-3 ${
+                                            isSelected ? "border-white/15" : "border-neutral-200"
+                                        }`}>
                                             {platform.tierInfo?.nextTierName && typeof platform.tierInfo.pointsToNextTier === "number" ? (
                                                 <>
                                                     {/* Progress Bar */}
-                                                    <div className="w-full h-1.5 rounded-full bg-[#1c2436] overflow-hidden">
+                                                    <div className={`w-full h-1.5 rounded-full overflow-hidden ${
+                                                        isSelected ? "bg-white/20" : "bg-neutral-200"
+                                                    }`}>
                                                         <div
                                                             style={{
                                                                 width: `${platform.tierInfo.progressPercent || 0}%`,
-                                                                backgroundColor: platform.tierColor || "#f59e0b",
                                                             }}
-                                                            className="h-full rounded-full transition-all duration-500"
+                                                            className={`h-full rounded-full transition-all duration-500 ${
+                                                                isSelected ? "bg-white" : "bg-black"
+                                                            }`}
                                                         />
                                                     </div>
-                                                    <div className="text-[11px] text-neutral-400 flex items-center gap-1 font-medium">
+                                                    <div className={`text-xs sm:text-sm flex items-center gap-1 font-medium ${
+                                                        isSelected ? "text-neutral-400" : "text-neutral-500"
+                                                    }`}>
                                                         <span>{platform.tierInfo.pointsToNextTier} to</span>
-                                                        <strong className="text-white font-bold">
+                                                        <strong className={`font-bold ${isSelected ? "text-white" : "text-neutral-900"}`}>
                                                             {platform.tierInfo.nextTierName}
                                                         </strong>
                                                     </div>
                                                 </>
                                             ) : platform.officialRank ? (
-                                                <div className="text-[11px] text-neutral-400 flex items-center gap-1.5">
+                                                <div className={`text-xs sm:text-sm flex items-center gap-1.5 ${
+                                                    isSelected ? "text-neutral-300" : "text-neutral-500"
+                                                }`}>
                                                     <span>Rank #{formatNumber(platform.officialRank)}</span>
                                                     {platform.peakRating && (
                                                         <>
-                                                            <span className="w-1 h-1 rounded-full bg-neutral-600" />
+                                                            <span className={`w-1 h-1 rounded-full ${isSelected ? "bg-neutral-500" : "bg-neutral-300"}`} />
                                                             <span>max {platform.peakRating}</span>
                                                         </>
                                                     )}
                                                 </div>
                                             ) : hasContests ? (
-                                                <div className="text-[11px] text-neutral-400">
+                                                <div className={`text-xs sm:text-sm ${isSelected ? "text-neutral-300" : "text-neutral-500"}`}>
                                                     {platform.ratedContestsCount} contests attended
                                                 </div>
                                             ) : platform.connected ? (
-                                                <div className="text-[11px] text-neutral-500 italic">
+                                                <div className={`text-xs sm:text-sm italic ${isSelected ? "text-neutral-400" : "text-neutral-400"}`}>
                                                     Attend a contest to get started
                                                 </div>
                                             ) : (
-                                                <div className="text-[11px] text-amber-400/90 font-medium">
+                                                <div className={`text-xs sm:text-sm font-semibold underline underline-offset-2 ${
+                                                    isSelected ? "text-white" : "text-neutral-900"
+                                                }`}>
                                                     Connect platform
                                                 </div>
                                             )}
@@ -1051,13 +1167,42 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                     </button>
                                 );
                             })}
+
+                            {/* 4th slot: Multi-Platform Standing Summary to fill gap if odd number of platforms */}
+                            {platformsList.length % 2 === 1 && (
+                                <div className="flex flex-col justify-between p-4 sm:p-5 rounded-2xl border border-neutral-300 bg-neutral-50/70 text-neutral-900 shadow-2xs">
+                                    <div className="space-y-2.5">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-lg bg-black/[0.04] border border-neutral-300 flex items-center justify-center">
+                                                <Trophy className="w-4 h-4 text-neutral-800" />
+                                            </div>
+                                            <span className="font-extrabold text-sm text-neutral-900">
+                                                Contest Summary
+                                            </span>
+                                        </div>
+                                        <div className="pt-1">
+                                            <span className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight font-sans">
+                                                {totalRatedContests} Contests
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-neutral-500 font-medium leading-relaxed">
+                                            Multi-platform rating across {platformsList.length} connected competitive programming portals.
+                                        </p>
+                                    </div>
+
+                                    <div className="pt-4 border-t border-neutral-200 flex items-center justify-between text-xs text-neutral-500 font-semibold mt-3">
+                                        <span>Overall Standing</span>
+                                        <span className="font-bold text-neutral-900">Active Competitor</span>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        <div className="w-full p-8 rounded-2xl bg-white/[0.02] border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-3">
-                            <Award className="w-8 h-8 text-neutral-500" />
+                        <div className="w-full p-8 rounded-2xl bg-black/[0.02] border border-dashed border-black/10 flex flex-col items-center justify-center text-center space-y-3">
+                            <Award className="w-8 h-8 text-neutral-400" />
                             <div className="space-y-1">
-                                <h4 className="text-sm font-bold text-white">No platform ranks to display</h4>
-                                <p className="text-xs text-neutral-400">Connect your contest accounts in your profile to see your official standings here.</p>
+                                <h4 className="text-sm font-bold text-neutral-900">No platform ranks to display</h4>
+                                <p className="text-xs text-neutral-500">Connect your contest accounts in your profile to see your official standings here.</p>
                             </div>
                         </div>
                     )}
@@ -1081,68 +1226,140 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="tier-modal-title"
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn"
                 >
-                    <div className="w-full max-w-md rounded-3xl bg-black border border-neutral-800 shadow-2xl p-6 sm:p-7 space-y-5 text-white relative">
+                    <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-white border border-black/10 shadow-2xl p-6 sm:p-7 space-y-5 text-neutral-900 relative">
                         {/* Close button */}
                         <button
                             type="button"
                             onClick={() => setIsTierModalOpen(false)}
-                            className="absolute top-5 right-5 p-2 rounded-full text-neutral-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                            className="absolute top-5 right-5 p-2 rounded-full text-neutral-400 hover:text-neutral-900 hover:bg-black/[0.05] transition-colors cursor-pointer"
                         >
                             <X className="w-4 h-4" />
                         </button>
 
                         {/* Title */}
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center">
+                            <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-black/10 flex items-center justify-center text-neutral-800">
                                 {getPortalIcon(activePlatform.portal, "w-5 h-5")}
                             </div>
                             <div>
-                                <h3 id="tier-modal-title" className="text-lg font-black text-white">
+                                <h3 id="tier-modal-title" className="text-lg font-black text-neutral-900">
                                     {activePlatform.portalName} Rating System
                                 </h3>
-                                <p className="text-xs text-neutral-400">
+                                <p className="text-xs text-neutral-500">
                                     Official competitive rank ladder
                                 </p>
                             </div>
                         </div>
 
                         {/* Current Tier Highlight */}
-                        <div className="p-4 rounded-2xl bg-[#141b28] border border-neutral-800 space-y-2">
+                        <div className="p-4 rounded-2xl bg-black/[0.03] border border-black/[0.06] space-y-2">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs text-neutral-400">Current Standing</span>
-                                <span
-                                    style={{
-                                        backgroundColor: activePlatform.tierColor || "#ea3943",
-                                    }}
-                                    className="px-2.5 py-0.5 rounded text-xs font-black text-white uppercase tracking-wider"
-                                >
-                                    {activePlatform.tier}
-                                </span>
+                                <span className="text-xs text-neutral-500 font-medium">Current Standing</span>
+                                {activePlatform.portal.toLowerCase() === "codeforces" ? (
+                                    <CodeforcesBadge
+                                        tier={activePlatform.tier}
+                                        rating={activePlatform.currentRating}
+                                        size="sm"
+                                    />
+                                ) : activePlatform.portal.toLowerCase() === "leetcode" ? (
+                                    <LeetCodeBadge
+                                        tier={activePlatform.tier}
+                                        rating={activePlatform.currentRating}
+                                        size="sm"
+                                    />
+                                ) : activePlatform.portal.toLowerCase() === "codechef" ? (
+                                    <CodeChefBadge
+                                        tier={activePlatform.tier}
+                                        rating={activePlatform.currentRating}
+                                        size="sm"
+                                    />
+                                ) : activePlatform.portal.toLowerCase() === "atcoder" ? (
+                                    <AtCoderBadge
+                                        tier={activePlatform.tier}
+                                        rating={activePlatform.currentRating}
+                                        size="sm"
+                                    />
+                                ) : (
+                                    <span className="px-2.5 py-0.5 rounded text-xs font-black text-white bg-black uppercase tracking-wider">
+                                        {activePlatform.tier}
+                                    </span>
+                                )}
                             </div>
-                            <p className="text-xs text-neutral-300 leading-relaxed">
+                            <p className="text-xs text-neutral-600 leading-relaxed">
                                 {activePlatform.tierInfo?.description ||
                                     `${activePlatform.tier} is an official competitive rating tier on ${activePlatform.portalName}.`}
                             </p>
                         </div>
 
+                        {/* If Codeforces: render all 10 rating badges */}
+                        {activePlatform.portal.toLowerCase() === "codeforces" && (
+                            <div className="p-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] space-y-3">
+                                <div className="text-xs font-bold text-neutral-900">
+                                    Codeforces Rating Badges
+                                </div>
+                                <CodeforcesRatingLadder
+                                    currentRating={activePlatform.currentRating}
+                                    currentTier={activePlatform.tier}
+                                />
+                            </div>
+                        )}
+
+                        {/* If LeetCode: render all 3 rating badges */}
+                        {activePlatform.portal.toLowerCase() === "leetcode" && (
+                            <div className="p-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] space-y-3">
+                                <div className="text-xs font-bold text-neutral-900">
+                                    LeetCode Ranks & Ratings
+                                </div>
+                                <LeetCodeRatingLadder
+                                    currentRating={activePlatform.currentRating}
+                                    currentTier={activePlatform.tier}
+                                />
+                            </div>
+                        )}
+
+                        {/* If CodeChef: render all 7 rating badges with division breakdown */}
+                        {activePlatform.portal.toLowerCase() === "codechef" && (
+                            <div className="p-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] space-y-3">
+                                <div className="text-xs font-bold text-neutral-900">
+                                    CodeChef Ranks & Ratings
+                                </div>
+                                <CodeChefRatingLadder
+                                    currentRating={activePlatform.currentRating}
+                                    currentTier={activePlatform.tier}
+                                />
+                            </div>
+                        )}
+
+                        {/* If AtCoder: render all 8 rating badges */}
+                        {activePlatform.portal.toLowerCase() === "atcoder" && (
+                            <div className="p-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] space-y-3">
+                                <div className="text-xs font-bold text-neutral-900">
+                                    AtCoder Ranks & Ratings
+                                </div>
+                                <AtCoderRatingLadder
+                                    currentRating={activePlatform.currentRating}
+                                    currentTier={activePlatform.tier}
+                                />
+                            </div>
+                        )}
+
                         {/* Progress to next tier */}
                         {activePlatform.tierInfo?.nextTierName && (
                             <div className="space-y-1.5">
-                                <div className="flex items-center justify-between text-xs text-neutral-400">
+                                <div className="flex items-center justify-between text-xs text-neutral-500">
                                     <span>Progress to {activePlatform.tierInfo.nextTierName}</span>
-                                    <strong className="text-white font-bold">
+                                    <strong className="text-neutral-900 font-bold">
                                         {activePlatform.tierInfo.pointsToNextTier} points needed
                                     </strong>
                                 </div>
-                                <div className="w-full h-2 rounded-full bg-[#1c2436] overflow-hidden">
+                                <div className="w-full h-2 rounded-full bg-black/[0.06] overflow-hidden">
                                     <div
                                         style={{
                                             width: `${activePlatform.tierInfo.progressPercent || 0}%`,
-                                            backgroundColor: activePlatform.tierColor || "#f59e0b",
                                         }}
-                                        className="h-full rounded-full transition-all"
+                                        className="h-full rounded-full bg-black transition-all"
                                     />
                                 </div>
                             </div>
@@ -1153,7 +1370,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                             <button
                                 type="button"
                                 onClick={() => setIsTierModalOpen(false)}
-                                className="px-5 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.12] text-white text-xs font-bold transition-all cursor-pointer"
+                                className="px-5 py-2.5 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
                             >
                                 Close
                             </button>

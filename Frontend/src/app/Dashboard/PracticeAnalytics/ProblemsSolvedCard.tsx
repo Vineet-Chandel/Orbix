@@ -56,25 +56,30 @@ export const ProblemsSolvedCard: React.FC<ProblemsSolvedCardProps> = ({ data, is
         return data?.platformBreakdown || [];
     }, [data]);
 
+    const maxPlatformCount = useMemo(() => {
+        if (!platforms || platforms.length === 0) return 1;
+        return Math.max(...platforms.map((p) => p.count), 1);
+    }, [platforms]);
+
     return (
         <div
             aria-labelledby="problems-solved-title"
-            className="w-full text-white select-none flex flex-col justify-between h-full"
+            className="w-full text-neutral-900 select-none flex flex-col justify-between h-full"
         >
             <div>
                 {/* Header Row */}
-                <div className="flex items-center justify-between pb-4 border-b border-white/[0.08] relative z-10">
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-white/[0.04] border border-white/10 flex items-center justify-center text-cyan-400 shadow-sm">
-                            <Target className="w-4 h-4 text-cyan-400" />
+                <div className="flex items-center justify-between pb-4 border-b border-neutral-300 relative z-10">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs">
+                            <Target className="w-5 h-5 text-neutral-800" />
                         </div>
-                        <h3 id="problems-solved-title" className="text-base sm:text-lg font-black text-white tracking-tight">
+                        <h3 id="problems-solved-title" className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
                             Problems solved
                         </h3>
                     </div>
 
                     <div className="flex items-center gap-1.5">
-                        <span className="text-xs sm:text-sm font-semibold text-neutral-400">
+                        <span className="text-sm sm:text-base font-bold text-neutral-600">
                             {totalSolved > 0 ? `${totalSolved.toLocaleString()} total` : "0 total"}
                         </span>
                     </div>
@@ -84,12 +89,12 @@ export const ProblemsSolvedCard: React.FC<ProblemsSolvedCardProps> = ({ data, is
                 <div className="pt-6 pb-4 relative z-10">
                     {isLoading && !data ? (
                         <div className="flex items-center justify-center py-10 animate-pulse">
-                            <div className="w-32 h-32 rounded-full border-4 border-white/[0.05]" />
+                            <div className="w-36 h-36 rounded-full border-4 border-neutral-200" />
                         </div>
                     ) : (
-                        <div className="flex items-center justify-around sm:justify-start sm:gap-12">
-                            {/* Circular Multi-Color Donut */}
-                            <div className="relative w-36 h-36 flex-shrink-0 flex items-center justify-center">
+                        <div className="flex items-center justify-around sm:justify-start sm:gap-14">
+                            {/* Circular Monochrome Donut */}
+                            <div className="relative w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 flex items-center justify-center">
                                 <svg
                                     className="w-full h-full -rotate-90 transform"
                                     viewBox="0 0 140 140"
@@ -100,19 +105,19 @@ export const ProblemsSolvedCard: React.FC<ProblemsSolvedCardProps> = ({ data, is
                                         cy="70"
                                         r={donutSegments.radius}
                                         fill="none"
-                                        stroke="rgba(255, 255, 255, 0.05)"
-                                        strokeWidth="10"
+                                        stroke="rgba(0, 0, 0, 0.06)"
+                                        strokeWidth="11"
                                     />
 
-                                    {/* Easy Segment (Cyan) */}
+                                    {/* Easy Segment (Blue) */}
                                     {easy > 0 && (
                                         <circle
                                             cx="70"
                                             cy="70"
                                             r={donutSegments.radius}
                                             fill="none"
-                                            stroke="#06b6d4"
-                                            strokeWidth="10"
+                                            stroke="#3B82F6"
+                                            strokeWidth="11"
                                             strokeLinecap="round"
                                             strokeDasharray={`${donutSegments.easyStroke} ${donutSegments.circumference}`}
                                             strokeDashoffset={donutSegments.offsetEasy}
@@ -120,15 +125,15 @@ export const ProblemsSolvedCard: React.FC<ProblemsSolvedCardProps> = ({ data, is
                                         />
                                     )}
 
-                                    {/* Medium Segment (Yellow/Amber) */}
+                                    {/* Medium Segment (Yellow) */}
                                     {medium > 0 && (
                                         <circle
                                             cx="70"
                                             cy="70"
                                             r={donutSegments.radius}
                                             fill="none"
-                                            stroke="#eab308"
-                                            strokeWidth="10"
+                                            stroke="#F59E0B"
+                                            strokeWidth="11"
                                             strokeLinecap="round"
                                             strokeDasharray={`${donutSegments.mediumStroke} ${donutSegments.circumference}`}
                                             strokeDashoffset={donutSegments.offsetMedium}
@@ -136,15 +141,15 @@ export const ProblemsSolvedCard: React.FC<ProblemsSolvedCardProps> = ({ data, is
                                         />
                                     )}
 
-                                    {/* Hard Segment (Rose/Pink) */}
+                                    {/* Hard Segment (Red) */}
                                     {hard > 0 && (
                                         <circle
                                             cx="70"
                                             cy="70"
                                             r={donutSegments.radius}
                                             fill="none"
-                                            stroke="#f43f5e"
-                                            strokeWidth="10"
+                                            stroke="#EF4444"
+                                            strokeWidth="11"
                                             strokeLinecap="round"
                                             strokeDasharray={`${donutSegments.hardStroke} ${donutSegments.circumference}`}
                                             strokeDashoffset={donutSegments.offsetHard}
@@ -155,29 +160,38 @@ export const ProblemsSolvedCard: React.FC<ProblemsSolvedCardProps> = ({ data, is
 
                                 {/* Center Count */}
                                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none">
-                                    <span className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                                    <span className="text-3xl sm:text-4xl font-black text-neutral-900 tracking-tight font-sans">
                                         {donutTotal > 0 ? donutTotal.toLocaleString() : totalSolved.toLocaleString()}
                                     </span>
                                 </div>
                             </div>
 
                             {/* Difficulty Stats List */}
-                            <div className="space-y-3 min-w-[130px]">
-                                <div className="flex items-center justify-between gap-4">
-                                    <span className="text-xs sm:text-sm font-bold text-[#06b6d4]">Easy</span>
-                                    <span className="text-xs sm:text-sm font-extrabold text-white font-mono">
+                            <div className="space-y-4 min-w-[160px]">
+                                <div className="flex items-center justify-between gap-5">
+                                    <span className="flex items-center gap-2.5 text-sm sm:text-base font-bold text-neutral-700">
+                                        <span className="w-3 h-3 rounded-full bg-[#3B82F6] shadow-2xs" />
+                                        <span>Easy</span>
+                                    </span>
+                                    <span className="text-sm sm:text-base font-black text-neutral-900 font-mono">
                                         {easy.toLocaleString()}
                                     </span>
                                 </div>
-                                <div className="flex items-center justify-between gap-4">
-                                    <span className="text-xs sm:text-sm font-bold text-[#eab308]">Medium</span>
-                                    <span className="text-xs sm:text-sm font-extrabold text-white font-mono">
+                                <div className="flex items-center justify-between gap-5">
+                                    <span className="flex items-center gap-2.5 text-sm sm:text-base font-bold text-neutral-800">
+                                        <span className="w-3 h-3 rounded-full bg-[#F59E0B] shadow-2xs" />
+                                        <span>Medium</span>
+                                    </span>
+                                    <span className="text-sm sm:text-base font-black text-neutral-900 font-mono">
                                         {medium.toLocaleString()}
                                     </span>
                                 </div>
-                                <div className="flex items-center justify-between gap-4">
-                                    <span className="text-xs sm:text-sm font-bold text-[#f43f5e]">Hard</span>
-                                    <span className="text-xs sm:text-sm font-extrabold text-white font-mono">
+                                <div className="flex items-center justify-between gap-5">
+                                    <span className="flex items-center gap-2.5 text-sm sm:text-base font-black text-neutral-950">
+                                        <span className="w-3 h-3 rounded-full bg-[#EF4444] shadow-2xs" />
+                                        <span>Hard</span>
+                                    </span>
+                                    <span className="text-sm sm:text-base font-black text-neutral-900 font-mono">
                                         {hard.toLocaleString()}
                                     </span>
                                 </div>
@@ -186,35 +200,58 @@ export const ProblemsSolvedCard: React.FC<ProblemsSolvedCardProps> = ({ data, is
                     )}
                 </div>
 
-                {/* Bottom Platform Breakdown Rows with Progress Bars */}
-                <div className="pt-4 border-t border-white/[0.06] space-y-3.5 relative z-10">
-                    {platforms.map((p) => {
-                        return (
-                            <div key={p.portal} className="space-y-1.5">
-                                <div className="flex items-center justify-between text-xs sm:text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-5 h-5 flex items-center justify-center">
-                                            {getPortalIcon(p.portal, "w-4 h-4 object-contain")}
-                                        </div>
-                                        <span className="font-semibold text-neutral-200">
-                                            {p.platformName}
-                                        </span>
-                                    </div>
-                                    <span className="font-bold text-white font-mono">
-                                        {p.count.toLocaleString()}
-                                    </span>
-                                </div>
+                {/* Bottom Platform Breakdown: Vertical Bar Chart (Matching Image 2) */}
+                <div className="pt-6 mt-3 border-t border-neutral-200 relative z-10">
+                    {platforms.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-neutral-400 font-medium">
+                            No platform problem data available
+                        </div>
+                    ) : (
+                        <div className="flex items-end justify-around gap-2 sm:gap-4 h-48 sm:h-52 pt-6 pb-2">
+                            {platforms.map((p) => {
+                                const heightPct =
+                                    p.count === 0
+                                        ? 6
+                                        : Math.max(Math.round((p.count / maxPlatformCount) * 100), 10);
+                                const isMax = p.count === maxPlatformCount && p.count > 0;
 
-                                {/* Progress Bar */}
-                                <div className="w-full h-1.5 bg-white/[0.08] rounded-full overflow-hidden">
+                                return (
                                     <div
-                                        className="h-full bg-white rounded-full transition-all duration-700"
-                                        style={{ width: `${Math.max(p.percentage, 3)}%` }}
-                                    />
-                                </div>
-                            </div>
-                        );
-                    })}
+                                        key={p.portal}
+                                        className="flex-1 flex flex-col items-center justify-end h-full group relative max-w-[110px]"
+                                        title={`${p.platformName}: ${p.count.toLocaleString()} problems solved`}
+                                    >
+                                        {/* Value directly above bar */}
+                                        <span className="text-xs sm:text-sm font-black text-neutral-900 font-mono text-center mb-1.5 transition-transform group-hover:scale-110">
+                                            {p.count.toLocaleString()}
+                                        </span>
+
+                                        {/* Bar Pillar */}
+                                        <div className="w-full flex items-end justify-center h-28 sm:h-32">
+                                            <div
+                                                style={{ height: `${heightPct}%` }}
+                                                className={`w-full max-w-[34px] sm:max-w-[44px] rounded-t-xl sm:rounded-t-2xl transition-all duration-500 ease-out ${
+                                                    isMax
+                                                        ? "bg-black shadow-xs"
+                                                        : "bg-neutral-200 group-hover:bg-neutral-300"
+                                                }`}
+                                            />
+                                        </div>
+
+                                        {/* Platform Icon & Label Below */}
+                                        <div className="flex flex-col items-center mt-2.5 gap-1 w-full">
+                                            <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                                {getPortalIcon(p.portal, "w-full h-full object-contain")}
+                                            </div>
+                                            <span className="text-xs sm:text-sm font-bold text-neutral-800 text-center truncate w-full">
+                                                {p.platformName}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

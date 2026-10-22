@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
+import { motion } from "framer-motion";
 import { toPng } from "html-to-image";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, useAppSelector, fetchContestPerformance } from "../../../store";
@@ -99,11 +100,18 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
         connectedPortals.github?.connected || connectedPortals.github?.username || githubStats.connected
     );
 
-    // Dynamic Platform Slot Resolution with Category Classification
-    const showcasedPlatforms = useMemo(
-        () => resolveShowcasedPlatforms(connectedPortals, customSlots, maxSlots, slotCategory, userFallback, contestData?.platforms),
-        [connectedPortals, customSlots, maxSlots, slotCategory, userFallback, contestData?.platforms]
+    // Dynamic Platform Slot Resolution for both formats
+    const linkedinPlatforms = useMemo(
+        () => resolveShowcasedPlatforms(connectedPortals, customSlots, 3, slotCategory, userFallback, contestData?.platforms),
+        [connectedPortals, customSlots, slotCategory, userFallback, contestData?.platforms]
     );
+
+    const storyPlatforms = useMemo(
+        () => resolveShowcasedPlatforms(connectedPortals, customSlots, 5, slotCategory, userFallback, contestData?.platforms),
+        [connectedPortals, customSlots, slotCategory, userFallback, contestData?.platforms]
+    );
+
+    const showcasedPlatforms = format === "linkedin" ? linkedinPlatforms : storyPlatforms;
 
     // The current slot IDs matching the showcased platforms
     const currentSlotIds = useMemo(() => {
@@ -216,10 +224,17 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
         [contestData?.platforms, connectedPortals, userFallback]
     );
 
-    const showcasedContests = useMemo(
-        () => resolveShowcasedContests(contestData?.platforms, connectedPortals, customContestSlots, maxSlots, userFallback),
-        [contestData?.platforms, connectedPortals, customContestSlots, maxSlots, userFallback]
+    const linkedinContests = useMemo(
+        () => resolveShowcasedContests(contestData?.platforms, connectedPortals, customContestSlots, 3, userFallback),
+        [contestData?.platforms, connectedPortals, customContestSlots, userFallback]
     );
+
+    const storyContests = useMemo(
+        () => resolveShowcasedContests(contestData?.platforms, connectedPortals, customContestSlots, 5, userFallback),
+        [contestData?.platforms, connectedPortals, customContestSlots, userFallback]
+    );
+
+    const showcasedContests = format === "linkedin" ? linkedinContests : storyContests;
 
     const currentContestSlotIds = useMemo(() => {
         const ids: string[] = [];
@@ -300,8 +315,8 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
         setIsExporting(true);
 
         try {
-            // Give 150ms for fonts/images/QR codes to settle
-            await new Promise((r) => setTimeout(r, 150));
+            // Give 200ms for fonts/images/QR codes to settle in the export canvas
+            await new Promise((r) => setTimeout(r, 200));
 
             if (!exportNodeRef.current) {
                 throw new Error("Export canvas element not found");
@@ -336,24 +351,28 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
         }
     };
 
-    // Calculate scale factor for live preview
-    const previewScale = useMemo(() => {
-        const availableWidth = Math.max(containerWidth - 32, 280);
-        if (format === "linkedin") {
-            // LinkedIn native: 1200 x 627
-            return availableWidth / 1200;
-        } else {
-            // Instagram Story native: 1080 x 1920
-            // Fit within max height of 560px on desktop/mobile
-            const maxHeight = Math.min(560, window.innerHeight * 0.65);
-            const scaleByHeight = maxHeight / 1920;
-            const scaleByWidth = availableWidth / 1080;
-            return Math.min(scaleByHeight, scaleByWidth);
-        }
-    }, [containerWidth, format]);
+    // Calculate scale factors for live preview for both formats
+    const availableWidth = Math.max(containerWidth - 32, 280);
 
-    const previewWidth = format === "linkedin" ? 1200 * previewScale : 1080 * previewScale;
-    const previewHeight = format === "linkedin" ? 627 * previewScale : 1920 * previewScale;
+    const linkedinScale = useMemo(() => {
+        return availableWidth / 1200;
+    }, [availableWidth]);
+
+    const storyScale = useMemo(() => {
+        const maxHeight = Math.min(560, window.innerHeight * 0.65);
+        const scaleByHeight = maxHeight / 1920;
+        const scaleByWidth = availableWidth / 1080;
+        return Math.min(scaleByHeight, scaleByWidth);
+    }, [availableWidth]);
+
+    const linkedinWidth = 1200 * linkedinScale;
+    const linkedinHeight = 627 * linkedinScale;
+
+    const storyWidth = 1080 * storyScale;
+    const storyHeight = 1920 * storyScale;
+
+    const activeWidth = format === "linkedin" ? linkedinWidth : storyWidth;
+    const activeHeight = format === "linkedin" ? linkedinHeight : storyHeight;
 
     return (
         <div className="rounded-2xl bg-white border border-neutral-200/90 shadow-xs p-5 sm:p-6 flex flex-col space-y-5">
@@ -387,68 +406,265 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
             {/* Live Interactive Card Preview Stage */}
             <div
                 ref={containerRef}
-                className="w-full min-h-[300px] flex items-center justify-center p-4 sm:p-6 rounded-2xl bg-[#090c10] border border-neutral-800 relative overflow-hidden shadow-inner"
+                className="min-h-[340px] flex items-center justify-center p-3 sm:p-6 py-6 sm:py-8 rounded-2xl relative bg-neutral-900/[0.02]"
             >
-                {/* Background ambient lighting */}
+                {/* 3D Perspective Stage Container */}
                 <div
-                    className="absolute inset-0 pointer-events-none opacity-30 transition-all duration-700 blur-3xl"
-                    style={{
-                        background: `radial-gradient(circle at 50% 50%, ${themeConfig.accentColor} 0%, transparent 65%)`,
-                    }}
-                />
-
-                {/* Scaled Preview Frame */}
-                <div
-                    style={{
-                        width: previewWidth,
-                        height: previewHeight,
-                    }}
-                    className="relative overflow-hidden rounded-[16px] shadow-2xl transition-all duration-300 flex-shrink-0"
+                    style={{ perspective: 1800 }}
+                    className="relative flex items-center justify-center flex-shrink-0"
                 >
-                    <div
+                    <motion.div
+                        className="relative cursor-pointer select-none flex-shrink-0"
                         style={{
-                            width: format === "linkedin" ? 1200 : 1080,
-                            height: format === "linkedin" ? 627 : 1920,
-                            transform: `scale(${previewScale})`,
-                            transformOrigin: "top left",
+                            width: activeWidth,
+                            height: activeHeight,
+                            transformStyle: "preserve-3d",
+                            WebkitTransformStyle: "preserve-3d",
+                        }}
+                        animate={{
+                            rotateY: face === "back" ? 180 : 0,
+                            width: activeWidth,
+                            height: activeHeight,
+                        }}
+                        transition={{
+                            rotateY: { duration: 0.75, ease: [0.23, 1, 0.32, 1] },
+                            width: { type: "spring", stiffness: 280, damping: 28, mass: 0.8 },
+                            height: { type: "spring", stiffness: 280, damping: 28, mass: 0.8 },
+                        }}
+                        onClick={handleFlip}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Flip ${format === "linkedin" ? "LinkedIn Card" : "Instagram Story Card"} in 3D`}
+                        title="Click card to flip"
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleFlip();
+                            }
                         }}
                     >
-                        {format === "linkedin" ? (
-                            <LinkedInCard
-                                user={user}
-                                stats={stats}
-                                coderType={coderType}
-                                topPlatforms={showcasedPlatforms}
-                                allConnectedPlatforms={allConnectedPlatforms}
-                                githubStats={githubStats}
-                                includeGitHub={includeGitHub}
-                                theme={themeConfig}
-                                face={face}
-                                publicProfileUrl={publicProfileUrl}
-                                connectedPortals={connectedPortals}
-                                showcaseMode={showcaseMode}
-                                slotCategory={slotCategory}
-                                topContests={showcasedContests}
-                            />
-                        ) : (
-                            <InstagramStoryCard
-                                user={user}
-                                stats={stats}
-                                coderType={coderType}
-                                topPlatforms={showcasedPlatforms}
-                                allConnectedPlatforms={allConnectedPlatforms}
-                                githubStats={githubStats}
-                                includeGitHub={includeGitHub}
-                                theme={themeConfig}
-                                face={face}
-                                publicProfileUrl={publicProfileUrl}
-                                connectedPortals={connectedPortals}
-                                showcaseMode={showcaseMode}
-                                slotCategory={slotCategory}
-                                topContests={showcasedContests}
-                            />
-                        )}
-                    </div>
+                        {/* =========================================================================
+                            FRONT FACE (Default View)
+                        ========================================================================= */}
+                        <div
+                            className={`absolute inset-0 w-full h-full overflow-hidden ${
+                                format === "linkedin"
+                                    ? "rounded-[22px] sm:rounded-[26px]"
+                                    : "rounded-[26px] sm:rounded-[34px]"
+                            } border border-neutral-800/90 shadow-2xl bg-[#0c1017]`}
+                            style={{
+                                backfaceVisibility: "hidden",
+                                WebkitBackfaceVisibility: "hidden",
+                                transform: "rotateY(0deg)",
+                                boxShadow: `0 30px 70px -15px rgba(0, 0, 0, 0.85), 0 0 45px -10px ${themeConfig.borderGlow}`,
+                            }}
+                        >
+                            {/* LinkedIn Card Layer (Front Face) */}
+                            <motion.div
+                                key="preview-linkedin-front"
+                                style={{
+                                    position: "absolute",
+                                    left: "50%",
+                                    top: "50%",
+                                    width: 1200,
+                                    height: 627,
+                                    marginLeft: -600,
+                                    marginTop: -313.5,
+                                    transformOrigin: "center center",
+                                    willChange: "transform, opacity, filter",
+                                }}
+                                initial={false}
+                                animate={{
+                                    scale: format === "linkedin" ? linkedinScale : linkedinScale * 0.92,
+                                    opacity: format === "linkedin" ? 1 : 0,
+                                    filter: format === "linkedin" ? "blur(0px)" : "blur(6px)",
+                                    pointerEvents: format === "linkedin" ? "auto" : "none",
+                                }}
+                                transition={{
+                                    type: "spring",
+                                    stiffness: 280,
+                                    damping: 28,
+                                    mass: 0.8,
+                                }}
+                            >
+                                <LinkedInCard
+                                    user={user}
+                                    stats={stats}
+                                    coderType={coderType}
+                                    topPlatforms={linkedinPlatforms}
+                                    allConnectedPlatforms={allConnectedPlatforms}
+                                    githubStats={githubStats}
+                                    includeGitHub={includeGitHub}
+                                    theme={themeConfig}
+                                    face="front"
+                                    publicProfileUrl={publicProfileUrl}
+                                    connectedPortals={connectedPortals}
+                                    showcaseMode={showcaseMode}
+                                    slotCategory={slotCategory}
+                                    topContests={linkedinContests}
+                                    animate={false}
+                                />
+                            </motion.div>
+
+                            {/* Instagram Story Card Layer (Front Face) */}
+                            <motion.div
+                                key="preview-story-front"
+                                style={{
+                                    position: "absolute",
+                                    left: "50%",
+                                    top: "50%",
+                                    width: 1080,
+                                    height: 1920,
+                                    marginLeft: -540,
+                                    marginTop: -960,
+                                    transformOrigin: "center center",
+                                    willChange: "transform, opacity, filter",
+                                }}
+                                initial={false}
+                                animate={{
+                                    scale: format === "instagram" ? storyScale : storyScale * 0.92,
+                                    opacity: format === "instagram" ? 1 : 0,
+                                    filter: format === "instagram" ? "blur(0px)" : "blur(6px)",
+                                    pointerEvents: format === "instagram" ? "auto" : "none",
+                                }}
+                                transition={{
+                                    type: "spring",
+                                    stiffness: 280,
+                                    damping: 28,
+                                    mass: 0.8,
+                                }}
+                            >
+                                <InstagramStoryCard
+                                    user={user}
+                                    stats={stats}
+                                    coderType={coderType}
+                                    topPlatforms={storyPlatforms}
+                                    allConnectedPlatforms={allConnectedPlatforms}
+                                    githubStats={githubStats}
+                                    includeGitHub={includeGitHub}
+                                    theme={themeConfig}
+                                    face="front"
+                                    publicProfileUrl={publicProfileUrl}
+                                    connectedPortals={connectedPortals}
+                                    showcaseMode={showcaseMode}
+                                    slotCategory={slotCategory}
+                                    topContests={storyContests}
+                                    animate={false}
+                                />
+                            </motion.div>
+                        </div>
+
+                        {/* =========================================================================
+                            BACK FACE (Revealed on 3D Flip)
+                        ========================================================================= */}
+                        <div
+                            className={`absolute inset-0 w-full h-full overflow-hidden ${
+                                format === "linkedin"
+                                    ? "rounded-[22px] sm:rounded-[26px]"
+                                    : "rounded-[26px] sm:rounded-[34px]"
+                            } border border-neutral-800/90 shadow-2xl bg-[#0c1017]`}
+                            style={{
+                                backfaceVisibility: "hidden",
+                                WebkitBackfaceVisibility: "hidden",
+                                transform: "rotateY(180deg)",
+                                boxShadow: `0 30px 70px -15px rgba(0, 0, 0, 0.85), 0 0 45px -10px ${themeConfig.borderGlow}`,
+                            }}
+                        >
+                            {/* LinkedIn Card Layer (Back Face) */}
+                            <motion.div
+                                key="preview-linkedin-back"
+                                style={{
+                                    position: "absolute",
+                                    left: "50%",
+                                    top: "50%",
+                                    width: 1200,
+                                    height: 627,
+                                    marginLeft: -600,
+                                    marginTop: -313.5,
+                                    transformOrigin: "center center",
+                                    willChange: "transform, opacity, filter",
+                                }}
+                                initial={false}
+                                animate={{
+                                    scale: format === "linkedin" ? linkedinScale : linkedinScale * 0.92,
+                                    opacity: format === "linkedin" ? 1 : 0,
+                                    filter: format === "linkedin" ? "blur(0px)" : "blur(6px)",
+                                    pointerEvents: format === "linkedin" ? "auto" : "none",
+                                }}
+                                transition={{
+                                    type: "spring",
+                                    stiffness: 280,
+                                    damping: 28,
+                                    mass: 0.8,
+                                }}
+                            >
+                                <LinkedInCard
+                                    user={user}
+                                    stats={stats}
+                                    coderType={coderType}
+                                    topPlatforms={linkedinPlatforms}
+                                    allConnectedPlatforms={allConnectedPlatforms}
+                                    githubStats={githubStats}
+                                    includeGitHub={includeGitHub}
+                                    theme={themeConfig}
+                                    face="back"
+                                    publicProfileUrl={publicProfileUrl}
+                                    connectedPortals={connectedPortals}
+                                    showcaseMode={showcaseMode}
+                                    slotCategory={slotCategory}
+                                    topContests={linkedinContests}
+                                    animate={false}
+                                />
+                            </motion.div>
+
+                            {/* Instagram Story Card Layer (Back Face) */}
+                            <motion.div
+                                key="preview-story-back"
+                                style={{
+                                    position: "absolute",
+                                    left: "50%",
+                                    top: "50%",
+                                    width: 1080,
+                                    height: 1920,
+                                    marginLeft: -540,
+                                    marginTop: -960,
+                                    transformOrigin: "center center",
+                                    willChange: "transform, opacity, filter",
+                                }}
+                                initial={false}
+                                animate={{
+                                    scale: format === "instagram" ? storyScale : storyScale * 0.92,
+                                    opacity: format === "instagram" ? 1 : 0,
+                                    filter: format === "instagram" ? "blur(0px)" : "blur(6px)",
+                                    pointerEvents: format === "instagram" ? "auto" : "none",
+                                }}
+                                transition={{
+                                    type: "spring",
+                                    stiffness: 280,
+                                    damping: 28,
+                                    mass: 0.8,
+                                }}
+                            >
+                                <InstagramStoryCard
+                                    user={user}
+                                    stats={stats}
+                                    coderType={coderType}
+                                    topPlatforms={storyPlatforms}
+                                    allConnectedPlatforms={allConnectedPlatforms}
+                                    githubStats={githubStats}
+                                    includeGitHub={includeGitHub}
+                                    theme={themeConfig}
+                                    face="back"
+                                    publicProfileUrl={publicProfileUrl}
+                                    connectedPortals={connectedPortals}
+                                    showcaseMode={showcaseMode}
+                                    slotCategory={slotCategory}
+                                    topContests={storyContests}
+                                    animate={false}
+                                />
+                            </motion.div>
+                        </div>
+                    </motion.div>
                 </div>
             </div>
 
@@ -491,56 +707,60 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
                 isContestCustomized={isContestCustomized}
             />
 
-            {/* Hidden Offscreen Node at Exact Native Dimensions for Clean High-Res Export */}
-            <div
-                aria-hidden="true"
-                style={{
-                    position: "fixed",
-                    left: "-9999px",
-                    top: 0,
-                    opacity: 0,
-                    pointerEvents: "none",
-                    zIndex: -999,
-                }}
-            >
-                <div ref={exportNodeRef}>
-                    {format === "linkedin" ? (
-                        <LinkedInCard
-                            user={user}
-                            stats={stats}
-                            coderType={coderType}
-                            topPlatforms={showcasedPlatforms}
-                            allConnectedPlatforms={allConnectedPlatforms}
-                            githubStats={githubStats}
-                            includeGitHub={includeGitHub}
-                            theme={themeConfig}
-                            face={face}
-                            publicProfileUrl={publicProfileUrl}
-                            connectedPortals={connectedPortals}
-                            showcaseMode={showcaseMode}
-                            slotCategory={slotCategory}
-                            topContests={showcasedContests}
-                        />
-                    ) : (
-                        <InstagramStoryCard
-                            user={user}
-                            stats={stats}
-                            coderType={coderType}
-                            topPlatforms={showcasedPlatforms}
-                            allConnectedPlatforms={allConnectedPlatforms}
-                            githubStats={githubStats}
-                            includeGitHub={includeGitHub}
-                            theme={themeConfig}
-                            face={face}
-                            publicProfileUrl={publicProfileUrl}
-                            connectedPortals={connectedPortals}
-                            showcaseMode={showcaseMode}
-                            slotCategory={slotCategory}
-                            topContests={showcasedContests}
-                        />
-                    )}
+            {/* Hidden Offscreen Node at Exact Native Dimensions for Clean High-Res Export (Only mounted during export) */}
+            {isExporting && (
+                <div
+                    aria-hidden="true"
+                    style={{
+                        position: "fixed",
+                        left: "-9999px",
+                        top: 0,
+                        opacity: 0,
+                        pointerEvents: "none",
+                        zIndex: -999,
+                    }}
+                >
+                    <div ref={exportNodeRef}>
+                        {format === "linkedin" ? (
+                            <LinkedInCard
+                                user={user}
+                                stats={stats}
+                                coderType={coderType}
+                                topPlatforms={linkedinPlatforms}
+                                allConnectedPlatforms={allConnectedPlatforms}
+                                githubStats={githubStats}
+                                includeGitHub={includeGitHub}
+                                theme={themeConfig}
+                                face={face}
+                                publicProfileUrl={publicProfileUrl}
+                                connectedPortals={connectedPortals}
+                                showcaseMode={showcaseMode}
+                                slotCategory={slotCategory}
+                                topContests={linkedinContests}
+                                animate={false}
+                            />
+                        ) : (
+                            <InstagramStoryCard
+                                user={user}
+                                stats={stats}
+                                coderType={coderType}
+                                topPlatforms={storyPlatforms}
+                                allConnectedPlatforms={allConnectedPlatforms}
+                                githubStats={githubStats}
+                                includeGitHub={includeGitHub}
+                                theme={themeConfig}
+                                face={face}
+                                publicProfileUrl={publicProfileUrl}
+                                connectedPortals={connectedPortals}
+                                showcaseMode={showcaseMode}
+                                slotCategory={slotCategory}
+                                topContests={storyContests}
+                                animate={false}
+                            />
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
         </div>
     );
 };

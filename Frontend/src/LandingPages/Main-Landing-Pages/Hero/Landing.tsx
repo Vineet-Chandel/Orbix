@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import PublicProfilePage from '../../../app/Profile/PublicProfilePage';
 
 export interface PlatformItem {
     id: string;
@@ -475,8 +476,56 @@ const Landing = () => {
     const current = CONNECTABLE_PLATFORMS[currentIndex];
     const currentOpp = OPPORTUNITIES[oppIndex];
 
+    const trackRef = useRef<HTMLDivElement>(null);
+    const boxRef = useRef<HTMLDivElement>(null);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const [maxScroll, setMaxScroll] = useState(2200);
+
+    // Measure height difference dynamically so the entire PublicProfilePage can scroll to the bottom
+    useEffect(() => {
+        const updateHeight = () => {
+            if (contentRef.current && boxRef.current) {
+                const ch = contentRef.current.scrollHeight;
+                const bh = boxRef.current.clientHeight;
+                if (ch > 0 && bh > 0) {
+                    setMaxScroll(Math.max(0, ch - bh + 48));
+                }
+            }
+        };
+
+        updateHeight();
+        const t1 = setTimeout(updateHeight, 400);
+        const t2 = setTimeout(updateHeight, 1200);
+
+        const ro = new ResizeObserver(() => {
+            updateHeight();
+        });
+
+        if (contentRef.current) ro.observe(contentRef.current);
+        if (boxRef.current) ro.observe(boxRef.current);
+
+        window.addEventListener('resize', updateHeight);
+        return () => {
+            clearTimeout(t1);
+            clearTimeout(t2);
+            ro.disconnect();
+            window.removeEventListener('resize', updateHeight);
+        };
+    }, []);
+
+    // Scroll progress across the pinning track
+    const { scrollYProgress } = useScroll({
+        target: trackRef,
+        offset: ["start start", "end end"],
+    });
+
+    // Content smoothly scrolls up while box is pinned, resting briefly at bottom before box unpins
+    const contentY = useTransform(scrollYProgress, [0, 0.92], [0, -maxScroll]);
+
     return (
-        <div className="flex flex-col items-center justify-center gap-9 text-8xl text-black font-MyCustomFont3">
+        <div className="w-full flex flex-col items-center">
+            {/* Hero Headline (Scoped to MyCustomFont3) */}
+            <div className="flex flex-col items-center justify-center gap-9 text-7xl text-black font-MyCustomFont3 pt-[170px]">
 
 
             <div className='flex items-center justify-center gap-2'>
@@ -610,6 +659,53 @@ const Landing = () => {
             </div>
             <div className='flex items-center justify-center gap-2'>
                 <span>our developers . </span>
+            </div>
+        </div>
+
+        {/* Pinned Scroll Showcase Section: Holds the box fixed in screen center while inner page scrolls */}
+        <div
+            ref={trackRef}
+            className="relative w-full h-[320vh] sm:h-[360vh] mt-6 sm:mt-10 font-sans"
+        >
+                {/* Sticky Centered Device Container */}
+                <div className="sticky top-[8vh] sm:top-[10vh] w-[94%] max-w-[1400px] mx-auto z-20">
+                    <div className="w-full p-2.5 sm:p-4 bg-black/10 rounded-[28px] sm:rounded-[36px] shadow-2xl backdrop-blur-xs border border-black/10">
+                        <div
+                            ref={boxRef}
+                            className="embedded-showcase-container relative w-full h-[76vh] sm:h-[78vh] max-h-[840px] min-h-[500px] rounded-[20px] sm:rounded-[28px] overflow-hidden border border-black/90 bg-[#F0F2F6] shadow-2xl flex flex-col font-sans text-base font-normal normal-case tracking-normal text-slate-900 select-auto"
+                        >
+                            {/* Browser Mockup Header Bar */}
+                            <div className="w-full bg-white/95 backdrop-blur-md border-b border-black/[0.08] px-4 py-2.5 flex items-center justify-between shrink-0 select-none z-10">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/60 inline-block" />
+                                    <span className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/60 inline-block" />
+                                    <span className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/60 inline-block" />
+                                </div>
+                                <div className="flex items-center gap-2 px-3 sm:px-4 py-1 rounded-full bg-black/[0.04] border border-black/[0.06] text-xs font-mono text-black/75 font-medium max-w-[340px] sm:max-w-[440px] truncate shadow-inner">
+                                    <svg className="w-3 h-3 text-black/50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                    </svg>
+                                    <span className="truncate">orbix.dev/profile/u/Vineet-Chandel</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs font-mono text-black/50">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="hidden sm:inline font-semibold">LIVE PROFILE</span>
+                                </div>
+                            </div>
+
+                            {/* Viewport Window with Overflow Hidden */}
+                            <div className="relative w-full flex-1 overflow-hidden">
+                                <motion.div
+                                    ref={contentRef}
+                                    style={{ y: contentY }}
+                                    className="embedded-showcase-container w-full will-change-transform"
+                                >
+                                    <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
+                                </motion.div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
 

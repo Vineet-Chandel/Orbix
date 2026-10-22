@@ -452,7 +452,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
         <section
             ref={sectionRef}
             onWheel={handleWheel}
-            className={`relative w-full py-20 px-4 sm:px-6 lg:px-8 bg-[#07090e] text-white overflow-hidden select-none flex flex-col items-center justify-center ${className}`}
+            className={`relative w-full py-20 px-4 sm:px-6 lg:px-8 text-black overflow-hidden select-none flex flex-col items-center justify-center ${className}`}
         >
             {/* Deep Ambient Background Glows */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-indigo-600/10 rounded-full blur-[180px] pointer-events-none -z-10" />
@@ -464,7 +464,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                 <div className="text-center max-w-4xl mx-auto mb-12 sm:mb-16 relative z-10">
 
 
-                    <h2 className="text-3xl sm:text-5xl md:text-6xl font-black text-white tracking-tight leading-tight">
+                    <h2 className="text-3xl sm:text-5xl md:text-6xl font-black text-black tracking-tight leading-tight">
                         {title.includes("every platform") ? (
                             <>
                                 Connect{" "}
@@ -756,7 +756,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                             {/* Pure White Orbix Brand Star Emblem */}
                             <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
                                 <svg
-                                    className="w-full h-full text-white drop-shadow-[0_4px_16px_rgba(134,59,255,0.75)]"
+                                    className="w-full h-full text-black drop-shadow-[0_4px_16px_rgba(134,59,255,0.75)]"
                                     viewBox="0 0 271 270"
                                     fill="none"
                                     xmlns="http://www.w3.org/2000/svg"

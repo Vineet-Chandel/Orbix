@@ -19,6 +19,16 @@ import {
     invalidateAllUserCaches,
 } from "../../redis/cache/cache-profile.js";
 import { deleteUserDetailsCache } from "../../redis/cache/cache-auth.js";
+import {
+    getCachedResumeMetadata,
+    setCachedResumeMetadata,
+    getCachedPublicResumeMetadata,
+    setCachedPublicResumeMetadata,
+    invalidateAllResumeCaches,
+    getCachedPdfBuffer,
+    setCachedPdfBuffer,
+    type ResumePayload,
+} from "../../redis/cache/cache-resume.js";
 
 const resumeRouter = express.Router();
 
@@ -137,15 +147,64 @@ export const generateSignedResumeUrl = (
 };
 
 /**
- * Streams a remote PDF URL directly to the Express response pipe, ensuring
- * proper headers for browser inline viewing or file downloading.
+ * High-performance PDF streaming with Redis buffer cache, ETag 304 revalidation,
+ * and HTTP 206 Partial Content byte-range support.
  */
-const streamPdf = (
+const streamPdfWithCache = async (
     url: string,
+    publicId: string | null,
     res: Response,
+    req: Request,
     filename: string,
     isDownload: boolean = false
 ) => {
+    const disposition = isDownload ? "attachment" : "inline";
+
+    // 1. Check Redis Binary Buffer Cache
+    if (publicId) {
+        const cached = await getCachedPdfBuffer(publicId);
+        if (cached && cached.buffer && cached.buffer.length > 0) {
+            // Check ETag for 304 Not Modified
+            const ifNoneMatch = req.headers["if-none-match"];
+            if (ifNoneMatch && (ifNoneMatch === cached.etag || ifNoneMatch === `W/${cached.etag}`)) {
+                return res.status(304).end();
+            }
+
+            res.setHeader("Content-Type", "application/pdf");
+            res.setHeader(
+                "Content-Disposition",
+                `${disposition}; filename="${encodeURIComponent(filename)}"`
+            );
+            res.setHeader("ETag", cached.etag);
+            res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+            res.setHeader("Accept-Ranges", "bytes");
+
+            // HTTP 206 Byte-Range Request Handling
+            const rangeHeader = req.headers.range;
+            if (rangeHeader) {
+                const parts = rangeHeader.replace(/bytes=/, "").split("-");
+                const total = cached.buffer.length;
+                const start = parseInt(parts[0] || "0", 10);
+                const end = parts[1] ? parseInt(parts[1], 10) : total - 1;
+
+                if (start >= total || end >= total || start > end) {
+                    res.setHeader("Content-Range", `bytes */${total}`);
+                    return res.status(416).end();
+                }
+
+                const chunk = cached.buffer.subarray(start, end + 1);
+                res.status(206);
+                res.setHeader("Content-Range", `bytes ${start}-${end}/${total}`);
+                res.setHeader("Content-Length", chunk.length);
+                return res.end(chunk);
+            }
+
+            res.setHeader("Content-Length", cached.buffer.length);
+            return res.status(200).end(cached.buffer);
+        }
+    }
+
+    // 2. Cache Miss: Stream from Cloudinary origin while capturing buffer for Redis
     const protocol = url.startsWith("https") ? https : http;
     const clientReq = protocol.get(url, (cldRes) => {
         if (cldRes.statusCode && cldRes.statusCode >= 400) {
@@ -156,18 +215,50 @@ const streamPdf = (
             });
         }
 
-        const disposition = isDownload ? "attachment" : "inline";
+        const etag = cldRes.headers.etag || `"${crypto.randomBytes(16).toString("hex")}"`;
+
+        // Check If-None-Match
+        if (req.headers["if-none-match"] && req.headers["if-none-match"] === etag) {
+            cldRes.resume(); // drain stream
+            return res.status(304).end();
+        }
+
         res.setHeader("Content-Type", "application/pdf");
         res.setHeader(
             "Content-Disposition",
             `${disposition}; filename="${encodeURIComponent(filename)}"`
         );
+        res.setHeader("ETag", etag);
+        res.setHeader("Cache-Control", "public, max-age=86400, stale-while-revalidate=604800");
+        res.setHeader("Accept-Ranges", "bytes");
+
         if (cldRes.headers["content-length"]) {
             res.setHeader("Content-Length", cldRes.headers["content-length"]);
         }
-        res.setHeader("Cache-Control", "public, max-age=3600");
 
+        // Forward status code (e.g. 200 or 206)
+        res.status(cldRes.statusCode || 200);
+
+        // Pipe directly to client response
         cldRes.pipe(res);
+
+        // Collect chunks in background to populate Redis cache for subsequent sub-5ms views
+        if (publicId) {
+            const chunks: Buffer[] = [];
+            let totalBytes = 0;
+            cldRes.on("data", (chunk: Buffer) => {
+                if (totalBytes <= DEFAULT_RESUME_MAX_BYTES) {
+                    chunks.push(chunk);
+                    totalBytes += chunk.length;
+                }
+            });
+            cldRes.on("end", () => {
+                if (totalBytes > 0 && totalBytes <= DEFAULT_RESUME_MAX_BYTES) {
+                    const fullBuffer = Buffer.concat(chunks);
+                    setCachedPdfBuffer(publicId, fullBuffer, etag).catch(() => {});
+                }
+            });
+        }
     });
 
     clientReq.on("error", (err) => {
@@ -200,9 +291,11 @@ export const handleStreamResume = async (
             if (usernameParam === "vineet-chandel" || usernameParam === "demo") {
                 const demoUrl =
                     "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
-                return streamPdf(
+                return streamPdfWithCache(
                     demoUrl,
+                    "demo_resume_vineet",
                     res,
+                    req,
                     "Vineet_Chandel_FullStack_Resume.pdf",
                     isDownload
                 );
@@ -225,17 +318,32 @@ export const handleStreamResume = async (
                     .status(401)
                     .json({ success: false, message: "Authentication required" });
             }
-            querySql = `
-                SELECT
-                    resume_public_id AS "resumePublicId",
-                    resume_url AS "resumeUrl",
-                    resume_filename AS "resumeFilename",
-                    is_resume_public AS "isResumePublic",
-                    is_public AS "isPublic"
-                FROM users
-                WHERE id = $1 OR username = $2
-                LIMIT 1;`;
-            queryParams = [authUser.id || null, authUser.username];
+
+            if (authUser.id) {
+                querySql = `
+                    SELECT
+                        resume_public_id AS "resumePublicId",
+                        resume_url AS "resumeUrl",
+                        resume_filename AS "resumeFilename",
+                        is_resume_public AS "isResumePublic",
+                        is_public AS "isPublic"
+                    FROM users
+                    WHERE id = $1
+                    LIMIT 1;`;
+                queryParams = [authUser.id];
+            } else {
+                querySql = `
+                    SELECT
+                        resume_public_id AS "resumePublicId",
+                        resume_url AS "resumeUrl",
+                        resume_filename AS "resumeFilename",
+                        is_resume_public AS "isResumePublic",
+                        is_public AS "isPublic"
+                    FROM users
+                    WHERE username = $1
+                    LIMIT 1;`;
+                queryParams = [authUser.username];
+            }
         }
 
         const result = await query(querySql, queryParams);
@@ -256,9 +364,17 @@ export const handleStreamResume = async (
             ? generateSignedResumeUrl(row.resumePublicId, 7200, isDownload)
             : row.resumeUrl;
 
-        return streamPdf(
+        // If redirect mode is requested via ?redirect=true, issue instant 302 Found redirect
+        if (req.query.redirect === "true" && signedUrl) {
+            res.setHeader("Cache-Control", "public, max-age=3600");
+            return res.redirect(302, signedUrl);
+        }
+
+        return streamPdfWithCache(
             signedUrl,
+            row.resumePublicId,
             res,
+            req,
             row.resumeFilename || "resume.pdf",
             isDownload
         );
@@ -272,7 +388,7 @@ export const handleStreamResume = async (
 
 /**
  * GET /api/profile/resume
- * Retrieves the current authenticated user's resume status, details, and checks
+ * Blazing fast, scalable resume retrieval with multi-tier Redis caching
  */
 export const handleGetResume = async (req: Request, res: Response) => {
     try {
@@ -281,20 +397,50 @@ export const handleGetResume = async (req: Request, res: Response) => {
             return res.status(401).json({ success: false, message: "Authentication required" });
         }
 
-        const result = await query(
-            `SELECT
-                resume_url AS "resumeUrl",
-                resume_public_id AS "resumePublicId",
-                resume_filename AS "resumeFilename",
-                resume_filesize AS "resumeFilesize",
-                resume_updated_at AS "resumeUpdatedAt",
-                is_resume_public AS "isResumePublic",
-                resume_metadata AS "resumeMetadata"
-             FROM users
-             WHERE id = $1 OR username = $2
-             LIMIT 1;`,
-            [authUser.id || null, authUser.username]
-        );
+        const cacheIdentifier = authUser.id || authUser.username;
+
+        // 1. Check Redis Cache First (<2ms response)
+        const cachedPayload = await getCachedResumeMetadata(cacheIdentifier);
+        if (cachedPayload) {
+            res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=300");
+            res.setHeader("X-Cache", "HIT");
+            return res.status(200).json(cachedPayload);
+        }
+
+        // 2. Cache Miss: Execute fast indexed single-field query
+        let querySql = "";
+        let queryParams: any[] = [];
+        if (authUser.id) {
+            querySql = `
+                SELECT
+                    resume_url AS "resumeUrl",
+                    resume_public_id AS "resumePublicId",
+                    resume_filename AS "resumeFilename",
+                    resume_filesize AS "resumeFilesize",
+                    resume_updated_at AS "resumeUpdatedAt",
+                    is_resume_public AS "isResumePublic",
+                    resume_metadata AS "resumeMetadata"
+                FROM users
+                WHERE id = $1
+                LIMIT 1;`;
+            queryParams = [authUser.id];
+        } else {
+            querySql = `
+                SELECT
+                    resume_url AS "resumeUrl",
+                    resume_public_id AS "resumePublicId",
+                    resume_filename AS "resumeFilename",
+                    resume_filesize AS "resumeFilesize",
+                    resume_updated_at AS "resumeUpdatedAt",
+                    is_resume_public AS "isResumePublic",
+                    resume_metadata AS "resumeMetadata"
+                FROM users
+                WHERE username = $1
+                LIMIT 1;`;
+            queryParams = [authUser.username];
+        }
+
+        const result = await query(querySql, queryParams);
 
         if (result.rowCount === 0) {
             return res.status(404).json({ success: false, message: "User not found" });
@@ -311,8 +457,7 @@ export const handleGetResume = async (req: Request, res: Response) => {
             ? evaluateResumeChecks(row.resumeFilename || "resume.pdf", row.resumeFilesize || 1024 * 500, true)
             : [];
 
-        return res.status(200).json({
-            success: true,
+        const payload: ResumePayload = {
             hasResume,
             resumeUrl: signedUrl || `/api/profile/resume/view`,
             viewUrl: `/api/profile/resume/view`,
@@ -325,6 +470,19 @@ export const handleGetResume = async (req: Request, res: Response) => {
             isResumePublic: row.isResumePublic !== false,
             checks,
             metadata: row.resumeMetadata || {},
+        };
+
+        // 3. Populate Redis Cache asynchronously
+        setCachedResumeMetadata(cacheIdentifier, payload).catch(() => {});
+        if (authUser.username && authUser.id) {
+            setCachedResumeMetadata(authUser.username, payload).catch(() => {});
+        }
+
+        res.setHeader("Cache-Control", "private, max-age=60, stale-while-revalidate=300");
+        res.setHeader("X-Cache", "MISS");
+        return res.status(200).json({
+            success: true,
+            ...payload,
         });
     } catch (err: any) {
         console.error("handleGetResume error:", err);
@@ -365,13 +523,10 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
         assertCloudinaryConfigured();
 
         // 1. Fetch current resume to queue old asset cleanup if replacing
-        const existingResult = await query(
-            `SELECT resume_public_id AS "resumePublicId", resume_url AS "resumeUrl"
-             FROM users
-             WHERE id = $1 OR username = $2
-             LIMIT 1;`,
-            [authUser.id || null, authUser.username]
-        );
+        const existingQuery = authUser.id
+            ? `SELECT resume_public_id AS "resumePublicId", resume_url AS "resumeUrl" FROM users WHERE id = $1 LIMIT 1;`
+            : `SELECT resume_public_id AS "resumePublicId", resume_url AS "resumeUrl" FROM users WHERE username = $1 LIMIT 1;`;
+        const existingResult = await query(existingQuery, [authUser.id || authUser.username]);
         const oldPublicId = existingResult.rows[0]?.resumePublicId;
 
         // 2. Generate a clean, unique Cloudinary public ID for the PDF
@@ -380,7 +535,7 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
         const safeUserId = (authUser.id || authUser.username || "user").replace(/[^a-zA-Z0-9_-]/g, "");
         const publicId = `${DEFAULT_RESUME_FOLDER}/resume_${safeUserId}_${timestamp}_${randomHex}`;
 
-        // 3. Upload file buffer stream to Cloudinary as raw / auto resource
+        // 3. Upload file buffer stream to Cloudinary as raw resource
         const uploadResult = await new Promise<any>((resolve, reject) => {
             const uploadStream = cloudinary.uploader.upload_stream(
                 {
@@ -409,29 +564,40 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
         const checks = evaluateResumeChecks(originalName, filesize, true);
 
         // 4. Update users table in PostgreSQL
-        await query(
-            `UPDATE users
-             SET resume_url = $1,
-                 resume_public_id = $2,
-                 resume_filename = $3,
-                 resume_filesize = $4,
-                 resume_updated_at = $5,
-                 is_resume_public = true,
-                 resume_metadata = $6
-             WHERE id = $7 OR username = $8;`,
-            [
-                secureUrl,
-                publicId,
-                originalName,
-                filesize,
-                updatedAt,
-                JSON.stringify({ checks, uploadResultVersion: uploadResult.version }),
-                authUser.id || null,
-                authUser.username,
-            ]
-        );
+        const updateSql = authUser.id
+            ? `UPDATE users
+               SET resume_url = $1,
+                   resume_public_id = $2,
+                   resume_filename = $3,
+                   resume_filesize = $4,
+                   resume_updated_at = $5,
+                   is_resume_public = true,
+                   resume_metadata = $6
+               WHERE id = $7;`
+            : `UPDATE users
+               SET resume_url = $1,
+                   resume_public_id = $2,
+                   resume_filename = $3,
+                   resume_filesize = $4,
+                   resume_updated_at = $5,
+                   is_resume_public = true,
+                   resume_metadata = $6
+               WHERE username = $7;`;
 
-        // 5. Asynchronously clean up superseded old resume asset if present
+        await query(updateSql, [
+            secureUrl,
+            publicId,
+            originalName,
+            filesize,
+            updatedAt,
+            JSON.stringify({ checks, uploadResultVersion: uploadResult.version }),
+            authUser.id || authUser.username,
+        ]);
+
+        // 5. Asynchronously cache binary buffer in Redis for instantaneous immediate preview
+        setCachedPdfBuffer(publicId, file.buffer).catch(() => {});
+
+        // 6. Clean up superseded old resume asset if present
         if (oldPublicId && oldPublicId !== publicId) {
             destroyCloudinaryAsset(oldPublicId, "raw").catch(() => {
                 query(
@@ -443,8 +609,13 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
             });
         }
 
-        // 6. Invalidate caches
+        // 7. Invalidate and re-warm caches
         await Promise.allSettled([
+            invalidateAllResumeCaches({
+                id: authUser.id,
+                username: authUser.username,
+                publicId: oldPublicId,
+            }),
             invalidatePublicProfileCache(authUser.username),
             invalidatePrivateProfileCache(authUser.id || authUser.username),
             invalidateAllUserCaches({ id: authUser.id, username: authUser.username, gmail: authUser.gmail }),
@@ -453,22 +624,31 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
 
         const signedUrl = generateSignedResumeUrl(publicId, 86400, false);
 
+        const newResumePayload: ResumePayload = {
+            hasResume: true,
+            resumeUrl: signedUrl || secureUrl,
+            viewUrl: "/api/profile/resume/view",
+            downloadUrl: "/api/profile/resume/download",
+            signedUrl,
+            rawUrl: secureUrl,
+            resumeFilename: originalName,
+            resumeFilesize: filesize,
+            resumeUpdatedAt: updatedAt.toISOString(),
+            isResumePublic: true,
+            checks,
+            metadata: { checks, uploadResultVersion: uploadResult.version },
+        };
+
+        // Pre-warm metadata cache
+        setCachedResumeMetadata(authUser.id || authUser.username, newResumePayload).catch(() => {});
+        if (authUser.username && authUser.id) {
+            setCachedResumeMetadata(authUser.username, newResumePayload).catch(() => {});
+        }
+
         return res.status(200).json({
             success: true,
             message: "Resume uploaded successfully",
-            resume: {
-                hasResume: true,
-                resumeUrl: signedUrl || secureUrl,
-                viewUrl: "/api/profile/resume/view",
-                downloadUrl: "/api/profile/resume/download",
-                signedUrl,
-                rawUrl: secureUrl,
-                resumeFilename: originalName,
-                resumeFilesize: filesize,
-                resumeUpdatedAt: updatedAt.toISOString(),
-                isResumePublic: true,
-                checks,
-            },
+            resume: newResumePayload,
         });
     } catch (err: any) {
         console.error("handleDirectResumeUpload error:", err);
@@ -490,13 +670,10 @@ export const handleDeleteResume = async (req: Request, res: Response) => {
             return res.status(401).json({ success: false, message: "Authentication required" });
         }
 
-        const existingResult = await query(
-            `SELECT resume_public_id AS "resumePublicId", resume_url AS "resumeUrl"
-             FROM users
-             WHERE id = $1 OR username = $2
-             LIMIT 1;`,
-            [authUser.id || null, authUser.username]
-        );
+        const existingQuery = authUser.id
+            ? `SELECT resume_public_id AS "resumePublicId", resume_url AS "resumeUrl" FROM users WHERE id = $1 LIMIT 1;`
+            : `SELECT resume_public_id AS "resumePublicId", resume_url AS "resumeUrl" FROM users WHERE username = $1 LIMIT 1;`;
+        const existingResult = await query(existingQuery, [authUser.id || authUser.username]);
 
         if (existingResult.rowCount === 0) {
             return res.status(404).json({ success: false, message: "User not found" });
@@ -512,20 +689,33 @@ export const handleDeleteResume = async (req: Request, res: Response) => {
         }
 
         // 2. Clear resume fields in database
-        await query(
-            `UPDATE users
-             SET resume_url = NULL,
-                 resume_public_id = NULL,
-                 resume_filename = NULL,
-                 resume_filesize = NULL,
-                 resume_updated_at = NULL,
-                 resume_metadata = '{}'::jsonb
-             WHERE id = $1 OR username = $2;`,
-            [authUser.id || null, authUser.username]
-        );
+        const clearSql = authUser.id
+            ? `UPDATE users
+               SET resume_url = NULL,
+                   resume_public_id = NULL,
+                   resume_filename = NULL,
+                   resume_filesize = NULL,
+                   resume_updated_at = NULL,
+                   resume_metadata = '{}'::jsonb
+               WHERE id = $1;`
+            : `UPDATE users
+               SET resume_url = NULL,
+                   resume_public_id = NULL,
+                   resume_filename = NULL,
+                   resume_filesize = NULL,
+                   resume_updated_at = NULL,
+                   resume_metadata = '{}'::jsonb
+               WHERE username = $1;`;
+
+        await query(clearSql, [authUser.id || authUser.username]);
 
         // 3. Invalidate caches
         await Promise.allSettled([
+            invalidateAllResumeCaches({
+                id: authUser.id,
+                username: authUser.username,
+                publicId,
+            }),
             invalidatePublicProfileCache(authUser.username),
             invalidatePrivateProfileCache(authUser.id || authUser.username),
             invalidateAllUserCaches({ id: authUser.id, username: authUser.username, gmail: authUser.gmail }),
@@ -556,14 +746,14 @@ export const handleToggleResumeVisibility = async (req: Request, res: Response) 
         const { isPublic } = req.body;
         const newVisibility = typeof isPublic === "boolean" ? isPublic : true;
 
-        await query(
-            `UPDATE users
-             SET is_resume_public = $1
-             WHERE id = $2 OR username = $3;`,
-            [newVisibility, authUser.id || null, authUser.username]
-        );
+        const updateSql = authUser.id
+            ? `UPDATE users SET is_resume_public = $1 WHERE id = $2;`
+            : `UPDATE users SET is_resume_public = $1 WHERE username = $2;`;
+
+        await query(updateSql, [newVisibility, authUser.id || authUser.username]);
 
         await Promise.allSettled([
+            invalidateAllResumeCaches({ id: authUser.id, username: authUser.username }),
             invalidatePublicProfileCache(authUser.username),
             invalidatePrivateProfileCache(authUser.id || authUser.username),
             invalidateAllUserCaches({ id: authUser.id, username: authUser.username, gmail: authUser.gmail }),
@@ -582,7 +772,7 @@ export const handleToggleResumeVisibility = async (req: Request, res: Response) 
 
 /**
  * GET /api/profile/public/:username/resume
- * Publicly view or retrieve the resume URL of a developer if public sharing is enabled
+ * Publicly view or retrieve the resume URL of a developer with Redis caching
  */
 export const handleGetPublicResume = async (req: Request, res: Response) => {
     try {
@@ -593,17 +783,33 @@ export const handleGetPublicResume = async (req: Request, res: Response) => {
 
         // Demo profile support
         if (username === "vineet-chandel" || username === "demo") {
-            return res.status(200).json({
+            const demoPayload = {
                 success: true,
                 hasResume: true,
                 resumeUrl: "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf",
+                viewUrl: `/api/profile/resume/view/demo`,
+                downloadUrl: `/api/profile/resume/download/demo`,
                 resumeFilename: "Vineet_Chandel_FullStack_Resume.pdf",
                 resumeFilesize: 1420000,
                 resumeUpdatedAt: "2026-02-15T00:00:00.000Z",
                 isResumePublic: true,
+            };
+            res.setHeader("Cache-Control", "public, max-age=3600");
+            return res.status(200).json(demoPayload);
+        }
+
+        // 1. Check Redis Cache First (<2ms)
+        const cachedPayload = await getCachedPublicResumeMetadata(username);
+        if (cachedPayload) {
+            res.setHeader("Cache-Control", "public, max-age=180, stale-while-revalidate=900");
+            res.setHeader("X-Cache", "HIT");
+            return res.status(200).json({
+                success: true,
+                ...cachedPayload,
             });
         }
 
+        // 2. Query DB with functional index on LOWER(username)
         const result = await query(
             `SELECT
                 resume_url AS "resumeUrl",
@@ -632,8 +838,7 @@ export const handleGetPublicResume = async (req: Request, res: Response) => {
             ? generateSignedResumeUrl(row.resumePublicId, 86400, false)
             : row.resumeUrl;
 
-        return res.status(200).json({
-            success: true,
+        const payload: ResumePayload = {
             hasResume: true,
             resumeUrl: signedUrl || `/api/profile/resume/view/${encodeURIComponent(username)}`,
             viewUrl: `/api/profile/resume/view/${encodeURIComponent(username)}`,
@@ -644,6 +849,18 @@ export const handleGetPublicResume = async (req: Request, res: Response) => {
             resumeFilesize: row.resumeFilesize,
             resumeUpdatedAt: row.resumeUpdatedAt,
             isResumePublic: true,
+            checks: [],
+            metadata: {},
+        };
+
+        // Cache in Redis for 1 hour
+        setCachedPublicResumeMetadata(username, payload).catch(() => {});
+
+        res.setHeader("Cache-Control", "public, max-age=180, stale-while-revalidate=900");
+        res.setHeader("X-Cache", "MISS");
+        return res.status(200).json({
+            success: true,
+            ...payload,
         });
     } catch (err: any) {
         console.error("handleGetPublicResume error:", err);
