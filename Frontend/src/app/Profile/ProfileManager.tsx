@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Briefcase, Mail, Trash2, Plus, FileText } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
-import { updateProfile } from "../../utils/profileApi";
+import { updateProfile, getInstitutionById, type InstitutionItem } from "../../utils/profileApi";
+import { CollegeAutocomplete } from "../../components/CollegeAutocomplete";
 import { usePlatformSync } from "../../hooks/usePlatformSync";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { ProfilePhotoFrame } from "./ProfilePhotoFrame";
@@ -95,6 +96,7 @@ export default function ProfileManager() {
     const [newSkillInput, setNewSkillInput] = useState("");
     const [isOpenToWork, setIsOpenToWork] = useState(Boolean(user?.isOpenToWork));
     const [isHireable, setIsHireable] = useState(Boolean(user?.isHireable));
+    const [selectedCollege, setSelectedCollege] = useState<InstitutionItem | null>(user?.college || null);
     const [savingProfile, setSavingProfile] = useState(false);
 
     // Connected Platforms from localStorage / sync
@@ -174,6 +176,15 @@ export default function ProfileManager() {
             setLinks(parseInitialLinks(user));
             setIsOpenToWork(Boolean(user.isOpenToWork));
             setIsHireable(Boolean(user.isHireable));
+            if (user.college) {
+                setSelectedCollege(user.college);
+            } else if (user.collegeId) {
+                getInstitutionById(user.collegeId).then((inst) => {
+                    if (inst) setSelectedCollege(inst);
+                });
+            } else {
+                setSelectedCollege(null);
+            }
         }
     }, [user]);
 
@@ -346,8 +357,13 @@ export default function ProfileManager() {
             }
         }
 
+        // College comparison
+        const currentCollegeId = selectedCollege?.id || null;
+        const initialCollegeId = user.collegeId || user.college?.id || null;
+        if (currentCollegeId !== initialCollegeId) return true;
+
         return false;
-    }, [user, firstName, lastName, headline, bio, location, skills, links, isOpenToWork, isHireable]);
+    }, [user, firstName, lastName, headline, bio, location, skills, links, isOpenToWork, isHireable, selectedCollege]);
 
     // Handle profile save
     const handleSaveProfile = async (e: React.FormEvent) => {
@@ -378,6 +394,7 @@ export default function ProfileManager() {
                 links: sanitizedLinks,
                 isOpenToWork,
                 isHireable,
+                collegeId: selectedCollege?.id || null,
             };
 
             const updated = await updateProfile(payload);
@@ -446,6 +463,8 @@ export default function ProfileManager() {
         bio,
         location,
         skills,
+        collegeId: selectedCollege?.id || null,
+        college: selectedCollege,
         links: links.map((l) => ({
             label: l.label.trim() || "Link",
             url: sanitizePlatformUrl(l.url.trim()),
@@ -454,7 +473,7 @@ export default function ProfileManager() {
         isOpenToWork,
         isHireable,
         photoUrl: user?.photoUrl || user?.avatarUrl,
-    }), [user, firstName, lastName, headline, bio, location, skills, links, isOpenToWork, isHireable]);
+    }), [user, firstName, lastName, headline, bio, location, skills, links, isOpenToWork, isHireable, selectedCollege]);
 
     return (
         <div className="min-h-screen bg-[#F0F2F6] text-neutral-900 font-sans flex antialiased selection:bg-neutral-900 selection:text-white">
@@ -643,6 +662,23 @@ export default function ProfileManager() {
                                             value={location}
                                             onChange={(e) => setLocation(e.target.value)}
                                             className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                        />
+                                    </div>
+
+                                    {/* Verified College / University Selector */}
+                                    <div>
+                                        <div className="flex items-center justify-between mb-1">
+                                            <label className="block text-xs font-bold text-neutral-700">
+                                                College / University (Verified Directory)
+                                            </label>
+                                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                                                Official AISHE / UGC
+                                            </span>
+                                        </div>
+                                        <CollegeAutocomplete
+                                            value={selectedCollege?.id}
+                                            selectedCollege={selectedCollege}
+                                            onChange={setSelectedCollege}
                                         />
                                     </div>
 

@@ -241,6 +241,78 @@ export const testDatabaseConnection = async () => {
                 updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_photo_cleanup_queue_status ON photo_cleanup_queue(status);
+
+            -- Verified Indian Institution Directory
+            CREATE TABLE IF NOT EXISTS institutions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                official_name VARCHAR(500) NOT NULL,
+                normalized_name VARCHAR(500) NOT NULL,
+                aliases TEXT[] DEFAULT '{}',
+                aishe_code VARCHAR(50) UNIQUE,
+                state VARCHAR(100),
+                district VARCHAR(150),
+                city VARCHAR(150),
+                institution_type VARCHAR(100),
+                website VARCHAR(500),
+                verification_status VARCHAR(30) NOT NULL DEFAULT 'unverified',
+                verification_basis TEXT,
+                is_active BOOLEAN NOT NULL DEFAULT true,
+                last_verified_at TIMESTAMPTZ,
+                source_year VARCHAR(20),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_institutions_normalized_name ON institutions (normalized_name varchar_pattern_ops);
+            CREATE INDEX IF NOT EXISTS idx_institutions_status_active ON institutions (verification_status, is_active) WHERE verification_status = 'verified' AND is_active = true;
+            CREATE INDEX IF NOT EXISTS idx_institutions_state ON institutions (state);
+            CREATE INDEX IF NOT EXISTS idx_institutions_aishe_code ON institutions (aishe_code) WHERE aishe_code IS NOT NULL;
+
+            CREATE TABLE IF NOT EXISTS institution_regulatory_ids (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+                regulator VARCHAR(50) NOT NULL,
+                identifier VARCHAR(100) NOT NULL,
+                status VARCHAR(50),
+                valid_from DATE,
+                valid_until DATE,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT unique_institution_regulator UNIQUE (institution_id, regulator, identifier)
+            );
+            CREATE INDEX IF NOT EXISTS idx_institution_regulatory_ids_institution ON institution_regulatory_ids (institution_id);
+
+            CREATE TABLE IF NOT EXISTS institution_sources (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                institution_id UUID NOT NULL REFERENCES institutions(id) ON DELETE CASCADE,
+                source_name VARCHAR(200) NOT NULL,
+                source_url TEXT,
+                source_record_id VARCHAR(100),
+                source_publication_year VARCHAR(20),
+                retrieval_date DATE NOT NULL DEFAULT CURRENT_DATE,
+                verification_result VARCHAR(50) NOT NULL DEFAULT 'confirmed',
+                notes TEXT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_institution_sources_institution ON institution_sources (institution_id);
+
+            CREATE TABLE IF NOT EXISTS institution_verification_requests (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                submitted_by_user_id UUID,
+                submitted_by_username VARCHAR(100),
+                institution_name VARCHAR(500) NOT NULL,
+                institution_website VARCHAR(500),
+                supporting_reference TEXT,
+                status VARCHAR(30) NOT NULL DEFAULT 'pending',
+                admin_notes TEXT,
+                resolved_institution_id UUID REFERENCES institutions(id),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_verification_requests_status ON institution_verification_requests (status);
+            CREATE INDEX IF NOT EXISTS idx_verification_requests_user ON institution_verification_requests (submitted_by_user_id);
+
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id UUID;
+            CREATE INDEX IF NOT EXISTS idx_users_college_id ON users (college_id);
+            ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS college_id UUID;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");
     } catch (error) {

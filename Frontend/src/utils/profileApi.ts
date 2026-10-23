@@ -40,6 +40,16 @@ export interface PublicProfileData {
     resumeFilesize?: number | null;
     resumeUpdatedAt?: string | null;
     isResumePublic?: boolean;
+    college?: {
+        id: string;
+        officialName: string;
+        city?: string | null;
+        state?: string | null;
+        district?: string | null;
+        institutionType?: string | null;
+        aisheCode?: string | null;
+        verificationStatus?: string | null;
+    } | null;
     createdAt?: string;
     isOwner: boolean;
     platforms: PublicProfilePlatform[];
@@ -66,7 +76,7 @@ function getAuthHeaders(): Record<string, string> {
         "Content-Type": "application/json",
     };
     if (typeof window !== "undefined") {
-        const token = localStorage.getItem("orbix_token");
+        const token = localStorage.getItem("orbix_token") || localStorage.getItem("token");
         if (token) {
             headers["Authorization"] = `Bearer ${token}`;
         }
@@ -104,6 +114,10 @@ async function apiFetch<T = any>(
                 credentials: "include",
             });
         } catch (netErr: any) {
+            // If the request was explicitly aborted (e.g. debounced typing), do not fall back or wrap in generic Error
+            if (options?.signal?.aborted || netErr?.name === "AbortError" || String(netErr?.message || "").toLowerCase().includes("abort")) {
+                throw netErr;
+            }
             lastError = netErr?.message || "Network request failed";
             continue; // Fall back to direct backend port if network/proxy failed
         }
@@ -223,6 +237,7 @@ export async function updateProfile(payload: {
     isOpenToWork?: boolean;
     isHireable?: boolean;
     isPublic?: boolean;
+    collegeId?: string | null;
 }): Promise<any> {
     const json = await apiFetch<{ success: boolean; user: any }>("/api/profile", {
         method: "PUT",
@@ -230,6 +245,87 @@ export async function updateProfile(payload: {
     });
     invalidatePublicProfileClientCache();
     return json.user;
+}
+
+export interface InstitutionItem {
+    id: string;
+    officialName: string;
+    city?: string | null;
+    state?: string | null;
+    district?: string | null;
+    institutionType?: string | null;
+    aisheCode?: string | null;
+    verificationStatus?: "verified" | "needs_review" | "unverified" | "inactive" | string | null;
+}
+
+/**
+ * Autocomplete search for verified institutions with optional state filter and abort signal
+ */
+export async function searchInstitutions(
+    q: string,
+    options?: { state?: string; limit?: number; signal?: AbortSignal }
+): Promise<InstitutionItem[]> {
+    const clean = (q || "").trim();
+    if (clean.length < 2) return [];
+
+    const params = new URLSearchParams({ q: clean });
+    if (options?.state) params.append("state", options.state);
+    if (options?.limit) params.append("limit", String(options.limit));
+
+    const json = await apiFetch<{ success: boolean; institutions: InstitutionItem[] }>(
+        `/api/institutions/search?${params.toString()}`,
+        {
+            signal: options?.signal,
+        }
+    );
+    return json.institutions || [];
+}
+
+/**
+ * Fetch a single institution by UUID
+ */
+export async function getInstitutionById(id: string): Promise<InstitutionItem | null> {
+    try {
+        const cleanId = String(id || "").trim();
+        if (!cleanId) return null;
+        const json = await apiFetch<{ success: boolean; institution: InstitutionItem }>(
+            `/api/institutions/${encodeURIComponent(cleanId)}`
+        );
+        return json.institution || null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Submit a verification request for an unlisted or missing college
+ */
+export async function submitInstitutionVerificationRequest(payload: {
+    institutionName: string;
+    institutionWebsite?: string;
+    supportingReference?: string;
+}): Promise<{ success: boolean; message: string; requestId?: string }> {
+    return await apiFetch<{ success: boolean; message: string; requestId?: string }>(
+        "/api/institutions/verification-request",
+        {
+            method: "POST",
+            body: JSON.stringify(payload),
+        }
+    );
+}
+
+/**
+ * Fetch authenticated user's submitted verification requests
+ */
+export async function getMyInstitutionVerificationRequests(): Promise<any[]> {
+    try {
+        const json = await apiFetch<{ success: boolean; requests: any[] }>(
+            "/api/institutions/verification-requests/mine"
+        );
+        return json.requests || [];
+    } catch {
+        return [];
+    }
 }
 
 /**

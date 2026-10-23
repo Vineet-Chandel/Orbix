@@ -116,6 +116,7 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 resume_filesize AS "resumeFilesize",
                 resume_updated_at AS "resumeUpdatedAt",
                 is_resume_public AS "isResumePublic",
+                college_id AS "collegeId",
                 created_at AS "createdAt"
             FROM users
             WHERE id = $1 OR email = $2
@@ -153,10 +154,25 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
             [userRow.username, userRow.gmail]
         );
 
+        let college = null;
+        if (userRow.collegeId) {
+            const collegeRes = await query(
+                `SELECT id, official_name AS "officialName", city, state, district,
+                        institution_type AS "institutionType", aishe_code AS "aisheCode",
+                        verification_status AS "verificationStatus"
+                 FROM institutions WHERE id = $1 LIMIT 1;`,
+                [userRow.collegeId]
+            );
+            if (collegeRes.rows[0]) {
+                college = collegeRes.rows[0];
+            }
+        }
+
         return res.status(200).json({
             success: true,
             user: {
                 ...userRow,
+                college,
                 skills: Array.isArray(userRow.skills) ? userRow.skills : [],
                 links: parseLinks(userRow.links, userRow),
                 platforms: linksResult.rows || [],
@@ -206,6 +222,7 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             isOpenToWork,
             isHireable,
             isPublic,
+            collegeId,
         } = req.body;
 
         // Validation
@@ -272,7 +289,8 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 links,
                 is_open_to_work AS "isOpenToWork",
                 is_hireable AS "isHireable",
-                is_public AS "isPublic"
+                is_public AS "isPublic",
+                college_id AS "collegeId"
              FROM users
              WHERE id = $1 OR email = $2
              LIMIT 1;`,
@@ -287,6 +305,34 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
         }
 
         const current = currentRes.rows[0];
+
+        // Validate college_id if provided
+        let sanitizedCollegeId: string | null | undefined = undefined;
+        if (collegeId !== undefined) {
+            if (collegeId === null || collegeId === "" || collegeId === "null") {
+                sanitizedCollegeId = null; // Allow clearing college selection
+            } else {
+                const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                if (!uuidRegex.test(String(collegeId))) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Invalid college ID format",
+                    });
+                }
+                // Verify institution exists, is verified and active
+                const instCheck = await query(
+                    `SELECT id FROM institutions WHERE id = $1 AND verification_status = 'verified' AND is_active = true LIMIT 1;`,
+                    [collegeId]
+                );
+                if (instCheck.rows.length === 0) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Selected institution is not verified or not active",
+                    });
+                }
+                sanitizedCollegeId = String(collegeId);
+            }
+        }
 
         const hasTextDiff = (incoming: string | null | undefined, existing: string | null | undefined) => {
             const inc = incoming !== undefined && incoming !== null ? String(incoming).trim() : "";
@@ -361,6 +407,8 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             }
         }
 
+        const isCollegeChanged = collegeId !== undefined && sanitizedCollegeId !== (current.collegeId || null);
+
         const hasAnyChanges =
             isFirstNameChanged ||
             isLastNameChanged ||
@@ -377,7 +425,8 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             isIsHireableChanged ||
             isIsPublicChanged ||
             isSkillsChanged ||
-            isLinksChanged;
+            isLinksChanged ||
+            isCollegeChanged;
 
         if (!hasAnyChanges) {
             return res.status(400).json({
@@ -402,6 +451,7 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
         const finalLinksJson = links !== undefined ? (sanitizedLinksJson || "[]") : (current.links ? (typeof current.links === "string" ? current.links : JSON.stringify(current.links)) : "[]");
         const finalIsOpenToWork = typeof isOpenToWork === "boolean" ? sanitizedIsOpenToWork : current.isOpenToWork;
         const finalIsHireable = typeof isHireable === "boolean" ? sanitizedIsHireable : current.isHireable;
+        const finalCollegeId = collegeId !== undefined ? sanitizedCollegeId : current.collegeId;
 
         const updateResult = await query(
             `UPDATE users
@@ -422,8 +472,9 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 links = COALESCE($14::jsonb, '[]'::jsonb),
                 is_open_to_work = COALESCE($15, false),
                 is_hireable = COALESCE($16, false),
+                college_id = $17,
                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $17 OR email = $18
+             WHERE id = $18 OR email = $19
              RETURNING
                 id,
                 username,
@@ -446,6 +497,7 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 is_open_to_work AS "isOpenToWork",
                 is_hireable AS "isHireable",
                 is_public AS "isPublic",
+                college_id AS "collegeId",
                 updated_at AS "updatedAt";`,
             [
                 finalFirstName || null,
@@ -464,6 +516,7 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 finalLinksJson,
                 finalIsOpenToWork,
                 finalIsHireable,
+                finalCollegeId,
                 authUser.id,
                 authUser.gmail,
             ]
@@ -478,6 +531,21 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
 
         const updatedUser = updateResult.rows[0];
 
+        // Fetch college details if user selected an institution
+        let college = null;
+        if (updatedUser.collegeId) {
+            const collegeRes = await query(
+                `SELECT id, official_name AS "officialName", city, state, district,
+                        institution_type AS "institutionType", aishe_code AS "aisheCode",
+                        verification_status AS "verificationStatus"
+                 FROM institutions WHERE id = $1 LIMIT 1;`,
+                [updatedUser.collegeId]
+            );
+            if (collegeRes.rows[0]) {
+                college = collegeRes.rows[0];
+            }
+        }
+
         // Invalidate Redis caches
         await invalidateAllUserCaches({
             id: authUser.id,
@@ -490,6 +558,7 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             message: "Profile updated successfully",
             user: {
                 ...updatedUser,
+                college,
                 skills: Array.isArray(updatedUser.skills) ? updatedUser.skills : [],
                 links: parseLinks(updatedUser.links, updatedUser),
             },
@@ -725,6 +794,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 is_open_to_work AS "isOpenToWork",
                 is_hireable AS "isHireable",
                 is_public AS "isPublic",
+                college_id AS "collegeId",
                 resume_url AS "resumeUrl",
                 resume_filename AS "resumeFilename",
                 resume_filesize AS "resumeFilesize",
@@ -769,6 +839,20 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
 
         const canonicalAvatar = userRow.photoUrl || userRow.avatarUrl || null;
 
+        let college = null;
+        if (userRow.collegeId) {
+            const collegeRes = await query(
+                `SELECT id, official_name AS "officialName", city, state, district,
+                        institution_type AS "institutionType", aishe_code AS "aisheCode",
+                        verification_status AS "verificationStatus"
+                 FROM institutions WHERE id = $1 LIMIT 1;`,
+                [userRow.collegeId]
+            );
+            if (collegeRes.rows[0]) {
+                college = collegeRes.rows[0];
+            }
+        }
+
         const publicProfilePayload: PublicProfilePayload = {
             id: userRow.id,
             username: userRow.username,
@@ -787,6 +871,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             location: userRow.location,
             skills: Array.isArray(userRow.skills) ? userRow.skills : [],
             links: parseLinks(userRow.links, userRow),
+            college,
             isOpenToWork: userRow.isOpenToWork === true,
             isHireable: userRow.isHireable === true,
             isPublic: userRow.isPublic !== false,

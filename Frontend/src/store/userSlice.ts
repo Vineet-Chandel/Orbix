@@ -36,6 +36,18 @@ export interface User {
     resumeUpdatedAt?: string | null;
     isResumePublic?: boolean;
     resumeMetadata?: Record<string, any> | null;
+    // Verified College / Institution
+    collegeId?: string | null;
+    college?: {
+        id: string;
+        officialName: string;
+        city?: string | null;
+        state?: string | null;
+        district?: string | null;
+        institutionType?: string | null;
+        aisheCode?: string | null;
+        verificationStatus?: "verified" | "needs_review" | "unverified" | "inactive" | string;
+    } | null;
 }
 
 export interface UserState {

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
-import { isDemoProfileUsername, demoBadgesData } from "../data/demoProfileData";
+import { isDemoProfileUsername, demoBadgesData, DEMO_USERNAME } from "../data/demoProfileData";
 
 export interface UnifiedBadgeRecord {
     id: string;
@@ -48,13 +48,26 @@ const saveStoredBadges = (data: Record<string, UnifiedBadgesData>) => {
     }
 };
 
-const initialData = getStoredBadges();
+const initialData: Record<string, UnifiedBadgesData> = {
+    [DEMO_USERNAME]: demoBadgesData,
+    "vineet-chandel": demoBadgesData,
+    "vineetchandel": demoBadgesData,
+    "vineet_chandel": demoBadgesData,
+    "demo": demoBadgesData,
+    ...getStoredBadges(),
+};
 
 const initialState: BadgesState = {
     dataByUser: initialData,
     loadingByUser: {},
     errorByUser: {},
-    lastFetchedAtByUser: {},
+    lastFetchedAtByUser: {
+        [DEMO_USERNAME]: Date.now(),
+        "vineet-chandel": Date.now(),
+        "vineetchandel": Date.now(),
+        "vineet_chandel": Date.now(),
+        "demo": Date.now(),
+    },
 };
 
 export const fetchUnifiedBadges = createAsyncThunk<
@@ -69,8 +82,36 @@ export const fetchUnifiedBadges = createAsyncThunk<
             return rejectWithValue("Username is required to fetch badges");
         }
 
-        // Instantly return enhanced mock data for demo profile
-        if (isDemoProfileUsername(effectiveUser)) {
+        // Instantly return enhanced data for demo profile, attempting live server sync for vineet_chandel first
+        if (isDemoProfileUsername(effectiveUser) || effectiveUser.toLowerCase() === "vineet_chandel") {
+            try {
+                const endpoints = [
+                    `/api/portals/badges/unified?username=vineet_chandel`,
+                    `http://localhost:3000/api/portals/badges/unified?username=vineet_chandel`,
+                ];
+                for (const url of endpoints) {
+                    try {
+                        const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.success && Array.isArray(data.badges) && data.badges.length > 0) {
+                                return {
+                                    username: effectiveUser,
+                                    totalEarned: data.totalEarned || data.badges.length,
+                                    platformCounts: data.platformCounts || {},
+                                    badges: data.badges,
+                                    timestamp: data.timestamp || new Date().toISOString(),
+                                };
+                            }
+                        }
+                    } catch {
+                        // try next
+                    }
+                }
+            } catch {
+                // fallback to demoBadgesData
+            }
+
             return {
                 ...demoBadgesData,
                 username: effectiveUser,

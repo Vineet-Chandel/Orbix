@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Repeat, Code2, GitBranch, Briefcase, Mail, MapPin, ExternalLink, Share2, CreditCard, Check, ArrowRight, FileText, Download, Eye, X } from "lucide-react";
+import { Repeat, Code2, GitBranch, Briefcase, Mail, MapPin, ExternalLink, Share2, CreditCard, Check, ArrowRight, FileText, Download, Eye, X, GraduationCap, ShieldCheck } from "lucide-react";
 import { fetchPublicProfile, type PublicProfileData } from "../../utils/profileApi";
 import { isDemoProfileUsername, demoPublicProfile, demoConnectedPortals } from "../../data/demoProfileData";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
@@ -24,6 +24,44 @@ import { PracticeAnalyticsSection } from "../Dashboard/PracticeAnalytics/Practic
 import { ContestPerformanceSection } from "../Dashboard/ContestPerformanceSection";
 import { DevelopmentContributionsTable } from "../Dashboard/DevelopmentContributionsTable";
 import { DevelopmentAnalyticsSection } from "../Dashboard/DevelopmentAnalytics/DevelopmentAnalyticsSection";
+
+export const getCleanDisplayHandle = (url: string, label?: string, platform?: string): string => {
+    try {
+        const clean = url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+        const lower = (platform || label || "").toLowerCase();
+
+        // GitHub: github.com/username -> @username
+        if (lower.includes("github") || clean.includes("github.com/")) {
+            const parts = clean.split("/");
+            if (parts.length >= 2 && parts[1]) return `@${parts[1]}`;
+        }
+        // LeetCode: leetcode.com/u/username or leetcode.com/username -> @username
+        if (lower.includes("leetcode") || clean.includes("leetcode.com/")) {
+            const match = clean.match(/leetcode\.com\/(?:u\/)?([^\/?#]+)/);
+            if (match && match[1]) return `@${match[1]}`;
+        }
+        // LinkedIn: linkedin.com/in/username -> in/username
+        if (lower.includes("linkedin") || clean.includes("linkedin.com/")) {
+            const match = clean.match(/linkedin\.com\/in\/([^\/?#]+)/);
+            if (match && match[1]) return `in/${match[1]}`;
+        }
+        // Codeforces: codeforces.com/profile/username -> @username
+        if (lower.includes("codeforces") || clean.includes("codeforces.com/")) {
+            const match = clean.match(/codeforces\.com\/profile\/([^\/?#]+)/);
+            if (match && match[1]) return `@${match[1]}`;
+        }
+        // Twitter / X: x.com/username or twitter.com/username -> @username
+        if (lower.includes("twitter") || lower.includes("x.com") || clean.includes("twitter.com/") || clean.includes("x.com/")) {
+            const parts = clean.split("/");
+            if (parts.length >= 2 && parts[1]) return `@${parts[1]}`;
+        }
+        // General website/portfolio: display host only (e.g. orbix.dev or myportfolio.io)
+        const host = clean.split("/")[0] || clean;
+        return host.replace(/^www\./, "");
+    } catch {
+        return url.replace(/^https?:\/\//, "").replace(/\/$/, "");
+    }
+};
 
 export interface PublicProfilePageProps {
     overrideUsername?: string;
@@ -217,6 +255,61 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
         return legacy.slice(0, 4);
     }, [profile]);
 
+    // Smart Layout Measurement:
+    // Determine whether the right details card exceeds the LinkedIn 3D card height.
+    const rightDetailsRef = useRef<HTMLDivElement>(null);
+    const [rightDetailsHeight, setRightDetailsHeight] = useState<number>(0);
+    const [isDesktop, setIsDesktop] = useState<boolean>(() => {
+        if (typeof window !== "undefined") {
+            return window.innerWidth >= 1024;
+        }
+        return true;
+    });
+
+    useEffect(() => {
+        const handleResize = () => {
+            setIsDesktop(window.innerWidth >= 1024);
+        };
+        window.addEventListener("resize", handleResize);
+        return () => window.removeEventListener("resize", handleResize);
+    }, []);
+
+    useEffect(() => {
+        const updateDetailsHeight = () => {
+            if (rightDetailsRef.current) {
+                const h = rightDetailsRef.current.offsetHeight;
+                if (h > 0) setRightDetailsHeight(h);
+            }
+        };
+
+        updateDetailsHeight();
+        window.addEventListener("resize", updateDetailsHeight);
+        const ro = new ResizeObserver(updateDetailsHeight);
+        if (rightDetailsRef.current) ro.observe(rightDetailsRef.current);
+
+        return () => {
+            window.removeEventListener("resize", updateDetailsHeight);
+            ro.disconnect();
+        };
+    }, [profile, displayLinks.length]);
+
+    const linkedInCardHeight = 627 * cardScale;
+    const estimatedLinksInRightHeight = displayLinks.length > 0 ? 45 + displayLinks.length * 62 : 0;
+    const effectiveDetailsHeight = rightDetailsHeight > 0 ? rightDetailsHeight : (
+        120 +
+        (profile?.bio ? Math.min(profile.bio.length * 0.45, 160) : 30) +
+        (profile?.location ? 28 : 0) +
+        (profile?.skills && profile.skills.length > 0 ? 70 : 0) +
+        (profile?.isOpenToWork || profile?.isHireable ? 45 : 0) +
+        45 +
+        (profile?.resumeUrl && profile?.isResumePublic !== false ? 55 : 0)
+    );
+    const projectedRightHeight = effectiveDetailsHeight + estimatedLinksInRightHeight;
+
+    // When the right card height exceeds the LinkedIn card height, switch links to sit cleanly below the LinkedIn card.
+    const shouldMoveLinksToLeft =
+        isDesktop && displayLinks.length > 0 && projectedRightHeight > linkedInCardHeight;
+
     // Loading Skeleton
     if (loading) {
         return (
@@ -269,7 +362,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
         )}&background=0c1017&color=fff&size=256&bold=true`;
 
     return (
-        <div className={`min-h-screen bg-[#F0F2F6] text-neutral-900 font-sans antialiased selection:bg-neutral-900 selection:text-white pb-16 ${isEmbedded ? "embedded-showcase-container" : ""}`}>
+        <div className={`${isEmbedded ? "pb-4 embedded-showcase-container" : "min-h-screen pb-16"} bg-[#F0F2F6] text-neutral-900 font-sans antialiased selection:bg-neutral-900 selection:text-white`}>
             {/* Minimal Orbix Button Only — Navigates to "/" (Hidden when embedded in hero showcase) */}
             {!isEmbedded && (
                 <div className="w-full px-4 sm:px-8 pt-4 pb-2 flex items-center justify-between">
@@ -326,7 +419,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
             )}
 
             {/* Profile Showcase Container - Full Width */}
-            <main className="w-full px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 pb-16 min-w-0">
+            <main className={`w-full px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 ${isEmbedded ? "pb-4" : "pb-16"} min-w-0`}>
                 {/* 3/4 Main Card + 1/4 Sidebar Card Section */}
                 <div className="w-full max-w-[1600px] mx-auto mb-10">
                     {/* Header Strip with Controls */}
@@ -353,7 +446,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                     {/* Split Layout: 3/4 Main Card + 1/4 Details, Bio & Links Card */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                         {/* LEFT (3/4 Screen Width on Large Screens): Main Developer Card with 3D Flip Animation */}
-                        <div ref={cardContainerRef} className="lg:col-span-9 flex flex-col justify-center items-center min-w-0">
+                        <div ref={cardContainerRef} className="lg:col-span-9 flex flex-col justify-start items-center min-w-0">
                             {/* 3D Motion Card Container (Matches Card.tsx from Main Landing Page) */}
                             <div style={{ perspective: 1800 }} className="w-full flex justify-center">
                                 <motion.div
@@ -456,13 +549,55 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                     </div>
                                 </motion.div>
                             </div>
+
+                            {/* Smart Connected Links Strip (Rendered below LinkedIn Card when right card is taller) */}
+                            {shouldMoveLinksToLeft && displayLinks.length > 0 && (
+                                <div
+                                    style={{ width: 1200 * cardScale, maxWidth: "100%" }}
+                                    className="mt-8 sm:mt-10 w-full relative z-10"
+                                >
+                                    <div className={`grid ${displayLinks.length === 1 ? "grid-cols-1" : displayLinks.length === 2 ? "grid-cols-1 sm:grid-cols-2" : displayLinks.length === 3 ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-2 sm:grid-cols-4"} gap-3.5 sm:gap-4`}>
+                                        {displayLinks.map((item, idx) => {
+                                            const formattedUrl = sanitizePlatformUrl(item.url);
+                                            const cleanHandle = getCleanDisplayHandle(item.url, item.label, item.platform);
+                                            return (
+                                                <a
+                                                    key={idx}
+                                                    href={formattedUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="flex items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-white hover:bg-neutral-50 border border-neutral-200/90 hover:border-neutral-300 text-neutral-900 transition-all duration-200 group shadow-sm hover:shadow-md cursor-pointer min-w-0"
+                                                    title={formattedUrl}
+                                                >
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <div className="w-10 h-10 rounded-xl bg-neutral-100 border border-neutral-200/90 flex items-center justify-center flex-shrink-0 shadow-2xs group-hover:scale-105 group-hover:bg-neutral-200/60 transition-all">
+                                                            {getPlatformIcon(
+                                                                item.platform || item.label || formattedUrl,
+                                                                "w-5 h-5 flex-shrink-0"
+                                                            )}
+                                                        </div>
+                                                        <div className="min-w-0 text-left">
+                                                            <span className="text-xs sm:text-sm font-extrabold text-neutral-900 block truncate group-hover:text-black tracking-tight">
+                                                                {item.label || item.platform || "Link"}
+                                                            </span>
+                                                            <span className="text-[11px] sm:text-xs font-mono text-neutral-600 font-semibold block truncate group-hover:text-neutral-900">
+                                                                {cleanHandle}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <ExternalLink className="w-4 h-4 text-neutral-400 group-hover:text-neutral-900 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all flex-shrink-0" />
+                                                </a>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* RIGHT (1/4 Screen Width on Large Screens): Bio, Location & Connected Links Card */}
                         <div className="lg:col-span-3 flex flex-col min-w-0">
-                            <div className="w-full h-full rounded-[28px] bg-white border border-neutral-200/90 shadow-sm p-5 sm:p-6 flex flex-col justify-between space-y-5">
-                                {/* Top: Info, Bio & Location */}
-                                <div className="space-y-4">
+                            <div className={`w-full rounded-[28px] bg-white border border-neutral-200/90 shadow-sm p-5 sm:p-6 flex flex-col ${shouldMoveLinksToLeft ? "justify-start space-y-4" : "h-full justify-between space-y-5"}`}>
+                                <div ref={rightDetailsRef} className="space-y-4">
                                     {/* Card Subheader */}
                                     <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
                                         <div className="flex items-center gap-2">
@@ -504,6 +639,32 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         </div>
                                     )}
 
+                                    {/* Verified College / Institution */}
+                                    {profile.college && (
+                                        <div className="flex items-start gap-2 pt-1 text-xs font-semibold text-neutral-800">
+                                            <GraduationCap className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0 mt-0.5" />
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="truncate font-bold tracking-tight">
+                                                        {profile.college.officialName}
+                                                    </span>
+                                                    {profile.college.verificationStatus === "verified" && (
+                                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-700">
+                                                            <ShieldCheck className="w-2.5 h-2.5 text-emerald-600" />
+                                                            Verified
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {(profile.college.city || profile.college.state) && (
+                                                    <span className="text-[10px] text-neutral-500 font-normal block truncate mt-0.5">
+                                                        {[profile.college.city, profile.college.state].filter(Boolean).join(", ")}
+                                                        {profile.college.aisheCode && ` • AISHE: ${profile.college.aisheCode}`}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
                                     {/* Skills if present */}
                                     {profile.skills && profile.skills.length > 0 && (
                                         <div className="pt-1">
@@ -522,13 +683,10 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                             </div>
                                         </div>
                                     )}
-                                </div>
 
-                                {/* Bottom: Status & Actions (OPEN TO WORK & Hire me) + Connected Links */}
-                                <div className="space-y-3 pt-3 border-t border-neutral-100">
                                     {/* Status & Actions: Open to work & Hire me matching bottom button layout */}
                                     {(profile.isOpenToWork || profile.isHireable) && (
-                                        <div className="grid grid-cols-2 gap-2 pb-0.5">
+                                        <div className="grid grid-cols-2 gap-2 pt-1 pb-0.5 border-t border-neutral-100">
                                             {profile.isOpenToWork && (
                                                 <div
                                                     className={`flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-neutral-100 hover:bg-neutral-200/90 border border-neutral-200 text-neutral-800 text-xs font-bold transition-all shadow-2xs select-none ${!profile.isHireable ? "col-span-2" : ""}`}
@@ -619,20 +777,21 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                             </div>
                                         </div>
                                     )}
+                                </div>
 
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
-                                            Links ({displayLinks.length})
-                                        </span>
-                                    </div>
+                                {/* Fallback Links when NOT moved to left */}
+                                {!shouldMoveLinksToLeft && displayLinks.length > 0 && (
+                                    <div className="space-y-3 pt-3 border-t border-neutral-100">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                                                Links ({displayLinks.length})
+                                            </span>
+                                        </div>
 
-                                    {displayLinks.length === 0 ? (
-                                        <p className="text-xs text-neutral-400 italic">No links connected.</p>
-                                    ) : (
                                         <div className="space-y-2 max-h-[260px] overflow-y-auto pr-1 scrollbar-thin">
                                             {displayLinks.map((item, idx) => {
                                                 const formattedUrl = sanitizePlatformUrl(item.url);
-                                                const displayHost = formattedUrl.replace(/^https?:\/\//, "").replace(/\/$/, "");
+                                                const cleanHandle = getCleanDisplayHandle(item.url, item.label, item.platform);
                                                 return (
                                                     <a
                                                         key={idx}
@@ -640,7 +799,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                         className="flex items-center justify-between gap-2.5 p-2.5 rounded-xl bg-neutral-50 hover:bg-neutral-100/90 border border-neutral-200/80 hover:border-neutral-300 text-neutral-800 transition-all group shadow-2xs"
-                                                        title={item.label || item.url}
+                                                        title={formattedUrl}
                                                     >
                                                         <div className="flex items-center gap-2.5 min-w-0">
                                                             <div className="w-8 h-8 rounded-lg bg-white border border-neutral-200/80 flex items-center justify-center flex-shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
@@ -651,10 +810,10 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                             </div>
                                                             <div className="min-w-0">
                                                                 <span className="text-xs font-bold text-neutral-900 block truncate group-hover:text-black">
-                                                                    {item.label || "Link"}
+                                                                    {item.label || item.platform || "Link"}
                                                                 </span>
-                                                                <span className="text-[10px] font-mono text-neutral-400 block truncate">
-                                                                    {displayHost}
+                                                                <span className="text-[10px] font-mono text-neutral-500 font-semibold block truncate">
+                                                                    {cleanHandle}
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -663,8 +822,8 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                 );
                                             })}
                                         </div>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

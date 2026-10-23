@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "tsx watch src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "migrate:institutions": "tsx src/database/run_migration.ts",
+    "seed:institutions": "tsx data/seed_institutions.ts"
   },
   "keywords": [],
   "author": "",

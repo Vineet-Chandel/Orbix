@@ -26,6 +26,16 @@ export interface PublicProfilePayload {
     resumeFilesize?: number | null;
     resumeUpdatedAt?: string | null;
     isResumePublic?: boolean;
+    college?: {
+        id: string;
+        officialName: string;
+        city?: string;
+        state?: string;
+        district?: string;
+        institutionType?: string;
+        aisheCode?: string;
+        verificationStatus?: string;
+    } | null;
     createdAt?: string;
     platforms: Array<{
         portal: string;

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Award, ChevronDown, ChevronUp, Calendar } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUnifiedBadges, type UnifiedBadgeRecord } from "../../store";
 import { getPortalIcon } from "../../utils/portalIcons";
+import { isDemoProfileUsername, demoBadgesData } from "../../data/demoProfileData";
 
 interface BadgesCardProps {
     connectedPortals?: Record<string, any>;
@@ -19,6 +20,32 @@ function formatBadgeDate(dateStr?: string | null): string {
         return dateStr;
     }
 }
+
+const BadgeIconWithFallback: React.FC<{ badge: UnifiedBadgeRecord }> = ({ badge }) => {
+    const [failed, setFailed] = useState(false);
+
+    if (failed || !badge.icon) {
+        return (
+            <div className="w-full h-full rounded-2xl bg-neutral-100 border border-neutral-200/90 flex flex-col items-center justify-center p-2 text-neutral-600 shadow-2xs group-hover:border-neutral-400 group-hover:shadow-xs transition-all">
+                <span className="w-6 h-6 flex items-center justify-center mb-1">
+                    {getPortalIcon(badge.platform, "w-full h-full object-contain")}
+                </span>
+                <Award className="w-4 h-4 text-amber-500" />
+            </div>
+        );
+    }
+
+    return (
+        <img
+            src={badge.icon}
+            alt={badge.displayName || badge.name}
+            className="w-full h-full object-contain drop-shadow-xs"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            onError={() => setFailed(true)}
+        />
+    );
+};
 
 export const BadgesCard: React.FC<BadgesCardProps> = ({
     connectedPortals: _connectedPortals,
@@ -42,14 +69,26 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
         }
     }, [effectiveUser, remoteData, isLoading, dispatch]);
 
+    const isDemo = isDemoProfileUsername(effectiveUser) || effectiveUser.toLowerCase() === "vineet_chandel";
+
     const badges = useMemo(() => {
-        return remoteData?.badges || [];
-    }, [remoteData]);
+        if (remoteData?.badges && remoteData.badges.length > 0) {
+            return remoteData.badges;
+        }
+        if (isDemo) {
+            return demoBadgesData.badges;
+        }
+        return [];
+    }, [remoteData, isDemo]);
 
     const platformsList = useMemo(() => {
-        const map = remoteData?.platformCounts || {};
+        const map = (remoteData?.platformCounts && Object.keys(remoteData.platformCounts).length > 0)
+            ? remoteData.platformCounts
+            : isDemo
+                ? demoBadgesData.platformCounts
+                : {};
         return Object.keys(map).filter((k) => (map[k] || 0) > 0);
-    }, [remoteData]);
+    }, [remoteData, isDemo]);
 
     const filteredBadges = useMemo(() => {
         if (selectedPlatform === "all") return badges;
@@ -65,7 +104,7 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
         return filteredBadges.slice(0, INITIAL_LIMIT);
     }, [filteredBadges, isExpanded]);
 
-    const totalCount = remoteData?.totalEarned ?? badges.length;
+    const totalCount = remoteData?.totalEarned ?? (isDemo ? demoBadgesData.totalEarned : badges.length);
 
     return (
         <section
@@ -167,16 +206,7 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
                                 >
                                     {/* Badge Artwork Container */}
                                     <div className="w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center p-1 transition-transform duration-200 group-hover:scale-110">
-                                        <img
-                                            src={badge.icon}
-                                            alt={badge.name}
-                                            className="w-full h-full object-contain drop-shadow-sm"
-                                            loading="lazy"
-                                            onError={(e) => {
-                                                // Fallback if image link fails
-                                                (e.target as HTMLElement).style.display = "none";
-                                            }}
-                                        />
+                                        <BadgeIconWithFallback badge={badge} />
                                     </div>
 
                                     {/* Badge Title beneath artwork */}

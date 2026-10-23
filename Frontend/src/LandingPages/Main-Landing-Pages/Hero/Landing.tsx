@@ -477,18 +477,18 @@ const Landing = () => {
     const currentOpp = OPPORTUNITIES[oppIndex];
 
     const trackRef = useRef<HTMLDivElement>(null);
-    const boxRef = useRef<HTMLDivElement>(null);
+    const viewportRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
-    const [maxScroll, setMaxScroll] = useState(2200);
+    const [maxScroll, setMaxScroll] = useState(2000);
 
-    // Measure height difference dynamically so the entire PublicProfilePage can scroll to the bottom
+    // Measure height difference dynamically so the entire PublicProfilePage scrolls flush to bottom
     useEffect(() => {
         const updateHeight = () => {
-            if (contentRef.current && boxRef.current) {
+            if (contentRef.current && viewportRef.current) {
                 const ch = contentRef.current.scrollHeight;
-                const bh = boxRef.current.clientHeight;
-                if (ch > 0 && bh > 0) {
-                    setMaxScroll(Math.max(0, ch - bh + 48));
+                const vh = viewportRef.current.clientHeight;
+                if (ch > 0 && vh > 0) {
+                    setMaxScroll(Math.max(0, ch - vh));
                 }
             }
         };
@@ -502,7 +502,7 @@ const Landing = () => {
         });
 
         if (contentRef.current) ro.observe(contentRef.current);
-        if (boxRef.current) ro.observe(boxRef.current);
+        if (viewportRef.current) ro.observe(viewportRef.current);
 
         window.addEventListener('resize', updateHeight);
         return () => {
@@ -528,151 +528,150 @@ const Landing = () => {
             <div className="flex flex-col items-center justify-center gap-9 text-7xl text-black font-MyCustomFont3 pt-[170px]">
 
 
-            <div className='flex items-center justify-center gap-2'>
-                <span>A developer tool to connect</span>
+                <div className='flex items-center justify-center gap-2'>
+                    <span>A developer tool to connect</span>
 
-                <motion.div
-                    layout
-                    onClick={handleNext}
-                    onMouseEnter={() => setIsPaused(true)}
-                    onMouseLeave={() => setIsPaused(false)}
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.94 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                    className="bg-[#f0f0ee] rounded-full px-4 py-2 inline-flex items-center gap-4 cursor-pointer select-none"
-                    title="Click to switch platform"
-                >
-                    <div
-                        className="relative w-9 h-9 sm:w-10 sm:h-10 -my-3 flex items-center justify-center shrink-0 overflow-visible"
-                        style={{ filter: WHITE_STICKER_FILTER }}
+                    <motion.div
+                        layout
+                        onClick={handleNext}
+                        onMouseEnter={() => setIsPaused(true)}
+                        onMouseLeave={() => setIsPaused(false)}
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.94 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                        className="bg-[#f0f0ee] rounded-full px-4 py-2 inline-flex items-center gap-4 cursor-pointer select-none"
+                        title="Click to switch platform"
                     >
+                        <div
+                            className="relative w-9 h-9 sm:w-10 sm:h-10 -my-3 flex items-center justify-center shrink-0 overflow-visible"
+                            style={{ filter: WHITE_STICKER_FILTER }}
+                        >
+                            <AnimatePresence mode="popLayout" initial={false}>
+                                <motion.div
+                                    key={current.id}
+                                    initial={{
+                                        scale: 0.05,
+                                        rotate: 0,
+                                        opacity: 0
+                                    }}
+                                    animate={{
+                                        scale: 1.25,
+                                        rotate: -8.5,
+                                        opacity: 1
+                                    }}
+                                    exit={{
+                                        scale: 0.1,
+                                        rotate: 0,
+                                        opacity: 0,
+                                        transition: { duration: 0.12, ease: "easeIn" }
+                                    }}
+                                    transition={{
+                                        type: "spring",
+                                        stiffness: 380,
+                                        damping: 18,
+                                        mass: 0.75
+                                    }}
+                                    className="w-full h-full flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
+                                >
+                                    {current.renderIcon("w-full h-full")}
+                                </motion.div>
+                            </AnimatePresence>
+                        </div>
+
                         <AnimatePresence mode="popLayout" initial={false}>
-                            <motion.div
+                            <motion.span
                                 key={current.id}
-                                initial={{
-                                    scale: 0.05,
-                                    rotate: 0,
-                                    opacity: 0
-                                }}
-                                animate={{
-                                    scale: 1.25,
-                                    rotate: -8.5,
-                                    opacity: 1
-                                }}
-                                exit={{
-                                    scale: 0.1,
-                                    rotate: 0,
-                                    opacity: 0,
-                                    transition: { duration: 0.12, ease: "easeIn" }
-                                }}
-                                transition={{
-                                    type: "spring",
-                                    stiffness: 380,
-                                    damping: 18,
-                                    mass: 0.75
-                                }}
-                                className="w-full h-full flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
+                                initial={{ scale: 0.92, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 1.05, opacity: 0 }}
+                                transition={{ duration: 0.12, ease: "easeOut" }}
+                                className="text-6xl text-black font-MyCustomFont3 whitespace-nowrap inline-block"
                             >
-                                {current.renderIcon("w-full h-full")}
-                            </motion.div>
+                                {current.name}
+                            </motion.span>
                         </AnimatePresence>
-                    </div>
+                    </motion.div> <span>,</span>
 
-                    <AnimatePresence mode="popLayout" initial={false}>
-                        <motion.span
-                            key={current.id}
-                            initial={{ scale: 0.92, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 1.05, opacity: 0 }}
-                            transition={{ duration: 0.12, ease: "easeOut" }}
-                            className="text-6xl text-black font-MyCustomFont3 whitespace-nowrap inline-block"
-                        >
-                            {current.name}
-                        </motion.span>
-                    </AnimatePresence>
-                </motion.div> <span>,</span>
-
-            </div>
-            <div className='flex items-center justify-center gap-2'>
-                <span>and redirecting </span>
-                <motion.div
-                    layout
-                    onClick={handleNextOpp}
-                    onMouseEnter={() => setIsOppPaused(true)}
-                    onMouseLeave={() => setIsOppPaused(false)}
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.94 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                    className="bg-[#f0f0ee] rounded-full px-4 py-2 inline-flex items-center gap-4 cursor-pointer select-none"
-                    title="Click to switch opportunity"
-                >
-                    <div
-                        className="relative w-9 h-9 sm:w-10 sm:h-10 -my-3 flex items-center justify-center shrink-0 overflow-visible"
-                        style={{ filter: WHITE_STICKER_FILTER }}
+                </div>
+                <div className='flex items-center justify-center gap-2'>
+                    <span>and redirecting </span>
+                    <motion.div
+                        layout
+                        onClick={handleNextOpp}
+                        onMouseEnter={() => setIsOppPaused(true)}
+                        onMouseLeave={() => setIsOppPaused(false)}
+                        whileHover={{ scale: 1.04 }}
+                        whileTap={{ scale: 0.94 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                        className="bg-[#f0f0ee] rounded-full px-4 py-2 inline-flex items-center gap-4 cursor-pointer select-none"
+                        title="Click to switch opportunity"
                     >
-                        <AnimatePresence mode="popLayout" initial={false}>
-                            <motion.div
-                                key={currentOpp.id || currentOpp.name}
-                                initial={{
-                                    scale: 0.05,
-                                    rotate: 0,
-                                    opacity: 0
-                                }}
-                                animate={{
-                                    scale: 1.25,
-                                    rotate: -8.5,
-                                    opacity: 1
-                                }}
-                                exit={{
-                                    scale: 0.1,
-                                    rotate: 0,
-                                    opacity: 0,
-                                    transition: { duration: 0.12, ease: "easeIn" }
-                                }}
-                                transition={{
-                                    type: "spring",
-                                    stiffness: 380,
-                                    damping: 18,
-                                    mass: 0.75
-                                }}
-                                className="w-full h-full flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
-                            >
-                                {currentOpp.renderIcon("w-full h-full")}
-                            </motion.div>
-                        </AnimatePresence>
-                    </div>
-
-                    <AnimatePresence mode="popLayout" initial={false}>
-                        <motion.span
-                            key={currentOpp.id || currentOpp.name}
-                            initial={{ scale: 0.92, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 1.05, opacity: 0 }}
-                            transition={{ duration: 0.12, ease: "easeOut" }}
-                            className="text-6xl text-black font-MyCustomFont3 whitespace-nowrap inline-block"
+                        <div
+                            className="relative w-9 h-9 sm:w-10 sm:h-10 -my-3 flex items-center justify-center shrink-0 overflow-visible"
+                            style={{ filter: WHITE_STICKER_FILTER }}
                         >
-                            {currentOpp.name}
-                        </motion.span>
-                    </AnimatePresence>
-                </motion.div>
-                <span>economics for </span>
-            </div>
-            <div className='flex items-center justify-center gap-2'>
-                <span>our developers . </span>
-            </div>
-        </div>
+                            <AnimatePresence mode="popLayout" initial={false}>
+                                <motion.div
+                                    key={currentOpp.id || currentOpp.name}
+                                    initial={{
+                                        scale: 0.05,
+                                        rotate: 0,
+                                        opacity: 0
+                                    }}
+                                    animate={{
+                                        scale: 1.25,
+                                        rotate: -8.5,
+                                        opacity: 1
+                                    }}
+                                    exit={{
+                                        scale: 0.1,
+                                        rotate: 0,
+                                        opacity: 0,
+                                        transition: { duration: 0.12, ease: "easeIn" }
+                                    }}
+                                    transition={{
+                                        type: "spring",
+                                        stiffness: 380,
+                                        damping: 18,
+                                        mass: 0.75
+                                    }}
+                                    className="w-full h-full flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
+                                >
+                                    {currentOpp.renderIcon("w-full h-full")}
+                                </motion.div>
+                            </AnimatePresence>
+                        </div>
 
-        {/* Pinned Scroll Showcase Section: Holds the box fixed in screen center while inner page scrolls */}
-        <div
-            ref={trackRef}
-            className="relative w-full h-[320vh] sm:h-[360vh] mt-6 sm:mt-10 font-sans"
-        >
+                        <AnimatePresence mode="popLayout" initial={false}>
+                            <motion.span
+                                key={currentOpp.id || currentOpp.name}
+                                initial={{ scale: 0.92, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                                exit={{ scale: 1.05, opacity: 0 }}
+                                transition={{ duration: 0.12, ease: "easeOut" }}
+                                className="text-6xl text-black font-MyCustomFont3 whitespace-nowrap inline-block"
+                            >
+                                {currentOpp.name}
+                            </motion.span>
+                        </AnimatePresence>
+                    </motion.div>
+                    <span>economics for </span>
+                </div>
+                <div className='flex items-center justify-center gap-2'>
+                    <span>our developers . </span>
+                </div>
+            </div>
+
+            {/* Pinned Scroll Showcase Section: Holds the box fixed in screen center while inner page scrolls */}
+            <div
+                ref={trackRef}
+                className="relative w-full h-[320vh] sm:h-[360vh] mt-6 sm:mt-10 font-sans"
+            >
                 {/* Sticky Centered Device Container */}
-                <div className="sticky top-[8vh] sm:top-[10vh] w-[94%] max-w-[1400px] mx-auto z-20">
+                <div className="sticky top-[6vh] sm:top-[7vh] w-[94%] max-w-[1550px] mx-auto z-20">
                     <div className="w-full p-2.5 sm:p-4 bg-black/10 rounded-[28px] sm:rounded-[36px] shadow-2xl backdrop-blur-xs border border-black/10">
                         <div
-                            ref={boxRef}
-                            className="embedded-showcase-container relative w-full h-[76vh] sm:h-[78vh] max-h-[840px] min-h-[500px] rounded-[20px] sm:rounded-[28px] overflow-hidden border border-black/90 bg-[#F0F2F6] shadow-2xl flex flex-col font-sans text-base font-normal normal-case tracking-normal text-slate-900 select-auto"
+                            className="embedded-showcase-container relative w-full h-[85vh] sm:h-[88vh] lg:h-[89vh] max-h-[1200px] min-h-[640px] rounded-[20px] sm:rounded-[28px] overflow-hidden border border-black/90 bg-[#F0F2F6] shadow-2xl flex flex-col font-sans text-base font-normal normal-case tracking-normal text-slate-900 select-auto"
                         >
                             {/* Browser Mockup Header Bar */}
                             <div className="w-full bg-white/95 backdrop-blur-md border-b border-black/[0.08] px-4 py-2.5 flex items-center justify-between shrink-0 select-none z-10">
@@ -694,7 +693,7 @@ const Landing = () => {
                             </div>
 
                             {/* Viewport Window with Overflow Hidden */}
-                            <div className="relative w-full flex-1 overflow-hidden">
+                            <div ref={viewportRef} className="relative w-full flex-1 overflow-hidden">
                                 <motion.div
                                     ref={contentRef}
                                     style={{ y: contentY }}
