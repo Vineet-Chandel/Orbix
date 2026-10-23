@@ -138,17 +138,17 @@ export const PortalProfileCard = ({
     // Loading State
     if (loading) {
         return (
-            <div className="mt-2.5 rounded-2xl border border-neutral-800 bg-[#0c101c] p-4 text-white shadow-xl animate-pulse">
+            <div className="mt-3 rounded-xl border-2 border-black bg-white p-4 text-black shadow-[4px_4px_0px_#000] animate-pulse">
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3.5">
-                        <div className="h-12 w-12 rounded-full bg-neutral-800" />
+                        <div className="h-12 w-12 rounded-lg border-2 border-black bg-neutral-200" />
                         <div className="space-y-2">
-                            <div className="h-3.5 w-32 rounded-md bg-neutral-800" />
-                            <div className="h-2.5 w-24 rounded-md bg-neutral-800" />
+                            <div className="h-3.5 w-32 rounded bg-neutral-300" />
+                            <div className="h-2.5 w-24 rounded bg-neutral-200" />
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-neutral-400">
-                        <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                    <div className="flex items-center gap-2 text-xs font-black uppercase text-black border-2 border-black bg-[#FAF6EE] px-3 py-1.5 rounded-md shadow-[2px_2px_0px_#000]">
+                        <span className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
                         <span>Verifying account...</span>
                     </div>
                 </div>
@@ -161,29 +161,26 @@ export const PortalProfileCard = ({
         return null;
     }
 
-    const brandColor = config?.brandColor || "#FFA116";
-
     return (
-        <div className="mt-2.5 rounded-2xl border border-neutral-800 bg-[#0b0f19] p-4 text-white shadow-2xl transition-all duration-300 animate-fadeIn">
+        <div className="mt-3 rounded-xl border-2 border-black bg-[#FAF6EE] p-4 text-black shadow-[4px_4px_0px_#000] transition-all duration-200 animate-fadeIn">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
                 {/* Left: Avatar with Portal Badge + User Details + Stats */}
                 <div className="flex items-center gap-3.5 min-w-0">
                     {/* Avatar with Platform Mini Badge at bottom-right */}
                     <div className="relative flex-shrink-0">
                         <div
-                            className="h-12 w-12 sm:h-14 sm:w-14 rounded-full border-2 p-0.5 bg-neutral-900 shadow-md flex items-center justify-center overflow-hidden"
-                            style={{ borderColor: brandColor }}
+                            className="h-12 w-12 sm:h-14 sm:w-14 rounded-lg border-2 border-black p-0.5 bg-white shadow-[2px_2px_0px_#000] flex items-center justify-center overflow-hidden"
                         >
                             {!avatarFailed && profile.avatar && profile.avatar.trim().length > 5 && !profile.avatar.includes("ui-avatars.com") ? (
                                 <img
                                     src={profile.avatar.trim()}
                                     alt={profile.name || username}
                                     referrerPolicy="no-referrer"
-                                    className="h-full w-full rounded-full object-cover"
+                                    className="h-full w-full rounded-md object-cover"
                                     onError={() => setAvatarFailed(true)}
                                 />
                             ) : (
-                                <div className="w-full h-full rounded-full bg-neutral-800 flex items-center justify-center p-2 text-white">
+                                <div className="w-full h-full rounded-md bg-white flex items-center justify-center p-2 text-black">
                                     {getPortalIcon(portalId, "w-full h-full object-contain")}
                                 </div>
                             )}
@@ -191,8 +188,7 @@ export const PortalProfileCard = ({
                         {/* Mini portal badge in the bottom-right corner */}
                         {!avatarFailed && profile.avatar && profile.avatar.trim().length > 5 && !profile.avatar.includes("ui-avatars.com") && (
                             <div
-                                className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white p-0.5 shadow-md border"
-                                style={{ borderColor: brandColor }}
+                                className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-md bg-white p-0.5 shadow-[1px_1px_0px_#000] border-2 border-black"
                             >
                                 {getPortalIcon(portalId, "h-3.5 w-3.5")}
                             </div>
@@ -202,10 +198,10 @@ export const PortalProfileCard = ({
                     {/* Info and Stats Pills */}
                     <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                            <h4 className="truncate text-sm sm:text-base font-bold text-white tracking-tight leading-tight">
+                            <h4 className="truncate text-sm sm:text-base font-black text-black tracking-tight leading-tight">
                                 {profile.name}
                             </h4>
-                            <span className="text-xs font-mono text-neutral-400 truncate">
+                            <span className="text-xs font-mono font-bold text-neutral-600 truncate">
                                 @{profile.username}
                             </span>
                         </div>
@@ -215,7 +211,7 @@ export const PortalProfileCard = ({
                             {profile.stats.map((st, idx) => (
                                 <span
                                     key={idx}
-                                    className="inline-flex items-center rounded-md bg-neutral-800/90 px-2.5 py-0.5 text-[11px] sm:text-xs font-medium text-neutral-200 border border-neutral-700/60 shadow-xs"
+                                    className="inline-flex items-center rounded-md bg-white px-2.5 py-0.5 text-[11px] sm:text-xs font-bold text-black border-2 border-black shadow-[1px_1px_0px_#000]"
                                 >
                                     {st.value}
                                 </span>
@@ -225,19 +221,18 @@ export const PortalProfileCard = ({
                 </div>
 
                 {/* Right: Confirmation Prompt & Action Button */}
-                <div className="flex items-center justify-end gap-2.5 sm:gap-3 flex-shrink-0 pt-2 sm:pt-0 border-t border-neutral-800/80 sm:border-t-0">
+                <div className="flex items-center justify-end gap-2.5 sm:gap-3 flex-shrink-0 pt-2 sm:pt-0 border-t-2 border-black/10 sm:border-t-0">
                     {!isConnected ? (
                         <>
-                            <span className="text-xs font-medium text-neutral-400 hidden sm:inline-block">
+                            <span className="text-xs font-black uppercase tracking-wide text-neutral-700 hidden sm:inline-block">
                                 Is this you?
                             </span>
                             <button
                                 type="button"
                                 onClick={() => onConnect(profile)}
-                                className="flex items-center gap-1.5 rounded-full px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white shadow-md transition-all hover:scale-105 active:scale-95 cursor-pointer"
-                                style={{ backgroundColor: brandColor }}
+                                className="flex items-center gap-1.5 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#92f574] px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-black uppercase tracking-wide text-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none cursor-pointer transition-all"
                             >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                <svg className="h-4 w-4 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <polyline points="20 6 9 17 4 12" />
                                 </svg>
                                 <span>Yes, connect</span>
@@ -245,8 +240,8 @@ export const PortalProfileCard = ({
                         </>
                     ) : (
                         <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-3 py-1.5 text-xs font-semibold text-emerald-400">
-                                <svg className="h-3.5 w-3.5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                            <div className="flex items-center gap-1.5 rounded-lg bg-[#a2ff86] border-2 border-black px-3 py-1.5 text-xs font-black uppercase text-black shadow-[2px_2px_0px_#000]">
+                                <svg className="h-3.5 w-3.5 stroke-[3] text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <polyline points="20 6 9 17 4 12" />
                                 </svg>
                                 <span>Connected</span>
@@ -254,7 +249,7 @@ export const PortalProfileCard = ({
                             <button
                                 type="button"
                                 onClick={onDisconnect}
-                                className="text-xs text-neutral-400 hover:text-rose-400 transition-colors p-1"
+                                className="text-xs font-bold text-black border-2 border-black bg-white hover:bg-rose-100 rounded-lg px-2.5 py-1.5 shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
                                 title="Disconnect account"
                             >
                                 Disconnect

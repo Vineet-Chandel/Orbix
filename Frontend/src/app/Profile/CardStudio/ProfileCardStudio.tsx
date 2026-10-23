@@ -375,38 +375,30 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
     const activeHeight = format === "linkedin" ? linkedinHeight : storyHeight;
 
     return (
-        <div className="rounded-2xl bg-white border border-neutral-200/90 shadow-xs p-5 sm:p-6 flex flex-col space-y-5">
+        <div className="rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-5 sm:p-6 flex flex-col space-y-5">
             {/* Studio Header */}
-            <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+            <div className="flex items-center justify-between pb-4 border-b-2 border-black/10">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center shadow-xs">
-                        <svg className="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="currentColor">
+                    <div className="w-8 h-8 rounded-xl bg-[#FFE566] text-black border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                        <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="currentColor">
                             <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
                         </svg>
                     </div>
                     <div>
                         <h2 className="text-base sm:text-lg font-black text-neutral-900 tracking-tight flex items-center gap-2">
                             <span>Orbix Share Card Studio</span>
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-neutral-900 text-white">
-                                Live
-                            </span>
                         </h2>
-                        <p className="text-xs text-neutral-500">
+                        <p className="text-xs text-neutral-600 font-medium">
                             Customizable social cards with scannable QR & aggregated coding analytics.
                         </p>
                     </div>
-                </div>
-
-                <div className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-neutral-500">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Realtime Sync</span>
                 </div>
             </div>
 
             {/* Live Interactive Card Preview Stage */}
             <div
                 ref={containerRef}
-                className="min-h-[340px] flex items-center justify-center p-3 sm:p-6 py-6 sm:py-8 rounded-2xl relative bg-neutral-900/[0.02]"
+                className="min-h-[340px] flex items-center justify-center p-3 sm:p-6 py-6 sm:py-8 rounded-2xl relative bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]"
             >
                 {/* 3D Perspective Stage Container */}
                 <div

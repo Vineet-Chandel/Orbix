@@ -140,7 +140,7 @@ export default function Dashboard() {
     }).format(new Date());
 
     return (
-        <div className="min-h-screen bg-[#F5F5F7] text-neutral-900 font-sans flex antialiased selection:bg-neutral-900 selection:text-white">
+        <div className={`min-h-screen ${activeTab === "resume" ? "bg-[#F0F2F6]" : "bg-[#F5F5F7]"} text-neutral-900 font-sans flex antialiased selection:bg-neutral-900 selection:text-white`}>
             {/* Left Sidebar (Apple-inspired floating sidebar) */}
             <Sidebar
                 activeTab={activeTab}
@@ -159,82 +159,80 @@ export default function Dashboard() {
 
             {/* Right Main Dashboard Workspace */}
             <div className="flex-1 min-w-0 flex flex-col min-h-screen p-3 sm:p-4 lg:pl-0">
-                {/* Top Header Bar matching Apple design language */}
-                <header className="h-16 w-full rounded-2xl bg-white border border-neutral-300 shadow-sm px-4 sm:px-6 flex items-center justify-between gap-4 mb-4 flex-shrink-0">
-                    {/* Left: Mobile Toggle & Page Title */}
-                    <div className="flex items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setIsMobileSidebarOpen(true)}
-                            className="lg:hidden p-2 text-neutral-600 hover:text-neutral-950 rounded-xl hover:bg-black/[0.04] transition-colors"
-                            aria-label="Open sidebar"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                <line x1="3" y1="12" x2="21" y2="12" />
-                                <line x1="3" y1="6" x2="21" y2="6" />
-                                <line x1="3" y1="18" x2="21" y2="18" />
-                            </svg>
-                        </button>
-                        <h1 className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight">
-                            {activeTab === "trends"
-                                ? "Trends & Performance Reports"
-                                : activeTab === "notifications"
-                                    ? "Inbox & Inquiries"
-                                    : activeTab === "profile"
-                                        ? "Developer Profile"
-                                        : activeTab === "resume"
-                                            ? "Resume & Credentials"
-                                            : activeTab === "projects"
-                                                ? "Projects & Code"
-                                                : activeTab === "connect-platform"
-                                                    ? "Connect Coding Platforms"
-                                                    : "Orbix Dashboard"}
-                        </h1>
-                    </div>
-
-                    {/* Center: Search input with ⌘ + / badge */}
-                    <div className="hidden md:flex items-center flex-1 max-w-md mx-4">
-                        <div className="relative w-full">
-                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <circle cx="11" cy="11" r="8" />
-                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                {/* Top Header Bar matching Apple design language (hidden on resume and profile sections to match Connected Platforms exactly) */}
+                {activeTab !== "resume" && activeTab !== "profile" && (
+                    <header className="h-16 w-full rounded-2xl bg-white border border-neutral-300 shadow-sm px-4 sm:px-6 flex items-center justify-between gap-4 mb-4 flex-shrink-0">
+                        {/* Left: Mobile Toggle & Page Title */}
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setIsMobileSidebarOpen(true)}
+                                className="lg:hidden p-2 text-neutral-600 hover:text-neutral-950 rounded-xl hover:bg-black/[0.04] transition-colors"
+                                aria-label="Open sidebar"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <line x1="3" y1="12" x2="21" y2="12" />
+                                    <line x1="3" y1="6" x2="21" y2="6" />
+                                    <line x1="3" y1="18" x2="21" y2="18" />
                                 </svg>
-                            </div>
-                            <input
-                                type="text"
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search or jump to..."
-                                className="w-full pl-9 pr-14 py-2 bg-black/[0.03] hover:bg-black/[0.05] focus:bg-white text-xs sm:text-sm rounded-full border border-neutral-300 focus:border-black text-neutral-900 focus:outline-none transition-colors"
-                            />
-                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                <span className="text-[10px] font-mono text-neutral-400 bg-white border border-neutral-300 px-1.5 py-0.5 rounded-md shadow-2xs">
-                                    ⌘ + /
-                                </span>
+                            </button>
+                            <h1 className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight">
+                                {activeTab === "trends"
+                                    ? "Trends & Performance Reports"
+                                    : activeTab === "notifications"
+                                        ? "Inbox & Inquiries"
+                                        : activeTab === "projects"
+                                            ? "Projects & Code"
+                                            : activeTab === "connect-platform"
+                                                ? "Connect Coding Platforms"
+                                                : "Orbix Dashboard"}
+                            </h1>
+                        </div>
+
+                        {/* Center: Search input with ⌘ + / badge */}
+                        <div className="hidden md:flex items-center flex-1 max-w-md mx-4">
+                            <div className="relative w-full">
+                                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="11" cy="11" r="8" />
+                                        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                    </svg>
+                                </div>
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search or jump to..."
+                                    className="w-full pl-9 pr-14 py-2 bg-black/[0.03] hover:bg-black/[0.05] focus:bg-white text-xs sm:text-sm rounded-full border border-neutral-300 focus:border-black text-neutral-900 focus:outline-none transition-colors"
+                                />
+                                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                    <span className="text-[10px] font-mono text-neutral-400 bg-white border border-neutral-300 px-1.5 py-0.5 rounded-md shadow-2xs">
+                                        ⌘ + /
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Right action area: Notification Bell & Quick Profile */}
-                    <div className="flex items-center gap-2">
-                        <NotificationBell variant="light" />
-                        <Link
-                            to="/profile"
-                            title="Profile Settings"
-                            className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full hover:bg-black/[0.04] transition-colors"
-                        >
-                            <img
-                                src={user?.photoUrl || user?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=111827&color=fff&size=64&bold=true`}
-                                alt={displayName}
-                                className="w-7 h-7 rounded-full object-cover border border-neutral-200"
-                            />
-                            <span className="hidden sm:inline text-xs sm:text-sm font-semibold text-neutral-700">
-                                {displayName}
-                            </span>
-                        </Link>
-                    </div>
-                </header>
+                        {/* Right action area: Notification Bell & Quick Profile */}
+                        <div className="flex items-center gap-2">
+                            <NotificationBell variant="light" />
+                            <Link
+                                to="/profile"
+                                title="Profile Settings"
+                                className="flex items-center gap-2 p-1 pl-1.5 pr-2 rounded-full hover:bg-black/[0.04] transition-colors"
+                            >
+                                <img
+                                    src={user?.photoUrl || user?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=111827&color=fff&size=64&bold=true`}
+                                    alt={displayName}
+                                    className="w-7 h-7 rounded-full object-cover border border-neutral-200"
+                                />
+                                <span className="hidden sm:inline text-xs sm:text-sm font-semibold text-neutral-700">
+                                    {displayName}
+                                </span>
+                            </Link>
+                        </div>
+                    </header>
+                )}
 
                 {/* Dashboard View */}
                 {activeTab === "dashboard" && (
@@ -371,8 +369,8 @@ export default function Dashboard() {
 
                 {/* Sub-view: Resume */}
                 {activeTab === "resume" && (
-                    <div className="flex-1 w-full animate-in fade-in duration-200">
-                        <ResumeManager />
+                    <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
+                        <ResumeManager onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
                     </div>
                 )}
 

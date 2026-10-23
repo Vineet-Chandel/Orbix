@@ -1,25 +1,22 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { Crown, Flame, CheckCircle2 } from "lucide-react";
+import { Crown, Flame, CheckCircle2, Building2 } from "lucide-react";
 import type { LeaderboardEntry } from "./types";
-import { resolveCodeforcesRank } from "../../utils/codeforcesRanks";
-import { resolveLeetCodeRank } from "../../utils/leetcodeRanks";
-import { resolveCodeChefRank } from "../../utils/codechefRanks";
-import { resolveAtCoderRank } from "../../utils/atcoderRanks";
 
 interface LeaderboardPodiumProps {
     podium: LeaderboardEntry[];
+    scope?: "global" | "college";
 }
 
-export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ podium }) => {
+export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ podium, scope = "global" }) => {
     if (!podium || podium.length === 0) {
         return null;
     }
 
     // Identify first, second, and third place from the podium array
-    const first = podium.find((p) => p.rank === 1) || podium[0];
-    const second = podium.find((p) => p.rank === 2) || (podium.length > 1 ? podium[1] : null);
-    const third = podium.find((p) => p.rank === 3) || (podium.length > 2 ? podium[2] : null);
+    const first = podium.find((p) => (scope === "college" ? p.collegeRank === 1 || p.rank === 1 : p.rank === 1)) || podium[0];
+    const second = podium.find((p) => (scope === "college" ? p.collegeRank === 2 || p.rank === 2 : p.rank === 2)) || (podium.length > 1 ? podium[1] : null);
+    const third = podium.find((p) => (scope === "college" ? p.collegeRank === 3 || p.rank === 3 : p.rank === 3)) || (podium.length > 2 ? podium[2] : null);
 
     return (
         <div className="w-full">
@@ -30,10 +27,10 @@ export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ podium }) 
                         entry={second}
                         position={2}
                         label="2nd"
-                        accentColor="#94A3B8"
-                        accentBg="bg-slate-500/10"
-                        accentBorder="border-slate-400/30"
+                        accentBg="bg-white"
+                        shadowClass="shadow-[4px_4px_0px_#000]"
                         heightClass="md:h-[390px]"
+                        scope={scope}
                     />
                 )}
 
@@ -43,11 +40,11 @@ export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ podium }) 
                         entry={first}
                         position={1}
                         label="1st"
-                        accentColor="#F59E0B"
-                        accentBg="bg-amber-500/10"
-                        accentBorder="border-amber-500/40"
+                        accentBg="bg-[#FFE566]"
+                        shadowClass="shadow-[6px_6px_0px_#000]"
                         heightClass="md:h-[430px]"
                         isFirst
+                        scope={scope}
                     />
                 )}
 
@@ -57,10 +54,10 @@ export const LeaderboardPodium: React.FC<LeaderboardPodiumProps> = ({ podium }) 
                         entry={third}
                         position={3}
                         label="3rd"
-                        accentColor="#D97706"
-                        accentBg="bg-orange-500/10"
-                        accentBorder="border-orange-500/30"
+                        accentBg="bg-white"
+                        shadowClass="shadow-[4px_4px_0px_#000]"
                         heightClass="md:h-[370px]"
+                        scope={scope}
                     />
                 )}
             </div>
@@ -72,22 +69,22 @@ interface PodiumCardProps {
     entry: LeaderboardEntry;
     position: number;
     label: string;
-    accentColor: string;
     accentBg: string;
-    accentBorder: string;
+    shadowClass: string;
     heightClass: string;
     isFirst?: boolean;
+    scope?: "global" | "college";
 }
 
 const PodiumCard: React.FC<PodiumCardProps> = ({
     entry,
-    position,
+    position: _position,
     label,
-    accentColor,
-    accentBg,
-    accentBorder,
+    accentBg: _accentBg,
+    shadowClass,
     heightClass,
     isFirst = false,
+    scope = "global",
 }) => {
     const initials = (entry.displayName || entry.username)
         .split(" ")
@@ -98,171 +95,128 @@ const PodiumCard: React.FC<PodiumCardProps> = ({
 
     const ratings = entry.platformRatings || {};
     const college = entry.college || "—";
+    const displayRank = scope === "college" && entry.collegeRank ? entry.collegeRank : entry.rank;
 
     return (
         <div
-            className={`relative rounded-2xl bg-neutral-900/80 border ${accentBorder} p-6 flex flex-col justify-between transition-all hover:bg-neutral-900 shadow-lg ${heightClass} ${
-                isFirst ? "order-first md:order-none ring-1 ring-amber-500/20" : ""
-            }`}
+            className={`w-full rounded-2xl border-2 border-black ${shadowClass} p-5 sm:p-6 flex flex-col justify-between relative transition-all duration-200 hover:-translate-y-1 ${
+                isFirst ? "bg-[#FFE566]" : "bg-white"
+            } ${heightClass}`}
         >
-            {/* Top Badge: Rank Position */}
-            <div className="flex items-center justify-between">
+            {/* Top Badge Strip: Position Badge & Streak */}
+            <div className="flex items-center justify-between gap-2">
                 <span
-                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black tracking-wider uppercase ${accentBg} border ${accentBorder}`}
-                    style={{ color: accentColor }}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border-2 border-black text-xs font-black uppercase shadow-[1px_1px_0px_#000] ${
+                        isFirst ? "bg-black text-[#FFE566]" : "bg-[#FAF6EE] text-black"
+                    }`}
                 >
-                    {isFirst && <Crown className="w-3.5 h-3.5 fill-current" />}
-                    <span>#{position} · {label} Place</span>
+                    {isFirst && <Crown className="w-3.5 h-3.5 fill-[#FFE566]" />}
+                    <span>#{displayRank} · {label} Place</span>
                 </span>
 
                 {entry.streak > 0 && (
-                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                        <Flame className="w-3 h-3 fill-amber-400" />
-                        <span>{entry.streak}d streak</span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-white border-2 border-black text-black text-[11px] font-mono font-black shadow-[1px_1px_0px_#000]">
+                        <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                        <span>{entry.streak}d</span>
                     </span>
                 )}
             </div>
 
-            {/* Middle Section: Avatar & Coder Info */}
-            <div className="text-center my-4 space-y-2">
-                <div className="relative inline-block">
+            {/* Middle Section: Avatar, Name, Handle & College */}
+            <div className="flex flex-col items-center text-center space-y-3 py-2">
+                <div className="relative">
                     {entry.avatarUrl ? (
                         <img
                             src={entry.avatarUrl}
                             alt={entry.displayName}
-                            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border-2 shadow-md mx-auto"
-                            style={{ borderColor: accentColor }}
+                            className={`w-20 h-20 rounded-2xl object-cover border-2 border-black shadow-[3px_3px_0px_#000] ${
+                                isFirst ? "ring-2 ring-black" : ""
+                            }`}
                         />
                     ) : (
-                        <div
-                            className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center font-bold text-lg sm:text-xl text-white border-2 mx-auto shadow-md"
-                            style={{
-                                borderColor: accentColor,
-                                backgroundColor: `${accentColor}25`,
-                            }}
-                        >
+                        <div className="w-20 h-20 rounded-2xl bg-[#a2ff86] border-2 border-black flex items-center justify-center font-black text-xl text-black shadow-[3px_3px_0px_#000]">
                             {initials}
                         </div>
                     )}
                     {entry.isVerified && (
-                        <div
-                            className="absolute bottom-0 right-0 p-1 rounded-full bg-neutral-950 border border-neutral-800 text-blue-400 shadow-xs"
-                            title="Ownership Verified"
-                        >
-                            <CheckCircle2 className="w-4 h-4 fill-blue-500 text-neutral-950" />
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-black border-2 border-white flex items-center justify-center text-white shadow-xs">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-[#a2ff86]" />
                         </div>
                     )}
                 </div>
 
-                <div>
-                    <div className="flex items-center justify-center gap-1.5">
-                        <Link
-                            to={`/profile/u/${encodeURIComponent(entry.username)}`}
-                            className="text-base sm:text-lg font-black text-white hover:text-amber-400 transition-colors tracking-tight truncate max-w-[200px]"
-                        >
-                            {entry.displayName}
-                        </Link>
-                    </div>
-                    <p className="text-xs text-neutral-400 font-mono">@{entry.username}</p>
-                    <p className="text-xs text-neutral-500 truncate max-w-[220px] mx-auto mt-0.5" title={college}>
-                        {college}
+                <div className="space-y-0.5 max-w-full">
+                    <Link
+                        to={`/profile/u/${encodeURIComponent(entry.username)}`}
+                        className="text-base sm:text-lg font-black text-black hover:underline tracking-tight block truncate"
+                        title={entry.displayName}
+                    >
+                        {entry.displayName}
+                    </Link>
+                    <p className="text-xs font-mono font-bold text-neutral-600 truncate">
+                        @{entry.username}
                     </p>
+                    {college && college !== "—" && (
+                        <p className="text-[11px] font-bold text-neutral-700 truncate max-w-[220px] flex items-center justify-center gap-1 mt-0.5" title={college}>
+                            <Building2 className="w-3 h-3 stroke-[2.5] flex-shrink-0" />
+                            <span className="truncate">{college}</span>
+                        </p>
+                    )}
                 </div>
             </div>
 
-            {/* Score & Key Metrics */}
-            <div className="space-y-3 pt-3 border-t border-neutral-800/80">
+            {/* Bottom Metrics: Big Orbix Score + Solved & Rating Chips */}
+            <div className="space-y-3 pt-2 border-t-2 border-black/15">
                 <div className="text-center">
-                    <div className="text-2xl sm:text-3xl font-black text-white font-mono tracking-tight">
+                    <span className="text-2xl sm:text-3xl font-mono font-black text-black block tracking-tight">
                         {entry.score.toLocaleString()}
-                    </div>
-                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">
+                    </span>
+                    <span className="text-[10px] font-black uppercase text-neutral-600 tracking-wider">
                         Orbix Score
                     </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-center text-xs">
-                    <div className="p-2 rounded-xl bg-neutral-950/70 border border-neutral-800">
-                        <span className="text-neutral-400 text-[10px] uppercase font-bold block">Solved</span>
-                        <span className="text-white font-mono font-bold">{entry.totalSolved.toLocaleString()}</span>
+                {/* Sub-metrics: Solved & Contests */}
+                <div className="grid grid-cols-2 gap-2 text-center">
+                    <div className="p-1.5 rounded-lg bg-white/80 border border-black/20">
+                        <span className="text-xs font-mono font-black text-black block">
+                            {entry.totalSolved.toLocaleString()}
+                        </span>
+                        <span className="text-[9px] font-bold uppercase text-neutral-600 block">
+                            Solved
+                        </span>
                     </div>
-                    <div className="p-2 rounded-xl bg-neutral-950/70 border border-neutral-800">
-                        <span className="text-neutral-400 text-[10px] uppercase font-bold block">Contests</span>
-                        <span className="text-white font-mono font-bold">{entry.totalContests}</span>
+                    <div className="p-1.5 rounded-lg bg-white/80 border border-black/20">
+                        <span className="text-xs font-mono font-black text-black block">
+                            {entry.totalContests}
+                        </span>
+                        <span className="text-[9px] font-bold uppercase text-neutral-600 block">
+                            Contests
+                        </span>
                     </div>
                 </div>
 
-                {/* Rating Chips */}
+                {/* Platform Rating Chips */}
                 {Object.keys(ratings).length > 0 && (
-                    <div className="flex items-center justify-center gap-1.5 flex-wrap pt-1">
-                        {ratings.codeforces && (() => {
-                            const cfRank = resolveCodeforcesRank(ratings.codeforces.tier, ratings.codeforces.rating);
-                            const cfColor = cfRank ? cfRank.bgColor : (ratings.codeforces.color || "#808080");
-                            return (
-                                <span
-                                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border"
-                                    style={{
-                                        color: cfColor,
-                                        backgroundColor: `${cfColor}15`,
-                                        borderColor: `${cfColor}40`,
-                                    }}
-                                    title={`Codeforces: ${ratings.codeforces.rating} (${cfRank?.name || ratings.codeforces.tier || "Rated"})`}
-                                >
-                                    CF {ratings.codeforces.rating}
-                                </span>
-                            );
-                        })()}
-                        {ratings.leetcode && (() => {
-                            const lcRank = resolveLeetCodeRank(ratings.leetcode.tier || ratings.leetcode.badge, ratings.leetcode.rating);
-                            const lcColor = lcRank ? lcRank.bgColor : "#7A4AD8";
-                            return (
-                                <span
-                                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border"
-                                    style={{
-                                        color: lcColor,
-                                        backgroundColor: `${lcColor}15`,
-                                        borderColor: `${lcColor}40`,
-                                    }}
-                                    title={`LeetCode: ${ratings.leetcode.rating} (${lcRank?.name || ratings.leetcode.tier || "Rated"})`}
-                                >
-                                    LC {ratings.leetcode.rating}
-                                </span>
-                            );
-                        })()}
-                        {ratings.codechef && (() => {
-                            const ccRank = resolveCodeChefRank(ratings.codechef.tier, ratings.codechef.rating);
-                            const ccColor = ccRank ? ccRank.bgColor : "#FF7F00";
-                            return (
-                                <span
-                                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border"
-                                    style={{
-                                        color: ccColor,
-                                        backgroundColor: `${ccColor}15`,
-                                        borderColor: `${ccColor}40`,
-                                    }}
-                                    title={`CodeChef: ${ratings.codechef.rating} (${ccRank?.name || ratings.codechef.tier || "Rated"})`}
-                                >
-                                    CC {ratings.codechef.rating}
-                                </span>
-                            );
-                        })()}
-                        {ratings.atcoder && (() => {
-                            const acRank = resolveAtCoderRank(ratings.atcoder.tier, ratings.atcoder.rating);
-                            const acColor = acRank ? acRank.bgColor : "#01A0A0";
-                            return (
-                                <span
-                                    className="text-[10px] font-mono font-bold px-2 py-0.5 rounded border"
-                                    style={{
-                                        color: acColor,
-                                        backgroundColor: `${acColor}15`,
-                                        borderColor: `${acColor}40`,
-                                    }}
-                                    title={`AtCoder: ${ratings.atcoder.rating} (${acRank?.name || ratings.atcoder.tier || "Rated"})`}
-                                >
-                                    AC {ratings.atcoder.rating}
-                                </span>
-                            );
-                        })()}
+                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                        {ratings.codeforces && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
+                                <span className="text-neutral-500">CF</span>
+                                <span style={{ color: ratings.codeforces.color || "#000" }}>{ratings.codeforces.rating}</span>
+                            </span>
+                        )}
+                        {ratings.leetcode && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
+                                <span className="text-neutral-500">LC</span>
+                                <span className="text-amber-600">{ratings.leetcode.rating}</span>
+                            </span>
+                        )}
+                        {ratings.codechef && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
+                                <span className="text-neutral-500">CC</span>
+                                <span>{ratings.codechef.rating}</span>
+                            </span>
+                        )}
                     </div>
                 )}
             </div>

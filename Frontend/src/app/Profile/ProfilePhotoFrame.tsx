@@ -242,7 +242,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
 
             {/* Avatar Frame Container */}
             <div
-                className={`group relative ${sizeClasses} rounded-full overflow-hidden border-2 border-white shadow-md bg-neutral-100 flex-shrink-0 select-none transition-transform hover:scale-[1.02] focus-within:ring-2 focus-within:ring-black focus-within:ring-offset-2`}
+                className={`group relative ${sizeClasses} rounded-full overflow-hidden border-2 border-black shadow-[3px_3px_0px_#000] bg-neutral-100 flex-shrink-0 select-none transition-transform hover:scale-[1.02] focus-within:ring-2 focus-within:ring-black focus-within:ring-offset-2`}
                 aria-busy={isBusy}
             >
                 {/* 1. Profile Image Display */}
@@ -303,7 +303,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                     type="button"
                     onClick={() => setIsMenuOpen((prev) => !prev)}
                     disabled={isBusy}
-                    className="w-7 h-7 rounded-full bg-neutral-900 hover:bg-black text-white border-2 border-white shadow-sm flex items-center justify-center transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    className="w-7 h-7 rounded-full bg-neutral-900 hover:bg-black text-white border-2 border-black shadow-[1px_1px_0px_#000] flex items-center justify-center transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                     aria-label="Profile photo options"
                     aria-haspopup="true"
                     aria-expanded={isMenuOpen}
@@ -317,7 +317,7 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
                 {/* Dropdown Menu for Touch, Keyboard & Explicit Actions */}
                 {isMenuOpen && (
                     <div
-                        className="absolute right-0 bottom-9 w-48 bg-white rounded-2xl border border-neutral-200 shadow-xl py-1.5 z-50 animate-fadeIn text-xs font-semibold text-neutral-800"
+                        className="absolute right-0 bottom-9 w-48 bg-white rounded-xl border-2 border-black shadow-[4px_4px_0px_#000] py-1.5 z-50 animate-fadeIn text-xs font-bold text-black"
                         role="menu"
                     >
                         {/* Action 1: Change photo */}

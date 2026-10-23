@@ -18,7 +18,7 @@ const ConnectedPlatformAvatar = ({
     avatarUrl,
     name,
     username,
-    brandColor,
+    brandColor: _brandColor,
     size = "md",
 }: {
     portalId: string;
@@ -36,10 +36,10 @@ const ConnectedPlatformAvatar = ({
 
     const cleanAvatar =
         !imgFailed &&
-        avatarUrl &&
-        typeof avatarUrl === "string" &&
-        avatarUrl.trim().length > 5 &&
-        !avatarUrl.includes("ui-avatars.com")
+            avatarUrl &&
+            typeof avatarUrl === "string" &&
+            avatarUrl.trim().length > 5 &&
+            !avatarUrl.includes("ui-avatars.com")
             ? avatarUrl.trim()
             : null;
 
@@ -47,25 +47,24 @@ const ConnectedPlatformAvatar = ({
         size === "sm"
             ? "h-8 w-8"
             : size === "lg"
-            ? "h-11 w-11 sm:h-12 sm:w-12"
-            : "h-9 w-9 sm:h-10 sm:w-10";
+                ? "h-11 w-11 sm:h-12 sm:w-12"
+                : "h-9 w-9 sm:h-10 sm:w-10";
 
     return (
         <div className="relative flex-shrink-0">
             <div
-                className={`${dimClasses} rounded-full border-2 p-0.5 bg-white shadow-2xs flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105`}
-                style={{ borderColor: brandColor }}
+                className={`${dimClasses} rounded-lg border-2 border-black p-0.5 bg-white shadow-[2px_2px_0px_#000] flex items-center justify-center overflow-hidden transition-transform group-hover:scale-105`}
             >
                 {cleanAvatar ? (
                     <img
                         src={cleanAvatar}
                         alt={name || username || portalId}
                         referrerPolicy="no-referrer"
-                        className="h-full w-full rounded-full object-cover"
+                        className="h-full w-full rounded-md object-cover"
                         onError={() => setImgFailed(true)}
                     />
                 ) : (
-                    <div className="w-full h-full rounded-full bg-neutral-50 flex items-center justify-center p-1.5">
+                    <div className="w-full h-full rounded-md bg-white flex items-center justify-center p-1.5">
                         {getPortalIcon(portalId, "w-full h-full object-contain")}
                     </div>
                 )}
@@ -74,8 +73,7 @@ const ConnectedPlatformAvatar = ({
             {/* Mini Platform Badge at Bottom-Right (rendered when displaying user's photo) */}
             {cleanAvatar && (
                 <div
-                    className="absolute -bottom-1 -right-1 flex h-4 w-4 sm:h-4.5 sm:w-4.5 items-center justify-center rounded-full bg-white p-0.5 shadow-xs border"
-                    style={{ borderColor: brandColor }}
+                    className="absolute -bottom-1 -right-1 flex h-4 w-4 sm:h-4.5 sm:w-4.5 items-center justify-center rounded-md bg-white p-0.5 shadow-[1px_1px_0px_#000] border-2 border-black"
                     title={PORTALS[portalId]?.name || portalId}
                 >
                     {getPortalIcon(portalId, "w-2.5 h-2.5 sm:w-3 sm:h-3")}
@@ -355,7 +353,7 @@ export default function ProfilesOnboardingPage() {
                     }
                     try {
                         localStorage.setItem("orbix_connected_portals", JSON.stringify(next));
-                    } catch {}
+                    } catch { }
                     return next;
                 });
             }
@@ -558,7 +556,7 @@ export default function ProfilesOnboardingPage() {
             // Persist to Redux and LocalStorage
             dispatch(setPortalProfiles(resolvedProfiles));
             localStorage.setItem("orbix_connected_portals", JSON.stringify(connectedProfiles));
-            
+
             // Invalidate all platform caches so Dashboard and Profile charts update immediately
             const activeUser = user || (() => {
                 try {
@@ -649,376 +647,347 @@ export default function ProfilesOnboardingPage() {
 
             {/* Right Main Content Workspace */}
             <div className="flex-1 min-w-0 flex flex-col min-h-screen p-3 sm:p-4 lg:pl-0">
-                {/* Top Header Bar */}
-                <header className="h-16 w-full rounded-2xl bg-white border border-neutral-200/90 shadow-xs px-4 sm:px-6 flex items-center justify-between gap-4 mb-4 flex-shrink-0">
-                    {/* Left: Mobile Toggle & Page Title */}
-                    <div className="flex items-center gap-3">
-                        <button
-                            type="button"
-                            onClick={() => setIsMobileSidebarOpen(true)}
-                            className="lg:hidden p-2 text-neutral-600 hover:text-neutral-950 rounded-xl hover:bg-neutral-100 transition-colors cursor-pointer"
-                            aria-label="Open sidebar"
-                        >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                <line x1="3" y1="12" x2="21" y2="12" />
-                                <line x1="3" y1="6" x2="21" y2="6" />
-                                <line x1="3" y1="18" x2="21" y2="18" />
-                            </svg>
-                        </button>
-                        <div className="flex items-center gap-2.5">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-black text-white shadow-xs">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h1 className="text-sm sm:text-base font-extrabold text-neutral-900 tracking-tight leading-none">
-                                    Connect Coding Platforms
-                                </h1>
-                                <p className="text-[11px] text-neutral-500 font-medium hidden sm:block mt-0.5">
-                                    Link your competitive programming & dev profiles
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right: Connected count badge & mobile bucket trigger */}
-                    <div className="flex items-center gap-2 sm:gap-3">
-                        <button
-                            type="button"
-                            onClick={() => connectedCount > 0 && setIsMobileBucketOpen(true)}
-                            className={`text-[11px] font-semibold px-3 py-1.5 rounded-full transition-all flex items-center gap-2 ${
-                                connectedCount > 0
-                                    ? "text-black bg-neutral-100 border border-neutral-300 hover:bg-neutral-200 cursor-pointer shadow-2xs"
-                                    : "text-neutral-500 bg-neutral-100 border border-neutral-200"
-                            }`}
-                            title={connectedCount > 0 ? "Click to view connected bucket" : ""}
-                        >
-                            {connectedCount > 0 ? (
-                                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                            ) : (
-                                <span className="h-2 w-2 rounded-full bg-neutral-400" />
-                            )}
-                            <span>{connectedCount} of 13 connected</span>
-                            {connectedCount > 0 && <span className="text-[10px] sm:hidden">▾</span>}
-                        </button>
-                    </div>
-                </header>
-
                 {/* Main Scrollable Content Card */}
-                <div className="flex-1 w-full bg-white rounded-2xl border border-neutral-200/90 shadow-xs p-4 sm:p-6 lg:p-8 overflow-y-auto scrollbar-none">
-                    <div className="mx-auto w-full max-w-7xl my-1">
-                        {/* Page Header */}
-                        <div className="mb-6 lg:mb-8 pb-5 border-b border-neutral-100 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                            <div>
-                                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-neutral-950">
-                                    Connect your coding profiles
-                                </h1>
-                                <p className="mt-1.5 text-xs sm:text-sm text-neutral-500 leading-relaxed max-w-2xl">
-                                    {user?.firstName ? `Hi ${user.firstName}! ` : ""}
-                                    Paste your profile link or handle on the left. As soon as you tap connect, profiles are gathered in your bucket on the right ready to save to your dashboard.
-                                </p>
+                <div className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between">
+                    <div className="p-4 sm:p-6 lg:p-8 flex-1">
+                        <div className="mx-auto w-full max-w-7xl my-1">
+                            {/* Page Header */}
+                            <div className="mb-6 lg:mb-8 pb-5 border-b-2 border-black/55 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                <div className="flex items-start gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMobileSidebarOpen(true)}
+                                        className="lg:hidden mt-0.5 p-2 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer flex-shrink-0"
+                                        aria-label="Open sidebar"
+                                    >
+                                        <svg className="w-5 h-5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <line x1="3" y1="12" x2="21" y2="12" />
+                                            <line x1="3" y1="6" x2="21" y2="6" />
+                                            <line x1="3" y1="18" x2="21" y2="18" />
+                                        </svg>
+                                    </button>
+                                    <div>
+                                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-black">
+                                            Connect your coding profiles
+                                        </h1>
+                                        <p className="mt-1.5 text-xs sm:text-sm font-medium text-neutral-700 leading-relaxed max-w-2xl">
+                                            {user?.firstName ? `Hi ${user.firstName}! ` : ""}
+                                            Paste your profile link or handle on the left. As soon as you tap connect, profiles are gathered in your bucket on the right ready to save to your dashboard.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2.5 flex-shrink-0 self-start md:self-center flex-wrap">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-black uppercase border-2 border-black bg-white text-black shadow-[3px_3px_0px_#000]">
+                                        <span>{availablePortalList.length} unlinked</span>
+                                    </span>
+                                    <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-black uppercase border-2 border-black shadow-[3px_3px_0px_#000] ${connectedCount > 0
+                                        ? "bg-[#a2ff86] text-black"
+                                        : "bg-white text-black"
+                                        }`}>
+                                        <span className={`w-2 h-2 rounded-full ${connectedCount > 0 ? "bg-black animate-pulse" : "bg-neutral-400"}`} />
+                                        <span>{connectedCount} of 13 platforms connected</span>
+                                    </span>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2.5 flex-shrink-0 self-start md:self-center">
-                                <span className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-2xs ${
-                                    connectedCount > 0
-                                        ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-                                        : "bg-neutral-100 text-neutral-600 border border-neutral-200"
-                                }`}>
-                                    <span className={`w-2 h-2 rounded-full ${connectedCount > 0 ? "bg-emerald-500 animate-pulse" : "bg-neutral-400"}`} />
-                                    <span>{connectedCount} of 13 platforms connected</span>
-                                </span>
-                            </div>
-                        </div>
 
-                        {/* Parallel 2-Column Grid Layout:
-                            - Left: Input fields for required platforms
-                            - Right: Connected Accounts Bucket (Sticky on desktop) */}
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
-                            {/* Left Column: Input of required fields (7 cols) */}
-                            <div className="lg:col-span-7 space-y-5">
-                                {/* Search and Filter Control Bar */}
-                                <div className="bg-neutral-50/80 border border-neutral-200/90 rounded-2xl p-4 sm:p-5 space-y-3.5">
-                                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                                        <div>
-                                            <h2 className="text-xs sm:text-sm font-bold text-neutral-900 tracking-tight flex items-center gap-2">
-                                                <span>Available Platforms</span>
-                                                <span className="text-[11px] font-semibold text-neutral-600 bg-white border border-neutral-200 px-2 py-0.5 rounded-full shadow-2xs">
-                                                    {availablePortalList.length} unlinked
-                                                </span>
-                                            </h2>
-                                            <p className="text-[11px] text-neutral-500 mt-0.5">
-                                                Select a platform, enter your username or link, and verify
-                                            </p>
+                            {/* Parallel 2-Column Grid Layout:
+                                - Left: Input fields for required platforms
+                                - Right: Connected Accounts Bucket (Sticky on desktop) */}
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-start">
+                                {/* Left Column: Input of required fields (7 cols) */}
+                                <div className="lg:col-span-7 space-y-5">
+                                    {/* Search and Filter Control Bar */}
+                                    <div className="bg-white border-2 border-black rounded-xl p-4 sm:p-5 space-y-3.5 shadow-[4px_4px_0px_#000]">
+                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                            <div>
+                                                <h2 className="text-xs sm:text-sm font-black text-black tracking-tight uppercase">
+                                                    Available Platforms
+                                                </h2>
+                                                <p className="text-[11px] font-medium text-neutral-600 mt-0.5">
+                                                    Select a platform, enter your username or link, and verify
+                                                </p>
+                                            </div>
+
+                                            {/* Category Tabs */}
+                                            <div className="flex flex-wrap items-center gap-1.5 p-1 bg-[#FAF6EE] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000]">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveCategory("all")}
+                                                    className={`px-3 py-1 rounded-md text-xs font-black transition-all cursor-pointer ${activeCategory === "all"
+                                                        ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                                        : "text-neutral-700 hover:text-black border-2 border-transparent"
+                                                        }`}
+                                                >
+                                                    All (13)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveCategory("cp")}
+                                                    className={`px-3 py-1 rounded-md text-xs font-black transition-all cursor-pointer ${activeCategory === "cp"
+                                                        ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                                        : "text-neutral-700 hover:text-black border-2 border-transparent"
+                                                        }`}
+                                                >
+                                                    CP (6)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveCategory("practice")}
+                                                    className={`px-3 py-1 rounded-md text-xs font-black transition-all cursor-pointer ${activeCategory === "practice"
+                                                        ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                                        : "text-neutral-700 hover:text-black border-2 border-transparent"
+                                                        }`}
+                                                >
+                                                    Practice (6)
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setActiveCategory("dev")}
+                                                    className={`px-3 py-1 rounded-md text-xs font-black transition-all cursor-pointer ${activeCategory === "dev"
+                                                        ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                                        : "text-neutral-700 hover:text-black border-2 border-transparent"
+                                                        }`}
+                                                >
+                                                    Dev (1)
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        {/* Category Tabs */}
-                                        <div className="flex flex-wrap items-center gap-1 p-1 bg-neutral-200/60 rounded-xl text-xs font-medium self-start sm:self-auto">
-                                            <button
-                                                type="button"
-                                                onClick={() => setActiveCategory("all")}
-                                                className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
-                                                    activeCategory === "all"
-                                                        ? "bg-white text-neutral-950 font-bold shadow-xs"
-                                                        : "text-neutral-600 hover:text-neutral-900"
-                                                }`}
-                                            >
-                                                All (13)
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setActiveCategory("cp")}
-                                                className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
-                                                    activeCategory === "cp"
-                                                        ? "bg-white text-neutral-950 font-bold shadow-xs"
-                                                        : "text-neutral-600 hover:text-neutral-900"
-                                                }`}
-                                            >
-                                                CP (6)
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setActiveCategory("practice")}
-                                                className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
-                                                    activeCategory === "practice"
-                                                        ? "bg-white text-neutral-950 font-bold shadow-xs"
-                                                        : "text-neutral-600 hover:text-neutral-900"
-                                                }`}
-                                            >
-                                                Practice (6)
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setActiveCategory("dev")}
-                                                className={`px-3 py-1 rounded-lg transition-all cursor-pointer text-xs ${
-                                                    activeCategory === "dev"
-                                                        ? "bg-white text-neutral-950 font-bold shadow-xs"
-                                                        : "text-neutral-600 hover:text-neutral-900"
-                                                }`}
-                                            >
-                                                Dev (1)
-                                            </button>
+                                        {/* Search input with clear button */}
+                                        <div className="relative w-full">
+                                            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-black">
+                                                <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <circle cx="11" cy="11" r="8" />
+                                                    <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                                                </svg>
+                                            </div>
+                                            <input
+                                                type="text"
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                placeholder="Filter platforms by name (e.g. LeetCode, GitHub, Codeforces)..."
+                                                autoCorrect="off"
+                                                autoCapitalize="off"
+                                                spellCheck={false}
+                                                className="w-full pl-10 pr-10 py-2.5 bg-white text-xs font-bold text-black placeholder:text-neutral-400 placeholder:font-normal rounded-lg border-2 border-black focus:outline-none shadow-[2px_2px_0px_#000] focus:shadow-[3px_3px_0px_#000] transition-all"
+                                            />
+                                            {searchQuery && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSearchQuery("")}
+                                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-black hover:text-neutral-600 cursor-pointer"
+                                                    title="Clear search"
+                                                >
+                                                    <svg className="w-3.5 h-3.5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <line x1="18" y1="6" x2="6" y2="18" />
+                                                        <line x1="6" y1="6" x2="18" y2="18" />
+                                                    </svg>
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {/* Search input with clear button */}
-                                    <div className="relative w-full">
-                                        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-neutral-400">
-                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                <circle cx="11" cy="11" r="8" />
-                                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                                            </svg>
-                                        </div>
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder="Filter platforms by name (e.g. LeetCode, GitHub, Codeforces)..."
-                                            className="w-full pl-10 pr-10 py-2.5 bg-white text-xs text-neutral-900 placeholder:text-neutral-400 rounded-xl border border-neutral-200 focus:outline-none focus:border-neutral-900 focus:ring-1 focus:ring-neutral-900 transition-colors shadow-2xs"
-                                        />
-                                        {searchQuery && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setSearchQuery("")}
-                                                className="absolute inset-y-0 right-0 pr-3 flex items-center text-neutral-400 hover:text-neutral-700 cursor-pointer"
-                                                title="Clear search"
+                                    {/* Portal Inputs List (Available portals) */}
+                                    <div className="space-y-4">
+                                        {availablePortalList.map((portal) => (
+                                            <div
+                                                key={portal.id}
+                                                className="bg-white border-2 border-black rounded-xl p-4 sm:p-5 shadow-[4px_4px_0px_#000] transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_#000]"
                                             >
-                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                                    <line x1="18" y1="6" x2="6" y2="18" />
-                                                    <line x1="6" y1="6" x2="18" y2="18" />
-                                                </svg>
-                                            </button>
+                                                <PortalProfileInput
+                                                    portalId={portal.id}
+                                                    value={portalValues[portal.id] || ""}
+                                                    isConnected={false}
+                                                    connectedProfile={null}
+                                                    recentProfile={recentProfilesHistory[portal.id] || null}
+                                                    onChange={handleInputChange}
+                                                    onConnectProfile={handleConnectProfile}
+                                                    onDisconnectProfile={handleDisconnectProfile}
+                                                />
+                                            </div>
+                                        ))}
+
+                                        {/* Empty state when all portals in category or search are connected */}
+                                        {availablePortalList.length === 0 && (
+                                            <div className="py-12 text-center space-y-3 bg-white border-2 border-dashed border-black rounded-xl p-6 shadow-[4px_4px_0px_#000]">
+                                                <div className="w-12 h-12 mx-auto rounded-lg border-2 border-black bg-[#a2ff86] text-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                                    <svg className="w-6 h-6 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <polyline points="20 6 9 17 4 12" />
+                                                    </svg>
+                                                </div>
+                                                <h4 className="text-sm font-black uppercase text-black">
+                                                    {connectedCount === 13
+                                                        ? "All 13 Platforms Connected!"
+                                                        : connectedCount > 0
+                                                            ? "All Filtered Platforms Connected!"
+                                                            : "No Platforms Match Your Search"}
+                                                </h4>
+                                                <p className="text-xs font-medium text-neutral-600 max-w-sm mx-auto leading-relaxed">
+                                                    {connectedCount === 13
+                                                        ? "Every supported platform is already gathered in your bucket on the right. Tap 'Save & Continue to Dashboard' to persist."
+                                                        : connectedCount > 0
+                                                            ? `You have connected ${connectedCount} ${connectedCount === 1 ? "platform" : "platforms"} in your bucket. Adjust your filter or search above to link more.`
+                                                            : `No platform matches '${searchQuery}'. Try clearing your search query.`}
+                                                </p>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
 
-                                {/* Portal Inputs List (Available portals) */}
-                                <div className="space-y-4">
-                                    {availablePortalList.map((portal) => (
-                                        <div
-                                            key={portal.id}
-                                            className="bg-white border border-neutral-200/90 hover:border-neutral-300 rounded-2xl p-4 sm:p-5 shadow-2xs transition-all"
-                                        >
-                                            <PortalProfileInput
-                                                portalId={portal.id}
-                                                value={portalValues[portal.id] || ""}
-                                                isConnected={false}
-                                                connectedProfile={null}
-                                                recentProfile={recentProfilesHistory[portal.id] || null}
-                                                onChange={handleInputChange}
-                                                onConnectProfile={handleConnectProfile}
-                                                onDisconnectProfile={handleDisconnectProfile}
-                                            />
-                                        </div>
-                                    ))}
-
-                                    {/* Empty state when all portals in category or search are connected */}
-                                    {availablePortalList.length === 0 && (
-                                        <div className="py-12 text-center space-y-3 bg-neutral-50/70 border border-dashed border-neutral-200 rounded-2xl p-6">
-                                            <div className="w-12 h-12 mx-auto rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200 shadow-xs">
-                                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                                    <polyline points="20 6 9 17 4 12" />
-                                                </svg>
+                                {/* Right Column: Connected Accounts Bucket (5 cols, sticky on desktop) */}
+                                <div className="lg:col-span-5 lg:sticky lg:top-4 space-y-4">
+                                    <div className="rounded-xl border-2 border-black bg-white p-4 sm:p-5 shadow-[6px_6px_0px_#000] transition-all">
+                                        {/* Bucket Header */}
+                                        <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b-2 border-black">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-black bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]">
+                                                    <svg className="w-5 h-5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-sm font-black text-black uppercase tracking-wide leading-tight">
+                                                        Connected Accounts Bucket
+                                                    </h3>
+                                                    <p className="text-[11px] font-medium text-neutral-600 mt-0.5">
+                                                        Accounts ready to save to your dashboard
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <h4 className="text-sm font-bold text-neutral-900">
-                                                {connectedCount === 13
-                                                    ? "All 13 Platforms Connected!"
-                                                    : connectedCount > 0
-                                                    ? "All Filtered Platforms Connected!"
-                                                    : "No Platforms Match Your Search"}
-                                            </h4>
-                                            <p className="text-xs text-neutral-500 max-w-sm mx-auto leading-relaxed">
-                                                {connectedCount === 13
-                                                    ? "Every supported platform is already gathered in your bucket on the right. Tap 'Save & Continue to Dashboard' to persist."
-                                                    : connectedCount > 0
-                                                    ? `You have connected ${connectedCount} ${connectedCount === 1 ? "platform" : "platforms"} in your bucket. Adjust your filter or search above to link more.`
-                                                    : `No platform matches '${searchQuery}'. Try clearing your search query.`}
-                                            </p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
 
-                            {/* Right Column: Connected Accounts Bucket (5 cols, sticky on desktop) */}
-                            <div className="lg:col-span-5 lg:sticky lg:top-4 space-y-4">
-                                <div className="rounded-2xl border border-neutral-200/90 bg-neutral-50/90 p-4 sm:p-5 shadow-xs transition-all">
-                                    {/* Bucket Header */}
-                                    <div className="flex items-center justify-between pb-3.5 mb-3.5 border-b border-neutral-200/80">
-                                        <div className="flex items-center gap-2.5">
-                                            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-neutral-950 text-white shadow-xs">
-                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                                </svg>
+                                            <span className={`text-xs font-black px-3 py-1 rounded-md border-2 border-black transition-all flex items-center gap-1.5 shadow-[2px_2px_0px_#000] ${connectedCount > 0
+                                                ? "text-black bg-[#a2ff86]"
+                                                : "text-neutral-700 bg-neutral-100"
+                                                }`}>
+                                                {connectedCount > 0 && <span className="w-2 h-2 rounded-full bg-black animate-pulse" />}
+                                                {connectedCount} {connectedCount === 1 ? "account" : "accounts"}
+                                            </span>
+                                        </div>
+
+                                        {/* Connected Cards List */}
+                                        {connectedCount > 0 ? (
+                                            <div className="space-y-2.5 max-h-[calc(100vh-320px)] min-h-[160px] overflow-y-auto pr-1 scrollbar-none">
+                                                {Object.entries(connectedProfiles).map(([pId, profile]) => {
+                                                    const portalConf = PORTALS[pId];
+                                                    const brandColor = portalConf?.brandColor || "#0D8BD9";
+                                                    return (
+                                                        <div
+                                                            key={pId}
+                                                            className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-lg border-2 border-black bg-white shadow-[3px_3px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[4px_4px_0px_#000] transition-all group"
+                                                        >
+                                                            <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                                                                <ConnectedPlatformAvatar
+                                                                    portalId={pId}
+                                                                    avatarUrl={profile.avatar || (profile as any).avatarUrl || (profile as any).avatar_url}
+                                                                    name={profile.name}
+                                                                    username={profile.username}
+                                                                    brandColor={brandColor}
+                                                                    size="md"
+                                                                />
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-1.5">
+                                                                        <span className="text-xs font-black text-black uppercase truncate">
+                                                                            {portalConf?.name || pId}
+                                                                        </span>
+                                                                        <span className="inline-flex items-center justify-center text-[10px] font-black text-black bg-[#a2ff86] border border-black px-1.5 rounded" title="Verified">✓</span>
+                                                                    </div>
+                                                                    <p className="text-[11px] text-neutral-600 font-mono font-bold truncate">
+                                                                        @{profile.username}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDisconnectProfile(pId)}
+                                                                className="p-1.5 text-black hover:bg-rose-100 rounded-md border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                                                                title={`Disconnect ${portalConf?.name || pId}`}
+                                                                aria-label={`Disconnect ${portalConf?.name || pId}`}
+                                                            >
+                                                                <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
-                                            <div>
-                                                <h3 className="text-sm font-bold text-neutral-900 leading-tight">
-                                                    Connected Accounts Bucket
-                                                </h3>
-                                                <p className="text-[11px] text-neutral-500 mt-0.5">
-                                                    Accounts ready to save to your dashboard
+                                        ) : (
+                                            <div className="py-10 px-4 text-center border-2 border-dashed border-black rounded-lg bg-[#FAF6EE] space-y-2.5">
+                                                <div className="w-12 h-12 mx-auto rounded-lg border-2 border-black bg-white flex items-center justify-center text-black shadow-[2px_2px_0px_#000]">
+                                                    <svg className="w-6 h-6 stroke-[2]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                                                    </svg>
+                                                </div>
+                                                <h4 className="text-xs font-black uppercase tracking-wide text-black">Your bucket is empty</h4>
+                                                <p className="text-[11px] font-medium text-neutral-600 max-w-sm mx-auto leading-relaxed">
+                                                    Enter your profile link or handle on the left and tap{" "}
+                                                    <span className="whitespace-nowrap inline-block font-black text-black bg-[#a2ff86] px-1.5 py-0.5 border border-black rounded shadow-[1px_1px_0px_#000]">
+                                                        "Yes, connect"
+                                                    </span>{" "}
+                                                    to gather accounts here.
                                                 </p>
                                             </div>
-                                        </div>
+                                        )}
 
-                                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border transition-all flex items-center gap-1.5 ${
-                                            connectedCount > 0
-                                                ? "text-emerald-800 bg-emerald-100/80 border-emerald-300 shadow-2xs"
-                                                : "text-neutral-500 bg-neutral-100 border-neutral-200"
-                                        }`}>
-                                            {connectedCount > 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
-                                            {connectedCount} {connectedCount === 1 ? "account" : "accounts"}
-                                        </span>
-                                    </div>
-
-                                    {/* Connected Cards List */}
-                                    {connectedCount > 0 ? (
-                                        <div className="space-y-2.5 max-h-[calc(100vh-320px)] min-h-[160px] overflow-y-auto pr-1 scrollbar-none">
-                                            {Object.entries(connectedProfiles).map(([pId, profile]) => {
-                                                const portalConf = PORTALS[pId];
-                                                const brandColor = portalConf?.brandColor || "#0D8BD9";
-                                                return (
-                                                    <div
-                                                        key={pId}
-                                                        className="flex items-center justify-between gap-3 p-2.5 sm:p-3 rounded-xl border border-neutral-200/80 bg-white shadow-2xs hover:shadow-xs hover:border-neutral-300 transition-all group"
-                                                    >
-                                                        <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                                                            <ConnectedPlatformAvatar
-                                                                portalId={pId}
-                                                                avatarUrl={profile.avatar || (profile as any).avatarUrl || (profile as any).avatar_url}
-                                                                name={profile.name}
-                                                                username={profile.username}
-                                                                brandColor={brandColor}
-                                                                size="md"
-                                                            />
-                                                            <div className="min-w-0">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-xs font-bold text-neutral-900 truncate">
-                                                                        {portalConf?.name || pId}
-                                                                    </span>
-                                                                    <span className="text-[11px] text-emerald-600 font-bold" title="Verified">✓</span>
-                                                                </div>
-                                                                <p className="text-[11px] text-neutral-500 font-mono truncate">
-                                                                    @{profile.username}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleDisconnectProfile(pId)}
-                                                            className="p-1.5 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer group-hover:text-neutral-600"
-                                                            title={`Disconnect ${portalConf?.name || pId}`}
-                                                            aria-label={`Disconnect ${portalConf?.name || pId}`}
-                                                        >
-                                                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                                            </svg>
-                                                        </button>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    ) : (
-                                        <div className="py-10 px-4 text-center border border-dashed border-neutral-300/80 rounded-xl bg-white/70 space-y-2.5">
-                                            <div className="w-10 h-10 mx-auto rounded-full bg-neutral-100 flex items-center justify-center text-neutral-400">
-                                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.8">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                                </svg>
+                                        {/* Actions & Status inside right bucket */}
+                                        <div className="pt-4 mt-4 border-t-2 border-black space-y-3">
+                                            {/* Status indicator row */}
+                                            <div className="flex items-center justify-between text-xs px-1">
+                                                <span className="text-neutral-700 font-extrabold uppercase tracking-wide">Status</span>
+                                                {isDirty ? (
+                                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-black bg-amber-200 border-2 border-black px-2.5 py-0.5 rounded-md shadow-[2px_2px_0px_#000]">
+                                                        <span className="w-2 h-2 rounded-full bg-black animate-pulse" />
+                                                        Unsaved changes
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center gap-1.5 text-[11px] font-extrabold text-black bg-[#a2ff86] border-2 border-black px-2.5 py-0.5 rounded-md shadow-[2px_2px_0px_#000]">
+                                                        <span className="w-2 h-2 rounded-full bg-black" />
+                                                        Up to date
+                                                    </span>
+                                                )}
                                             </div>
-                                            <h4 className="text-xs font-bold text-neutral-800">Your bucket is empty</h4>
-                                            <p className="text-[11px] text-neutral-500 max-w-xs mx-auto leading-relaxed">
-                                                Enter your profile link or handle on the left and tap <span className="font-semibold text-neutral-800">"Yes, connect"</span> to gather accounts here.
+
+                                            {/* Save & Continue to Dashboard Button (EXACT MATCH TO USER'S REFERENCE IMAGE) */}
+                                            <button
+                                                type="button"
+                                                onClick={handleSave}
+                                                disabled={isSaving}
+                                                className="w-full h-13 rounded-lg border-2 border-black bg-[#a2ff86] hover:bg-[#92f574] text-black font-black uppercase tracking-wider text-xs sm:text-sm shadow-[4px_4px_0px_#000] hover:shadow-[2px_2px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                                            >
+                                                {isSaving ? (
+                                                    <>
+                                                        <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                                        <span>Saving Profiles...</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span>Save & Continue to Dashboard</span>
+                                                        <svg className="w-4 h-4 stroke-[3]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                                        </svg>
+                                                    </>
+                                                )}
+                                            </button>
+
+                                            <p className="text-[11px] text-center font-medium text-neutral-500">
+                                                You can edit or update your public profile handles anytime from your Orbix Dashboard settings.
                                             </p>
                                         </div>
-                                    )}
-
-                                    {/* Actions & Status inside right bucket */}
-                                    <div className="pt-4 mt-4 border-t border-neutral-200/80 space-y-3">
-                                        {/* Status indicator row */}
-                                        <div className="flex items-center justify-between text-xs px-1">
-                                            <span className="text-neutral-500 font-medium">Status</span>
-                                            {isDirty ? (
-                                                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                                    Unsaved changes
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                                    Up to date
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {/* Save & Continue to Dashboard Button */}
-                                        <button
-                                            type="button"
-                                            onClick={handleSave}
-                                            disabled={isSaving}
-                                            className="w-full h-12 rounded-xl bg-neutral-950 hover:bg-neutral-800 active:scale-[0.99] text-white font-semibold text-xs sm:text-sm transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-                                        >
-                                            {isSaving ? (
-                                                <>
-                                                    <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                                    <span>Saving Profiles...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span>Save & Continue to Dashboard</span>
-                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                                                    </svg>
-                                                </>
-                                            )}
-                                        </button>
-
-                                        <p className="text-[11px] text-center text-neutral-400">
-                                            You can edit or update your public profile handles anytime from your Orbix Dashboard settings.
-                                        </p>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
+
+                    {/* Bottom Full-Width Illustration grounded at the bottom of the container */}
+                    <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
+                        <img
+                            src="/image.png"
+                            alt="Connected platforms workspace illustration"
+                            className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
+                            loading="eager"
+                        />
                     </div>
                 </div>
             </div>
@@ -1029,9 +998,9 @@ export default function ProfilesOnboardingPage() {
                     <button
                         type="button"
                         onClick={() => setIsMobileBucketOpen(true)}
-                        className="flex items-center gap-2 rounded-full bg-neutral-950 text-white pl-3.5 pr-4 py-2.5 shadow-2xl border border-neutral-700 active:scale-95 transition-all text-xs font-bold cursor-pointer"
+                        className="flex items-center gap-2 rounded-lg bg-[#a2ff86] text-black border-2 border-black pl-3.5 pr-4 py-2.5 shadow-[4px_4px_0px_#000] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all text-xs font-black uppercase cursor-pointer"
                     >
-                        <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="flex h-2 w-2 rounded-full bg-black animate-pulse" />
                         <div className="flex -space-x-1.5 overflow-hidden">
                             {Object.entries(connectedProfiles).slice(0, 3).map(([pId, p]) => (
                                 <MobilePillAvatar
@@ -1043,7 +1012,7 @@ export default function ProfilesOnboardingPage() {
                             ))}
                         </div>
                         <span>Bucket ({connectedCount})</span>
-                        <span className="text-neutral-400 text-[10px]">▴</span>
+                        <span className="text-black text-[10px]">▴</span>
                     </button>
                 </div>
             )}
@@ -1052,30 +1021,30 @@ export default function ProfilesOnboardingPage() {
             {isMobileBucketOpen && (
                 <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-fadeIn">
                     <div
-                        className="w-full max-w-lg bg-[#0b0f19] border border-neutral-800 rounded-t-3xl sm:rounded-2xl text-white p-5 flex flex-col max-h-[85vh] shadow-2xl animate-slideUp"
+                        className="w-full max-w-lg bg-white border-2 border-black rounded-t-3xl sm:rounded-xl text-black p-5 flex flex-col max-h-[85vh] shadow-[8px_8px_0px_#000] animate-slideUp"
                     >
                         {/* Drawer handle for mobile */}
-                        <div className="w-12 h-1 bg-neutral-700 rounded-full mx-auto mb-4 sm:hidden" />
+                        <div className="w-12 h-1.5 bg-black rounded-full mx-auto mb-4 sm:hidden" />
 
                         {/* Drawer Header */}
-                        <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+                        <div className="flex items-center justify-between pb-3 border-b-2 border-black">
                             <div>
-                                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                                <h3 className="text-base font-black text-black flex items-center gap-2 uppercase tracking-wide">
                                     <span>Connected Accounts Bucket</span>
-                                    <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                                    <span className="text-xs font-black text-black bg-[#a2ff86] border-2 border-black px-2 py-0.5 rounded-md shadow-[1px_1px_0px_#000]">
                                         {connectedCount} connected
                                     </span>
                                 </h3>
-                                <p className="text-xs text-neutral-400 mt-0.5">
+                                <p className="text-xs font-medium text-neutral-600 mt-0.5">
                                     Tap disconnect to remove an account back to its input state.
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setIsMobileBucketOpen(false)}
-                                className="p-1.5 text-neutral-400 hover:text-white rounded-lg transition-colors cursor-pointer"
+                                className="p-1.5 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
                             >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <svg className="w-5 h-5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
                             </button>
@@ -1089,7 +1058,7 @@ export default function ProfilesOnboardingPage() {
                                 return (
                                     <div
                                         key={pId}
-                                        className="flex items-center justify-between gap-3 p-3 rounded-xl border border-neutral-800 bg-neutral-900/80"
+                                        className="flex items-center justify-between gap-3 p-3 rounded-lg border-2 border-black bg-white shadow-[3px_3px_0px_#000]"
                                     >
                                         <div className="flex items-center gap-3 min-w-0">
                                             <ConnectedPlatformAvatar
@@ -1102,15 +1071,15 @@ export default function ProfilesOnboardingPage() {
                                             />
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-1.5">
-                                                    <span className="text-xs font-bold text-white truncate">
+                                                    <span className="text-xs font-black text-black uppercase truncate">
                                                         {portalConf?.name || pId}
                                                     </span>
-                                                    <span className="text-[10px] text-emerald-400 font-semibold">✓</span>
+                                                    <span className="text-[10px] text-black font-black bg-[#a2ff86] border border-black px-1 rounded">✓</span>
                                                 </div>
-                                                <p className="text-xs text-neutral-300 font-medium truncate">
+                                                <p className="text-xs text-neutral-900 font-bold truncate">
                                                     {profile.name}
                                                 </p>
-                                                <p className="text-[11px] text-neutral-400 font-mono truncate">
+                                                <p className="text-[11px] text-neutral-600 font-mono font-bold truncate">
                                                     @{profile.username}
                                                 </p>
                                             </div>
@@ -1119,9 +1088,9 @@ export default function ProfilesOnboardingPage() {
                                         <button
                                             type="button"
                                             onClick={() => handleDisconnectProfile(pId)}
-                                            className="px-3 py-1.5 text-xs font-medium text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-full transition-colors cursor-pointer flex items-center gap-1.5"
+                                            className="px-3 py-1.5 text-xs font-black text-black bg-white hover:bg-rose-100 border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition-all cursor-pointer flex items-center gap-1.5"
                                         >
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                            <svg className="w-3.5 h-3.5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                                             </svg>
                                             <span>Disconnect</span>
@@ -1132,21 +1101,21 @@ export default function ProfilesOnboardingPage() {
                         </div>
 
                         {/* Modal Action Buttons */}
-                        <div className="pt-3 border-t border-neutral-800 flex items-center gap-2">
+                        <div className="pt-3 border-t-2 border-black flex items-center gap-2">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setIsMobileBucketOpen(false);
                                     handleSave();
                                 }}
-                                className="flex-1 h-11 rounded-full bg-white text-neutral-950 hover:bg-neutral-200 font-bold text-xs transition-colors cursor-pointer"
+                                className="flex-1 h-12 rounded-lg border-2 border-black bg-[#a2ff86] text-black font-black uppercase tracking-wider text-xs shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
                             >
                                 Save & Continue to Dashboard
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setIsMobileBucketOpen(false)}
-                                className="px-4 h-11 rounded-full border border-neutral-700 text-neutral-300 hover:text-white text-xs font-semibold cursor-pointer"
+                                className="px-4 h-12 rounded-lg border-2 border-black bg-white text-black font-black text-xs shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer"
                             >
                                 Done
                             </button>

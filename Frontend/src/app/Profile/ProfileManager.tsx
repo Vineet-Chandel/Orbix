@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Briefcase, Mail, Trash2, Plus, FileText } from "lucide-react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { Briefcase, Mail, Trash2, Plus } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { updateProfile, getInstitutionById, type InstitutionItem } from "../../utils/profileApi";
@@ -10,7 +10,6 @@ import { Sidebar } from "../Dashboard/Sidebar";
 import { ProfilePhotoFrame } from "./ProfilePhotoFrame";
 import { ConnectedPlatformsSection } from "../Dashboard/ConnectedPlatformsSection";
 import { ProfileCardStudio } from "./CardStudio/ProfileCardStudio";
-import { NotificationBell } from "../../components/NotificationBell";
 import {
     detectPlatform,
     getPlatformIcon,
@@ -98,6 +97,7 @@ export default function ProfileManager() {
     const [isHireable, setIsHireable] = useState(Boolean(user?.isHireable));
     const [selectedCollege, setSelectedCollege] = useState<InstitutionItem | null>(user?.college || null);
     const [savingProfile, setSavingProfile] = useState(false);
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     // Connected Platforms from localStorage / sync
     const [connectedPortals, setConnectedPortals] = useState<Record<string, any>>(() => {
@@ -164,9 +164,13 @@ export default function ProfileManager() {
         }
     }, [user?.platforms]);
 
+    // Track whether form has initialized from user state to prevent clobbering edits on background updates
+    const hasInitializedRef = useRef(false);
+
     // Sync initial form values when user object loads
     useEffect(() => {
-        if (user) {
+        if (user && !hasInitializedRef.current) {
+            hasInitializedRef.current = true;
             setFirstName(user.firstName || "");
             setLastName(user.lastName || "");
             setHeadline(user.headline || "");
@@ -187,6 +191,18 @@ export default function ProfileManager() {
             }
         }
     }, [user]);
+
+    // Pending toggle queue to batch & sequence concurrent or rapid toggle clicks
+    const pendingTogglesRef = useRef<{ isOpenToWork?: boolean; isHireable?: boolean }>({});
+    const isFlushingTogglesRef = useRef(false);
+
+    // Synchronize toggles from external user updates only when no toggle flush is in-flight or pending
+    useEffect(() => {
+        if (user && hasInitializedRef.current && !isFlushingTogglesRef.current && Object.keys(pendingTogglesRef.current).length === 0) {
+            setIsOpenToWork(Boolean(user.isOpenToWork));
+            setIsHireable(Boolean(user.isHireable));
+        }
+    }, [user?.isOpenToWork, user?.isHireable]);
 
     // Dynamic Links handlers
     const handleAddLink = () => {
@@ -237,46 +253,66 @@ export default function ProfileManager() {
         });
     };
 
-    // Handle instant toggle for Open to work
-    const handleToggleOpenToWork = async () => {
-        const nextVal = !isOpenToWork;
-        setIsOpenToWork(nextVal);
+    // Queue worker that handles sequential/batched updates without race conditions
+    const flushToggleQueue = useCallback(async () => {
+        if (isFlushingTogglesRef.current) return;
+        isFlushingTogglesRef.current = true;
+
         try {
-            const updated = await updateProfile({ isOpenToWork: nextVal });
-            dispatch(updateUserProfile(updated));
+            while (Object.keys(pendingTogglesRef.current).length > 0) {
+                // Snapshot the current pending batch
+                const batch = { ...pendingTogglesRef.current };
+                for (const key of Object.keys(batch) as Array<keyof typeof batch>) {
+                    delete pendingTogglesRef.current[key];
+                }
+
+                const updated = await updateProfile(batch);
+                dispatch(updateUserProfile(updated));
+            }
+        } catch (err: any) {
+            console.error("Failed to update profile toggles:", err);
+            toast.error(err.message || "Failed to update toggle setting", {
+                title: "Update Error",
+            });
+        } finally {
+            isFlushingTogglesRef.current = false;
+            // If another click arrived while request was in-flight, flush it immediately
+            if (Object.keys(pendingTogglesRef.current).length > 0) {
+                flushToggleQueue();
+            }
+        }
+    }, [dispatch]);
+
+    // Handle instant toggle for Open to work (smooth functional update, no race condition)
+    const handleToggleOpenToWork = () => {
+        setIsOpenToWork((prev) => {
+            const nextVal = !prev;
+            pendingTogglesRef.current.isOpenToWork = nextVal;
             toast.success(
                 nextVal
                     ? "Open to work tag is now active on your public profile showcase."
                     : "Open to work tag has been disabled.",
                 { title: nextVal ? "Open to Work Active" : "Open to Work Inactive" }
             );
-        } catch (err: any) {
-            setIsOpenToWork(!nextVal); // Revert on failure
-            toast.error(err.message || "Failed to update Open to work status", {
-                title: "Update Error",
-            });
-        }
+            setTimeout(() => flushToggleQueue(), 0);
+            return nextVal;
+        });
     };
 
-    // Handle instant toggle for Hire me button
-    const handleToggleHireMe = async () => {
-        const nextVal = !isHireable;
-        setIsHireable(nextVal);
-        try {
-            const updated = await updateProfile({ isHireable: nextVal });
-            dispatch(updateUserProfile(updated));
+    // Handle instant toggle for Hire me button (smooth functional update, no race condition)
+    const handleToggleHireMe = () => {
+        setIsHireable((prev) => {
+            const nextVal = !prev;
+            pendingTogglesRef.current.isHireable = nextVal;
             toast.success(
                 nextVal
                     ? "Hire me button is now visible so recruiters can message you directly."
                     : "Hire me button has been hidden from your showcase.",
                 { title: nextVal ? "Hire Me Active" : "Hire Me Inactive" }
             );
-        } catch (err: any) {
-            setIsHireable(!nextVal); // Revert on failure
-            toast.error(err.message || "Failed to update Hire me status", {
-                title: "Update Error",
-            });
-        }
+            setTimeout(() => flushToggleQueue(), 0);
+            return nextVal;
+        });
     };
 
     // Determine whether user has made any changes compared to current saved profile state
@@ -427,33 +463,6 @@ export default function ProfileManager() {
         setSkills(skills.filter((s) => s !== skillToRemove));
     };
 
-    const handleCopyProfileLink = () => {
-        const fullUrl = `${window.location.origin}/profile/u/${encodeURIComponent(user?.username || "")}`;
-        navigator.clipboard.writeText(fullUrl).then(
-            () => toast.success("Profile link copied to clipboard!", { title: "Copied" }),
-            () => toast.error("Failed to copy link", { title: "Error" })
-        );
-    };
-
-    const handleShareProfile = async () => {
-        const fullUrl = `${window.location.origin}/profile/u/${encodeURIComponent(user?.username || "")}`;
-        if (navigator.share) {
-            try {
-                await navigator.share({
-                    title: `${firstName} ${lastName} (@${user?.username}) — Orbix Profile`,
-                    text: headline || "Check out my developer and competitive programming profile on Orbix!",
-                    url: fullUrl,
-                });
-            } catch {
-                // user dismissed share dialog
-            }
-        } else {
-            handleCopyProfileLink();
-        }
-    };
-
-    const publicUrl = `/profile/u/${encodeURIComponent(user?.username || "")}`;
-
     // Live combined user object for the Card Studio to react instantly to form edits
     const liveUser = useMemo(() => ({
         ...user,
@@ -476,447 +485,423 @@ export default function ProfileManager() {
     }), [user, firstName, lastName, headline, bio, location, skills, links, isOpenToWork, isHireable, selectedCollege]);
 
     return (
-        <div className="min-h-screen bg-[#F0F2F6] text-neutral-900 font-sans flex antialiased selection:bg-neutral-900 selection:text-white">
+        <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
             {/* Desktop & Mobile Floating Sidebar */}
             <Sidebar
                 activeTab="profile"
+                isOpen={isMobileSidebarOpen}
+                onClose={() => setIsMobileSidebarOpen(false)}
                 onTabChange={(tab) => {
                     if (tab === "dashboard") navigate("/dashboard");
                     if (tab === "profile") navigate("/profile");
                     if (tab === "connect-platform") navigate("/onboarding");
                     if (tab === "resume") navigate("/resume");
                     if (tab === "projects") navigate("/projects");
+                    if (tab === "leaderboard") navigate("/leaderboard");
                 }}
             />
 
             {/* Main Content Area */}
-            <main className="flex-1 min-w-0 flex flex-col min-h-screen p-3 sm:p-6 lg:pl-0">
-                <div className="mx-auto w-full space-y-6">
-                    {/* Header Navbar */}
-                    <header className="w-full rounded-2xl bg-white border border-neutral-200/90 shadow-xs px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0">
-                        <div>
-                            <div className="flex items-center gap-2 text-xs font-semibold text-neutral-400 mb-1">
-                                <Link to="/dashboard" className="hover:text-neutral-700 transition-colors">
-                                    Dashboard
-                                </Link>
-                                <span>/</span>
-                                <span className="text-neutral-800">Profile Settings</span>
-                            </div>
-                            <h1 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
-                                Profile Settings
-                            </h1>
-                        </div>
-
-                        {/* Quick Profile Link & Share Controls */}
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                            <NotificationBell variant="light" />
-                            <Link
-                                to="/resume"
-                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-800 text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                                title="Upload & manage your resume"
-                            >
-                                <FileText className="w-4 h-4 text-neutral-600" />
-                                <span>Resume</span>
-                            </Link>
-                            <Link
-                                to={publicUrl}
-                                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-800 text-xs font-bold transition-all cursor-pointer"
-                                title="Preview your public profile"
-                            >
-                                <svg className="w-4 h-4 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                                <span>Preview Showcase</span>
-                            </Link>
-
-                            <button
-                                type="button"
-                                onClick={handleCopyProfileLink}
-                                className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-800 text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                            >
-                                <svg className="w-4 h-4 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
-                                </svg>
-                                <span>Copy Link</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={handleShareProfile}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-bold transition-all shadow-sm cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                                </svg>
-                                <span>Share Profile</span>
-                            </button>
-                        </div>
-                    </header>
-
-                    {/* Split Layout: Left Column = Personal Details, Right Column = Orbix Share Card Studio */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                        {/* LEFT COLUMN: Personal Details Card */}
-                        <div className="rounded-2xl bg-white border border-neutral-200/90 shadow-xs p-6 sm:p-7">
-                            <div className="flex items-center justify-between pb-4 border-b border-neutral-100 mb-6">
-                                <div>
-                                    <h2 className="text-lg font-bold text-neutral-900">Personal Details</h2>
-                                    <p className="text-xs text-neutral-500 mt-0.5">Manage your showcase details and profile photo.</p>
+            <div className="flex-1 flex flex-col h-full overflow-y-auto min-w-0 p-3 sm:p-5 lg:p-7">
+                <section
+                    aria-label="Developer Profile & Card Studio"
+                    className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                >
+                    <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
+                        {/* ========================================================================= */}
+                        {/* PAGE HEADER: Neo-Brutalist Heading */}
+                        {/* ========================================================================= */}
+                        <div className="pb-5 border-b-2 border-black/55 flex items-center justify-between gap-4">
+                            <div className="space-y-1">
+                                <div className="flex items-center gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMobileSidebarOpen(true)}
+                                        className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer"
+                                        aria-label="Open sidebar"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                            <line x1="3" y1="12" x2="21" y2="12" />
+                                            <line x1="3" y1="6" x2="21" y2="6" />
+                                            <line x1="3" y1="18" x2="21" y2="18" />
+                                        </svg>
+                                    </button>
+                                    <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                        Profile & Showcase Studio
+                                    </h1>
                                 </div>
-                                <span className="text-xs font-mono font-bold text-neutral-600 bg-neutral-100 px-3 py-1 rounded-full">
-                                    @{user?.username}
-                                </span>
+                                <p className="text-xs sm:text-sm font-bold text-neutral-700 max-w-2xl">
+                                    Manage your developer showcase, social cards, verified directory affiliation, and recruiter contact visibility.
+                                </p>
                             </div>
+                        </div>
 
-                            {/* Profile Photo Interactive Frame */}
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-5 p-5 rounded-2xl bg-neutral-50/90 border border-neutral-200/80 mb-6 shadow-2xs">
-                                <ProfilePhotoFrame
-                                    currentPhotoUrl={user?.photoUrl || user?.avatarUrl}
-                                    hasPreviousPhoto={user?.hasPreviousPhoto}
-                                    previousPhotoUrl={user?.previousPhotoUrl}
-                                    displayName={`${firstName} ${lastName}`.trim() || user?.username || "User"}
-                                    username={user?.username || ""}
-                                    size="lg"
-                                />
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="text-sm font-extrabold text-neutral-900 truncate">
-                                            Profile Photo
-                                        </h3>
-                                        {user?.photoUrl ? (
-                                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-[10px] font-bold text-emerald-700">
-                                                Custom
-                                            </span>
-                                        ) : (
-                                            <span className="px-2 py-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-[10px] font-bold text-neutral-600">
-                                                Default
+                        {/* Split Layout: Left Column = Personal Details, Right Column = Orbix Share Card Studio */}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                            {/* LEFT COLUMN: Personal Details Card */}
+                            <div className="rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-6 sm:p-7">
+                                <div className="pb-4 border-b-2 border-black/10 mb-6">
+                                    <h2 className="text-lg font-black text-black">Personal Details</h2>
+                                    <p className="text-xs font-medium text-neutral-600 mt-0.5">Manage your showcase details and profile photo.</p>
+                                </div>
+
+                                {/* Profile Photo Interactive Frame */}
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-5 p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black mb-6 shadow-[2px_2px_0px_#000]">
+                                    <ProfilePhotoFrame
+                                        currentPhotoUrl={user?.photoUrl || user?.avatarUrl}
+                                        hasPreviousPhoto={user?.hasPreviousPhoto}
+                                        previousPhotoUrl={user?.previousPhotoUrl}
+                                        displayName={`${firstName} ${lastName}`.trim() || user?.username || "User"}
+                                        username={user?.username || ""}
+                                        size="lg"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-sm font-black text-black truncate">
+                                                Profile Photo
+                                            </h3>
+                                            {user?.photoUrl ? (
+                                                <span className="px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000]">
+                                                    Custom
+                                                </span>
+                                            ) : (
+                                                <span className="px-2 py-0.5 rounded-full bg-neutral-100 border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000]">
+                                                    Default
+                                                </span>
+                                            )}
+                                        </div>
+                                        <p className="text-xs font-medium text-neutral-600 mt-1 leading-relaxed">
+                                            Hover or tap avatar to upload, restore, or reset photo. Images are optimized and face-cropped automatically.
+                                        </p>
+                                        {user?.hasPreviousPhoto && (
+                                            <span className="inline-flex items-center gap-1.5 text-[11px] text-black font-bold mt-2">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500 border border-black" />
+                                                <span>Previous photo available for instant restoration</span>
                                             </span>
                                         )}
                                     </div>
-                                    <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
-                                        Hover or tap avatar to upload, restore, or reset photo. Images are optimized and face-cropped automatically.
-                                    </p>
-                                    {user?.hasPreviousPhoto && (
-                                        <span className="inline-flex items-center gap-1.5 text-[11px] text-neutral-600 font-semibold mt-2">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                            <span>Previous photo available for instant restoration</span>
-                                        </span>
-                                    )}
                                 </div>
-                            </div>
 
-                            <form onSubmit={handleSaveProfile} className="space-y-5">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-bold text-neutral-700 mb-1">First Name</label>
-                                        <input
-                                            type="text"
-                                            value={firstName}
-                                            onChange={(e) => setFirstName(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                            required
-                                        />
+                                <form onSubmit={handleSaveProfile} className="space-y-5">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">First Name</label>
+                                            <input
+                                                type="text"
+                                                value={firstName}
+                                                onChange={(e) => setFirstName(e.target.value)}
+                                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                                                required
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Last Name</label>
+                                            <input
+                                                type="text"
+                                                value={lastName}
+                                                onChange={(e) => setLastName(e.target.value)}
+                                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                                            />
+                                        </div>
                                     </div>
+
                                     <div>
-                                        <label className="block text-xs font-bold text-neutral-700 mb-1">Last Name</label>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Headline</label>
                                         <input
                                             type="text"
-                                            value={lastName}
-                                            onChange={(e) => setLastName(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                            placeholder="e.g. Senior Full-Stack Engineer & Competitive Programmer"
+                                            value={headline}
+                                            maxLength={255}
+                                            onChange={(e) => setHeadline(e.target.value)}
+                                            className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
                                         />
+                                        <span className="text-[10px] font-bold text-neutral-500 flex justify-end mt-1">{headline.length}/255</span>
                                     </div>
-                                </div>
 
-                                <div>
-                                    <label className="block text-xs font-bold text-neutral-700 mb-1">Headline</label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Senior Full-Stack Engineer & Competitive Programmer"
-                                        value={headline}
-                                        maxLength={255}
-                                        onChange={(e) => setHeadline(e.target.value)}
-                                        className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                    />
-                                    <span className="text-[10px] text-neutral-400 flex justify-end mt-1">{headline.length}/255</span>
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-bold text-neutral-700 mb-1">Biography</label>
-                                    <textarea
-                                        rows={3}
-                                        placeholder="Write a brief intro about yourself, your tech stack, and what you're passionate about..."
-                                        value={bio}
-                                        maxLength={2000}
-                                        onChange={(e) => setBio(e.target.value)}
-                                        className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all resize-none"
-                                    />
-                                </div>
-
-                                <div className="space-y-4">
                                     <div>
-                                        <label className="block text-xs font-bold text-neutral-700 mb-1">Location</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. San Francisco, CA"
-                                            value={location}
-                                            onChange={(e) => setLocation(e.target.value)}
-                                            className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Biography</label>
+                                        <textarea
+                                            rows={3}
+                                            placeholder="Write a brief intro about yourself, your tech stack, and what you're passionate about..."
+                                            value={bio}
+                                            maxLength={2000}
+                                            onChange={(e) => setBio(e.target.value)}
+                                            className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all resize-none"
                                         />
                                     </div>
 
-                                    {/* Verified College / University Selector */}
-                                    <div>
-                                        <div className="flex items-center justify-between mb-1">
-                                            <label className="block text-xs font-bold text-neutral-700">
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Location</label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. San Francisco, CA"
+                                                value={location}
+                                                onChange={(e) => setLocation(e.target.value)}
+                                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                                            />
+                                        </div>
+
+                                        {/* Verified College / University Selector */}
+                                        <div>
+                                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
                                                 College / University (Verified Directory)
                                             </label>
-                                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
-                                                Official AISHE / UGC
-                                            </span>
+                                            <CollegeAutocomplete
+                                                value={selectedCollege?.id}
+                                                selectedCollege={selectedCollege}
+                                                onChange={setSelectedCollege}
+                                            />
                                         </div>
-                                        <CollegeAutocomplete
-                                            value={selectedCollege?.id}
-                                            selectedCollege={selectedCollege}
-                                            onChange={setSelectedCollege}
-                                        />
-                                    </div>
 
-                                    {/* Dynamic Links Section (White Theme) */}
-                                    <div className="space-y-3 pt-1">
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <label className="block text-xs font-black tracking-wider uppercase text-neutral-800">
-                                                        LINKS ({links.length}/4)
-                                                    </label>
+                                        {/* Dynamic Links Section */}
+                                        <div className="space-y-3 pt-1">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <label className="block text-xs font-black tracking-wider uppercase text-black">
+                                                            LINKS ({links.length}/4)
+                                                        </label>
+                                                    </div>
+                                                    <p className="text-[11px] text-neutral-600 font-medium mt-0.5">
+                                                        Portfolio, blog, X, anything with https://
+                                                    </p>
                                                 </div>
-                                                <p className="text-[11px] text-neutral-400 font-medium mt-0.5">
-                                                    Portfolio, blog, X, anything with https://
-                                                </p>
                                             </div>
-                                        </div>
 
-                                        {/* Platform Autocomplete Datalist */}
-                                        <datalist id="platform-suggestions">
-                                            {PLATFORM_REGISTRY.map((p) => (
-                                                 <option key={p.id} value={p.name} />
-                                            ))}
-                                        </datalist>
+                                            {/* Platform Autocomplete Datalist */}
+                                            <datalist id="platform-suggestions">
+                                                {PLATFORM_REGISTRY.map((p) => (
+                                                     <option key={p.id} value={p.name} />
+                                                ))}
+                                            </datalist>
 
-                                        {/* Links Rows */}
-                                        <div className="space-y-2.5">
-                                            {links.map((item, index) => (
-                                                <div
-                                                    key={item.id}
-                                                    className="flex items-center gap-2 group"
-                                                >
-                                                    {/* Label / Platform Input */}
-                                                    <div className="w-28 sm:w-36 flex-shrink-0">
-                                                        <input
-                                                            type="text"
-                                                            list="platform-suggestions"
-                                                            placeholder="Label"
-                                                            value={item.label}
-                                                            onChange={(e) => handleLinkChange(index, "label", e.target.value)}
-                                                            className="w-full px-3 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-bold text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                                        />
-                                                    </div>
-
-                                                    {/* URL Input with Live Icon on Left */}
-                                                    <div className="relative flex-1 min-w-0">
-                                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                            {getPlatformIcon(
-                                                                item.platform || item.label || item.url,
-                                                                "w-4 h-4 flex-shrink-0"
-                                                            )}
+                                            {/* Links Rows */}
+                                            <div className="space-y-2.5">
+                                                {links.map((item, index) => (
+                                                    <div
+                                                        key={item.id}
+                                                        className="flex items-center gap-2 group"
+                                                    >
+                                                        {/* Label / Platform Input */}
+                                                        <div className="w-28 sm:w-36 flex-shrink-0">
+                                                            <input
+                                                                type="text"
+                                                                list="platform-suggestions"
+                                                                placeholder="Label"
+                                                                value={item.label}
+                                                                onChange={(e) => handleLinkChange(index, "label", e.target.value)}
+                                                                className="w-full px-3 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                                                            />
                                                         </div>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="https://..."
-                                                            value={item.url}
-                                                            onChange={(e) => handleLinkChange(index, "url", e.target.value)}
-                                                            className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 placeholder:text-neutral-400 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                                        />
-                                                    </div>
 
-                                                    {/* Trash / Delete button */}
+                                                        {/* URL Input with Live Icon on Left */}
+                                                        <div className="relative flex-1 min-w-0">
+                                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-black">
+                                                                {getPlatformIcon(
+                                                                    item.platform || item.label || item.url,
+                                                                    "w-4 h-4 flex-shrink-0"
+                                                                )}
+                                                            </div>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="https://..."
+                                                                value={item.url}
+                                                                onChange={(e) => handleLinkChange(index, "url", e.target.value)}
+                                                                className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                                                            />
+                                                        </div>
+
+                                                        {/* Trash / Delete button */}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveLink(index)}
+                                                            className="w-9 h-9 rounded-xl border-2 border-black hover:bg-rose-100 bg-white text-black hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer flex-shrink-0 shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px]"
+                                                            title="Delete link"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {/* + Add Link Button */}
+                                            {links.length < 4 && (
+                                                <div className="pt-1">
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleRemoveLink(index)}
-                                                        className="w-9 h-9 rounded-xl border border-neutral-200 hover:border-rose-300 bg-neutral-50 hover:bg-rose-50 text-neutral-400 hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer flex-shrink-0"
-                                                        title="Delete link"
+                                                        onClick={handleAddLink}
+                                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-white border-2 border-black hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider transition-all shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer"
                                                     >
-                                                        <Trash2 className="w-4 h-4" />
+                                                        <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                        <span>Add link</span>
                                                     </button>
                                                 </div>
-                                            ))}
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Skills Tags */}
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Skills & Technologies</label>
+                                        <div className="flex gap-2 mb-2.5">
+                                            <input
+                                                type="text"
+                                                placeholder="Type skill & press Enter"
+                                                value={newSkillInput}
+                                                onChange={(e) => setNewSkillInput(e.target.value)}
+                                                onKeyDown={handleAddSkill}
+                                                className="flex-1 px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={handleAddSkill}
+                                                className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-xs font-black uppercase tracking-wider text-white border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
+                                            >
+                                                Add
+                                            </button>
                                         </div>
 
-                                        {/* + Add Link Button */}
-                                        {links.length < 4 && (
-                                            <div className="pt-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={handleAddLink}
-                                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-800 text-xs font-bold transition-all shadow-2xs hover:border-neutral-400 cursor-pointer active:scale-95"
+                                        <div className="flex flex-wrap gap-2 min-h-[32px]">
+                                            {skills.map((skill) => (
+                                                <span
+                                                    key={skill}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border-2 border-black text-black text-xs font-black shadow-[2px_2px_0px_#000]"
                                                 >
-                                                    <Plus className="w-3.5 h-3.5 text-neutral-600" />
-                                                    <span>Add link</span>
-                                                </button>
-                                            </div>
-                                        )}
+                                                    <span>{skill}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleRemoveSkill(skill)}
+                                                        className="text-neutral-500 hover:text-rose-600 font-black cursor-pointer ml-0.5"
+                                                    >
+                                                        &times;
+                                                    </button>
+                                                </span>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
 
-                                {/* Skills Tags */}
-                                <div>
-                                    <label className="block text-xs font-bold text-neutral-700 mb-1">Skills & Technologies</label>
-                                    <div className="flex gap-2 mb-2.5">
-                                        <input
-                                            type="text"
-                                            placeholder="Type skill & press Enter"
-                                            value={newSkillInput}
-                                            onChange={(e) => setNewSkillInput(e.target.value)}
-                                            onKeyDown={handleAddSkill}
-                                            className="flex-1 px-3.5 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                        />
+                                    {/* Save Button */}
+                                    <div className="pt-4 border-t-2 border-black/10">
                                         <button
-                                            type="button"
-                                            onClick={handleAddSkill}
-                                            className="px-4 py-2 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-xs font-bold text-neutral-800 transition-colors cursor-pointer"
+                                            type="submit"
+                                            disabled={!hasChanges || savingProfile}
+                                            className={`w-full h-11 flex items-center justify-center rounded-xl text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] ${
+                                                hasChanges && !savingProfile
+                                                    ? "bg-[#a2ff86] hover:bg-[#8ee673] text-black cursor-pointer hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px]"
+                                                    : "bg-neutral-100 text-neutral-400 cursor-not-allowed shadow-none"
+                                            }`}
                                         >
-                                            Add
+                                            {savingProfile ? (
+                                                <div className="flex items-center gap-2">
+                                                    <svg className="h-4 w-4 animate-spin text-black" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                                    </svg>
+                                                    <span>Saving Changes...</span>
+                                                </div>
+                                            ) : hasChanges ? (
+                                                <span>Save Profile Details</span>
+                                            ) : (
+                                                <span>No Changes to Save</span>
+                                            )}
                                         </button>
                                     </div>
 
-                                    <div className="flex flex-wrap gap-1.5 min-h-[32px]">
-                                        {skills.map((skill) => (
-                                            <span
-                                                key={skill}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-800 text-xs font-semibold"
-                                            >
-                                                <span>{skill}</span>
+                                    {/* OPEN TO WORK AND HIRE ME SECTION */}
+                                    <div className="space-y-2 pt-4 border-t-2 border-black/10">
+                                        <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-600">
+                                            OPEN TO WORK AND HIRE ME
+                                        </label>
+                                        <div className="space-y-2.5">
+                                            {/* Toggle 1: Open to work */}
+                                            <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] transition-all">
+                                                <div className="flex items-center gap-3">
+                                                    <Briefcase className="w-4 h-4 text-black flex-shrink-0 stroke-[2.5]" />
+                                                    <span className="text-xs sm:text-sm font-bold text-black">
+                                                        Show an Open to work tag on your profile
+                                                    </span>
+                                                </div>
                                                 <button
                                                     type="button"
-                                                    onClick={() => handleRemoveSkill(skill)}
-                                                    className="text-neutral-400 hover:text-rose-500 transition-colors cursor-pointer ml-0.5"
+                                                    role="switch"
+                                                    aria-checked={isOpenToWork}
+                                                    onClick={handleToggleOpenToWork}
+                                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-black shadow-[1px_1px_0px_#000] transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                        isOpenToWork ? "bg-[#a2ff86]" : "bg-neutral-200"
+                                                    }`}
                                                 >
-                                                    &times;
+                                                    <span
+                                                        aria-hidden="true"
+                                                        className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white border border-black shadow-xs ring-0 transition duration-200 ease-in-out mt-0.25 ${
+                                                            isOpenToWork ? "translate-x-5" : "translate-x-0.5"
+                                                        }`}
+                                                    />
                                                 </button>
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                {/* Save Button */}
-                                <div className="pt-4 border-t border-neutral-100">
-                                    <button
-                                        type="submit"
-                                        disabled={!hasChanges || savingProfile}
-                                        className={`w-full h-11 flex items-center justify-center rounded-xl text-xs font-bold transition-all shadow-sm ${
-                                            hasChanges && !savingProfile
-                                                ? "bg-black text-white hover:bg-neutral-800 cursor-pointer hover:scale-[1.005] active:scale-[0.995]"
-                                                : "bg-neutral-100 text-neutral-400 border border-neutral-200 cursor-not-allowed shadow-none"
-                                        }`}
-                                    >
-                                        {savingProfile ? (
-                                            <div className="flex items-center gap-2">
-                                                <svg className="h-4 w-4 animate-spin text-neutral-400" fill="none" viewBox="0 0 24 24">
-                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                                </svg>
-                                                <span>Saving Changes...</span>
                                             </div>
-                                        ) : hasChanges ? (
-                                            <span>Save Profile Details</span>
-                                        ) : (
-                                            <span>No Changes to Save</span>
-                                        )}
-                                    </button>
-                                </div>
 
-                                {/* OPEN TO WORK AND HIRE ME SECTION (Just below the save profile details button) */}
-                                <div className="space-y-2 pt-4 border-t border-neutral-100">
-                                    <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-500">
-                                        OPEN TO WORK AND HIRE ME
-                                    </label>
-                                    <div className="space-y-2.5">
-                                        {/* Toggle 1: Open to work */}
-                                        <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-[#0B0F17] border border-neutral-800 transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                <Briefcase className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                                                <span className="text-xs sm:text-sm font-medium text-neutral-200">
-                                                    Show an Open to work tag on your profile
-                                                </span>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                role="switch"
-                                                aria-checked={isOpenToWork}
-                                                onClick={handleToggleOpenToWork}
-                                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                                                    isOpenToWork ? "bg-[#2563EB]" : "bg-neutral-800"
-                                                }`}
-                                            >
-                                                <span
-                                                    aria-hidden="true"
-                                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                                        isOpenToWork ? "translate-x-5" : "translate-x-0"
+                                            {/* Toggle 2: Hire me */}
+                                            <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] transition-all">
+                                                <div className="flex items-center gap-3">
+                                                    <Mail className="w-4 h-4 text-black flex-shrink-0 stroke-[2.5]" />
+                                                    <span className="text-xs sm:text-sm font-bold text-black">
+                                                        Show a Hire me button so recruiters can message you
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    role="switch"
+                                                    aria-checked={isHireable}
+                                                    onClick={handleToggleHireMe}
+                                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-black shadow-[1px_1px_0px_#000] transition-colors duration-200 ease-in-out focus:outline-none ${
+                                                        isHireable ? "bg-[#a2ff86]" : "bg-neutral-200"
                                                     }`}
-                                                />
-                                            </button>
-                                        </div>
-
-                                        {/* Toggle 2: Hire me */}
-                                        <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-[#0B0F17] border border-neutral-800 transition-colors">
-                                            <div className="flex items-center gap-3">
-                                                <Mail className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                                                <span className="text-xs sm:text-sm font-medium text-neutral-200">
-                                                    Show a Hire me button so recruiters can message you
-                                                </span>
+                                                >
+                                                    <span
+                                                        aria-hidden="true"
+                                                        className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white border border-black shadow-xs ring-0 transition duration-200 ease-in-out mt-0.25 ${
+                                                            isHireable ? "translate-x-5" : "translate-x-0.5"
+                                                        }`}
+                                                    />
+                                                </button>
                                             </div>
-                                            <button
-                                                type="button"
-                                                role="switch"
-                                                aria-checked={isHireable}
-                                                onClick={handleToggleHireMe}
-                                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
-                                                    isHireable ? "bg-[#2563EB]" : "bg-neutral-800"
-                                                }`}
-                                            >
-                                                <span
-                                                    aria-hidden="true"
-                                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                                        isHireable ? "translate-x-5" : "translate-x-0"
-                                                    }`}
-                                                />
-                                            </button>
                                         </div>
                                     </div>
-                                </div>
-                            </form>
+                                </form>
+                            </div>
+
+                            {/* RIGHT COLUMN: Orbix Share Card Studio (Sticky on Desktop) */}
+                            <div className="lg:sticky lg:top-5">
+                                <ProfileCardStudio
+                                    user={liveUser}
+                                    connectedPortals={connectedPortals}
+                                />
+                            </div>
                         </div>
 
-                        {/* RIGHT COLUMN: Orbix Share Card Studio (Sticky on Desktop) */}
-                        <div className="lg:sticky lg:top-5">
-                            <ProfileCardStudio
-                                user={liveUser}
+                        {/* Connected Platforms Section (Shifted below the Personal Details Card) */}
+                        <div className="w-full">
+                            <ConnectedPlatformsSection
                                 connectedPortals={connectedPortals}
+                                onPortalsChange={(updated) => setConnectedPortals(updated)}
+                                syncState={platformSync}
                             />
                         </div>
                     </div>
 
-                    {/* Connected Platforms Section (Shifted below the Personal Details Card) */}
-                    <div className="w-full">
-                        <ConnectedPlatformsSection
-                            connectedPortals={connectedPortals}
-                            onPortalsChange={(updated) => setConnectedPortals(updated)}
-                            syncState={platformSync}
+                    {/* ========================================================================= */}
+                    {/* BOTTOM FULL-WIDTH DESK ILLUSTRATION (Matching Connected Platforms & Resume) */}
+                    {/* ========================================================================= */}
+                    <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
+                        <img
+                            src="/image.png"
+                            alt="Profile workspace illustration"
+                            className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
+                            loading="eager"
                         />
                     </div>
-                </div>
-            </main>
+                </section>
+            </div>
         </div>
     );
 }

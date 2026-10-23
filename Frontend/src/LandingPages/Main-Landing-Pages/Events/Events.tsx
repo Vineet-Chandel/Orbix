@@ -491,18 +491,14 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                             <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                                 Event Tracker
                             </h3>
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 border border-emerald-500/25 text-emerald-400">
-                                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                                <span>Live Contest Platforms</span>
-                            </span>
                         </div>
-                        <p className="text-xs sm:text-sm text-slate-400">
+                        <p className="text-xs sm:text-sm text-slate-300 font-medium">
                             Every round on Codeforces, LeetCode, CodeChef, AtCoder and GfG, with reminders.
                         </p>
-                        <p className="text-xs text-indigo-300 font-medium pt-0.5">
-                            <span className="text-white font-bold">12 contests</span> in the next 7 days across 9 platforms ·{" "}
-                            <span className="text-emerald-400 font-semibold">live from each platform</span>
-                        </p>
+                        <div className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-950/60 border border-indigo-500/30 text-xs">
+                            <span className="text-emerald-400 font-black">12 contests</span>
+                            <span className="text-slate-300 font-semibold">in the next 7 days across 9 platforms</span>
+                        </div>
                     </div>
 
                     {/* Segmented Controls: Contests vs Hackathons & Calendar vs List */}

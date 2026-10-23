@@ -3,6 +3,7 @@ import { query } from "../../database/client.js";
 import redis from "../../redis/client.js";
 import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
 import { invalidateAllUserCaches } from "../../redis/cache/cache-profile.js";
+import { syncLeaderboardForUser } from "../leaderboard/leaderboard.js";
 import { calculateUserContestPerformance } from "./contestAnalytics.js";
 import { calculateUserBadges } from "./badgesAnalytics.js";
 import { calculateUserPracticeAnalytics } from "./practiceAnalytics.js";
@@ -2768,6 +2769,7 @@ export interface SavedPortalLink {
     display_name?: string;
     avatar_url?: string;
     stats?: any[];
+    snapshot?: any;
     verified?: boolean;
 }
 
@@ -2962,6 +2964,7 @@ export const handleSavePortals = async (req: Request, res: Response) => {
                     display_name: profile.name,
                     avatar_url: profile.avatar,
                     stats: profile.stats || [],
+                    snapshot: profile,
                     verified: profile.verified !== false,
                 });
             }
@@ -3118,8 +3121,9 @@ export const handleSavePortals = async (req: Request, res: Response) => {
                         display_name,
                         avatar_url,
                         stats,
+                        snapshot,
                         updated_at
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CURRENT_TIMESTAMP)
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CURRENT_TIMESTAMP)
                     ON CONFLICT (username, portal)
                     DO UPDATE SET
                         user_id = COALESCE(EXCLUDED.user_id, user_links.user_id),
@@ -3130,6 +3134,7 @@ export const handleSavePortals = async (req: Request, res: Response) => {
                         display_name = COALESCE(EXCLUDED.display_name, user_links.display_name),
                         avatar_url = COALESCE(EXCLUDED.avatar_url, user_links.avatar_url),
                         stats = COALESCE(EXCLUDED.stats, user_links.stats),
+                        snapshot = COALESCE(EXCLUDED.snapshot, user_links.snapshot),
                         updated_at = CURRENT_TIMESTAMP;`,
                     [
                         userId,
@@ -3142,10 +3147,19 @@ export const handleSavePortals = async (req: Request, res: Response) => {
                         item.display_name || null,
                         item.avatar_url || null,
                         JSON.stringify(item.stats || []),
+                        JSON.stringify(item.snapshot || {}),
                     ]
                 );
             }
             dbSaved = true;
+
+            // Immediately trigger authoritative leaderboard and Orbix Score synchronization
+            if (authUser.username || userIdentifier) {
+                const uToSync = authUser.username || userIdentifier;
+                syncLeaderboardForUser(uToSync).catch((syncErr: any) => {
+                    console.warn(`Post-save leaderboard sync warning for ${uToSync}:`, syncErr?.message);
+                });
+            }
         } catch (dbErr: any) {
             console.warn("Database storage warning (non-fatal):", dbErr.message || dbErr);
         }
@@ -3374,12 +3388,14 @@ export const handleResyncPortals = async (req: Request, res: Response) => {
                                      display_name = COALESCE($1, display_name),
                                      avatar_url = COALESCE($2, avatar_url),
                                      stats = COALESCE($3, stats),
+                                     snapshot = $4::jsonb,
                                      updated_at = CURRENT_TIMESTAMP
-                                 WHERE username = $4 AND portal = $5;`,
+                                 WHERE username = $5 AND portal = $6;`,
                                 [
                                     profile.name || null,
                                     profile.avatar || null,
                                     JSON.stringify(profile.stats || []),
+                                    JSON.stringify(profile),
                                     userIdentifier,
                                     item.portal,
                                 ]
@@ -3482,6 +3498,13 @@ export const handleResyncPortals = async (req: Request, res: Response) => {
             }
         }
 
+        // Trigger automatic leaderboard score recalculation
+        if (userIdentifier) {
+            syncLeaderboardForUser(userIdentifier).catch((sErr: any) => {
+                console.warn(`Resync leaderboard update warning for ${userIdentifier}:`, sErr?.message);
+            });
+        }
+
         const validCount = results.filter((r) => r.status === "valid").length;
         const brokenCount = results.filter((r) => r.status === "broken").length;
         const errorCount = results.filter((r) => r.status === "error").length;
@@ -3548,6 +3571,13 @@ portalsRouter.delete("/:portal", authenticate, async (req: Request, res: Respons
             gmail: authUser.gmail,
         });
 
+        // Recalculate leaderboard score upon disconnecting a portal
+        if (authUser.username) {
+            syncLeaderboardForUser(authUser.username).catch((sErr: any) => {
+                console.warn(`Disconnect portal leaderboard sync warning for ${authUser.username}:`, sErr?.message);
+            });
+        }
+
         return res.status(200).json({
             success: true,
             message: `Platform '${portal}' disconnected successfully`,
@@ -3588,12 +3618,25 @@ portalsRouter.put("/:portal", authenticate, async (req: Request, res: Response) 
                  display_name = $5,
                  avatar_url = $6,
                  stats = $7::jsonb,
+                 snapshot = $8::jsonb,
                  last_sync_status = 'valid',
                  last_sync_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP
-             WHERE (username = $8 OR username = $9) AND LOWER(portal) = $10
+             WHERE (username = $9 OR username = $10) AND LOWER(portal) = $11
              RETURNING id, portal, portal_username AS "portalUsername", link, verified, is_public AS "isPublic";`,
-            [finalHandle, finalLink, rawCandidate, isVerified, finalDisplayName, finalAvatar, JSON.stringify(finalStats), authUser.username, authUser.gmail, portal]
+            [
+                finalHandle,
+                finalLink,
+                rawCandidate,
+                isVerified,
+                finalDisplayName,
+                finalAvatar,
+                JSON.stringify(finalStats),
+                JSON.stringify(verifiedData || {}),
+                authUser.username,
+                authUser.gmail,
+                portal,
+            ]
         );
 
         if (updateResult.rowCount === 0) {
@@ -3605,6 +3648,13 @@ portalsRouter.put("/:portal", authenticate, async (req: Request, res: Response) 
             username: authUser.username,
             gmail: authUser.gmail,
         });
+
+        // Recalculate leaderboard score upon disconnecting a portal
+        if (authUser.username) {
+            syncLeaderboardForUser(authUser.username).catch((sErr: any) => {
+                console.warn(`Disconnect portal leaderboard sync warning for ${authUser.username}:`, sErr?.message);
+            });
+        }
 
         return res.status(200).json({
             success: true,

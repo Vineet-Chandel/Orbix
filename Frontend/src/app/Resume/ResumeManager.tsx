@@ -4,7 +4,6 @@ import {
     FileText,
     Sparkles,
     Scan,
-    Copy,
     Check,
     Download,
     Eye,
@@ -18,11 +17,11 @@ import {
     FileCheck2,
     ZoomIn,
     ZoomOut,
-    RotateCcw,
+    RotateCw,
     Maximize2,
     Link2,
 } from "lucide-react";
-import { useAppSelector } from "../../store";
+import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import {
     fetchMyResume,
@@ -31,32 +30,64 @@ import {
     updateResumeVisibility,
     type ResumeData,
 } from "../../utils/profileApi";
-import { isDemoProfileUsername } from "../../data/demoProfileData";
 
 interface ResumeManagerProps {
     className?: string;
+    onOpenMobileSidebar?: () => void;
 }
 
-type SnippetTab = "one_line" | "bullets" | "linkedin";
-
-export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) => {
+export const ResumeManager: React.FC<ResumeManagerProps> = ({
+    className = "",
+    onOpenMobileSidebar,
+}) => {
     const toast = useToast();
+    const dispatch = useAppDispatch();
     const user = useAppSelector((state) => state.user.user);
     const username = user?.username || "developer";
-    const isDemo = isDemoProfileUsername(username);
 
-    // Resume State
-    const [resumeData, setResumeData] = useState<ResumeData>({
-        hasResume: false,
-        resumeUrl: null,
-        resumeFilename: null,
-        resumeFilesize: null,
-        resumeUpdatedAt: null,
-        isResumePublic: true,
-        checks: [],
+    // Resume State initialized from Redux user or localStorage cache to avoid re-fetching lag
+    const [resumeData, setResumeData] = useState<ResumeData>(() => {
+        if (user?.resumeUrl) {
+            return {
+                hasResume: true,
+                resumeUrl: user.resumeUrl,
+                resumeFilename: user.resumeFilename || "Resume.pdf",
+                resumeFilesize: user.resumeFilesize ?? null,
+                resumeUpdatedAt: user.resumeUpdatedAt ?? null,
+                isResumePublic: user.isResumePublic !== false,
+                checks: [],
+            };
+        }
+        try {
+            const cached = localStorage.getItem("orbix_resume_cache");
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed && typeof parsed === "object") return parsed;
+            }
+        } catch {}
+        return {
+            hasResume: false,
+            resumeUrl: null,
+            resumeFilename: null,
+            resumeFilesize: null,
+            resumeUpdatedAt: null,
+            isResumePublic: true,
+            checks: [],
+        };
     });
 
-    const [isLoading, setIsLoading] = useState(true);
+    // Only set loading to true if we do not already have cached data in Redux or localStorage
+    const [isLoading, setIsLoading] = useState<boolean>(() => {
+        if (user?.resumeUrl) return false;
+        try {
+            const cached = localStorage.getItem("orbix_resume_cache");
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed?.resumeUrl) return false;
+            }
+        } catch {}
+        return true;
+    });
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<number>(0);
     const [isDeleting, setIsDeleting] = useState(false);
@@ -64,7 +95,9 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
     const [isDragging, setIsDragging] = useState(false);
 
     // Document Viewer Controls (Below-the-screen viewer)
+    const [previewDemo, setPreviewDemo] = useState(false);
     const [zoomLevel, setZoomLevel] = useState<number>(100);
+    const [rotation, setRotation] = useState<number>(0);
     const [isCopiedCdnLink, setIsCopiedCdnLink] = useState(false);
     const [isIframeLoaded, setIsIframeLoaded] = useState(false);
     const [iframeError, setIframeError] = useState(false);
@@ -87,18 +120,6 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
         return () => window.removeEventListener("keydown", handleKeyDown);
     }, []);
 
-    // Reset iframe loaded state when resume URL changes
-    useEffect(() => {
-        setIsIframeLoaded(false);
-        setIframeError(false);
-    }, [resumeData.resumeUrl]);
-
-    // "For your resume" snippet controls
-    const [snippetTab, setSnippetTab] = useState<SnippetTab>("bullets");
-    const [includeProfileLink, setIncludeProfileLink] = useState(true);
-    const [onlyVerifiedPlatforms, setOnlyVerifiedPlatforms] = useState(false);
-    const [isCopied, setIsCopied] = useState(false);
-
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Default sample checks
@@ -116,70 +137,105 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
         []
     );
 
-    // Load initial resume status
+    // Document currently shown in the below preview viewer (real uploaded resume or sample demo preview)
+    const activeDoc = useMemo(() => {
+        if (resumeData.hasResume && resumeData.resumeUrl) {
+            return {
+                isDemo: false,
+                url: resumeData.resumeUrl,
+                filename: resumeData.resumeFilename || "Resume.pdf",
+                filesize: resumeData.resumeFilesize,
+                updatedAt: resumeData.resumeUpdatedAt,
+                isPublic: resumeData.isResumePublic,
+                checks: resumeData.checks && resumeData.checks.length > 0 ? resumeData.checks : defaultChecks,
+            };
+        }
+        if (previewDemo) {
+            return {
+                isDemo: true,
+                url: "/sample-resume.pdf",
+                filename: "Vineet_Chandel_FullStack_Resume.pdf",
+                filesize: 1420000,
+                updatedAt: new Date().toISOString(),
+                isPublic: false,
+                checks: defaultChecks,
+            };
+        }
+        return null;
+    }, [resumeData, previewDemo, defaultChecks]);
+
+    // Reset iframe loaded state and rotation when active document URL changes
+    useEffect(() => {
+        setIsIframeLoaded(false);
+        setIframeError(false);
+        setRotation(0);
+        // Safety fallback: browser PDF plugins may not reliably fire DOM onLoad on iframes
+        const timer = setTimeout(() => {
+            setIsIframeLoaded(true);
+        }, 800);
+        return () => clearTimeout(timer);
+    }, [activeDoc?.url]);
+
+    // Revalidate resume status from backend and keep Redux + localStorage cache in sync
     useEffect(() => {
         let isMounted = true;
-        setIsLoading(true);
-
-        if (isDemo) {
-            setResumeData({
-                hasResume: true,
-                resumeUrl: "/sample-resume.pdf",
-                resumeFilename: "Vineet_Chandel_FullStack_Resume.pdf",
-                resumeFilesize: 1420000,
-                resumeUpdatedAt: new Date().toISOString(),
-                isResumePublic: true,
-                checks: defaultChecks,
-            });
-            setIsLoading(false);
-            return;
-        }
 
         fetchMyResume()
             .then((data) => {
-                if (isMounted) {
-                    if (data && data.hasResume) {
-                        setResumeData({
-                            ...data,
-                            checks: data.checks && data.checks.length > 0 ? data.checks : defaultChecks,
-                        });
-                    } else if (user?.resumeUrl) {
-                        setResumeData({
-                            hasResume: true,
-                            resumeUrl: user.resumeUrl,
-                            resumeFilename: user.resumeFilename || "resume.pdf",
-                            resumeFilesize: user.resumeFilesize || 1420000,
-                            resumeUpdatedAt: user.resumeUpdatedAt || new Date().toISOString(),
-                            isResumePublic: user.isResumePublic !== false,
-                            checks: defaultChecks,
-                        });
-                    } else {
-                        setResumeData(data);
-                    }
-                    setIsLoading(false);
+                if (!isMounted) return;
+                if (data && data.hasResume) {
+                    const resolved: ResumeData = {
+                        ...data,
+                        checks: data.checks && data.checks.length > 0 ? data.checks : defaultChecks,
+                    };
+                    setResumeData(resolved);
+                    try {
+                        localStorage.setItem("orbix_resume_cache", JSON.stringify(resolved));
+                    } catch {}
+                    dispatch(
+                        updateUserProfile({
+                            resumeUrl: data.resumeUrl,
+                            resumeFilename: data.resumeFilename,
+                            resumeFilesize: data.resumeFilesize,
+                            resumeUpdatedAt: data.resumeUpdatedAt,
+                            isResumePublic: data.isResumePublic,
+                        })
+                    );
+                } else if (user?.resumeUrl) {
+                    setResumeData({
+                        hasResume: true,
+                        resumeUrl: user.resumeUrl,
+                        resumeFilename: user.resumeFilename || "Resume.pdf",
+                        resumeFilesize: user.resumeFilesize || 1420000,
+                        resumeUpdatedAt: user.resumeUpdatedAt || new Date().toISOString(),
+                        isResumePublic: user.isResumePublic !== false,
+                        checks: defaultChecks,
+                    });
+                } else {
+                    setResumeData(data || {
+                        hasResume: false,
+                        resumeUrl: null,
+                        resumeFilename: null,
+                        resumeFilesize: null,
+                        resumeUpdatedAt: null,
+                        isResumePublic: true,
+                        checks: [],
+                    });
+                    try {
+                        localStorage.removeItem("orbix_resume_cache");
+                    } catch {}
                 }
+                setIsLoading(false);
             })
             .catch(() => {
-                if (isMounted) {
-                    if (user?.resumeUrl) {
-                        setResumeData({
-                            hasResume: true,
-                            resumeUrl: user.resumeUrl,
-                            resumeFilename: user.resumeFilename || "resume.pdf",
-                            resumeFilesize: user.resumeFilesize || 1420000,
-                            resumeUpdatedAt: user.resumeUpdatedAt || new Date().toISOString(),
-                            isResumePublic: user.isResumePublic !== false,
-                            checks: defaultChecks,
-                        });
-                    }
-                    setIsLoading(false);
-                }
+                if (!isMounted) return;
+                setIsLoading(false);
             });
 
         return () => {
             isMounted = false;
         };
-    }, [user, isDemo, defaultChecks]);
+    }, [dispatch, user?.resumeUrl, user?.resumeFilename, user?.resumeFilesize, user?.resumeUpdatedAt, user?.isResumePublic, defaultChecks]);
 
     // Format bytes to human readable format
     const formatBytes = (bytes?: number | null) => {
@@ -234,15 +290,29 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
             });
 
             setUploadProgress(100);
-            setResumeData({
+            setPreviewDemo(false);
+            const uploadedResume: ResumeData = {
                 ...res.resume,
                 checks: res.resume.checks && res.resume.checks.length > 0 ? res.resume.checks : defaultChecks,
-            });
+            };
+            setResumeData(uploadedResume);
+            try {
+                localStorage.setItem("orbix_resume_cache", JSON.stringify(uploadedResume));
+            } catch {}
+            dispatch(
+                updateUserProfile({
+                    resumeUrl: res.resume.resumeUrl,
+                    resumeFilename: res.resume.resumeFilename,
+                    resumeFilesize: res.resume.resumeFilesize,
+                    resumeUpdatedAt: res.resume.resumeUpdatedAt,
+                    isResumePublic: res.resume.isResumePublic,
+                })
+            );
             toast.success("Resume uploaded and analyzed successfully!", {
                 title: "Upload Complete",
             });
 
-            // Auto-scroll to the embedded resume viewer below the screen
+            // Auto-scroll to the embedded resume viewer below
             setTimeout(() => {
                 const viewerEl = document.getElementById("active-resume-viewer");
                 if (viewerEl) {
@@ -291,7 +361,8 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
         setIsDeleting(true);
         try {
             await deleteResume();
-            setResumeData({
+            setPreviewDemo(false);
+            const emptyResume: ResumeData = {
                 hasResume: false,
                 resumeUrl: null,
                 resumeFilename: null,
@@ -299,7 +370,19 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                 resumeUpdatedAt: null,
                 isResumePublic: true,
                 checks: [],
-            });
+            };
+            setResumeData(emptyResume);
+            try {
+                localStorage.removeItem("orbix_resume_cache");
+            } catch {}
+            dispatch(
+                updateUserProfile({
+                    resumeUrl: null,
+                    resumeFilename: null,
+                    resumeFilesize: null,
+                    resumeUpdatedAt: null,
+                })
+            );
             setIsDeleteModalOpen(false);
             toast.success("Resume deleted from Cloudinary and profile.", {
                 title: "Resume Removed",
@@ -320,7 +403,14 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
         setIsTogglingVisibility(true);
         try {
             await updateResumeVisibility(newVis);
-            setResumeData((prev) => ({ ...prev, isResumePublic: newVis }));
+            setResumeData((prev) => {
+                const next = { ...prev, isResumePublic: newVis };
+                try {
+                    localStorage.setItem("orbix_resume_cache", JSON.stringify(next));
+                } catch {}
+                return next;
+            });
+            dispatch(updateUserProfile({ isResumePublic: newVis }));
             toast.success(
                 newVis
                     ? "Resume download button is now live on your public profile."
@@ -336,17 +426,9 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
         }
     };
 
-    // Enable demo sample resume preview on click
+    // Enable demo sample resume preview on click (strictly updates below preview area, dropzone remains untouched)
     const handleLoadSampleResume = () => {
-        setResumeData({
-            hasResume: true,
-            resumeUrl: "/sample-resume.pdf",
-            resumeFilename: "Vineet_Chandel_FullStack_Resume.pdf",
-            resumeFilesize: 1420000,
-            resumeUpdatedAt: new Date().toISOString(),
-            isResumePublic: true,
-            checks: defaultChecks,
-        });
+        setPreviewDemo(true);
         toast.success("Sample resume loaded into live document preview below!", {
             title: "Demo Preview Active",
         });
@@ -360,10 +442,11 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
 
     // Copy direct CDN link
     const handleCopyCdnLink = () => {
-        if (!resumeData.resumeUrl) return;
-        const fullUrl = resumeData.resumeUrl.startsWith("http")
-            ? resumeData.resumeUrl
-            : `${window.location.origin}${resumeData.resumeUrl}`;
+        const targetUrl = activeDoc?.url;
+        if (!targetUrl) return;
+        const fullUrl = targetUrl.startsWith("http")
+            ? targetUrl
+            : `${window.location.origin}${targetUrl}`;
 
         navigator.clipboard.writeText(fullUrl).then(
             () => {
@@ -377,44 +460,9 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
         );
     };
 
-    // Generated Snippet Text based on Active Tab & Options
+
     const origin = typeof window !== "undefined" ? window.location.origin : "https://orbix.dev";
     const profileUrl = `${origin}/profile/u/${encodeURIComponent(username)}`;
-
-    const snippetText = useMemo(() => {
-        if (snippetTab === "bullets") {
-            const lines: string[] = [];
-            if (includeProfileLink) {
-                lines.push(`• Verified coding profile: ${profileUrl}`);
-            }
-            lines.push("• 1,680+ algorithmic problems solved across LeetCode, Codeforces & CodeChef");
-            lines.push("• Top 0.5% Guardian tier on LeetCode | Candidate Master on Codeforces");
-            return lines.join("\n");
-        } else if (snippetTab === "one_line") {
-            if (includeProfileLink) {
-                return `Verified Coding Profile: ${profileUrl} (1,680+ solved, Guardian on LeetCode)`;
-            }
-            return "Verified Coding Track: 1,680+ algorithmic problems solved | Guardian on LeetCode";
-        } else {
-            if (includeProfileLink) {
-                return `Orbix Verified Developer Profile: ${profileUrl}`;
-            }
-            return `Competitive Programming & Verified Developer Profile (@${username})`;
-        }
-    }, [snippetTab, includeProfileLink, profileUrl, username]);
-
-    const handleCopySnippet = () => {
-        navigator.clipboard.writeText(snippetText).then(
-            () => {
-                setIsCopied(true);
-                toast.success("Snippet copied to clipboard!", { title: "Copied" });
-                setTimeout(() => setIsCopied(false), 2000);
-            },
-            () => {
-                toast.error("Failed to copy snippet", { title: "Copy Failed" });
-            }
-        );
-    };
 
     // Recruiter Checks Summary
     const checksList = resumeData.checks && resumeData.checks.length > 0 ? resumeData.checks : defaultChecks;
@@ -422,9 +470,9 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
 
     if (isLoading) {
         return (
-            <div className="w-full max-w-[1600px] mx-auto py-20 flex flex-col items-center justify-center rounded-3xl bg-[#030509] border border-neutral-800/80">
-                <div className="w-9 h-9 border-2 border-indigo-950 border-t-indigo-500 rounded-full animate-spin mb-3 shadow-[0_0_15px_rgba(99,102,241,0.4)]" />
-                <p className="text-xs text-neutral-400 font-mono tracking-wide">Loading resume details...</p>
+            <div className="w-full max-w-7xl mx-auto py-24 flex flex-col items-center justify-center rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[6px_6px_0px_#000]">
+                <div className="w-10 h-10 border-4 border-black border-t-[#a2ff86] rounded-full animate-spin mb-3 shadow-[2px_2px_0px_#000]" />
+                <p className="text-xs text-black font-black uppercase tracking-wider">Loading resume details...</p>
             </div>
         );
     }
@@ -432,77 +480,98 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
     return (
         <section
             aria-label="Resume Management & Document Showcase"
-            className={`w-full max-w-[1600px] mx-auto font-sans text-white select-none ${className}`}
+            className={`flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between ${className}`}
         >
-            {/* Outer Premium Container with Midnight Indigo Ambient Glow */}
-            <div className="w-full rounded-3xl bg-[#030408] border border-neutral-800/90 p-5 sm:p-8 shadow-2xl relative overflow-hidden space-y-8">
-                {/* Midnight Indigo Top Ambient Glow Orbs */}
-                <div className="absolute top-0 right-1/4 w-[550px] h-[280px] bg-gradient-to-br from-indigo-600/15 via-indigo-900/5 to-transparent blur-3xl pointer-events-none" />
-                <div className="absolute top-1/2 left-0 w-[400px] h-[300px] bg-indigo-950/10 blur-3xl pointer-events-none" />
-
-                {/* ========================================================================= */}
-                {/* SECTION HEADER: Title, Badge & Subtitle */}
-                {/* ========================================================================= */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-800/80 pb-6 relative z-10">
-                    <div>
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-950/70 border border-indigo-500/30 text-indigo-300 text-[11px] font-bold tracking-wide uppercase shadow-[0_0_15px_rgba(99,102,241,0.2)] mb-3">
-                            <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-                            <span>ATS-Optimized Resume Engine · Cloudinary Verified</span>
+            <div className="p-4 sm:p-6 lg:p-8 flex-1">
+                <div className="mx-auto w-full max-w-7xl my-1">
+                    {/* ========================================================================= */}
+                    {/* PAGE HEADER: Title, Badges & Action Buttons */}
+                    {/* ========================================================================= */}
+                    <div className="mb-6 lg:mb-8 pb-5 border-b-2 border-black/55 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div className="flex items-start gap-3">
+                            {onOpenMobileSidebar && (
+                                <button
+                                    type="button"
+                                    onClick={onOpenMobileSidebar}
+                                    className="lg:hidden mt-0.5 p-2 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer flex-shrink-0"
+                                    aria-label="Open sidebar"
+                                >
+                                    <svg className="w-5 h-5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <line x1="3" y1="12" x2="21" y2="12" />
+                                        <line x1="3" y1="6" x2="21" y2="6" />
+                                        <line x1="3" y1="18" x2="21" y2="18" />
+                                    </svg>
+                                </button>
+                            )}
+                            <div>
+                                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-black">
+                                    Resume & Credentials
+                                </h1>
+                                <p className="mt-1.5 text-xs sm:text-sm font-medium text-neutral-700 leading-relaxed max-w-2xl">
+                                    Upload your resume PDF. We analyze recruiter checks, sync your skills and handles, and showcase your live document right below.
+                                </p>
+                            </div>
                         </div>
-                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white tracking-tight">
-                            Resume & Credentials
-                        </h1>
-                        <p className="text-xs sm:text-sm text-neutral-400 mt-1.5 max-w-2xl font-medium leading-relaxed">
-                            Upload your resume PDF. We analyze recruiter checks, sync your skills and handles, and showcase your live document right below.
-                        </p>
+
+                        {/* Right Header Badges and Quick Actions */}
+                        <div className="flex items-center gap-2.5 flex-shrink-0 self-start md:self-center flex-wrap">
+                            <span
+                                className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-md text-xs font-black uppercase border-2 border-black shadow-[3px_3px_0px_#000] ${resumeData.hasResume ? "bg-[#a2ff86] text-black" : "bg-white text-black"
+                                    }`}
+                            >
+                                <span
+                                    className={`w-2 h-2 rounded-full ${resumeData.hasResume ? "bg-black animate-pulse" : "bg-neutral-400"
+                                        }`}
+                                />
+                                <span>
+                                    {resumeData.hasResume
+                                        ? `${passedChecksCount} of 8 checks passed`
+                                        : "No resume uploaded"}
+                                </span>
+                            </span>
+
+                            {resumeData.hasResume && resumeData.resumeUrl && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const el = document.getElementById("active-resume-viewer");
+                                            if (el) el.scrollIntoView({ behavior: "smooth" });
+                                        }}
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-black uppercase border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all cursor-pointer"
+                                    >
+                                        <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Preview</span>
+                                    </button>
+                                    <a
+                                        href={resumeData.resumeUrl}
+                                        download={resumeData.resumeFilename || "resume.pdf"}
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-md text-xs font-black uppercase border-2 border-black bg-[#a2ff86] text-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all cursor-pointer"
+                                    >
+                                        <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Download PDF</span>
+                                    </a>
+                                </>
+                            )}
+                        </div>
                     </div>
 
-                    {/* Quick Action in Header */}
-                    {resumeData.hasResume && resumeData.resumeUrl && (
-                        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-shrink-0">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const el = document.getElementById("active-resume-viewer");
-                                    if (el) el.scrollIntoView({ behavior: "smooth" });
-                                }}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-200 hover:text-white border border-neutral-800 text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer"
-                            >
-                                <Eye className="w-3.5 h-3.5 text-indigo-400" />
-                                <span>Jump to Preview</span>
-                            </button>
-                            <a
-                                href={resumeData.resumeUrl}
-                                download={resumeData.resumeFilename || "resume.pdf"}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 border border-indigo-400/25 active:scale-95 cursor-pointer"
-                            >
-                                <Download className="w-3.5 h-3.5" />
-                                <span>Download PDF</span>
-                            </a>
-                        </div>
-                    )}
-                </div>
-
-                {/* ========================================================================= */}
-                {/* UPPER GRID: Left (Upload / Active File & 3 Cards) + Right (Snippet Generator) */}
-                {/* ========================================================================= */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch relative z-10">
-                    {/* LEFT COLUMN: Upload Dropzone & 3 Pitch-Black Feature Summary Cards */}
-                    <div className="lg:col-span-8 flex flex-col justify-between space-y-6">
-                        {/* Block 1: Upload Dropzone / Active File Box (Pure Pitch Black) */}
+                    {/* ========================================================================= */}
+                    {/* UPPER SECTION: Upload Dropzone & 3 Feature Summary Cards */}
+                    {/* ========================================================================= */}
+                    <div className="w-full space-y-6">
+                        {/* Block 1: Upload Dropzone / Active File Box */}
                         <div
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
                             onDrop={handleDrop}
-                            className={`w-full rounded-2xl sm:rounded-3xl border transition-all duration-200 relative overflow-hidden flex flex-col justify-center items-center text-center p-6 sm:p-8 min-h-[260px] bg-black ${
-                                isDragging
-                                    ? "border-indigo-500 bg-indigo-950/20 shadow-[0_0_35px_rgba(99,102,241,0.25)]"
-                                    : resumeData.hasResume
-                                    ? "border-neutral-800 shadow-xl"
-                                    : "border-dashed border-neutral-800 hover:border-indigo-500/50 hover:bg-[#05070F] shadow-lg"
-                            }`}
+                            className={`w-full rounded-xl border-2 transition-all duration-200 relative overflow-hidden flex flex-col justify-center items-center text-center p-6 sm:p-7 min-h-[260px] bg-white  ${isDragging
+                                ? "border-black bg-[#a2ff86]/25 "
+                                : resumeData.hasResume
+                                    ? "border-black"
+                                    : "border-dashed border-black hover:bg-[#FAF6EE]"
+                                }`}
                         >
-                            {/* Hidden Native File Input */}
                             <input
                                 ref={fileInputRef}
                                 type="file"
@@ -517,47 +586,43 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                             {/* State 1: Uploading in Progress */}
                             {isUploading ? (
                                 <div className="w-full max-w-md mx-auto space-y-4 text-center py-6 animate-fadeIn">
-                                    <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 mx-auto flex items-center justify-center animate-pulse shadow-[0_0_20px_rgba(99,102,241,0.25)]">
-                                        <FileUp className="w-7 h-7 animate-bounce text-indigo-400" />
+                                    <div className="w-14 h-14 rounded-xl bg-[#a2ff86] border-2 border-black text-black mx-auto flex items-center justify-center shadow-[3px_3px_0px_#000] animate-bounce">
+                                        <FileUp className="w-7 h-7 stroke-[2.5]" />
                                     </div>
                                     <div>
-                                        <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                                        <h3 className="text-base sm:text-lg font-black text-black tracking-tight uppercase">
                                             Uploading to Cloudinary...
                                         </h3>
-                                        <p className="text-xs text-neutral-400 mt-0.5">
-                                            Compressing and parsing recruiter checks ({uploadProgress}%)
+                                        <p className="text-xs font-bold text-neutral-600 mt-0.5">
+                                            Compressing and verifying ATS compliance ({uploadProgress}%)
                                         </p>
                                     </div>
-                                    <div className="w-full h-2 rounded-full bg-neutral-900 overflow-hidden border border-neutral-800">
+                                    <div className="w-full h-3 rounded-full bg-[#FAF6EE] overflow-hidden border-2 border-black shadow-[1px_1px_0px_#000]">
                                         <div
-                                            className="h-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-cyan-400 transition-all duration-200 rounded-full shadow-[0_0_15px_rgba(99,102,241,0.7)]"
+                                            className="h-full bg-[#a2ff86] border-r-2 border-black transition-all duration-200"
                                             style={{ width: `${uploadProgress}%` }}
                                         />
                                     </div>
                                 </div>
                             ) : resumeData.hasResume ? (
-                                /* State 2: Resume IS Uploaded (Active & Manageable) */
-                                <div className="w-full flex flex-col justify-between space-y-6 animate-fadeIn">
-                                    {/* Top Strip: File Info & Midnight Indigo Badges */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-800/80 text-left">
+                                /* State 2: Resume is Active */
+                                <div className="w-full flex flex-col justify-between space-y-5 animate-fadeIn text-left">
+                                    {/* Top File Meta & Actions */}
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-black">
                                         <div className="flex items-center gap-3.5 min-w-0">
-                                            <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 flex items-center justify-center flex-shrink-0 shadow-sm shadow-indigo-500/10">
-                                                <FileText className="w-6 h-6 text-indigo-400" />
+                                            <div className="w-12 h-12 rounded-xl bg-[#a2ff86] border-2 border-black text-black flex items-center justify-center flex-shrink-0 shadow-[2px_2px_0px_#000]">
+                                                <FileText className="w-6 h-6 stroke-[2.5]" />
                                             </div>
                                             <div className="min-w-0">
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <h3
-                                                        className="text-sm sm:text-base font-bold text-white truncate max-w-[280px] sm:max-w-[380px]"
+                                                        className="text-sm sm:text-base font-black text-black truncate max-w-[240px] sm:max-w-[340px]"
                                                         title={resumeData.resumeFilename || "Resume.pdf"}
                                                     >
                                                         {resumeData.resumeFilename || "Resume.pdf"}
                                                     </h3>
-                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold tracking-wide uppercase">
-                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                                        Active
-                                                    </span>
                                                 </div>
-                                                <p className="text-xs text-neutral-400 font-mono mt-0.5 flex items-center gap-2">
+                                                <p className="text-xs font-mono font-bold text-neutral-600 mt-0.5 flex items-center gap-2">
                                                     <span>{formatBytes(resumeData.resumeFilesize)}</span>
                                                     <span>•</span>
                                                     <span>Updated {formatDate(resumeData.resumeUpdatedAt)}</span>
@@ -565,15 +630,15 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                             </div>
                                         </div>
 
-                                        {/* Action Buttons: View, Download (Midnight Indigo), Replace, Delete */}
+                                        {/* Action Buttons: Modal, Download, Replace, Delete */}
                                         <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
                                             <button
                                                 type="button"
                                                 onClick={() => setIsPreviewOpen(true)}
-                                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-all border border-neutral-800 shadow-sm active:scale-95 cursor-pointer"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-100 text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
                                                 title="View full-screen modal"
                                             >
-                                                <Eye className="w-3.5 h-3.5 text-neutral-300" />
+                                                <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
                                                 <span>Modal</span>
                                             </button>
 
@@ -581,10 +646,10 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                                 <a
                                                     href={resumeData.resumeUrl}
                                                     download={resumeData.resumeFilename || "resume.pdf"}
-                                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 border border-indigo-400/20 active:scale-95 cursor-pointer"
+                                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#a2ff86] text-black text-xs font-black uppercase border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
                                                     title="Download PDF"
                                                 >
-                                                    <Download className="w-3.5 h-3.5" />
+                                                    <Download className="w-3.5 h-3.5 stroke-[2.5]" />
                                                     <span>Download</span>
                                                 </a>
                                             )}
@@ -592,33 +657,35 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                             <button
                                                 type="button"
                                                 onClick={() => fileInputRef.current?.click()}
-                                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-semibold transition-all border border-neutral-800 shadow-2xs active:scale-95 cursor-pointer"
+                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-neutral-100 text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
                                                 title="Upload a new PDF to replace this one"
                                             >
-                                                <RefreshCw className="w-3.5 h-3.5 text-neutral-400" />
+                                                <RefreshCw className="w-3.5 h-3.5 stroke-[2.5]" />
                                                 <span className="hidden sm:inline">Replace</span>
                                             </button>
 
                                             <button
                                                 type="button"
                                                 onClick={() => setIsDeleteModalOpen(true)}
-                                                className="inline-flex items-center justify-center p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-all active:scale-95 cursor-pointer"
+                                                className="inline-flex items-center justify-center p-2 rounded-lg bg-white hover:bg-rose-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer"
                                                 title="Delete resume"
                                             >
-                                                <Trash2 className="w-4 h-4" />
+                                                <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
                                             </button>
                                         </div>
                                     </div>
 
                                     {/* Bottom Strip: Public Profile Sharing Switch & Recruiter Score */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#06080F] border border-neutral-800/90 text-left">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
                                             <div>
-                                                <span className="text-xs font-bold text-white block">
-                                                    Public page download
+                                                <span className="text-xs font-black text-black block uppercase tracking-tight">
+                                                    Public Page Download
                                                 </span>
-                                                <span className="text-[11px] text-neutral-400 block mt-0.5">
-                                                    {resumeData.isResumePublic ? "Visible on your public profile" : "Hidden from public visitors"}
+                                                <span className="text-[11px] font-medium text-neutral-600 block mt-0.5">
+                                                    {resumeData.isResumePublic
+                                                        ? "Visible on public profile"
+                                                        : "Hidden from visitors"}
                                                 </span>
                                             </div>
                                             <button
@@ -627,13 +694,15 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                                 aria-checked={resumeData.isResumePublic}
                                                 disabled={isTogglingVisibility}
                                                 onClick={handleToggleVisibility}
-                                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                                    resumeData.isResumePublic ? "bg-indigo-600 shadow-[0_0_12px_rgba(99,102,241,0.5)]" : "bg-neutral-800"
+                                                className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer items-center rounded-full border-2 border-black transition-colors duration-200 ease-in-out shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] disabled:opacity-50 disabled:cursor-not-allowed ${
+                                                    resumeData.isResumePublic ? "bg-[#a2ff86]" : "bg-neutral-300"
                                                 }`}
+                                                title={resumeData.isResumePublic ? "Public download enabled (click to disable)" : "Public download disabled (click to enable)"}
                                             >
+                                                <span className="sr-only">Toggle public resume download</span>
                                                 <span
-                                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                                                        resumeData.isResumePublic ? "translate-x-5" : "translate-x-0"
+                                                    className={`pointer-events-none inline-block h-5 w-5 rounded-full border-2 border-black transition-transform duration-200 ease-in-out shadow-[1px_1px_0px_rgba(0,0,0,0.2)] ${
+                                                        resumeData.isResumePublic ? "translate-x-7 bg-black" : "translate-x-1 bg-white"
                                                     }`}
                                                 />
                                             </button>
@@ -641,22 +710,22 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
 
                                         <div
                                             onClick={() => setIsChecksModalOpen(true)}
-                                            className="flex items-center justify-between p-3.5 rounded-xl bg-[#06080F] border border-neutral-800/90 text-left hover:border-indigo-500/40 cursor-pointer transition-all group"
+                                            className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#a2ff86]/30 cursor-pointer transition-all group"
                                         >
                                             <div className="flex items-center gap-2.5">
-                                                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-xs flex-shrink-0">
-                                                    <FileCheck2 className="w-4 h-4" />
+                                                <div className="w-8 h-8 rounded-lg bg-white border-2 border-black flex items-center justify-center font-black text-xs text-black shadow-[1px_1px_0px_#000] flex-shrink-0">
+                                                    <FileCheck2 className="w-4 h-4 stroke-[2.5]" />
                                                 </div>
                                                 <div>
-                                                    <span className="text-xs font-bold text-white group-hover:text-indigo-400 transition-colors block">
+                                                    <span className="text-xs font-black text-black group-hover:underline block uppercase tracking-tight">
                                                         Recruiter Checks ({passedChecksCount}/8)
                                                     </span>
-                                                    <span className="text-[11px] text-neutral-400 block mt-0.5">
+                                                    <span className="text-[11px] font-medium text-neutral-600 block mt-0.5">
                                                         100% ATS format compliant
                                                     </span>
                                                 </div>
                                             </div>
-                                            <span className="text-xs font-semibold text-neutral-400 group-hover:text-indigo-300 transition-colors">
+                                            <span className="text-xs font-black text-black">
                                                 Details →
                                             </span>
                                         </div>
@@ -667,12 +736,12 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                 <div className="w-full flex flex-col items-center justify-center space-y-4 py-4">
                                     <div
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="w-14 h-14 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center text-neutral-300 hover:text-white hover:border-indigo-500/40 hover:scale-105 transition-all shadow-md cursor-pointer group"
+                                        className="w-14 h-14 rounded-xl bg-white border-2 border-black flex items-center justify-center text-black hover:bg-[#a2ff86] transition-all shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] cursor-pointer group"
                                     >
                                         <div className="relative">
-                                            <FileText className="w-7 h-7 text-neutral-400 group-hover:text-indigo-400 transition-colors" />
-                                            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-indigo-600 border border-indigo-400 flex items-center justify-center">
-                                                <FileUp className="w-2.5 h-2.5 text-white" />
+                                            <FileText className="w-7 h-7 stroke-[2.5]" />
+                                            <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#a2ff86] border-2 border-black flex items-center justify-center">
+                                                <FileUp className="w-2.5 h-2.5 stroke-[2.5] text-black" />
                                             </div>
                                         </div>
                                     </div>
@@ -680,48 +749,36 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                     <div className="space-y-1">
                                         <h3
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="text-lg sm:text-xl font-bold text-white tracking-tight hover:text-indigo-400 transition-colors cursor-pointer"
+                                            className="text-lg sm:text-xl font-black text-black tracking-tight hover:underline cursor-pointer"
                                         >
                                             Drop your resume here
                                         </h3>
-                                        <p className="text-xs text-neutral-400 font-medium">
+                                        <p className="text-xs font-medium text-neutral-600">
                                             PDF up to 5 MB ·{" "}
                                             <span
                                                 onClick={() => fileInputRef.current?.click()}
-                                                className="text-indigo-400 underline decoration-indigo-500/50 underline-offset-4 hover:text-indigo-300 cursor-pointer"
+                                                className="font-black text-black underline underline-offset-2 cursor-pointer hover:text-neutral-800"
                                             >
                                                 or click to browse
                                             </span>
                                         </p>
                                     </div>
-
-                                    {/* Quick Demo Preview Button for immediate testing */}
-                                    <div className="pt-2">
-                                        <button
-                                            type="button"
-                                            onClick={handleLoadSampleResume}
-                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 text-[11px] font-semibold transition-all cursor-pointer"
-                                        >
-                                            <Sparkles className="w-3 h-3 text-indigo-400" />
-                                            <span>Load Sample Resume to Preview Viewer</span>
-                                        </button>
-                                    </div>
                                 </div>
                             )}
                         </div>
 
-                        {/* Blocks 2, 3, 4: 3 Feature Cards (Pure Pitch Black) */}
+                        {/* Blocks 2, 3, 4: 3 Feature Summary Cards */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                             {/* Card 1: Fills your profile */}
-                            <div className="rounded-2xl bg-black border border-neutral-800/90 p-5 flex flex-col justify-between space-y-3 hover:border-indigo-500/40 hover:bg-[#05070E] transition-all shadow-sm">
-                                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-2xs">
-                                    <Sparkles className="w-4 h-4 text-indigo-400" />
+                            <div className="rounded-xl bg-white border-2 border-black p-4 sm:p-5 flex flex-col justify-between space-y-3 shadow-[4px_4px_0px_#000]">
+                                <div className="w-8 h-8 rounded-lg bg-[#a2ff86] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000]">
+                                    <Sparkles className="w-4 h-4 stroke-[2.5]" />
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-bold text-white tracking-tight">
+                                    <h4 className="text-sm font-black text-black tracking-tight">
                                         Fills your profile
                                     </h4>
-                                    <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                                    <p className="text-xs font-medium text-neutral-600 mt-1 leading-relaxed">
                                         Name, LinkedIn, coding handles and skills, in one click.
                                     </p>
                                 </div>
@@ -730,31 +787,31 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                             {/* Card 2: Checks it */}
                             <div
                                 onClick={() => setIsChecksModalOpen(true)}
-                                className="rounded-2xl bg-black border border-neutral-800/90 p-5 flex flex-col justify-between space-y-3 hover:border-indigo-500/40 hover:bg-[#05070E] transition-all shadow-sm cursor-pointer group"
+                                className="rounded-xl bg-white border-2 border-black p-4 sm:p-5 flex flex-col justify-between space-y-3 shadow-[4px_4px_0px_#000] hover:shadow-[2px_2px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer group"
                             >
-                                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 group-hover:scale-105 transition-all shadow-2xs">
-                                    <Scan className="w-4 h-4 text-indigo-400" />
+                                <div className="w-8 h-8 rounded-lg bg-white border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] group-hover:bg-[#a2ff86] transition-colors">
+                                    <Scan className="w-4 h-4 stroke-[2.5]" />
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-bold text-white tracking-tight group-hover:text-indigo-400 transition-colors">
+                                    <h4 className="text-sm font-black text-black tracking-tight group-hover:underline">
                                         Checks it
                                     </h4>
-                                    <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                                    <p className="text-xs font-medium text-neutral-600 mt-1 leading-relaxed">
                                         Eight quick checks recruiters make in the first ten seconds.
                                     </p>
                                 </div>
                             </div>
 
                             {/* Card 3: Shares it */}
-                            <div className="rounded-2xl bg-black border border-neutral-800/90 p-5 flex flex-col justify-between space-y-3 hover:border-indigo-500/40 hover:bg-[#05070E] transition-all shadow-sm">
-                                <div className="w-8 h-8 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-2xs">
-                                    <FileText className="w-4 h-4 text-indigo-400" />
+                            <div className="rounded-xl bg-white border-2 border-black p-4 sm:p-5 flex flex-col justify-between space-y-3 shadow-[4px_4px_0px_#000]">
+                                <div className="w-8 h-8 rounded-lg bg-white border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000]">
+                                    <FileText className="w-4 h-4 stroke-[2.5]" />
                                 </div>
                                 <div>
-                                    <h4 className="text-sm font-bold text-white tracking-tight">
+                                    <h4 className="text-sm font-black text-black tracking-tight">
                                         Shares it
                                     </h4>
-                                    <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                                    <p className="text-xs font-medium text-neutral-600 mt-1 leading-relaxed">
                                         A download button on your public page, if you want one.
                                     </p>
                                 </div>
@@ -762,447 +819,311 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                         </div>
                     </div>
 
-                    {/* RIGHT COLUMN: "For your resume" Snippet Generator (Pure Pitch Black) */}
-                    <div className="lg:col-span-4 flex flex-col justify-between space-y-5">
-                        {/* Block 5: Right Column Container */}
-                        <div className="w-full h-full rounded-2xl sm:rounded-3xl bg-black border border-neutral-800/90 p-5 sm:p-6 shadow-xl flex flex-col justify-between space-y-5">
-                            <div className="space-y-4">
-                                {/* Card Header */}
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shadow-2xs">
-                                        <FileText className="w-4 h-4 text-indigo-400" />
+                    {/* ========================================================================= */}
+                    {/* BELOW-THE-SCREEN: EMBEDDED RESUME DOCUMENT VIEWER */}
+                    {/* Shows the active resume PDF directly below the screen when uploaded */}
+                    {/* ========================================================================= */}
+                    {activeDoc ? (
+                        <div
+                            id="active-resume-viewer"
+                            className="w-full rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] p-5 sm:p-7 space-y-5 transition-all duration-300 mt-8"
+                        >
+                            {/* Document Viewer Header Bar */}
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b-2 border-black">
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                    <div className="w-11 h-11 rounded-xl bg-[#a2ff86] border-2 border-black text-black flex items-center justify-center flex-shrink-0 shadow-[2px_2px_0px_#000]">
+                                        <FileText className="w-5 h-5 stroke-[2.5]" />
                                     </div>
-                                    <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                                        For your resume
-                                    </h3>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2.5 flex-wrap">
+                                            <h2 className="text-base sm:text-lg font-black text-black tracking-tight truncate max-w-[320px] sm:max-w-[450px]">
+                                                {activeDoc.filename}
+                                            </h2>
+                                            {activeDoc.isDemo && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setPreviewDemo(false)}
+                                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white hover:bg-neutral-100 text-black border-2 border-black text-[10px] font-black uppercase shadow-[1px_1px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer transition-all"
+                                                    title="Close demo resume preview"
+                                                >
+                                                    <X className="w-3 h-3 stroke-[2.5]" />
+                                                    <span>Close Demo</span>
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-xs text-neutral-600 font-mono font-bold mt-1">
+                                            <span>{formatBytes(activeDoc.filesize)}</span>
+                                            <span>•</span>
+                                            <span>PDF Document</span>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* Segmented Tab Controls: One line | Bullets | LinkedIn */}
-                                <div className="grid grid-cols-3 p-1 rounded-xl bg-[#06080F] border border-neutral-800/80 gap-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => setSnippetTab("one_line")}
-                                        className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                            snippetTab === "one_line"
-                                                ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
-                                                : "text-neutral-400 hover:text-white"
-                                        }`}
-                                    >
-                                        One line
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSnippetTab("bullets")}
-                                        className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                            snippetTab === "bullets"
-                                                ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
-                                                : "text-neutral-400 hover:text-white"
-                                        }`}
-                                    >
-                                        Bullets
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setSnippetTab("linkedin")}
-                                        className={`py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                            snippetTab === "linkedin"
-                                                ? "bg-indigo-600 text-white shadow-sm shadow-indigo-600/30"
-                                                : "text-neutral-400 hover:text-white"
-                                        }`}
-                                    >
-                                        LinkedIn
-                                    </button>
-                                </div>
+                                {/* Toolbar Controls: Zoom, Rotate, Copy Link, Open in Tab, Fullscreen Modal, Download */}
+                                <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap justify-start md:justify-end">
+                                    {/* 1. Zoom & Rotation Controls */}
+                                    <div className="hidden sm:inline-flex items-center h-9 bg-[#FAF6EE] border-2 border-black rounded-lg px-1.5 gap-1 shadow-[2px_2px_0px_#000]">
+                                        <button
+                                            type="button"
+                                            onClick={() => setZoomLevel((prev) => Math.max(65, prev - 15))}
+                                            className="p-1 text-black hover:bg-white rounded transition-colors cursor-pointer"
+                                            title="Zoom Out"
+                                        >
+                                            <ZoomOut className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        </button>
+                                        <span className="text-[11px] font-mono px-1.5 text-black font-black whitespace-nowrap">
+                                            {zoomLevel}%{rotation !== 0 ? ` (${rotation}°)` : ""}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setZoomLevel((prev) => Math.min(160, prev + 15))}
+                                            className="p-1 text-black hover:bg-white rounded transition-colors cursor-pointer"
+                                            title="Zoom In"
+                                        >
+                                            <ZoomIn className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setRotation((prev) => (prev + 90) % 360)}
+                                            className="p-1 text-black hover:bg-white rounded transition-colors cursor-pointer"
+                                            title="Rotate 90° Clockwise"
+                                        >
+                                            <RotateCw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        </button>
+                                    </div>
 
-                                {/* Block 6: Dashed Preview Box (Pure Dark Black) */}
-                                <div className="w-full rounded-xl border border-dashed border-neutral-800 bg-[#05060A] p-4 font-mono text-xs text-neutral-300 space-y-1.5 leading-relaxed min-h-[92px] select-text">
-                                    <p className="text-neutral-300 font-medium whitespace-pre-line">
-                                        {snippetText}
-                                    </p>
-                                </div>
-
-                                {/* Action Row: Midnight Indigo Copy Button + Add my profile link toggle */}
-                                <div className="flex items-center justify-between gap-3 pt-1">
+                                    {/* 2. Copy Direct Link */}
                                     <button
                                         type="button"
-                                        onClick={handleCopySnippet}
-                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs sm:text-sm font-bold transition-all transform active:scale-95 shadow-md shadow-indigo-600/30 border border-indigo-400/20 cursor-pointer flex-shrink-0"
+                                        onClick={handleCopyCdnLink}
+                                        className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg bg-white hover:bg-neutral-100 text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer whitespace-nowrap"
+                                        title="Copy direct resume link"
                                     >
-                                        {isCopied ? (
+                                        {isCopiedCdnLink ? (
                                             <>
-                                                <Check className="w-4 h-4 text-white" />
-                                                <span>Copied!</span>
+                                                <Check className="w-3.5 h-3.5 stroke-[3] text-black" />
+                                                <span>Copied</span>
                                             </>
                                         ) : (
                                             <>
-                                                <Copy className="w-4 h-4 text-white" />
-                                                <span>Copy</span>
+                                                <Link2 className="w-3.5 h-3.5 stroke-[2.5] text-black" />
+                                                <span>Link</span>
                                             </>
                                         )}
                                     </button>
 
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            role="switch"
-                                            aria-checked={includeProfileLink}
-                                            onClick={() => setIncludeProfileLink((prev) => !prev)}
-                                            className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                                includeProfileLink ? "bg-indigo-600 shadow-[0_0_12px_rgba(99,102,241,0.5)]" : "bg-neutral-800"
-                                            }`}
-                                        >
-                                            <span
-                                                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                                                    includeProfileLink ? "translate-x-4" : "translate-x-0"
-                                                }`}
-                                            />
-                                        </button>
-                                        <span
-                                            className="text-xs font-semibold text-neutral-300 cursor-pointer select-none"
-                                            onClick={() => setIncludeProfileLink((prev) => !prev)}
-                                        >
-                                            Add my profile link
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Secondary Row: Only verified platforms toggle */}
-                                <div className="flex items-center gap-2 pt-1 border-t border-neutral-800/80">
-                                    <button
-                                        type="button"
-                                        role="switch"
-                                        aria-checked={onlyVerifiedPlatforms}
-                                        onClick={() => setOnlyVerifiedPlatforms((prev) => !prev)}
-                                        className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                                            onlyVerifiedPlatforms ? "bg-indigo-600 shadow-[0_0_12px_rgba(99,102,241,0.5)]" : "bg-neutral-800"
-                                        }`}
-                                    >
-                                        <span
-                                            className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                                                onlyVerifiedPlatforms ? "translate-x-4" : "translate-x-0"
-                                            }`}
-                                        />
-                                    </button>
-                                    <span
-                                        className="text-xs font-semibold text-neutral-400 cursor-pointer select-none"
-                                        onClick={() => setOnlyVerifiedPlatforms((prev) => !prev)}
-                                    >
-                                        Only verified platforms
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Status Footer: Verified Handles Note */}
-                            <div className="pt-3 border-t border-neutral-800/80 flex items-start gap-2.5 text-xs text-neutral-400">
-                                <ShieldCheck className="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5" />
-                                <p className="leading-normal text-[11px]">
-                                    8 of 8 handles verified. Recruiters can open your link and see the tick next to each one.{" "}
+                                    {/* 3. Open in New Tab */}
                                     <a
-                                        href="/profile"
-                                        className="text-indigo-400 hover:text-indigo-300 font-bold underline underline-offset-2"
+                                        href={activeDoc.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-colors cursor-pointer shrink-0"
+                                        title="Open in new tab"
                                     >
-                                        Verify more
+                                        <ExternalLink className="w-4 h-4 stroke-[2.5]" />
                                     </a>
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                {/* ========================================================================= */}
-                {/* BELOW-THE-SCREEN: EMBEDDED RESUME DOCUMENT VIEWER */}
-                {/* Shows the active resume PDF directly below the screen when uploaded */}
-                {/* ========================================================================= */}
-                {resumeData.hasResume && resumeData.resumeUrl ? (
-                    <div
-                        id="active-resume-viewer"
-                        className="w-full rounded-3xl bg-black border border-neutral-800/90 shadow-2xl p-5 sm:p-7 space-y-5 relative overflow-hidden transition-all duration-300"
-                    >
-                        {/* Ambient Glow */}
-                        <div className="absolute top-0 left-1/3 w-96 h-36 bg-gradient-to-r from-indigo-600/15 via-indigo-500/10 to-indigo-600/15 blur-2xl pointer-events-none" />
+                                    {/* 4. Fullscreen Modal Trigger */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsPreviewOpen(true)}
+                                        className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-colors cursor-pointer shrink-0"
+                                        title="Expand Fullscreen Modal"
+                                    >
+                                        <Maximize2 className="w-4 h-4 stroke-[2.5]" />
+                                    </button>
 
-                        {/* Document Viewer Header Bar */}
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-neutral-800/80">
-                            {/* File Title & Status Indicators */}
-                            <div className="flex items-center gap-3.5 min-w-0">
-                                <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-400 flex items-center justify-center flex-shrink-0 shadow-sm shadow-indigo-500/10">
-                                    <FileText className="w-5 h-5 text-indigo-400" />
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-2.5 flex-wrap">
-                                        <h2 className="text-base sm:text-lg font-black text-white tracking-tight truncate max-w-[320px] sm:max-w-[450px]">
-                                            {resumeData.resumeFilename || "Resume.pdf"}
-                                        </h2>
-                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-bold tracking-wide uppercase">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                            Live Cloudinary Document
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-3 text-xs text-neutral-400 font-mono mt-1 flex-wrap">
-                                        <span>{formatBytes(resumeData.resumeFilesize)}</span>
-                                        <span>•</span>
-                                        <span className="text-indigo-400 font-bold">100% ATS Scored (8/8 Checks)</span>
-                                        <span>•</span>
-                                        <span>{resumeData.isResumePublic ? "Public Profile Live" : "Private Draft"}</span>
-                                    </div>
+                                    {/* 5. Download PDF Button */}
+                                    <a
+                                        href={activeDoc.url}
+                                        download={activeDoc.filename || "resume.pdf"}
+                                        className="inline-flex items-center gap-2 h-9 px-3.5 rounded-lg bg-[#a2ff86] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all cursor-pointer whitespace-nowrap shrink-0"
+                                        title="Download resume PDF"
+                                    >
+                                        <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Download PDF</span>
+                                    </a>
                                 </div>
                             </div>
 
-                            {/* Toolbar Controls: Zoom, Open in Tab, Copy Link, Download (Midnight Indigo), Modal */}
-                            <div className="flex items-center gap-2 flex-wrap self-start md:self-auto">
-                                {/* Zoom Controls */}
-                                <div className="hidden sm:flex items-center bg-[#06080F] border border-neutral-800/90 rounded-xl p-1 gap-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => setZoomLevel((prev) => Math.max(65, prev - 15))}
-                                        className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
-                                        title="Zoom Out"
-                                    >
-                                        <ZoomOut className="w-3.5 h-3.5" />
-                                    </button>
-                                    <span className="text-[11px] font-mono px-1.5 text-neutral-300 font-bold">
-                                        {zoomLevel}%
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={() => setZoomLevel((prev) => Math.min(160, prev + 15))}
-                                        className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
-                                        title="Zoom In"
-                                    >
-                                        <ZoomIn className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setZoomLevel(100)}
-                                        className="p-1.5 text-neutral-400 hover:text-white rounded-lg hover:bg-neutral-800 transition-colors"
-                                        title="Reset Zoom"
-                                    >
-                                        <RotateCcw className="w-3 h-3" />
-                                    </button>
-                                </div>
-
-                                {/* Copy Direct Link */}
-                                <button
-                                    type="button"
-                                    onClick={handleCopyCdnLink}
-                                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs font-semibold transition-all border border-neutral-800 shadow-2xs active:scale-95 cursor-pointer"
-                                    title="Copy direct resume link"
-                                >
-                                    {isCopiedCdnLink ? (
-                                        <>
-                                            <Check className="w-3.5 h-3.5 text-emerald-400" />
-                                            <span className="text-emerald-400 font-bold">Copied</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Link2 className="w-3.5 h-3.5 text-neutral-400" />
-                                            <span>Link</span>
-                                        </>
-                                    )}
-                                </button>
-
-                                {/* Open in New Tab */}
-                                <a
-                                    href={resumeData.resumeUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 transition-colors cursor-pointer"
-                                    title="Open in new tab"
-                                >
-                                    <ExternalLink className="w-4 h-4" />
-                                </a>
-
-                                {/* Fullscreen Modal Trigger */}
-                                <button
-                                    type="button"
-                                    onClick={() => setIsPreviewOpen(true)}
-                                    className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 transition-colors cursor-pointer"
-                                    title="Expand Fullscreen Modal"
-                                >
-                                    <Maximize2 className="w-4 h-4" />
-                                </button>
-
-                                {/* Primary Midnight Indigo Download Button */}
-                                <a
-                                    href={resumeData.resumeUrl}
-                                    download={resumeData.resumeFilename || "resume.pdf"}
-                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs sm:text-sm font-bold transition-all shadow-md shadow-indigo-600/30 border border-indigo-400/25 active:scale-95 cursor-pointer"
-                                >
-                                    <Download className="w-4 h-4" />
-                                    <span>Download PDF</span>
-                                </a>
-                            </div>
-                        </div>
-
-                        {/* Live Embedded PDF Viewer Viewport with Smooth Scale Zoom & Skeleton Placeholder */}
-                        <div className="w-full rounded-2xl bg-[#07090F] border border-neutral-800 overflow-hidden shadow-[inset_0_2px_12px_rgba(0,0,0,0.8)] relative flex flex-col items-center justify-center min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px]">
-                            {/* Ambient Skeleton Loading State */}
-                            {!isIframeLoaded && !iframeError && (
-                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#07090F] space-y-4">
-                                    <div className="relative">
-                                        <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-400 shadow-[0_0_25px_rgba(99,102,241,0.2)]">
-                                            <FileText className="w-7 h-7 text-indigo-400 animate-pulse" />
+                            {/* Live Embedded PDF Viewer Viewport with Smooth Scale Zoom & Rotation */}
+                            <div className="w-full rounded-xl bg-[#FAF6EE] border-2 border-black overflow-hidden shadow-[inset_0_2px_8px_rgba(0,0,0,0.1)] relative flex flex-col items-center justify-center min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px]">
+                                {!isIframeLoaded && !iframeError && (
+                                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#FAF6EE] space-y-4 pointer-events-none transition-opacity duration-300">
+                                        <div className="relative">
+                                            <div className="w-14 h-14 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center text-black shadow-[3px_3px_0px_#000]">
+                                                <FileText className="w-7 h-7 stroke-[2.5] animate-pulse" />
+                                            </div>
+                                            <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-black animate-ping" />
                                         </div>
-                                        <div className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-indigo-500 animate-ping" />
+                                        <div className="text-center space-y-1">
+                                            <p className="text-sm font-black text-black uppercase tracking-tight">Rendering ATS Document...</p>
+                                            <p className="text-xs text-neutral-600 font-mono font-bold">
+                                                Verified PDF Stream
+                                            </p>
+                                        </div>
+                                        <div className="w-48 h-2 rounded-full bg-white overflow-hidden border-2 border-black shadow-[1px_1px_0px_#000]">
+                                            <div className="h-full bg-[#a2ff86] w-full animate-pulse border-r-2 border-black" />
+                                        </div>
                                     </div>
-                                    <div className="text-center space-y-1">
-                                        <p className="text-sm font-bold text-white tracking-tight">Rendering ATS Document...</p>
-                                        <p className="text-xs text-neutral-400 font-mono">Cloudinary CDN verified stream</p>
-                                    </div>
-                                    <div className="w-48 h-1.5 rounded-full bg-neutral-900 overflow-hidden border border-neutral-800">
-                                        <div className="h-full bg-gradient-to-r from-indigo-600 via-indigo-400 to-cyan-400 w-full animate-pulse" />
-                                    </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* Error Fallback if PDF Viewer is Blocked */}
-                            {iframeError && (
-                                <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#07090F] p-6 text-center space-y-3">
-                                    <AlertCircle className="w-10 h-10 text-amber-400" />
-                                    <h3 className="text-base font-bold text-white">Browser Preview Blocked</h3>
-                                    <p className="text-xs text-neutral-400 max-w-md">
-                                        Your browser or extension prevented inline PDF rendering. You can still open or download your resume directly.
-                                    </p>
-                                    <div className="flex items-center gap-3 pt-2">
-                                        <a
-                                            href={resumeData.resumeUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold border border-neutral-800"
-                                        >
-                                            Open in Tab
-                                        </a>
-                                        <a
-                                            href={resumeData.resumeUrl}
-                                            download={resumeData.resumeFilename || "resume.pdf"}
-                                            className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
-                                        >
-                                            Download PDF
-                                        </a>
+                                {iframeError && (
+                                    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#FAF6EE] p-6 text-center space-y-3">
+                                        <AlertCircle className="w-10 h-10 text-amber-500 stroke-[2.5]" />
+                                        <h3 className="text-base font-black text-black">Browser Preview Blocked</h3>
+                                        <p className="text-xs text-neutral-600 max-w-md font-medium">
+                                            Your browser or extension prevented inline PDF rendering. You can still open or download your resume directly.
+                                        </p>
+                                        <div className="flex items-center gap-3 pt-2">
+                                            <a
+                                                href={activeDoc.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-4 py-2 rounded-lg bg-white hover:bg-neutral-100 text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            >
+                                                Open in Tab
+                                            </a>
+                                            <a
+                                                href={activeDoc.url}
+                                                download={activeDoc.filename || "resume.pdf"}
+                                                className="px-4 py-2 rounded-lg bg-[#a2ff86] text-black text-xs font-black uppercase border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            >
+                                                Download PDF
+                                            </a>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* Scalable Container with Smooth CSS Transform Zoom (ZERO Network Re-fetch on Zoom) */}
-                            <div className="w-full h-full min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px] overflow-auto flex justify-center items-start">
-                                <div
-                                    style={{
-                                        width: "100%",
-                                        height: "100%",
-                                        minHeight: "750px",
-                                        transform: `scale(${zoomLevel / 100})`,
-                                        transformOrigin: "top center",
-                                        transition: "transform 0.15s ease-out",
-                                    }}
-                                    className="w-full h-full min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px]"
-                                >
-                                    <iframe
-                                        key={resumeData.resumeUrl || "active-resume"}
-                                        src={`${resumeData.resumeUrl}#toolbar=1&navpanes=0`}
-                                        title={resumeData.resumeFilename || "Resume Document Viewer"}
-                                        className={`w-full h-full min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px] border-0 rounded-2xl bg-white shadow-2xl transition-opacity duration-300 ${
-                                            isIframeLoaded ? "opacity-100" : "opacity-0"
-                                        }`}
-                                        onLoad={() => setIsIframeLoaded(true)}
-                                        onError={() => {
-                                            setIsIframeLoaded(true);
-                                            setIframeError(true);
+                                <div className="w-full h-full min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px] overflow-auto flex justify-center items-center p-2">
+                                    <div
+                                        style={{
+                                            width: "100%",
+                                            height: "100%",
+                                            minHeight: "750px",
+                                            transform: `scale(${zoomLevel / 100}) rotate(${rotation}deg)`,
+                                            transformOrigin: "center center",
+                                            transition: "transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
                                         }}
-                                        loading="lazy"
-                                    />
+                                        className="w-full h-full min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px] flex items-center justify-center"
+                                    >
+                                        <iframe
+                                            key={activeDoc.url}
+                                            src={`${activeDoc.url}#toolbar=1&navpanes=0`}
+                                            title={activeDoc.filename}
+                                            className="w-full h-full min-h-[750px] sm:min-h-[880px] lg:min-h-[1050px] border-0 rounded-xl bg-white shadow-xl"
+                                            onLoad={() => setIsIframeLoaded(true)}
+                                            onError={() => {
+                                                setIsIframeLoaded(true);
+                                                setIframeError(true);
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Mobile Helper Callout Bar */}
+                                <div className="w-full flex sm:hidden items-center justify-between px-4 py-2.5 bg-[#a2ff86] border-t-2 border-black text-xs font-black text-black">
+                                    <span className="truncate">Viewing on mobile?</span>
+                                    <a
+                                        href={activeDoc.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="ml-2 font-black underline flex items-center gap-1 text-black flex-shrink-0"
+                                    >
+                                        <span>Open PDF</span>
+                                        <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    </a>
                                 </div>
                             </div>
 
-                            {/* Mobile Helper Callout Bar */}
-                            <div className="w-full flex sm:hidden items-center justify-between px-4 py-2 bg-indigo-950/40 border-t border-indigo-500/20 text-xs text-indigo-200">
-                                <span className="truncate">Viewing on mobile?</span>
-                                <a
-                                    href={resumeData.resumeUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="ml-2 font-bold underline flex items-center gap-1 text-white flex-shrink-0"
+                            {/* Bottom Insights Strip below the Viewer */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black text-left space-y-1 shadow-[3px_3px_0px_#000]">
+                                    <div className="flex items-center gap-2 text-black text-xs font-black uppercase">
+                                        <CheckCircle2 className="w-4 h-4 stroke-[2.5] text-black" />
+                                        <span>ATS Readability 100%</span>
+                                    </div>
+                                    <p className="text-[11px] text-neutral-700 font-medium leading-relaxed">
+                                        Clean single-column structure and standard section headers.
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black text-left space-y-1 shadow-[3px_3px_0px_#000]">
+                                    <div className="flex items-center gap-2 text-black text-xs font-black uppercase">
+                                        <ShieldCheck className="w-4 h-4 stroke-[2.5] text-black" />
+                                        <span>Handles Synced</span>
+                                    </div>
+                                    <p className="text-[11px] text-neutral-700 font-medium leading-relaxed">
+                                        LeetCode Guardian & Codeforces ratings live on public profile.
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black text-left space-y-1 shadow-[3px_3px_0px_#000]">
+                                    <div className="flex items-center gap-2 text-black text-xs font-black uppercase">
+                                        <FileCheck2 className="w-4 h-4 stroke-[2.5] text-black" />
+                                        <span>Fast Cloud CDN</span>
+                                    </div>
+                                    <p className="text-[11px] text-neutral-700 font-medium leading-relaxed">
+                                        Cached globally with sub-200ms latency for mobile recruiters.
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black text-left space-y-1 shadow-[3px_3px_0px_#000]">
+                                    <div className="flex items-center gap-2 text-black text-xs font-black uppercase">
+                                        <ExternalLink className="w-4 h-4 stroke-[2.5] text-black" />
+                                        <span>Public Profile Link</span>
+                                    </div>
+                                    <p className="text-[11px] text-neutral-700 font-mono font-bold truncate">
+                                        {profileUrl}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Fallback when no resume is uploaded yet */
+                        <div className="w-full rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-8 text-center space-y-4 mt-8">
+                            <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black text-black mx-auto flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                <FileText className="w-6 h-6 stroke-[2.5]" />
+                            </div>
+                            <div className="max-w-md mx-auto space-y-1">
+                                <h3 className="text-base font-black text-black uppercase tracking-wide">
+                                    Live Resume Preview Area
+                                </h3>
+                                <p className="text-xs font-medium text-neutral-600 leading-relaxed">
+                                    Once uploaded, your live resume document will appear right here with interactive zoom, full-screen inspector, and recruiter insights.
+                                </p>
+                            </div>
+                            <div className="pt-2">
+                                <button
+                                    type="button"
+                                    onClick={handleLoadSampleResume}
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#a2ff86] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] active:translate-x-[3px] active:translate-y-[3px] active:shadow-none transition-all cursor-pointer"
                                 >
-                                    <span>Open PDF</span>
-                                    <ExternalLink className="w-3 h-3" />
-                                </a>
+                                    <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Preview with Demo Resume Document</span>
+                                </button>
                             </div>
                         </div>
-
-                        {/* Bottom Insights Strip below the Viewer */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
-                            <div className="p-4 rounded-2xl bg-[#06080F] border border-neutral-800/90 text-left space-y-1">
-                                <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                                    <CheckCircle2 className="w-4 h-4" />
-                                    <span>ATS Readability 100%</span>
-                                </div>
-                                <p className="text-[11px] text-neutral-400 leading-relaxed">
-                                    Clean single-column structure and standard section headers.
-                                </p>
-                            </div>
-
-                            <div className="p-4 rounded-2xl bg-[#06080F] border border-neutral-800/90 text-left space-y-1">
-                                <div className="flex items-center gap-2 text-indigo-400 text-xs font-bold">
-                                    <ShieldCheck className="w-4 h-4" />
-                                    <span>Verified Handles Synced</span>
-                                </div>
-                                <p className="text-[11px] text-neutral-400 leading-relaxed">
-                                    LeetCode Guardian & Codeforces ratings live on public profile.
-                                </p>
-                            </div>
-
-                            <div className="p-4 rounded-2xl bg-[#06080F] border border-neutral-800/90 text-left space-y-1">
-                                <div className="flex items-center gap-2 text-cyan-400 text-xs font-bold">
-                                    <FileCheck2 className="w-4 h-4" />
-                                    <span>Fast Cloud CDN</span>
-                                </div>
-                                <p className="text-[11px] text-neutral-400 leading-relaxed">
-                                    Cached globally with sub-200ms latency for mobile recruiters.
-                                </p>
-                            </div>
-
-                            <div className="p-4 rounded-2xl bg-[#06080F] border border-neutral-800/90 text-left space-y-1">
-                                <div className="flex items-center gap-2 text-neutral-300 text-xs font-bold">
-                                    <ExternalLink className="w-4 h-4 text-indigo-400" />
-                                    <span>Public Profile Link</span>
-                                </div>
-                                <p className="text-[11px] text-neutral-400 truncate">
-                                    {profileUrl}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                ) : (
-                    /* Fallback when no resume is uploaded yet */
-                    <div className="w-full rounded-3xl bg-black border border-neutral-800/90 p-8 text-center space-y-4">
-                        <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 mx-auto flex items-center justify-center">
-                            <FileText className="w-6 h-6 text-indigo-400" />
-                        </div>
-                        <div className="max-w-md mx-auto space-y-1">
-                            <h3 className="text-base font-bold text-white">
-                                Live Resume Preview Area
-                            </h3>
-                            <p className="text-xs text-neutral-400 leading-relaxed">
-                                Once uploaded, your live resume document will appear right here with interactive zoom, full-screen inspector, and recruiter insights.
-                            </p>
-                        </div>
-                        <div className="pt-2">
-                            <button
-                                type="button"
-                                onClick={handleLoadSampleResume}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 border border-indigo-400/20 cursor-pointer"
-                            >
-                                <Sparkles className="w-3.5 h-3.5" />
-                                <span>Preview with Demo Resume Document</span>
-                            </button>
-                        </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* ========================================================================= */}
-            {/* MODAL 1: Interactive Full-Screen PDF Viewer Modal with Light-Dismiss */}
+            {/* BOTTOM FULL-WIDTH DESK ILLUSTRATION (Matching Connected Platforms) */}
             {/* ========================================================================= */}
-            {isPreviewOpen && resumeData.resumeUrl && (
+            <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
+                <img
+                    src="/image.png"
+                    alt="Resume management workspace illustration"
+                    className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
+                    loading="eager"
+                />
+            </div>
+
+            {/* ========================================================================= */}
+            {/* MODAL 1: Full-Screen PDF Viewer Modal with Neo-Brutalist Styling */}
+            {/* ========================================================================= */}
+            {isPreviewOpen && activeDoc?.url && (
                 <div
                     role="dialog"
                     aria-modal="true"
@@ -1210,61 +1131,61 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                     onClick={(e) => {
                         if (e.target === e.currentTarget) setIsPreviewOpen(false);
                     }}
-                    className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
                 >
-                    <div className="w-full max-w-6xl h-[90vh] bg-black border border-neutral-800 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+                    <div className="w-full max-w-6xl h-[90vh] bg-white border-2 border-black rounded-2xl overflow-hidden shadow-[8px_8px_0px_#000] flex flex-col text-black">
                         {/* Modal Header */}
-                        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800 bg-[#06080F]">
+                        <div className="flex items-center justify-between px-5 py-3.5 border-b-2 border-black bg-[#FAF6EE]">
                             <div className="flex items-center gap-3 min-w-0">
-                                <div className="w-9 h-9 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center flex-shrink-0">
-                                    <FileText className="w-4 h-4 text-indigo-400" />
+                                <div className="w-9 h-9 rounded-lg bg-[#a2ff86] border-2 border-black text-black flex items-center justify-center flex-shrink-0 shadow-[1px_1px_0px_#000]">
+                                    <FileText className="w-4 h-4 stroke-[2.5]" />
                                 </div>
                                 <div className="min-w-0">
-                                    <h3 id="previewModalTitle" className="text-sm font-bold text-white truncate max-w-sm">
-                                        {resumeData.resumeFilename || "Resume.pdf"}
+                                    <h3 id="previewModalTitle" className="text-sm font-black text-black truncate max-w-sm uppercase">
+                                        {activeDoc.filename}
                                     </h3>
-                                    <p className="text-[11px] text-neutral-400 font-mono">
-                                        {formatBytes(resumeData.resumeFilesize)} • Cloudinary CDN Verified
+                                    <p className="text-[11px] text-neutral-600 font-mono font-bold">
+                                        {formatBytes(activeDoc.filesize)} • PDF Document
                                     </p>
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-2">
                                 <a
-                                    href={resumeData.resumeUrl}
+                                    href={activeDoc.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 transition-colors"
+                                    className="p-1.5 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition-colors"
                                     title="Open PDF in new tab"
                                 >
-                                    <ExternalLink className="w-4 h-4" />
+                                    <ExternalLink className="w-4 h-4 stroke-[2.5]" />
                                 </a>
                                 <a
-                                    href={resumeData.resumeUrl}
-                                    download={resumeData.resumeFilename || "resume.pdf"}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 border border-indigo-400/20"
+                                    href={activeDoc.url}
+                                    download={activeDoc.filename || "resume.pdf"}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#a2ff86] text-black text-xs font-black uppercase border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000]"
                                     title="Download resume"
                                 >
-                                    <Download className="w-3.5 h-3.5" />
+                                    <Download className="w-3.5 h-3.5 stroke-[2.5]" />
                                     <span>Download</span>
                                 </a>
                                 <button
                                     type="button"
                                     onClick={() => setIsPreviewOpen(false)}
-                                    className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border border-neutral-800 transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
                                     title="Close preview (Esc)"
                                 >
-                                    <X className="w-4 h-4" />
+                                    <X className="w-4 h-4 stroke-[2.5]" />
                                 </button>
                             </div>
                         </div>
 
                         {/* Modal Body: Embedded PDF View */}
-                        <div className="flex-1 w-full bg-[#131620] relative overflow-hidden flex items-center justify-center">
+                        <div className="flex-1 w-full bg-[#FAF6EE] relative overflow-hidden flex items-center justify-center p-2">
                             <iframe
-                                src={`${resumeData.resumeUrl}#toolbar=1&navpanes=0`}
+                                src={`${activeDoc.url}#toolbar=1&navpanes=0`}
                                 title="Resume PDF Preview"
-                                className="w-full h-full border-0 bg-white"
+                                className="w-full h-full border-2 border-black rounded-xl bg-white shadow-md"
                             />
                         </div>
                     </div>
@@ -1272,7 +1193,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
             )}
 
             {/* ========================================================================= */}
-            {/* MODAL 2: Eight Recruiter Checks Modal with Light-Dismiss */}
+            {/* MODAL 2: Eight Recruiter Checks Modal with Neo-Brutalist Styling */}
             {/* ========================================================================= */}
             {isChecksModalOpen && (
                 <div
@@ -1282,19 +1203,19 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                     onClick={(e) => {
                         if (e.target === e.currentTarget) setIsChecksModalOpen(false);
                     }}
-                    className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
                 >
-                    <div className="w-full max-w-xl bg-black border border-neutral-800 rounded-3xl p-6 shadow-2xl space-y-5">
-                        <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+                    <div className="w-full max-w-xl bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] space-y-5 text-black">
+                        <div className="flex items-center justify-between pb-3 border-b-2 border-black">
                             <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center justify-center">
-                                    <FileCheck2 className="w-4 h-4" />
+                                <div className="w-9 h-9 rounded-lg bg-[#a2ff86] text-black border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                    <FileCheck2 className="w-5 h-5 stroke-[2.5]" />
                                 </div>
                                 <div>
-                                    <h3 id="checksModalTitle" className="text-base font-bold text-white tracking-tight">
+                                    <h3 id="checksModalTitle" className="text-base font-black text-black tracking-tight uppercase">
                                         Eight Quick Recruiter Checks
                                     </h3>
-                                    <p className="text-xs text-neutral-400">
+                                    <p className="text-xs text-neutral-600 font-medium">
                                         Automated scans recruiters perform in the first 10 seconds
                                     </p>
                                 </div>
@@ -1302,10 +1223,10 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                             <button
                                 type="button"
                                 onClick={() => setIsChecksModalOpen(false)}
-                                className="p-1.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border border-neutral-800 cursor-pointer"
+                                className="p-1.5 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
                                 title="Close checks (Esc)"
                             >
-                                <X className="w-4 h-4" />
+                                <X className="w-4 h-4 stroke-[2.5]" />
                             </button>
                         </div>
 
@@ -1313,27 +1234,27 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                             {checksList.map((check) => (
                                 <div
                                     key={check.id}
-                                    className="p-3.5 rounded-xl bg-[#06080F] border border-neutral-800/80 flex items-start gap-3"
+                                    className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-start gap-3 shadow-[2px_2px_0px_#000]"
                                 >
                                     <div className="mt-0.5 flex-shrink-0">
                                         {check.status === "pass" ? (
-                                            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                                            <CheckCircle2 className="w-4 h-4 stroke-[2.5] text-black" />
                                         ) : check.status === "warn" ? (
-                                            <AlertCircle className="w-4 h-4 text-indigo-400" />
+                                            <AlertCircle className="w-4 h-4 stroke-[2.5] text-amber-600" />
                                         ) : (
-                                            <Sparkles className="w-4 h-4 text-indigo-400" />
+                                            <Sparkles className="w-4 h-4 stroke-[2.5] text-black" />
                                         )}
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center justify-between gap-2">
-                                            <h4 className="text-xs font-bold text-white">
+                                            <h4 className="text-xs font-black text-black uppercase">
                                                 {check.label}
                                             </h4>
-                                            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-black bg-[#a2ff86] px-2 py-0.5 rounded border-2 border-black shadow-[1px_1px_0px_#000]">
                                                 Pass
                                             </span>
                                         </div>
-                                        <p className="text-[11px] text-neutral-400 mt-0.5 leading-relaxed">
+                                        <p className="text-[11px] text-neutral-700 mt-0.5 font-medium leading-relaxed">
                                             {check.description}
                                         </p>
                                     </div>
@@ -1345,7 +1266,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                             <button
                                 type="button"
                                 onClick={() => setIsChecksModalOpen(false)}
-                                className="px-5 py-2 rounded-full bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 text-white text-xs font-bold transition-all shadow-md shadow-indigo-600/30 border border-indigo-400/20 cursor-pointer"
+                                className="px-5 py-2 rounded-lg bg-[#a2ff86] text-black text-xs font-black uppercase border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer"
                             >
                                 Done
                             </button>
@@ -1355,7 +1276,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
             )}
 
             {/* ========================================================================= */}
-            {/* MODAL 3: Delete Confirmation Modal with Light-Dismiss */}
+            {/* MODAL 3: Delete Confirmation Modal with Neo-Brutalist Styling */}
             {/* ========================================================================= */}
             {isDeleteModalOpen && (
                 <div
@@ -1365,17 +1286,17 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                     onClick={(e) => {
                         if (e.target === e.currentTarget && !isDeleting) setIsDeleteModalOpen(false);
                     }}
-                    className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fadeIn"
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
                 >
-                    <div className="w-full max-w-md bg-black border border-neutral-800 rounded-3xl p-6 shadow-2xl space-y-4 text-center">
-                        <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 mx-auto flex items-center justify-center">
-                            <Trash2 className="w-6 h-6" />
+                    <div className="w-full max-w-md bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] space-y-4 text-center text-black">
+                        <div className="w-12 h-12 rounded-xl bg-rose-100 border-2 border-black text-rose-600 mx-auto flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                            <Trash2 className="w-6 h-6 stroke-[2.5]" />
                         </div>
                         <div>
-                            <h3 id="deleteModalTitle" className="text-base font-bold text-white tracking-tight">
+                            <h3 id="deleteModalTitle" className="text-base font-black text-black tracking-tight uppercase">
                                 Delete Resume?
                             </h3>
-                            <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                            <p className="text-xs text-neutral-600 mt-1 leading-relaxed font-medium">
                                 This will permanently remove your resume from Cloudinary and hide the download button from your public profile.
                             </p>
                         </div>
@@ -1384,7 +1305,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                 type="button"
                                 onClick={() => setIsDeleteModalOpen(false)}
                                 disabled={isDeleting}
-                                className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-xs font-semibold transition-colors cursor-pointer border border-neutral-800"
+                                className="px-4 py-2 rounded-lg bg-white hover:bg-neutral-100 text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
                             >
                                 Cancel
                             </button>
@@ -1392,7 +1313,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({ className = "" }) 
                                 type="button"
                                 onClick={handleDeleteResume}
                                 disabled={isDeleting}
-                                className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50"
+                                className="px-5 py-2 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-xs font-black uppercase border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer disabled:opacity-50"
                             >
                                 {isDeleting ? "Deleting..." : "Yes, Delete"}
                             </button>

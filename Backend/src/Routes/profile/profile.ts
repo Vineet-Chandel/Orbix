@@ -10,6 +10,7 @@ import {
     type PublicProfilePayload,
 } from "../../redis/cache/cache-profile.js";
 import { verifyAndFetchPortal, extractPortalUsername } from "../portals/portals.js";
+import { syncLeaderboardForUser } from "../leaderboard/leaderboard.js";
 import photoRouter from "./photo.js";
 import resumeRouter, { generateSignedResumeUrl } from "./resume.js";
 
@@ -453,6 +454,19 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
         const finalIsHireable = typeof isHireable === "boolean" ? sanitizedIsHireable : current.isHireable;
         const finalCollegeId = collegeId !== undefined ? sanitizedCollegeId : current.collegeId;
 
+        // Resolve authoritative college name from verified institutions directory
+        let resolvedCollegeName: string | null = null;
+        if (finalCollegeId) {
+            try {
+                const instRes = await query("SELECT official_name FROM institutions WHERE id = $1 LIMIT 1;", [finalCollegeId]);
+                if (instRes.rows[0]) {
+                    resolvedCollegeName = instRes.rows[0].official_name;
+                }
+            } catch {
+                // Ignore institution resolution error
+            }
+        }
+
         const updateResult = await query(
             `UPDATE users
              SET
@@ -470,11 +484,12 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 skills = $12::jsonb,
                 is_public = $13,
                 links = COALESCE($14::jsonb, '[]'::jsonb),
-                is_open_to_work = COALESCE($15, false),
-                is_hireable = COALESCE($16, false),
+                is_open_to_work = (CASE WHEN $15::boolean IS NULL THEN is_open_to_work ELSE $15::boolean END),
+                is_hireable = (CASE WHEN $16::boolean IS NULL THEN is_hireable ELSE $16::boolean END),
                 college_id = $17,
+                college = $18,
                 updated_at = CURRENT_TIMESTAMP
-             WHERE id = $18 OR email = $19
+             WHERE id = $19 OR email = $20
              RETURNING
                 id,
                 username,
@@ -497,6 +512,7 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 is_open_to_work AS "isOpenToWork",
                 is_hireable AS "isHireable",
                 is_public AS "isPublic",
+                college,
                 college_id AS "collegeId",
                 updated_at AS "updatedAt";`,
             [
@@ -514,9 +530,10 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 JSON.stringify(finalSkills),
                 finalIsPublic,
                 finalLinksJson,
-                finalIsOpenToWork,
-                finalIsHireable,
+                typeof isOpenToWork === "boolean" ? isOpenToWork : null,
+                typeof isHireable === "boolean" ? isHireable : null,
                 finalCollegeId,
+                resolvedCollegeName,
                 authUser.id,
                 authUser.gmail,
             ]
@@ -530,6 +547,37 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
         }
 
         const updatedUser = updateResult.rows[0];
+
+        // Keep leaderboard_entries synchronized with updated college and profile details
+        try {
+            await query(
+                `UPDATE leaderboard_entries
+                 SET college = $1,
+                     college_id = $2,
+                     display_name = COALESCE($3, display_name),
+                     avatar_url = COALESCE($4, avatar_url),
+                     is_public = $5,
+                     updated_at = CURRENT_TIMESTAMP
+                 WHERE user_id = $6;`,
+                [
+                    resolvedCollegeName,
+                    finalCollegeId,
+                    [updatedUser.firstName, updatedUser.lastName].filter(Boolean).join(" ") || updatedUser.username,
+                    updatedUser.avatarUrl,
+                    finalIsPublic,
+                    updatedUser.id,
+                ]
+            );
+        } catch (lErr: any) {
+            console.warn("Leaderboard update on profile change warning:", lErr?.message);
+        }
+
+        // Trigger leaderboard recalculation and cache invalidation
+        if (updatedUser.username) {
+            syncLeaderboardForUser(updatedUser.username).catch((sErr: any) => {
+                console.warn("Leaderboard sync warning:", sErr?.message);
+            });
+        }
 
         // Fetch college details if user selected an institution
         let college = null;

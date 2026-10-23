@@ -693,12 +693,12 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
     const activeViewingConfig = viewingPortalId ? PORTALS[viewingPortalId] : null;
 
     return (
-        <section className="rounded-2xl bg-white border border-neutral-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5 transition-all">
+        <section className="rounded-2xl bg-white border-2 border-black p-4 sm:p-6 shadow-[4px_4px_0px_#000] space-y-4 sm:space-y-5 transition-all">
             {/* Header: Title, Counter, and Manage Trigger */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-1 border-b border-neutral-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b-2 border-black/10">
                 {/* Left: Icon and Title */}
                 <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-neutral-100/90 border border-neutral-200 flex items-center justify-center text-neutral-800 shadow-2xs">
+                    <div className="w-8 h-8 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000]">
                         <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                             <path d="M12 2L2 7l10 5 10-5-10-5z" strokeLinecap="round" strokeLinejoin="round" />
                             <path d="M2 12l10 5 10-5" strokeLinecap="round" strokeLinejoin="round" />

@@ -1,65 +1,82 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Flame, Award } from "lucide-react";
+import { CheckCircle2, Flame, Award, Building2 } from "lucide-react";
 import type { LeaderboardEntry } from "./types";
-import { resolveCodeforcesRank } from "../../utils/codeforcesRanks";
-import { resolveLeetCodeRank } from "../../utils/leetcodeRanks";
-import { resolveCodeChefRank } from "../../utils/codechefRanks";
-import { resolveAtCoderRank } from "../../utils/atcoderRanks";
 
 interface LeaderboardTableProps {
     entries: LeaderboardEntry[];
     currentUsername?: string | null;
     isLoading?: boolean;
+    scope?: "global" | "college";
+    selectedCollegeName?: string | null;
+    onOpenAlgorithm?: () => void;
 }
 
 export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
     entries,
     currentUsername,
     isLoading = false,
+    scope = "global",
+    selectedCollegeName,
+    onOpenAlgorithm,
 }) => {
     if (isLoading) {
         return (
-            <div className="w-full rounded-2xl bg-neutral-900/60 border border-neutral-800 p-8 text-center space-y-3">
-                <div className="w-8 h-8 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
-                <p className="text-xs text-neutral-400 font-medium">Loading leaderboard rankings...</p>
+            <div className="w-full rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-12 text-center space-y-3">
+                <div className="w-8 h-8 border-4 border-black border-t-[#a2ff86] rounded-full animate-spin mx-auto shadow-[1px_1px_0px_#000]" />
+                <p className="text-xs font-black uppercase tracking-wider text-black">
+                    Loading {scope === "college" ? "College League" : "Global"} Standings...
+                </p>
             </div>
         );
     }
 
     if (!entries || entries.length === 0) {
         return (
-            <div className="w-full rounded-2xl bg-neutral-900/60 border border-neutral-800 p-12 text-center space-y-3">
-                <Award className="w-10 h-10 text-neutral-600 mx-auto" />
-                <h3 className="text-base font-bold text-white">No Coders Found</h3>
-                <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-                    No coders match the active filter or search criteria.
+            <div className="w-full rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-12 text-center space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-black mx-auto shadow-[2px_2px_0px_#000]">
+                    <Award className="w-6 h-6 stroke-[2.5]" />
+                </div>
+                <h3 className="text-base font-black text-black uppercase tracking-wide">
+                    {scope === "college"
+                        ? `No Coders from ${selectedCollegeName || "this College"} Yet`
+                        : "No Coders Found"}
+                </h3>
+                <p className="text-xs font-medium text-neutral-600 max-w-sm mx-auto leading-relaxed">
+                    {scope === "college"
+                        ? "Be the first student to link your coding handles and represent this campus on the leaderboard!"
+                        : "No coders match the active filter or search criteria."}
                 </p>
             </div>
         );
     }
 
     return (
-        <div className="w-full overflow-hidden rounded-2xl bg-neutral-900/60 border border-neutral-800/80 shadow-sm backdrop-blur-sm">
+        <div className="w-full overflow-hidden rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
             <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                     <thead>
-                        <tr className="border-b border-neutral-800 bg-neutral-950/80 text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+                        <tr className="border-b-2 border-black bg-[#FAF6EE] text-[11px] font-black text-black uppercase tracking-wider">
                             <th className="py-3.5 px-4 sm:px-6 w-16 text-center">Rank</th>
                             <th className="py-3.5 px-4 min-w-[220px]">Coder</th>
-                            <th className="py-3.5 px-4 min-w-[180px] hidden md:table-cell">College / University</th>
+                            <th className="py-3.5 px-4 min-w-[200px] hidden md:table-cell">
+                                {scope === "college" ? "Campus Location" : "College / University"}
+                            </th>
                             <th className="py-3.5 px-4 text-right">Score</th>
                             <th className="py-3.5 px-4 text-center hidden sm:table-cell">Solved</th>
                             <th className="py-3.5 px-4 text-center hidden sm:table-cell">Contests</th>
-                            <th className="py-3.5 px-4 min-w-[160px] hidden lg:table-cell">Ratings</th>
+                            <th className="py-3.5 px-4 min-w-[170px] hidden lg:table-cell">Ratings</th>
                             <th className="py-3.5 px-4 text-center hidden xl:table-cell">Streak</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-neutral-850 text-xs">
+                    <tbody className="divide-y-2 divide-black/10 text-xs">
                         {entries.map((entry) => {
-                            const isCurrentUser = currentUsername && entry.username.toLowerCase() === currentUsername.toLowerCase();
+                            const isCurrentUser = Boolean(
+                                currentUsername && entry.username.toLowerCase() === currentUsername.toLowerCase()
+                            );
                             const ratings = entry.platformRatings || {};
                             const college = entry.college || "—";
+                            const displayRank = scope === "college" && entry.collegeRank ? entry.collegeRank : entry.rank;
 
                             const initials = (entry.displayName || entry.username)
                                 .split(" ")
@@ -68,27 +85,27 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                 .join("")
                                 .toUpperCase();
 
-                            // Distinct rank badge styling for podium positions
+                            // Distinct rank badge styling
                             let rankBadge = (
-                                <span className="font-mono font-bold text-neutral-400 text-sm">
-                                    #{entry.rank}
+                                <span className="font-mono font-black text-neutral-800 text-sm">
+                                    #{displayRank}
                                 </span>
                             );
-                            if (entry.rank === 1) {
+                            if (displayRank === 1) {
                                 rankBadge = (
-                                    <span className="w-7 h-7 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center font-mono font-black text-xs mx-auto shadow-xs">
+                                    <span className="w-7 h-7 rounded-lg bg-[#FFE566] text-black border-2 border-black flex items-center justify-center font-mono font-black text-xs mx-auto shadow-[1px_1px_0px_#000]">
                                         1
                                     </span>
                                 );
-                            } else if (entry.rank === 2) {
+                            } else if (displayRank === 2) {
                                 rankBadge = (
-                                    <span className="w-7 h-7 rounded-full bg-slate-400/20 text-slate-300 border border-slate-400/40 flex items-center justify-center font-mono font-black text-xs mx-auto shadow-xs">
+                                    <span className="w-7 h-7 rounded-lg bg-white text-black border-2 border-black flex items-center justify-center font-mono font-black text-xs mx-auto shadow-[1px_1px_0px_#000]">
                                         2
                                     </span>
                                 );
-                            } else if (entry.rank === 3) {
+                            } else if (displayRank === 3) {
                                 rankBadge = (
-                                    <span className="w-7 h-7 rounded-full bg-amber-700/20 text-amber-600 border border-amber-700/40 flex items-center justify-center font-mono font-black text-xs mx-auto shadow-xs">
+                                    <span className="w-7 h-7 rounded-lg bg-[#FAF6EE] text-black border-2 border-black flex items-center justify-center font-mono font-black text-xs mx-auto shadow-[1px_1px_0px_#000]">
                                         3
                                     </span>
                                 );
@@ -97,175 +114,143 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                             return (
                                 <tr
                                     key={entry.userId || entry.username}
-                                    className={`transition-colors group hover:bg-neutral-800/50 ${
-                                        isCurrentUser ? "bg-amber-500/5 border-l-2 border-l-amber-400" : ""
+                                    className={`transition-colors group hover:bg-[#FAF6EE]/90 ${
+                                        isCurrentUser ? "bg-[#a2ff86]/30 font-bold" : "bg-white"
                                     }`}
                                 >
                                     {/* Rank */}
-                                    <td className="py-3.5 px-4 sm:px-6 text-center">
+                                    <td className="py-3 px-4 sm:px-6 text-center font-mono">
                                         {rankBadge}
                                     </td>
 
-                                    {/* Coder Column */}
-                                    <td className="py-3.5 px-4">
+                                    {/* Coder Avatar & Names */}
+                                    <td className="py-3 px-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="relative shrink-0">
+                                            <div className="relative flex-shrink-0">
                                                 {entry.avatarUrl ? (
                                                     <img
                                                         src={entry.avatarUrl}
                                                         alt={entry.displayName}
-                                                        className="w-9 h-9 rounded-full object-cover border border-neutral-700"
+                                                        className="w-10 h-10 rounded-xl object-cover border-2 border-black shadow-[1px_1px_0px_#000]"
                                                     />
                                                 ) : (
-                                                    <div className="w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-xs font-bold text-neutral-300">
+                                                    <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center font-black text-xs text-black shadow-[1px_1px_0px_#000]">
                                                         {initials}
                                                     </div>
                                                 )}
                                                 {entry.isVerified && (
-                                                    <div
-                                                        className="absolute -bottom-0.5 -right-0.5 p-0.5 rounded-full bg-neutral-950 text-blue-400"
-                                                        title="Verified Coder"
-                                                    >
-                                                        <CheckCircle2 className="w-3 h-3 fill-blue-500 text-neutral-950" />
+                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black border border-white flex items-center justify-center text-[#a2ff86]">
+                                                        <CheckCircle2 className="w-3 h-3" />
                                                     </div>
                                                 )}
                                             </div>
 
                                             <div className="min-w-0">
-                                                <div className="flex items-center gap-1.5">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
                                                     <Link
                                                         to={`/profile/u/${encodeURIComponent(entry.username)}`}
-                                                        className="font-bold text-white hover:text-amber-400 transition-colors truncate max-w-[160px] sm:max-w-[200px]"
+                                                        className="text-xs sm:text-sm font-black text-black hover:underline truncate max-w-[160px] sm:max-w-[220px]"
+                                                        title={entry.displayName}
                                                     >
                                                         {entry.displayName}
                                                     </Link>
-                                                    {!entry.isVerified && (
-                                                        <span
-                                                            className="text-[9px] font-bold px-1 py-0.2 rounded bg-neutral-800 text-neutral-400 border border-neutral-700"
-                                                            title="Platform account linked, pending ownership verification"
-                                                        >
-                                                            Unverified
+                                                    {isCurrentUser && (
+                                                        <span className="px-1.5 py-0.2 rounded bg-black text-[#a2ff86] text-[9px] font-black uppercase">
+                                                            You
                                                         </span>
                                                     )}
                                                 </div>
-                                                <span className="text-[11px] text-neutral-400 font-mono block">
+                                                <p className="text-[11px] font-mono text-neutral-600 truncate">
                                                     @{entry.username}
-                                                </span>
+                                                </p>
                                             </div>
                                         </div>
                                     </td>
 
-                                    {/* College / University */}
-                                    <td className="py-3.5 px-4 hidden md:table-cell text-neutral-400 truncate max-w-[200px]" title={college}>
-                                        {college}
+                                    {/* College / University or Campus Location */}
+                                    <td className="py-3 px-4 hidden md:table-cell">
+                                        {scope === "college" ? (
+                                            <div className="flex items-center gap-1.5 text-neutral-700">
+                                                <Building2 className="w-3.5 h-3.5 stroke-[2.5] flex-shrink-0" />
+                                                <span className="truncate text-xs font-bold">
+                                                    {[entry.collegeCity, entry.collegeState].filter(Boolean).join(", ") || college}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center gap-1.5 text-neutral-800" title={college}>
+                                                {college !== "—" && (
+                                                    <Building2 className="w-3.5 h-3.5 stroke-[2.5] text-neutral-500 flex-shrink-0" />
+                                                )}
+                                                <span className="truncate text-xs font-black max-w-[220px]">
+                                                    {college}
+                                                </span>
+                                            </div>
+                                        )}
                                     </td>
 
                                     {/* Score */}
-                                    <td className="py-3.5 px-4 text-right">
-                                        <div className="font-mono font-black text-white text-sm sm:text-base">
-                                            {entry.score.toLocaleString()}
-                                        </div>
-                                        <span className="text-[10px] text-neutral-400 font-bold block uppercase tracking-wider">
-                                            Pts
-                                        </span>
+                                    <td className="py-3 px-4 text-right">
+                                        <button
+                                            type="button"
+                                            onClick={onOpenAlgorithm}
+                                            className="inline-flex flex-col items-end group cursor-pointer text-right hover:opacity-85 transition-opacity"
+                                            title="Orbix Score v2.0.0 — Click to view algorithm breakdown"
+                                        >
+                                            <span className="text-sm sm:text-base font-mono font-black text-black group-hover:underline">
+                                                {entry.score.toLocaleString()}
+                                            </span>
+                                            <span className="text-[9px] font-black uppercase text-neutral-500 group-hover:text-black">
+                                                PTS
+                                            </span>
+                                        </button>
                                     </td>
 
-                                    {/* Solved */}
-                                    <td className="py-3.5 px-4 text-center hidden sm:table-cell font-mono text-neutral-300 font-bold">
+                                    {/* Solved Problems */}
+                                    <td className="py-3 px-4 text-center font-mono font-bold text-neutral-800 hidden sm:table-cell">
                                         {entry.totalSolved.toLocaleString()}
                                     </td>
 
                                     {/* Contests */}
-                                    <td className="py-3.5 px-4 text-center hidden sm:table-cell font-mono text-neutral-300 font-bold">
+                                    <td className="py-3 px-4 text-center font-mono font-bold text-neutral-800 hidden sm:table-cell">
                                         {entry.totalContests}
                                     </td>
 
-                                    {/* Ratings Chips */}
-                                    <td className="py-3.5 px-4 hidden lg:table-cell">
+                                    {/* Platform Ratings Chips */}
+                                    <td className="py-3 px-4 hidden lg:table-cell">
                                         <div className="flex items-center gap-1 flex-wrap">
-                                            {ratings.codeforces && (() => {
-                                                const cfRank = resolveCodeforcesRank(ratings.codeforces.tier, ratings.codeforces.rating);
-                                                const cfColor = cfRank ? cfRank.bgColor : (ratings.codeforces.color || "#808080");
-                                                return (
-                                                    <span
-                                                        className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
-                                                        style={{
-                                                            color: cfColor,
-                                                            backgroundColor: `${cfColor}15`,
-                                                            borderColor: `${cfColor}35`,
-                                                        }}
-                                                        title={`Codeforces: ${ratings.codeforces.rating} (${cfRank?.name || ratings.codeforces.tier || "Rated"})`}
-                                                    >
-                                                        CF {ratings.codeforces.rating}
-                                                    </span>
-                                                );
-                                            })()}
-                                            {ratings.leetcode && (() => {
-                                                const lcRank = resolveLeetCodeRank(ratings.leetcode.tier || ratings.leetcode.badge, ratings.leetcode.rating);
-                                                const lcColor = lcRank ? lcRank.bgColor : "#7A4AD8";
-                                                return (
-                                                    <span
-                                                        className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
-                                                        style={{
-                                                            color: lcColor,
-                                                            backgroundColor: `${lcColor}15`,
-                                                            borderColor: `${lcColor}35`,
-                                                        }}
-                                                        title={`LeetCode: ${ratings.leetcode.rating} (${lcRank?.name || ratings.leetcode.tier || ratings.leetcode.badge || "Rated"})`}
-                                                    >
-                                                        LC {ratings.leetcode.rating}
-                                                    </span>
-                                                );
-                                            })()}
-                                            {ratings.codechef && (() => {
-                                                const ccRank = resolveCodeChefRank(ratings.codechef.tier, ratings.codechef.rating);
-                                                const ccColor = ccRank ? ccRank.bgColor : "#FF7F00";
-                                                return (
-                                                    <span
-                                                        className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
-                                                        style={{
-                                                            color: ccColor,
-                                                            backgroundColor: `${ccColor}15`,
-                                                            borderColor: `${ccColor}35`,
-                                                        }}
-                                                        title={`CodeChef: ${ratings.codechef.rating} (${ccRank?.name || ratings.codechef.tier || "Rated"})`}
-                                                    >
-                                                        CC {ratings.codechef.rating}
-                                                    </span>
-                                                );
-                                            })()}
-                                            {ratings.atcoder && (() => {
-                                                const acRank = resolveAtCoderRank(ratings.atcoder.tier, ratings.atcoder.rating);
-                                                const acColor = acRank ? acRank.bgColor : "#01A0A0";
-                                                return (
-                                                    <span
-                                                        className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border"
-                                                        style={{
-                                                            color: acColor,
-                                                            backgroundColor: `${acColor}15`,
-                                                            borderColor: `${acColor}35`,
-                                                        }}
-                                                        title={`AtCoder: ${ratings.atcoder.rating} (${acRank?.name || ratings.atcoder.tier || "Rated"})`}
-                                                    >
-                                                        AC {ratings.atcoder.rating}
-                                                    </span>
-                                                );
-                                            })()}
+                                            {ratings.codeforces && (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
+                                                    <span className="text-neutral-500">CF</span>
+                                                    <span style={{ color: ratings.codeforces.color || "#000" }}>{ratings.codeforces.rating}</span>
+                                                </span>
+                                            )}
+                                            {ratings.leetcode && (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
+                                                    <span className="text-neutral-500">LC</span>
+                                                    <span className="text-amber-600">{ratings.leetcode.rating}</span>
+                                                </span>
+                                            )}
+                                            {ratings.codechef && (
+                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black text-[10px] font-mono font-black shadow-[1px_1px_0px_#000]">
+                                                    <span className="text-neutral-500">CC</span>
+                                                    <span>{ratings.codechef.rating}</span>
+                                                </span>
+                                            )}
                                             {Object.keys(ratings).length === 0 && (
-                                                <span className="text-[11px] text-neutral-400 font-mono">—</span>
+                                                <span className="text-neutral-400 font-mono text-xs">—</span>
                                             )}
                                         </div>
                                     </td>
 
                                     {/* Streak */}
-                                    <td className="py-3.5 px-4 text-center hidden xl:table-cell">
+                                    <td className="py-3 px-4 text-center hidden xl:table-cell">
                                         {entry.streak > 0 ? (
-                                            <span className="inline-flex items-center gap-1 font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 text-xs">
-                                                <Flame className="w-3 h-3 fill-amber-400" />
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#FAF6EE] border border-black text-black font-mono font-black text-[11px] shadow-[1px_1px_0px_#000]">
+                                                <Flame className="w-3 h-3 text-amber-500 fill-amber-500" />
                                                 <span>{entry.streak}d</span>
                                             </span>
                                         ) : (
-                                            <span className="text-neutral-400 font-mono">—</span>
+                                            <span className="text-neutral-400 font-mono text-xs">—</span>
                                         )}
                                     </td>
                                 </tr>

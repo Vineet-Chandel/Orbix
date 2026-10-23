@@ -233,6 +233,9 @@ export const EventTrackerPage: React.FC = () => {
     const contestsState = useAppSelector((state) => state.contests);
     const currentUser = useAppSelector((state) => state.user.user);
 
+    // Mobile Sidebar toggle
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+
     // Live ticking clock for hero timer (updates every second)
     const [nowMs, setNowMs] = useState<number>(Date.now());
     useEffect(() => {
@@ -246,6 +249,21 @@ export const EventTrackerPage: React.FC = () => {
     useEffect(() => {
         dispatch(fetchEvents({ refresh: true }));
     }, [dispatch]);
+
+    // Dynamic 7-day rolling window algorithm: calculates upcoming contests and participating platforms in [nowMs, nowMs + 7 days]
+    const next7DaysStats = useMemo(() => {
+        const now = nowMs;
+        const sevenDaysLater = now + 7 * 24 * 60 * 60 * 1000;
+        const upcomingIn7Days = allEvents.filter((ev) => {
+            const start = ev.startTimestamp;
+            return start >= now && start <= sevenDaysLater;
+        });
+        const uniquePlatforms = new Set(upcomingIn7Days.map((ev) => ev.platform.toLowerCase()));
+        return {
+            count: upcomingIn7Days.length || stats.totalInNext7Days || 0,
+            platforms: uniquePlatforms.size || stats.totalPlatformsInNext7Days || 0,
+        };
+    }, [allEvents, nowMs, stats]);
 
     // Close calendar dropdowns on outside click
     useEffect(() => {
@@ -538,310 +556,349 @@ export const EventTrackerPage: React.FC = () => {
     }, [currentUser, contestsState]);
 
     return (
-        <div className="min-h-screen bg-[#F0F2F6] text-neutral-900 flex overflow-x-hidden selection:bg-amber-500/20 selection:text-amber-900 antialiased font-sans ">
-            {/* Soft Ambient Lighting Accents */}
-            <div className="fixed top-0 left-1/4 w-[600px] h-[300px] bg-amber-500/[0.04] blur-[140px] pointer-events-none rounded-full" />
-            <div className="fixed top-1/2 right-1/4 w-[500px] h-[350px] bg-blue-500/[0.02] blur-[160px] pointer-events-none rounded-full" />
+        <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
+            {/* Desktop & Mobile Collapsible Navigation Sidebar */}
+            <Sidebar
+                activeTab="events"
+                isOpen={isMobileSidebarOpen}
+                onClose={() => setIsMobileSidebarOpen(false)}
+            />
 
-            {/* Sidebar Navigation */}
-            <div className="hidden lg:block w-[72px] flex-shrink-0">
-                <Sidebar activeTab="events" />
-            </div>
-
-            {/* Main Tracker Container */}
-            <main className="flex-1  px-4 sm:px-6 lg:px-10 py-6 sm:py-8 max-w-[1630px] mx-auto w-full space-y-6">
-                {/* 1. Header Bar */}
-                <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-black pb-5">
-                    <div >
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-neutral-900 flex items-center gap-2.5">
-                                Event Tracker
-                            </h1>
-                            <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 border border-emerald-300/80 text-emerald-700 shadow-xs">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                Live Contest Platforms
-                            </span>
-                        </div>
-                        <p className="text-neutral-500 text-xs sm:text-sm mt-1 font-medium">
-                            Every round on Codeforces, LeetCode, CodeChef, AtCoder and GfG, with reminders.
-                        </p>
-                        <div className="flex items-center gap-2 mt-2 text-xs text-neutral-500">
-                            <span className="text-neutral-700 font-semibold">
-                                {stats.totalInNext7Days || 7} contests in the next 7 days across {stats.totalPlatformsInNext7Days || 5} platforms
-                            </span>
-                            <span className="text-neutral-300">•</span>
-                            <span className="flex items-center gap-1.5 text-emerald-600 font-semibold">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
-                                live from each platform
-                            </span>
-                        </div>
-                    </div>
-
-                    {/* View & Type Controls */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                        {/* Segmented Pill: Contests vs Hackathons */}
-                        <div className="inline-flex rounded-xl bg-white p-1 border border-neutral-200/90 shadow-xs">
-                            <button
-                                type="button"
-                                onClick={() => dispatch(setSelectedType("contests"))}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${selectedType === "contests"
-                                    ? "bg-neutral-900 text-white shadow-sm font-bold"
-                                    : "text-neutral-600 hover:text-neutral-950 font-medium"
-                                    }`}
-                            >
-                                Contests
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => dispatch(setSelectedType("hackathons"))}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${selectedType === "hackathons"
-                                    ? "bg-neutral-900 text-white shadow-sm font-bold"
-                                    : "text-neutral-600 hover:text-neutral-950 font-medium"
-                                    }`}
-                            >
-                                Hackathons
-                            </button>
-                        </div>
-
-                        {/* Segmented Pill: Calendar vs List */}
-                        <div className="inline-flex rounded-xl bg-white p-1 border border-neutral-200/90 shadow-xs">
-                            <button
-                                type="button"
-                                onClick={() => dispatch(setViewMode("calendar"))}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${viewMode === "calendar"
-                                    ? "bg-neutral-900 text-white shadow-sm font-bold"
-                                    : "text-neutral-600 hover:text-neutral-950 font-medium"
-                                    }`}
-                            >
-                                <CalendarIcon className="w-3.5 h-3.5" />
-                                Calendar
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => dispatch(setViewMode("list"))}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all ${viewMode === "list"
-                                    ? "bg-neutral-900 text-white shadow-sm font-bold"
-                                    : "text-neutral-600 hover:text-neutral-950 font-medium"
-                                    }`}
-                            >
-                                <ListIcon className="w-3.5 h-3.5" />
-                                List
-                            </button>
-                        </div>
-                    </div>
-                </header>
-
-                {/* 2. Hero Banner: UP NEXT Contest with Live Amber Countdown */}
-                {activeUpNext && (
-                    <section className="relative rounded-2xl bg-gradient-to-r from-[#f59e0b] via-[#eab308] to-[#f59e0b] p-5 sm:p-7 shadow-2xl shadow-amber-500/10 text-black overflow-hidden border border-amber-300/30">
-                        {/* Background watermark icon */}
-                        <div className="absolute -right-6 -bottom-8 opacity-10 pointer-events-none scale-150 transform rotate-12">
-                            {getPortalIcon(activeUpNext.platform, "w-48 h-48")}
-                        </div>
-
-                        <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
-                            {/* Left details */}
-                            <div className="flex items-start sm:items-center gap-4 sm:gap-5 min-w-0">
-                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white shadow-lg shadow-black/10 flex items-center justify-center flex-shrink-0 p-2.5">
-                                    {getPortalIcon(activeUpNext.platform, "w-9 h-9")}
-                                </div>
-                                <div className="min-w-0 space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[11px] font-black uppercase tracking-wider text-black/75 bg-black/10 px-2 py-0.5 rounded-md">
-                                            UP NEXT · {activeUpNext.platformName}
-                                        </span>
-                                        {activeUpNext.rated && (
-                                            <span className="text-[10px] font-bold text-amber-950 bg-white/70 px-1.5 py-0.5 rounded">
-                                                Rated
-                                            </span>
-                                        )}
+            {/* Main Content Area */}
+            <div className="flex-1 flex flex-col h-full overflow-y-auto min-w-0 p-3 sm:p-5 lg:p-7">
+                <section
+                    aria-label="Event Tracker"
+                    className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                >
+                    <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
+                        {/* 1. Header Bar */}
+                        <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-black/55 pb-5">
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsMobileSidebarOpen(true)}
+                                    className="lg:hidden p-2 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer flex-shrink-0"
+                                    aria-label="Open sidebar"
+                                >
+                                    <svg className="w-5 h-5 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <line x1="3" y1="12" x2="21" y2="12" />
+                                        <line x1="3" y1="6" x2="21" y2="6" />
+                                        <line x1="3" y1="18" x2="21" y2="18" />
+                                    </svg>
+                                </button>
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-9 h-9 rounded-xl bg-black text-[#FFE566] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                        <CalendarIcon className="w-5 h-5 stroke-[2.5]" />
                                     </div>
-                                    <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight truncate max-w-2xl">
-                                        {activeUpNext.title}
-                                    </h2>
-                                    <p className="text-xs sm:text-sm font-semibold text-black/85 flex items-center gap-2">
-                                        <Clock className="w-4 h-4 text-black/70 flex-shrink-0" />
-                                        {formatScheduleIST(activeUpNext)}
-                                    </p>
+                                    <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-neutral-900">
+                                        Event Tracker
+                                    </h1>
                                 </div>
                             </div>
 
-                            {/* Middle & Right: Countdown Blocks + Action Buttons */}
-                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 flex-shrink-0">
-                                {/* Digital Countdown blocks */}
-                                <div className="flex items-center gap-2 sm:gap-2.5">
-                                    <div className="flex flex-col items-center">
-                                        <div className="bg-black text-white px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-mono font-black text-lg sm:text-xl shadow-inner min-w-[52px] sm:min-w-[58px] text-center">
-                                            {countdown.days}
-                                        </div>
-                                        <span className="text-[10px] font-black tracking-wider text-black/70 uppercase mt-1">
-                                            DAYS
-                                        </span>
-                                    </div>
-                                    <span className="text-black/60 font-bold text-lg mb-4">:</span>
-                                    <div className="flex flex-col items-center">
-                                        <div className="bg-black text-white px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-mono font-black text-lg sm:text-xl shadow-inner min-w-[52px] sm:min-w-[58px] text-center">
-                                            {countdown.hours}
-                                        </div>
-                                        <span className="text-[10px] font-black tracking-wider text-black/70 uppercase mt-1">
-                                            HRS
-                                        </span>
-                                    </div>
-                                    <span className="text-black/60 font-bold text-lg mb-4">:</span>
-                                    <div className="flex flex-col items-center">
-                                        <div className="bg-black text-white px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-mono font-black text-lg sm:text-xl shadow-inner min-w-[52px] sm:min-w-[58px] text-center">
-                                            {countdown.minutes}
-                                        </div>
-                                        <span className="text-[10px] font-black tracking-wider text-black/70 uppercase mt-1">
-                                            MIN
-                                        </span>
-                                    </div>
-                                    <span className="text-black/60 font-bold text-lg mb-4">:</span>
-                                    <div className="flex flex-col items-center">
-                                        <div className="bg-black text-white px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-mono font-black text-lg sm:text-xl shadow-inner min-w-[52px] sm:min-w-[58px] text-center">
-                                            {countdown.seconds}
-                                        </div>
-                                        <span className="text-[10px] font-black tracking-wider text-black/70 uppercase mt-1">
-                                            SEC
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Action Buttons */}
-                                <div className="flex items-center gap-2">
-                                    {/* Remind Me button */}
+                            {/* View & Type Controls */}
+                            <div className="flex items-center gap-3 flex-wrap">
+                                {/* Segmented Pill: Contests vs Hackathons */}
+                                <div className="inline-flex rounded-xl bg-white p-1 border-2 border-black shadow-[3px_3px_0px_#000]">
                                     <button
                                         type="button"
-                                        onClick={(e) => handleToggleReminder(activeUpNext.id, e)}
-                                        className={`px-3.5 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all shadow-sm ${reminders.includes(activeUpNext.id)
-                                            ? "bg-black text-amber-400 hover:bg-neutral-900 ring-2 ring-black"
-                                            : "bg-white text-black hover:bg-neutral-100 ring-1 ring-black/10"
+                                        onClick={() => dispatch(setSelectedType("contests"))}
+                                        className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${selectedType === "contests"
+                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "text-neutral-700 hover:text-black font-bold"
                                             }`}
                                     >
-                                        {reminders.includes(activeUpNext.id) ? (
-                                            <>
-                                                <Check className="w-4 h-4 text-emerald-400 stroke-[3]" />
-                                                <span>Reminded</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Bell className="w-4 h-4 text-black" />
-                                                <span>Remind me</span>
-                                            </>
-                                        )}
+                                        Contests
                                     </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => dispatch(setSelectedType("hackathons"))}
+                                        className={`px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${selectedType === "hackathons"
+                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "text-neutral-700 hover:text-black font-bold"
+                                            }`}
+                                    >
+                                        Hackathons
+                                    </button>
+                                </div>
 
-                                    {/* Add to Calendar button with popup */}
-                                    <div className="relative">
-                                        <button
-                                            type="button"
-                                            onClick={() => setOpenCalDropdownId(openCalDropdownId === activeUpNext.id ? null : activeUpNext.id)}
-                                            className="bg-white hover:bg-neutral-100 text-black px-3.5 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition shadow-sm ring-1 ring-black/10"
-                                            title="Add to Google or Apple Calendar"
-                                        >
-                                            <CalendarPlus className="w-4 h-4" />
-                                            <span>Add to calendar</span>
-                                        </button>
+                                {/* Segmented Pill: Calendar vs List */}
+                                <div className="inline-flex rounded-xl bg-white p-1 border-2 border-black shadow-[3px_3px_0px_#000]">
+                                    <button
+                                        type="button"
+                                        onClick={() => dispatch(setViewMode("calendar"))}
+                                        className={`px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${viewMode === "calendar"
+                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "text-neutral-700 hover:text-black font-bold"
+                                            }`}
+                                    >
+                                        <CalendarIcon className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        Calendar
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => dispatch(setViewMode("list"))}
+                                        className={`px-3.5 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${viewMode === "list"
+                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "text-neutral-700 hover:text-black font-bold"
+                                            }`}
+                                    >
+                                        <ListIcon className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        List
+                                    </button>
+                                </div>
+                            </div>
+                        </header>
 
-                                        {openCalDropdownId === activeUpNext.id && (
-                                            <div className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-[#0e1422] border border-white/10 shadow-2xl z-30 p-1.5 text-white animate-in fade-in zoom-in-95">
-                                                <a
-                                                    href={createGoogleCalendarUrl(activeUpNext)}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    onClick={() => setOpenCalDropdownId(null)}
-                                                    className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold hover:bg-white/10 flex items-center gap-2 transition"
-                                                >
-                                                    <span className="w-2 h-2 rounded-full bg-blue-400" />
-                                                    Google Calendar
-                                                </a>
+                        {/* Highlighted Subtitle & 7-Day Metric Card (Dynamic Real-Time Algorithm) */}
+                        <div className="rounded-2xl border-2 border-black bg-white p-4 sm:p-5 shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-7 h-7 rounded-lg bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center flex-shrink-0">
+                                        <Sparkles className="w-4 h-4 text-black stroke-[2.5]" />
+                                    </div>
+                                    <h2 className="text-sm sm:text-base font-black tracking-tight text-black">
+                                        Every round on Codeforces, LeetCode, CodeChef, AtCoder and GfG, with reminders.
+                                    </h2>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-bold pl-9">
+                                    Synchronised competitive programming round schedule · Times displayed in Indian Standard Time (IST).
+                                </p>
+                            </div>
+
+                            {/* Prominent Highlighting: Dynamic 7-Day Algorithm Metrics */}
+                            <div className="flex items-center gap-2.5 flex-wrap flex-shrink-0">
+                                <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000]">
+                                    <span className="text-base sm:text-lg font-black font-mono text-black leading-none">
+                                        {next7DaysStats.count}
+                                    </span>
+                                    <span className="text-xs font-black uppercase tracking-wider text-black">
+                                        Contests in next 7 days
+                                    </span>
+                                </div>
+
+                                <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000]">
+                                    <span className="text-base sm:text-lg font-black font-mono text-black leading-none">
+                                        {next7DaysStats.platforms}
+                                    </span>
+                                    <span className="text-xs font-black uppercase tracking-wider text-black">
+                                        Platforms
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 2. Hero Banner: UP NEXT Contest with Live Countdown */}
+                        {activeUpNext && (
+                            <section className="relative rounded-2xl bg-[#FFE566] p-5 sm:p-7 shadow-[5px_5px_0px_#000] text-black overflow-hidden border-2 border-black">
+                                {/* Background watermark icon */}
+                                <div className="absolute -right-6 -bottom-8 opacity-10 pointer-events-none scale-150 transform rotate-12">
+                                    {getPortalIcon(activeUpNext.platform, "w-48 h-48")}
+                                </div>
+
+                                <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+                                    {/* Left details */}
+                                    <div className="flex items-start sm:items-center gap-4 sm:gap-5 min-w-0">
+                                        <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center flex-shrink-0 p-2.5">
+                                            {getPortalIcon(activeUpNext.platform, "w-9 h-9")}
+                                        </div>
+                                        <div className="min-w-0 space-y-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] font-black uppercase tracking-wider text-black bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] px-2 py-0.5 rounded-md">
+                                                    UP NEXT · {activeUpNext.platformName}
+                                                </span>
+                                                {activeUpNext.rated && (
+                                                    <span className="text-[10px] font-black uppercase tracking-wider text-black bg-[#a2ff86] border-2 border-black shadow-[1.5px_1.5px_0px_#000] px-2 py-0.5 rounded-md">
+                                                        Rated
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight truncate max-w-2xl">
+                                                {activeUpNext.title}
+                                            </h2>
+                                            <p className="text-xs sm:text-sm font-bold text-black flex items-center gap-2">
+                                                <Clock className="w-4 h-4 text-black flex-shrink-0 stroke-[2.5]" />
+                                                {formatScheduleIST(activeUpNext)}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Middle & Right: Countdown Blocks + Action Buttons */}
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 flex-shrink-0">
+                                        {/* Digital Countdown blocks */}
+                                        <div className="flex items-center gap-2 sm:gap-2.5">
+                                            <div className="flex flex-col items-center">
+                                                <div className="bg-black text-white px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-mono font-black text-lg sm:text-xl border-2 border-black shadow-[2px_2px_0px_#000] min-w-[52px] sm:min-w-[58px] text-center">
+                                                    {countdown.days}
+                                                </div>
+                                                <span className="text-[10px] font-black tracking-wider text-black uppercase mt-1">
+                                                    DAYS
+                                                </span>
+                                            </div>
+                                            <span className="text-black font-black text-lg mb-4">:</span>
+                                            <div className="flex flex-col items-center">
+                                                <div className="bg-black text-white px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-mono font-black text-lg sm:text-xl border-2 border-black shadow-[2px_2px_0px_#000] min-w-[52px] sm:min-w-[58px] text-center">
+                                                    {countdown.hours}
+                                                </div>
+                                                <span className="text-[10px] font-black tracking-wider text-black uppercase mt-1">
+                                                    HRS
+                                                </span>
+                                            </div>
+                                            <span className="text-black font-black text-lg mb-4">:</span>
+                                            <div className="flex flex-col items-center">
+                                                <div className="bg-black text-white px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-mono font-black text-lg sm:text-xl border-2 border-black shadow-[2px_2px_0px_#000] min-w-[52px] sm:min-w-[58px] text-center">
+                                                    {countdown.minutes}
+                                                </div>
+                                                <span className="text-[10px] font-black tracking-wider text-black uppercase mt-1">
+                                                    MIN
+                                                </span>
+                                            </div>
+                                            <span className="text-black font-black text-lg mb-4">:</span>
+                                            <div className="flex flex-col items-center">
+                                                <div className="bg-black text-white px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-mono font-black text-lg sm:text-xl border-2 border-black shadow-[2px_2px_0px_#000] min-w-[52px] sm:min-w-[58px] text-center">
+                                                    {countdown.seconds}
+                                                </div>
+                                                <span className="text-[10px] font-black tracking-wider text-black uppercase mt-1">
+                                                    SEC
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Action Buttons */}
+                                        <div className="flex items-center gap-2">
+                                            {/* Remind Me button */}
+                                            <button
+                                                type="button"
+                                                onClick={(e) => handleToggleReminder(activeUpNext.id, e)}
+                                                className={`px-3.5 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 transition-all border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer ${reminders.includes(activeUpNext.id)
+                                                    ? "bg-black text-[#a2ff86]"
+                                                    : "bg-white text-black hover:bg-neutral-100"
+                                                    }`}
+                                            >
+                                                {reminders.includes(activeUpNext.id) ? (
+                                                    <>
+                                                        <Check className="w-4 h-4 text-[#a2ff86] stroke-[3]" />
+                                                        <span>Reminded</span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Bell className="w-4 h-4 text-black stroke-[2.5]" />
+                                                        <span>Remind me</span>
+                                                    </>
+                                                )}
+                                            </button>
+
+                                            {/* Add to Calendar button with popup */}
+                                            <div className="relative">
                                                 <button
                                                     type="button"
-                                                    onClick={() => {
-                                                        downloadIcsFile(activeUpNext);
-                                                        setOpenCalDropdownId(null);
-                                                    }}
-                                                    className="w-full text-left px-3 py-2 rounded-lg text-xs font-semibold hover:bg-white/10 flex items-center gap-2 transition"
+                                                    onClick={() => setOpenCalDropdownId(openCalDropdownId === activeUpNext.id ? null : activeUpNext.id)}
+                                                    className="bg-white hover:bg-neutral-100 text-black px-3.5 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black flex items-center gap-1.5 transition border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+                                                    title="Add to Google or Apple Calendar"
                                                 >
-                                                    <span className="w-2 h-2 rounded-full bg-amber-400" />
-                                                    Apple / Outlook (.ics)
+                                                    <CalendarPlus className="w-4 h-4 stroke-[2.5]" />
+                                                    <span>Add to calendar</span>
                                                 </button>
+
+                                                {openCalDropdownId === activeUpNext.id && (
+                                                    <div className="absolute right-0 top-full mt-2 w-48 rounded-xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] z-30 p-1.5 text-black animate-in fade-in zoom-in-95">
+                                                        <a
+                                                            href={createGoogleCalendarUrl(activeUpNext)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={() => setOpenCalDropdownId(null)}
+                                                            className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold hover:bg-[#FFE566] flex items-center gap-2 transition"
+                                                        >
+                                                            <span className="w-2.5 h-2.5 rounded-full bg-blue-500 border border-black" />
+                                                            Google Calendar
+                                                        </a>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                downloadIcsFile(activeUpNext);
+                                                                setOpenCalDropdownId(null);
+                                                            }}
+                                                            className="w-full text-left px-3 py-2 rounded-lg text-xs font-bold hover:bg-[#a2ff86] flex items-center gap-2 transition cursor-pointer"
+                                                        >
+                                                            <span className="w-2.5 h-2.5 rounded-full bg-amber-400 border border-black" />
+                                                            Apple / Outlook (.ics)
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
+
+                                            {/* External Link button */}
+                                            <a
+                                                href={activeUpNext.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="w-10 h-10 rounded-xl bg-white hover:bg-neutral-100 text-black flex items-center justify-center transition border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Open Contest Page"
+                                            >
+                                                <ExternalLink className="w-4 h-4 stroke-[2.5]" />
+                                            </a>
+                                        </div>
                                     </div>
-
-                                    {/* External Link button */}
-                                    <a
-                                        href={activeUpNext.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="w-10 h-10 rounded-xl bg-white hover:bg-neutral-100 text-black flex items-center justify-center transition shadow-sm ring-1 ring-black/10"
-                                        title="Open Contest Page"
-                                    >
-                                        <ExternalLink className="w-4 h-4" />
-                                    </a>
                                 </div>
-                            </div>
-                        </div>
-                    </section>
-                )}
+                            </section>
+                        )}
 
-                {/* 3. Platform Filter Chips Row (All 16 Platforms) */}
-                <section className="space-y-2">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <div className="flex items-center gap-2 overflow-x-auto p-2 scrollbar-none max-w-full border-y border-black">
-                            {/* "All" reset chip */}
-                            <button
-                                type="button"
-                                onClick={() => dispatch(setSelectedPlatform(null))}
-                                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 flex-shrink-0 border ${selectedPlatform === null
-                                    ? "bg-neutral-900 text-white shadow-sm border-neutral-900"
-                                    : "bg-white text-neutral-700 border-neutral-200/90 hover:border-neutral-300 hover:bg-neutral-50 shadow-xs"
-                                    }`}
-                            >
-                                All Platforms
-                            </button>
-
-                            {/* Individual 16 Platform Chips */}
-                            {ALL_16_PLATFORMS.map((plat) => {
-                                const count = activeCounts[plat.id] || 0;
-                                const isSelected = selectedPlatform === plat.id;
-
-                                return (
+                        {/* 3. Platform Filter Chips Row (All 16 Platforms) */}
+                        <section className="space-y-2">
+                            <div className="flex items-center justify-between gap-3 flex-wrap">
+                                <div className="flex items-center gap-2 overflow-x-auto py-2.5 px-1 scrollbar-none max-w-full">
+                                    {/* "All" reset chip */}
                                     <button
-                                        key={plat.id}
                                         type="button"
-                                        onClick={() => dispatch(setSelectedPlatform(plat.id))}
-                                        className={`px-3 py-1.5 rounded-full text-xs transition-all flex items-center gap-2 flex-shrink-0 border ${isSelected
-                                            ? "bg-neutral-900 text-white font-bold shadow-sm border-neutral-900"
-                                            : "bg-white text-neutral-800 border-neutral-200/90 hover:border-neutral-300 hover:bg-neutral-50 shadow-xs font-medium"
+                                        onClick={() => dispatch(setSelectedPlatform(null))}
+                                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 flex-shrink-0 border-2 border-black cursor-pointer ${selectedPlatform === null
+                                            ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                            : "bg-white text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000]"
                                             }`}
                                     >
-                                        <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
-                                            {getPortalIcon(plat.id, "w-3.5 h-3.5")}
-                                        </div>
-                                        <span>{plat.name}</span>
-                                        <span
-                                            className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${isSelected
-                                                ? "bg-white/20 text-white"
-                                                : "bg-neutral-100 text-neutral-600"
-                                                }`}
-                                        >
-                                            {count}
-                                        </span>
+                                        All Platforms
                                     </button>
-                                );
-                            })}
-                        </div>
 
-                        <span className="text-[11px] font-medium text-neutral-500 flex-shrink-0 ml-auto">
-                            Counts are for {monthLabel}. All times IST.
-                        </span>
-                    </div>
-                </section>
+                                    {/* Individual 16 Platform Chips */}
+                                    {ALL_16_PLATFORMS.map((plat) => {
+                                        const count = activeCounts[plat.id] || 0;
+                                        const isSelected = selectedPlatform === plat.id;
+
+                                        return (
+                                            <button
+                                                key={plat.id}
+                                                type="button"
+                                                onClick={() => dispatch(setSelectedPlatform(plat.id))}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-2 flex-shrink-0 border-2 border-black cursor-pointer ${isSelected
+                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    : "bg-white text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000]"
+                                                    }`}
+                                            >
+                                                <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
+                                                    {getPortalIcon(plat.id, "w-3.5 h-3.5")}
+                                                </div>
+                                                <span>{plat.name}</span>
+                                                <span
+                                                    className={`text-[10px] px-1.5 py-0.2 rounded-md font-mono font-black border border-black ${isSelected
+                                                        ? "bg-white text-black"
+                                                        : "bg-[#FFE566] text-black"
+                                                        }`}
+                                                >
+                                                    {count}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <span className="text-xs font-bold text-neutral-600 flex-shrink-0 ml-auto">
+                                    Counts for {monthLabel} · All times IST
+                                </span>
+                            </div>
+                        </section>
 
                 {/* 4 & 5. Unified Black Scheduler & Contest History Section */}
-                <section className="rounded-2xl sm:rounded-3xl bg-black border border-neutral-800 shadow-2xl text-white ring-1 ring-white/10 overflow-hidden">
+                <section className="rounded-2xl sm:rounded-3xl bg-black border-2 border-black shadow-[6px_6px_0px_#000] text-white overflow-hidden">
                     {/* Upper: The Scheduler (Calendar or List View) */}
                     <div className="p-4 sm:p-6 space-y-4">
                         {viewMode === "calendar" ? (
@@ -1324,15 +1381,29 @@ export const EventTrackerPage: React.FC = () => {
                             </p>
                             <Link
                                 to="/onboarding"
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white/10 hover:bg-white/20 text-neutral-200 hover:text-white transition border border-white/15"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-amber-300 transition"
                             >
-                                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                                <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                                 Connect More Platforms
                             </Link>
                         </div>
                     </div>
                 </section>
-            </main>
+            </div>
+
+            {/* ========================================================================= */}
+            {/* BOTTOM FULL-WIDTH DESK ILLUSTRATION (Matching Connected Platforms, Resume & Leaderboard) */}
+            {/* ========================================================================= */}
+            <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
+                <img
+                    src="/image.png"
+                    alt="Events workspace illustration"
+                    className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
+                    loading="eager"
+                />
+            </div>
+        </section>
+    </div>
 
             {/* Modal: Full Day Contest Breakdown (triggered by "+N more" or day click) */}
             {selectedDayEvents && (

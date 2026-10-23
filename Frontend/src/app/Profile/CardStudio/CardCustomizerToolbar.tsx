@@ -92,20 +92,20 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
             {/* Format & Face Segmented Controls */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Format Selector */}
-                <div className="bg-neutral-100 p-1 rounded-xl flex items-center relative">
+                <div className="bg-[#FAF6EE] p-1 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center relative">
                     <button
                         type="button"
                         onClick={() => onFormatChange("linkedin")}
-                        className={`relative flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                        className={`relative flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-black cursor-pointer transition-colors ${
                             format === "linkedin"
-                                ? "text-neutral-900"
-                                : "text-neutral-500 hover:text-neutral-900"
+                                ? "text-black"
+                                : "text-neutral-500 hover:text-black"
                         }`}
                     >
                         {format === "linkedin" && (
                             <motion.div
                                 layoutId="activeFormatIndicator"
-                                className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                                className="absolute inset-0 bg-white border-2 border-black rounded-lg shadow-[1px_1px_0px_#000]"
                                 transition={{ type: "spring", stiffness: 450, damping: 35 }}
                             />
                         )}
@@ -119,16 +119,16 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                     <button
                         type="button"
                         onClick={() => onFormatChange("instagram")}
-                        className={`relative flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                        className={`relative flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg text-xs font-black cursor-pointer transition-colors ${
                             format === "instagram"
-                                ? "text-neutral-900"
-                                : "text-neutral-500 hover:text-neutral-900"
+                                ? "text-black"
+                                : "text-neutral-500 hover:text-black"
                         }`}
                     >
                         {format === "instagram" && (
                             <motion.div
                                 layoutId="activeFormatIndicator"
-                                className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                                className="absolute inset-0 bg-white border-2 border-black rounded-lg shadow-[1px_1px_0px_#000]"
                                 transition={{ type: "spring", stiffness: 450, damping: 35 }}
                             />
                         )}
@@ -144,20 +144,20 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
 
                 {/* Face Selector + Quick Flip Button */}
                 <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-neutral-100 p-1 rounded-xl flex items-center relative">
+                    <div className="flex-1 bg-[#FAF6EE] p-1 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center relative">
                         <button
                             type="button"
                             onClick={() => onFaceChange("front")}
-                            className={`relative flex-1 py-1.5 px-3 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                            className={`relative flex-1 py-1.5 px-3 rounded-lg text-xs font-black cursor-pointer transition-colors ${
                                 face === "front"
-                                    ? "text-neutral-900"
-                                    : "text-neutral-500 hover:text-neutral-900"
+                                    ? "text-black"
+                                    : "text-neutral-500 hover:text-black"
                             }`}
                         >
                             {face === "front" && (
                                 <motion.div
                                     layoutId="activeFaceIndicator"
-                                    className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                                    className="absolute inset-0 bg-white border-2 border-black rounded-lg shadow-[1px_1px_0px_#000]"
                                     transition={{ type: "spring", stiffness: 450, damping: 35 }}
                                 />
                             )}
@@ -166,16 +166,16 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                         <button
                             type="button"
                             onClick={() => onFaceChange("back")}
-                            className={`relative flex-1 py-1.5 px-3 rounded-lg text-xs font-bold cursor-pointer transition-colors ${
+                            className={`relative flex-1 py-1.5 px-3 rounded-lg text-xs font-black cursor-pointer transition-colors ${
                                 face === "back"
-                                    ? "text-neutral-900"
-                                    : "text-neutral-500 hover:text-neutral-900"
+                                    ? "text-black"
+                                    : "text-neutral-500 hover:text-black"
                             }`}
                         >
                             {face === "back" && (
                                 <motion.div
                                     layoutId="activeFaceIndicator"
-                                    className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                                    className="absolute inset-0 bg-white border-2 border-black rounded-lg shadow-[1px_1px_0px_#000]"
                                     transition={{ type: "spring", stiffness: 450, damping: 35 }}
                                 />
                             )}
@@ -190,9 +190,9 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                         whileHover={{ scale: 1.05 }}
                         transition={{ type: "spring", stiffness: 400, damping: 25 }}
                         title="Flip card between Front and Back"
-                        className="h-9 w-9 flex items-center justify-center rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 transition-colors cursor-pointer flex-shrink-0"
+                        className="h-10 w-10 flex items-center justify-center rounded-xl bg-white hover:bg-[#FAF6EE] text-black border-2 border-black shadow-[2px_2px_0px_#000] transition-colors cursor-pointer flex-shrink-0"
                     >
-                        <svg className={`w-4 h-4 transition-transform duration-500 ${face === "back" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <svg className={`w-4 h-4 transition-transform duration-500 ${face === "back" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                         </svg>
                     </motion.button>
@@ -200,10 +200,10 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
             </div>
 
             {/* Theme Swatches & GitHub Stats Toggle */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-neutral-50 border border-neutral-200/70">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000]">
                 {/* Theme Selector */}
                 <div>
-                    <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1.5">
+                    <label className="block text-[11px] font-black text-black uppercase tracking-wider mb-1.5">
                         Brand Theme
                     </label>
                     <div className="flex items-center gap-2">
@@ -216,10 +216,10 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                                     type="button"
                                     onClick={() => onThemeChange(id)}
                                     title={th.name}
-                                    className={`relative w-7 h-7 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+                                    className={`relative w-7 h-7 rounded-full transition-all cursor-pointer flex items-center justify-center border-2 border-black ${
                                         isSelected
-                                            ? "ring-2 ring-offset-2 ring-neutral-900 scale-110 shadow-xs"
-                                            : "opacity-75 hover:opacity-100 hover:scale-105"
+                                            ? "ring-2 ring-black scale-110 shadow-[2px_2px_0px_#000]"
+                                            : "opacity-80 hover:opacity-100 hover:scale-105"
                                     }`}
                                     style={{ backgroundColor: th.accentColor }}
                                 >
@@ -231,19 +231,19 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                                 </button>
                             );
                         })}
-                        <span className="text-xs font-semibold text-neutral-700 ml-1.5 truncate max-w-[120px]">
+                        <span className="text-xs font-black text-black ml-1.5 truncate max-w-[120px]">
                             {CARD_THEMES[themeId].name}
                         </span>
                     </div>
                 </div>
 
                 {/* GitHub Toggle Switch */}
-                <div className="sm:border-l sm:border-neutral-200 sm:pl-4 pt-2 sm:pt-0">
-                    <label className="block text-[11px] font-bold text-neutral-500 uppercase tracking-wider mb-1.5">
+                <div className="sm:border-l-2 sm:border-black/20 sm:pl-4 pt-2 sm:pt-0">
+                    <label className="block text-[11px] font-black text-black uppercase tracking-wider mb-1.5">
                         GitHub Activity
                     </label>
                     <label
-                        className={`inline-flex items-center gap-2 text-xs font-medium cursor-pointer ${
+                        className={`inline-flex items-center gap-2 text-xs font-bold cursor-pointer ${
                             !isGitHubConnected ? "opacity-50 cursor-not-allowed" : ""
                         }`}
                         title={
@@ -257,13 +257,13 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                             checked={includeGitHub && isGitHubConnected}
                             disabled={!isGitHubConnected}
                             onChange={(e) => onToggleGitHub(e.target.checked)}
-                            className="w-4 h-4 rounded text-black focus:ring-black accent-black cursor-pointer"
+                            className="w-4 h-4 rounded border-2 border-black text-black focus:ring-black accent-black cursor-pointer"
                         />
-                        <span className="font-semibold text-neutral-800">
+                        <span className="font-bold text-black">
                             Include GitHub Stats
                         </span>
                         {!isGitHubConnected && (
-                            <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200">
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
                                 Not Connected
                             </span>
                         )}
@@ -274,7 +274,7 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
             {/* ========================================================================= */}
             {/* SHOWCASED PLATFORM SLOTS SECTION */}
             {/* ========================================================================= */}
-            <div className="p-3.5 rounded-xl bg-neutral-50 border border-neutral-200/70 space-y-3.5">
+            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-3.5">
                 {/* Slot Classification Category Selector Segmented Tabs */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-neutral-200/80">
                     <div>
@@ -302,7 +302,7 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                     </div>
 
                     {/* 3-Way Slot Classification Category Switcher */}
-                    <div className="bg-neutral-200/80 p-0.5 rounded-xl flex items-center flex-shrink-0 relative">
+                    <div className="bg-[#FAF6EE] p-0.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center flex-shrink-0 relative">
                         {(["practice", "dev", "both"] as SlotShowcaseCategory[]).map((cat) => {
                             const isSelected = slotCategory === cat;
                             return (
@@ -310,16 +310,16 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                                     key={cat}
                                     type="button"
                                     onClick={() => onSlotCategoryChange(cat)}
-                                    className={`relative flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                                    className={`relative flex items-center gap-1.5 py-1 px-3 rounded-lg text-xs font-black transition-colors cursor-pointer ${
                                         isSelected
-                                            ? "text-neutral-900"
-                                            : "text-neutral-600 hover:text-neutral-900"
+                                            ? "text-black"
+                                            : "text-neutral-500 hover:text-black"
                                     }`}
                                 >
                                     {isSelected && (
                                         <motion.div
                                             layoutId="activeCategoryIndicator"
-                                            className="absolute inset-0 bg-white rounded-lg shadow-2xs"
+                                            className="absolute inset-0 bg-white border-2 border-black rounded-lg shadow-[1px_1px_0px_#000]"
                                             transition={{ type: "spring", stiffness: 450, damping: 35 }}
                                         />
                                     )}
@@ -336,8 +336,8 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                 </div>
 
                 {/* Reset Auto Button Header if customized */}
-                <div className="flex items-center justify-between text-xs text-neutral-500">
-                    <span className="text-[11px]">
+                <div className="flex items-center justify-between text-xs text-neutral-600">
+                    <span className="text-[11px] font-bold">
                         {format === "linkedin"
                             ? `Displaying ${currentSlotIds.filter(Boolean).length} of 3 slots on LinkedIn Card`
                             : `Displaying ${currentSlotIds.filter(Boolean).length} of 5 slots on Story Card`}
@@ -348,9 +348,9 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                             type="button"
                             onClick={onResetSlots}
                             title="Reset slots back to auto-ranked order"
-                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold text-neutral-600 hover:text-neutral-900 bg-white hover:bg-neutral-100 border border-neutral-300 rounded-md shadow-2xs transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-black text-black bg-white hover:bg-neutral-100 border-2 border-black rounded-md shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
                         >
-                            <svg className="w-3 h-3 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-3 h-3 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                             </svg>
                             <span>Reset Auto</span>
@@ -389,18 +389,18 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                                 exit={{ opacity: 0, y: -6 }}
                                 transition={{ duration: 0.18 }}
                                 key={slotIdx}
-                                className="flex items-center gap-2 bg-white p-2 rounded-lg border border-neutral-200 shadow-2xs"
+                                className="flex items-center gap-2 bg-white p-2 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000]"
                             >
                                 {/* Slot Badge */}
                                 <div className="flex items-center gap-1.5 w-20 flex-shrink-0">
                                     <span
-                                        className={`w-2 h-2 rounded-full ${
+                                        className={`w-2 h-2 rounded-full border border-black ${
                                             isDevDedicatedSlot || slotCategory === "dev"
                                                 ? "bg-emerald-500"
                                                 : "bg-indigo-500"
                                         }`}
                                     />
-                                    <span className="text-[11px] font-black text-neutral-700 tracking-wider">
+                                    <span className="text-[11px] font-black text-black tracking-wider">
                                         {isDevDedicatedSlot ? "Dev Slot" : `Slot ${slotIdx + 1}`}
                                     </span>
                                 </div>
@@ -410,7 +410,7 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                                     <select
                                         value={currentId}
                                         onChange={(e) => onSlotChange(slotIdx, e.target.value)}
-                                        className="w-full text-xs font-semibold bg-neutral-50 hover:bg-neutral-100 focus:bg-white text-neutral-800 border border-neutral-200 focus:border-neutral-900 rounded-md py-1.5 pl-2.5 pr-7 outline-none cursor-pointer truncate transition-colors"
+                                        className="w-full text-xs font-bold bg-[#FAF6EE] hover:bg-white focus:bg-white text-black border-2 border-black rounded-md py-1.5 pl-2.5 pr-7 outline-none cursor-pointer truncate transition-colors shadow-[1px_1px_0px_#000]"
                                     >
                                         <option value="">— Empty / Select Platform —</option>
                                         {platformsToDisplay.map((plat) => {
@@ -556,11 +556,11 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                     type="button"
                     onClick={onDownload}
                     disabled={isExporting}
-                    className="h-11 flex items-center justify-center gap-2 px-4 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-bold transition-all shadow-sm cursor-pointer hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+                    className="h-11 flex items-center justify-center gap-2 px-4 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer disabled:opacity-50"
                 >
                     {isExporting ? (
                         <>
-                            <svg className="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 animate-spin text-black" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                             </svg>
@@ -568,7 +568,7 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                         </>
                     ) : (
                         <>
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
                             <span>Download {face === "front" ? "Front" : "Back"} Card PNG</span>
@@ -579,9 +579,9 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                 <button
                     type="button"
                     onClick={onCopyLink}
-                    className="h-11 flex items-center justify-center gap-2 px-4 rounded-xl bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-800 text-xs font-bold transition-all shadow-2xs cursor-pointer hover:border-neutral-400"
+                    className="h-11 flex items-center justify-center gap-2 px-4 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer"
                 >
-                    <svg className="w-4 h-4 text-neutral-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                     </svg>
                     <span>Copy Showcase URL</span>

@@ -313,6 +313,8 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id UUID;
             CREATE INDEX IF NOT EXISTS idx_users_college_id ON users (college_id);
             ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS college_id UUID;
+            CREATE INDEX IF NOT EXISTS idx_leaderboard_college_id ON leaderboard_entries (college_id);
+            CREATE INDEX IF NOT EXISTS idx_leaderboard_college_score ON leaderboard_entries (college_id, score DESC, total_solved DESC, username ASC) WHERE is_public = true AND college_id IS NOT NULL;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");
     } catch (error) {

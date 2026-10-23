@@ -42,31 +42,38 @@ export const LeaderboardPagination: React.FC<LeaderboardPaginationProps> = ({
 
     return (
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4 px-2 text-xs">
-            {/* Total counts text matching reference */}
-            <div className="text-neutral-400 font-medium">
-                Showing <strong className="text-white font-mono">{startRow}–{endRow}</strong> of{" "}
-                <strong className="text-white font-mono">{totalCoders.toLocaleString()}</strong> coders
+            {/* Total counts text matching neo-brutalist reference */}
+            <div className="text-black font-extrabold tracking-tight">
+                Showing{" "}
+                <span className="font-mono px-1.5 py-0.5 rounded bg-white border border-black shadow-[1px_1px_0px_#000] font-black">
+                    {startRow}–{endRow}
+                </span>{" "}
+                of{" "}
+                <span className="font-mono px-1.5 py-0.5 rounded bg-[#a2ff86] border border-black shadow-[1px_1px_0px_#000] font-black">
+                    {totalCoders.toLocaleString()}
+                </span>{" "}
+                coders
             </div>
 
             {/* Pagination Controls */}
-            <div className="flex items-center gap-1.5 self-center sm:self-auto">
+            <div className="flex items-center gap-2 self-center sm:self-auto">
                 {/* Previous Button */}
                 <button
                     type="button"
                     onClick={() => onPageChange(currentPage - 1)}
                     disabled={currentPage <= 1 || isLoading}
-                    className="p-2 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
+                    className="p-1.5 rounded-lg bg-white border-2 border-black text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
                     aria-label="Previous Page"
                 >
-                    <ChevronLeft className="w-4 h-4" />
+                    <ChevronLeft className="w-4 h-4 stroke-[3]" />
                 </button>
 
                 {/* Numbered Page Buttons */}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                     {getPageNumbers().map((p, idx) => {
                         if (p === "...") {
                             return (
-                                <span key={`ellipsis-${idx}`} className="px-2 text-neutral-600 select-none">
+                                <span key={`ellipsis-${idx}`} className="px-1 text-black font-black select-none">
                                     ...
                                 </span>
                             );
@@ -78,10 +85,10 @@ export const LeaderboardPagination: React.FC<LeaderboardPaginationProps> = ({
                                 type="button"
                                 onClick={() => onPageChange(Number(p))}
                                 disabled={isLoading}
-                                className={`w-8 h-8 rounded-xl font-mono text-xs font-bold transition-all cursor-pointer flex items-center justify-center ${
+                                className={`w-8 h-8 rounded-lg font-mono text-xs font-black border-2 border-black transition-all cursor-pointer flex items-center justify-center ${
                                     isCurrent
-                                        ? "bg-white text-black shadow-xs"
-                                        : "bg-neutral-900 text-neutral-400 hover:text-white hover:bg-neutral-800 border border-neutral-800"
+                                        ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000] -translate-y-[1px]"
+                                        : "bg-white text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px]"
                                 }`}
                             >
                                 {p}
@@ -95,10 +102,10 @@ export const LeaderboardPagination: React.FC<LeaderboardPaginationProps> = ({
                     type="button"
                     onClick={() => onPageChange(currentPage + 1)}
                     disabled={currentPage >= totalPages || isLoading}
-                    className="p-2 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-800 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
+                    className="p-1.5 rounded-lg bg-white border-2 border-black text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer"
                     aria-label="Next Page"
                 >
-                    <ChevronRight className="w-4 h-4" />
+                    <ChevronRight className="w-4 h-4 stroke-[3]" />
                 </button>
             </div>
         </div>
