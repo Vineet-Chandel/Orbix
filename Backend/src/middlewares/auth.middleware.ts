@@ -54,21 +54,27 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
             const result = await query(
                 `SELECT
                     id,
-                    firstName,
-                    middleName,
-                    lastName,
+                    firstname AS "firstName",
+                    middlename AS "middleName",
+                    lastname AS "lastName",
                     email AS gmail,
                     username,
-                    termsAccepted
+                    termsaccepted AS "termsAccepted"
                 FROM users
-                WHERE id = $1 OR email = $2 OR username = $3
+                WHERE id = $1 OR LOWER(email) = LOWER($2) OR LOWER(username) = LOWER($3)
                 LIMIT 1;`,
                 [userId || null, userGmail || null, username || null]
             );
             user = result.rows[0];
 
             if (user && user.gmail) {
-                // Prime Redis cache for instant future lookups
+                // Ensure camelCase fields are set cleanly
+                user.firstName = user.firstName || (user as any).firstname || "";
+                user.middleName = user.middleName || (user as any).middlename || "";
+                user.lastName = user.lastName || (user as any).lastname || "";
+                user.termsAccepted = user.termsAccepted ?? (user as any).termsaccepted ?? false;
+
+                // Prime Redis cache for instant future lookups (without touching password_hash)
                 userDetailsCache({
                     id: user.id,
                     firstName: user.firstName,
@@ -76,7 +82,6 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
                     lastName: user.lastName,
                     gmail: user.gmail,
                     username: user.username,
-                    password_hash: "",
                     termsAccepted: user.termsAccepted
                 }).catch(() => {});
             }
@@ -89,7 +94,14 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
             });
         }
 
-        req.user = user;
+        // Normalize camelCase on req.user
+        req.user = {
+            ...user,
+            firstName: user.firstName || (user as any).firstname || "",
+            middleName: user.middleName || (user as any).middlename || "",
+            lastName: user.lastName || (user as any).lastname || "",
+            termsAccepted: user.termsAccepted ?? (user as any).termsaccepted ?? false,
+        };
         return next();
     } catch (err) {
         console.error("Authentication middleware error:", err);
@@ -138,20 +150,25 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
             const result = await query(
                 `SELECT
                     id,
-                    firstName,
-                    middleName,
-                    lastName,
+                    firstname AS "firstName",
+                    middlename AS "middleName",
+                    lastname AS "lastName",
                     email AS gmail,
                     username,
-                    termsAccepted
+                    termsaccepted AS "termsAccepted"
                 FROM users
-                WHERE id = $1 OR email = $2 OR username = $3
+                WHERE id = $1 OR LOWER(email) = LOWER($2) OR LOWER(username) = LOWER($3)
                 LIMIT 1;`,
                 [userId || null, userGmail || null, username || null]
             );
             user = result.rows[0];
 
             if (user && user.gmail) {
+                user.firstName = user.firstName || (user as any).firstname || "";
+                user.middleName = user.middleName || (user as any).middlename || "";
+                user.lastName = user.lastName || (user as any).lastname || "";
+                user.termsAccepted = user.termsAccepted ?? (user as any).termsaccepted ?? false;
+
                 userDetailsCache({
                     id: user.id,
                     firstName: user.firstName,
@@ -159,14 +176,19 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
                     lastName: user.lastName,
                     gmail: user.gmail,
                     username: user.username,
-                    password_hash: "",
                     termsAccepted: user.termsAccepted
                 }).catch(() => {});
             }
         }
 
         if (user) {
-            req.user = user;
+            req.user = {
+                ...user,
+                firstName: user.firstName || (user as any).firstname || "",
+                middleName: user.middleName || (user as any).middlename || "",
+                lastName: user.lastName || (user as any).lastname || "",
+                termsAccepted: user.termsAccepted ?? (user as any).termsaccepted ?? false,
+            };
         }
 
         return next();

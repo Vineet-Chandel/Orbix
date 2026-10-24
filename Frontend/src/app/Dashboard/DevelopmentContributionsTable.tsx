@@ -131,20 +131,20 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
         return { weeks: clientAgg.weeks, monthNames: clientAgg.monthNames };
     }, [remoteData, selectedPortal, weeksCount, clientAgg]);
 
-    // Circular Curvy Green Accent Shader mapping
+    // Neo-Brutalist Green Accent Shader mapping
     const getCellColor = (level: 0 | 1 | 2 | 3 | 4) => {
         switch (level) {
             case 4:
-                return "bg-[#216e39] border-[#17562a] shadow-2xs";
+                return "bg-[#115e24] border-black shadow-[1px_1px_0px_#000]";
             case 3:
-                return "bg-[#30a14e] border-[#248941]";
+                return "bg-[#22c55e] border-black shadow-[1px_1px_0px_#000]";
             case 2:
-                return "bg-[#40c463] border-[#33b255]";
+                return "bg-[#4ade80] border-black";
             case 1:
-                return "bg-[#9be9a8] border-[#7cd88c]";
+                return "bg-[#a2ff86] border-black";
             case 0:
             default:
-                return "bg-neutral-100 border-neutral-200/90 hover:border-emerald-300";
+                return "bg-[#FAF6EE] border-black/25 hover:border-black";
         }
     };
 
@@ -177,21 +177,21 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
 
     if (!isGitHubConnected) {
         return (
-            <div className="w-full rounded-3xl bg-white text-neutral-900 p-8 sm:p-12 border border-neutral-300 shadow-sm relative overflow-hidden select-none">
+            <div className="w-full rounded-2xl bg-white text-black p-8 sm:p-12 border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden select-none">
                 <div className="relative z-10 flex flex-col items-center justify-center text-center max-w-lg mx-auto py-8 space-y-5">
-                    <div className="w-16 h-16 rounded-3xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs">
-                        <GitBranch className="w-8 h-8 text-neutral-900" />
+                    <div className="w-16 h-16 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black shadow-[3px_3px_0px_#000]">
+                        <GitBranch className="w-8 h-8 text-black" />
                     </div>
 
                     <div className="space-y-2">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/[0.04] border border-neutral-300 text-[11px] font-bold text-neutral-600 uppercase tracking-wider">
-                            <Sparkles className="w-3.5 h-3.5 text-neutral-500" />
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[2px_2px_0px_#000]">
+                            <Sparkles className="w-3.5 h-3.5 text-black" />
                             <span>Development Field</span>
                         </div>
-                        <h3 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
+                        <h3 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
                             GitHub Profile Not Connected
                         </h3>
-                        <p className="text-sm text-neutral-500 leading-relaxed max-w-md font-medium">
+                        <p className="text-sm text-neutral-600 leading-relaxed max-w-md font-medium">
                             Connect your GitHub profile to automatically sync your repository contributions, commits, pull requests, issues, and live 365-day development heatmaps.
                         </p>
                     </div>
@@ -199,14 +199,14 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                     <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
                         <Link
                             to="/onboarding"
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-black hover:bg-neutral-800 text-white font-extrabold text-xs shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
                         >
                             <span>Connect GitHub Platform</span>
                             <ArrowRight className="w-4 h-4" />
                         </Link>
                         <Link
                             to="/profile"
-                            className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-black/[0.04] hover:bg-black/[0.08] text-neutral-700 font-bold text-xs border border-neutral-300 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#FAF6EE] hover:bg-white text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
                         >
                             <span>Manage Profile</span>
                         </Link>
@@ -217,24 +217,24 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
     }
 
     return (
-        <div className="w-full rounded-3xl bg-white text-neutral-900 p-6 sm:p-8 border border-neutral-300 shadow-sm relative overflow-hidden select-none">
+        <div className="w-full rounded-2xl bg-white text-black p-6 sm:p-8 border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden select-none">
             {/* Top Header Row */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
                 <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs flex-shrink-0">
-                        <GitBranch className="w-5 h-5 text-neutral-900" />
+                    <div className="w-10 h-10 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] flex-shrink-0">
+                        <GitBranch className="w-5 h-5 text-black" />
                     </div>
                     <div>
                         <div className="flex items-center gap-2.5 flex-wrap">
-                            <h3 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight leading-tight">
+                            <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight">
                                 Development Activity
                             </h3>
-                            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/[0.04] border border-neutral-300 text-[11px] font-bold text-neutral-600 uppercase tracking-wider">
-                                <Sparkles className="w-3 h-3 text-neutral-500" />
+                            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FAF6EE] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                <Sparkles className="w-3 h-3 text-black" />
                                 <span>GitHub Development</span>
                             </span>
                         </div>
-                        <p className="text-xs sm:text-sm text-neutral-500 font-medium mt-1">
+                        <p className="text-xs sm:text-sm text-neutral-600 font-medium mt-1">
                             Merged development contributions, repositories & commits from GitHub
                         </p>
                     </div>
@@ -246,19 +246,19 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                             href={`https://github.com/${rawGhHandle}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black/[0.04] hover:bg-black/[0.08] border border-neutral-300 text-xs sm:text-sm font-mono font-bold text-neutral-800 hover:text-black transition-all cursor-pointer shadow-2xs group"
+                            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FAF6EE] hover:bg-[#FFE566] border-2 border-black text-xs sm:text-sm font-mono font-black text-black transition-all cursor-pointer shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 group"
                             title={`View ${rawGhHandle} on GitHub`}
                         >
-                            <span className="w-2 h-2 rounded-full bg-neutral-900" />
+                            <span className="w-2.5 h-2.5 rounded-full bg-black" />
                             <span>@{rawGhHandle}</span>
-                            <ExternalLink className="w-3.5 h-3.5 text-neutral-500 group-hover:text-black transition-colors" />
+                            <ExternalLink className="w-3.5 h-3.5 text-black group-hover:translate-x-0.5 transition-transform" />
                         </a>
                     </div>
                 )}
             </div>
 
             {/* 4 Metric Stats: Contributions, Repositories, Stars, Followers */}
-            <div className="py-5 my-2 border-t border-neutral-200 relative z-10">
+            <div className="py-5 my-2 border-t-2 border-black/10 relative z-10">
                 <DevelopmentMetricCards
                     data={analyticsData}
                     isLoading={isAnalyticsLoading}
@@ -267,14 +267,14 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
             </div>
 
             {/* Platform Filter Chips Row */}
-            <div className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y border-neutral-200 relative z-10 scrollbar-none">
+            <div className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y-2 border-black/10 relative z-10 scrollbar-none">
                 <button
                     type="button"
                     onClick={() => setSelectedPortal("all")}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex-shrink-0 ${
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm transition-all cursor-pointer flex-shrink-0 ${
                         selectedPortal === "all"
-                            ? "bg-black text-white shadow-xs font-black"
-                            : "bg-black/[0.04] hover:bg-black/[0.08] text-neutral-700 border border-neutral-300"
+                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] font-black"
+                            : "bg-[#FAF6EE] hover:bg-white text-black border-2 border-black shadow-[1px_1px_0px_#000] font-bold"
                     }`}
                 >
                     <Layers className="w-3.5 h-3.5" />
@@ -288,18 +288,18 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                             key={plat.portal}
                             type="button"
                             onClick={() => setSelectedPortal(plat.portal)}
-                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex-shrink-0 ${
+                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm transition-all cursor-pointer flex-shrink-0 ${
                                 isSelected
-                                    ? "bg-black text-white shadow-xs font-black"
-                                    : "bg-black/[0.04] hover:bg-black/[0.08] text-neutral-700 border border-neutral-300"
+                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] font-black"
+                                    : "bg-[#FAF6EE] hover:bg-white text-black border-2 border-black shadow-[1px_1px_0px_#000] font-bold"
                             }`}
                         >
                             <div className="w-4 h-4 flex items-center justify-center">
                                 {getPortalIcon(plat.portal, "w-full h-full object-contain")}
                             </div>
                             <span className="capitalize">{plat.portal}</span>
-                            <span className={`text-xs font-mono font-semibold px-1.5 py-0.5 rounded-md ${
-                                isSelected ? "bg-white/20 text-white" : "bg-black/5 text-neutral-600"
+                            <span className={`text-xs font-mono font-black px-1.5 py-0.5 rounded-md border border-black ${
+                                isSelected ? "bg-[#a2ff86] text-black" : "bg-black/5 text-black"
                             }`}>
                                 {Math.max(plat.submissions || 0, plat.solved || 0)}
                             </span>
@@ -313,11 +313,11 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                 <div className="min-w-[700px] flex flex-col space-y-2">
                     {/* Month Labels Row aligned across columns */}
                     <div
-                        className="grid text-xs font-mono text-neutral-500 font-semibold select-none pl-7 pr-1"
+                        className="grid text-xs font-mono text-black/70 font-black select-none pl-7 pr-1"
                         style={{ gridTemplateColumns: `repeat(${monthNames.length}, minmax(0, 1fr))` }}
                     >
                         {monthNames.map((m, idx) => (
-                            <span key={idx} className="block text-left">
+                            <span key={idx} className="block text-left uppercase text-[10px] tracking-wider">
                                 {m}
                             </span>
                         ))}
@@ -326,7 +326,7 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                     {/* Day Labels Column + Week Columns Grid */}
                     <div className="flex items-center gap-2.5">
                         {/* Day labels (Sun through Sat, showing Mon, Wed, Fri aligned with square rows) */}
-                        <div className="flex flex-col gap-1.5 text-[11px] font-mono text-neutral-400 select-none w-5 flex-shrink-0 text-right">
+                        <div className="flex flex-col gap-1.5 text-[11px] font-mono text-black/60 font-black select-none w-5 flex-shrink-0 text-right">
                             <div className="aspect-square flex items-center justify-end leading-none" />
                             <div className="aspect-square flex items-center justify-end leading-none">Mon</div>
                             <div className="aspect-square flex items-center justify-end leading-none" />
@@ -348,7 +348,7 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
                                             title={`${day.count} contributions on ${day.displayDate}${
                                                 day.platforms.length > 0 ? ` (${day.platforms.join(", ")})` : ""
                                             }`}
-                                            className={`w-full aspect-square rounded-full border transition-all duration-200 hover:scale-130 cursor-pointer ${getCellColor(
+                                            className={`w-full aspect-square rounded-full border transition-all duration-150 hover:scale-130 cursor-pointer ${getCellColor(
                                                 day.level
                                             )}`}
                                         />
@@ -361,61 +361,59 @@ export const DevelopmentContributionsTable: React.FC<DevelopmentContributionsTab
             </div>
 
             {/* Hover Tooltip Info Banner if cell is hovered */}
-            <div className="min-h-[28px] flex items-center text-xs sm:text-sm font-mono text-neutral-700 pt-1">
+            <div className="min-h-[36px] flex items-center text-xs sm:text-sm font-mono text-black pt-1">
                 {hoveredCell ? (
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-neutral-900">{hoveredCell.displayDate}:</span>
-                        <span className="text-emerald-800 font-extrabold bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-300">
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                        <span className="font-black text-black">{hoveredCell.displayDate}:</span>
+                        <span className="text-black font-black bg-[#a2ff86] px-2 py-0.5 rounded-md border border-black">
                             {hoveredCell.count === 0
                                 ? "No contributions"
                                 : `${hoveredCell.count} ${hoveredCell.count === 1 ? "contribution" : "contributions"}`}
                         </span>
                         {hoveredCell.platforms.length > 0 && (
-                            <span className="text-neutral-500 font-sans font-medium">
-                                via <span className="capitalize text-neutral-800 font-bold">{hoveredCell.platforms.join(", ")}</span>
+                            <span className="text-neutral-700 font-sans font-medium text-xs">
+                                via <span className="capitalize text-black font-black">{hoveredCell.platforms.join(", ")}</span>
                             </span>
                         )}
                     </div>
                 ) : (
-                    <span className="text-neutral-400 text-xs font-sans">Hover over any circular dot to view daily contribution breakdown.</span>
+                    <span className="text-neutral-500 text-xs font-sans font-medium">Hover over any circular dot to view daily contribution breakdown.</span>
                 )}
             </div>
 
             {/* Bottom Footer Row with Metrics and Circular Curvy Legend */}
-            <div className="pt-4 mt-2 border-t border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono text-neutral-500 relative z-10">
-                <div className="flex items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-1.5 text-neutral-800 font-bold">
-                        <Flame className="w-4 h-4 text-neutral-900" />
+            <div className="pt-4 mt-2 border-t-2 border-black/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono text-neutral-600 relative z-10">
+                <div className="flex items-center gap-3 flex-wrap">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-black font-black">
+                        <Flame className="w-3.5 h-3.5 text-black" />
                         <span>{dayStreak} day streak</span>
                     </div>
-                    <span className="text-neutral-300">•</span>
-                    <div className="flex items-center gap-1.5 text-neutral-800 font-bold">
-                        <Calendar className="w-4 h-4 text-neutral-900" />
-                        <span>{activeDays} active development days</span>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-black font-black">
+                        <Calendar className="w-3.5 h-3.5 text-black" />
+                        <span>{activeDays} active days</span>
                     </div>
-                    <span className="text-neutral-300">•</span>
-                    <div className="flex items-center gap-1.5 text-neutral-800 font-bold">
-                        <CheckCircle2 className="w-4 h-4 text-neutral-900" />
-                        <span>{connectedPlatformsList.length} platform{connectedPlatformsList.length === 1 ? "" : "s"} synced</span>
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-black font-black">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-black" />
+                        <span>{connectedPlatformsList.length} platform{connectedPlatformsList.length === 1 ? "" : "s"}</span>
                     </div>
                 </div>
 
                 {/* Circular Curvy Legend: Less (o)(o)(o)(o)(o) More */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider">Less</span>
+                <div className="flex items-center gap-2 flex-shrink-0 bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] px-3 py-1 rounded-full">
+                    <span className="text-[10px] uppercase font-black text-black tracking-wider">Less</span>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-full bg-neutral-100 border border-neutral-300" />
-                        <span className="w-3 h-3 rounded-full bg-[#9be9a8] border border-[#7cd88c]" />
-                        <span className="w-3 h-3 rounded-full bg-[#40c463] border border-[#33b255]" />
-                        <span className="w-3 h-3 rounded-full bg-[#30a14e] border border-[#248941]" />
-                        <span className="w-3 h-3 rounded-full bg-[#216e39] border border-[#17562a] shadow-xs" />
+                        <span className="w-3 h-3 rounded-full bg-[#FAF6EE] border border-black/30" />
+                        <span className="w-3 h-3 rounded-full bg-[#a2ff86] border border-black" />
+                        <span className="w-3 h-3 rounded-full bg-[#4ade80] border border-black" />
+                        <span className="w-3 h-3 rounded-full bg-[#22c55e] border border-black" />
+                        <span className="w-3 h-3 rounded-full bg-[#115e24] border border-black shadow-xs" />
                     </div>
-                    <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider">More</span>
+                    <span className="text-[10px] uppercase font-black text-black tracking-wider">More</span>
                 </div>
             </div>
 
             {/* Dynamic Development Activity Charts: Contributions by month & Coding days */}
-            <div className="pt-6 mt-6 border-t border-neutral-200 relative z-10">
+            <div className="pt-6 mt-6 border-t-2 border-black/10 relative z-10">
                 <DevelopmentActivityCharts
                     dailyMerged={remoteData?.dailyMerged || clientAgg.dailyMerged}
                     serverCharts={remoteData?.charts || clientAgg.charts}

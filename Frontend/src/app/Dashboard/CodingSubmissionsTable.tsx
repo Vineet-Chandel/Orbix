@@ -255,21 +255,21 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
 
     if (!hasConnectedPlatforms) {
         return (
-            <div className="w-full rounded-3xl bg-white text-neutral-900 p-8 sm:p-12 border border-neutral-300 shadow-sm relative overflow-hidden select-none">
+            <div className="w-full rounded-2xl bg-white text-neutral-900 p-8 sm:p-12 border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden select-none">
                 <div className="relative z-10 flex flex-col items-center justify-center text-center max-w-lg mx-auto py-8 space-y-5">
-                    <div className="w-16 h-16 rounded-3xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs">
-                        <Code2 className="w-8 h-8 text-neutral-900" />
+                    <div className="w-16 h-16 rounded-2xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-neutral-900 shadow-[3px_3px_0px_#000]">
+                        <Code2 className="w-8 h-8 text-black" />
                     </div>
 
                     <div className="space-y-2">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/[0.04] border border-neutral-300 text-[11px] font-bold text-neutral-600 uppercase tracking-wider">
-                            <Sparkles className="w-3.5 h-3.5 text-neutral-500" />
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                            <Sparkles className="w-3.5 h-3.5 text-black" />
                             <span>Practice Field</span>
                         </div>
-                        <h3 className="text-2xl sm:text-3xl font-black text-neutral-900 tracking-tight">
+                        <h3 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
                             No Practice Platforms Connected
                         </h3>
-                        <p className="text-sm text-neutral-500 leading-relaxed max-w-md font-medium">
+                        <p className="text-sm text-neutral-700 leading-relaxed max-w-md font-bold">
                             Connect your coding handles (LeetCode, Codeforces, HackerRank, CodeChef, AtCoder & more) to track daily submissions, active streaks, and solve metrics.
                         </p>
                     </div>
@@ -277,14 +277,14 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                     <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
                         <Link
                             to="/onboarding"
-                            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-black hover:bg-neutral-800 text-white font-extrabold text-xs shadow-sm transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                         >
                             <span>Connect Coding Platforms</span>
                             <ArrowRight className="w-4 h-4" />
                         </Link>
                         <Link
                             to="/profile"
-                            className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-black/[0.04] hover:bg-black/[0.08] text-neutral-700 font-bold text-xs border border-neutral-300 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-[#FAF6EE] hover:bg-neutral-200 text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                         >
                             <span>Manage Profile</span>
                         </Link>
@@ -295,24 +295,24 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     }
 
     return (
-        <div className="w-full rounded-3xl bg-white text-neutral-900 p-6 sm:p-8 border border-neutral-300 shadow-sm relative overflow-hidden select-none">
+        <div className="w-full rounded-2xl bg-white text-neutral-900 p-6 sm:p-7 border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden select-none">
             {/* Top Header Row */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
                 <div className="flex items-center gap-3.5">
-                    <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs flex-shrink-0">
-                        <Code2 className="w-5 h-5 text-neutral-900" />
+                    <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] flex-shrink-0">
+                        <Code2 className="w-5 h-5 text-black" />
                     </div>
                     <div>
                         <div className="flex items-center gap-2.5 flex-wrap">
-                            <h3 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight leading-tight">
+                            <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight">
                                 Practice Activity
                             </h3>
-                            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/[0.04] border border-neutral-300 text-[11px] font-bold text-neutral-600 uppercase tracking-wider">
-                                <Sparkles className="w-3 h-3 text-neutral-500" />
+                            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                <Sparkles className="w-3 h-3 text-black" />
                                 <span>Multi-Platform Practice</span>
                             </span>
                         </div>
-                        <p className="text-xs sm:text-sm text-neutral-500 font-medium mt-1">
+                        <p className="text-xs sm:text-sm text-neutral-600 font-bold mt-1">
                             Merged problem solving and practice submissions from all connected platforms (excluding GitHub)
                         </p>
                     </div>
@@ -321,11 +321,11 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                 <div className="flex items-center gap-5 flex-shrink-0">
                     {/* Total Submissions Metric */}
                     <div className="text-left md:text-right">
-                        <span className="text-3xl sm:text-4xl font-mono font-black text-neutral-900 block leading-none">
+                        <span className="text-3xl sm:text-4xl font-mono font-black text-black block leading-none">
                             {totalSubmissions.toLocaleString()}
                         </span>
-                        <div className="flex items-center md:justify-end gap-1.5 text-xs font-bold uppercase tracking-wider text-neutral-500 mt-1.5">
-                            <GitCommit className="w-3.5 h-3.5 text-neutral-700" />
+                        <div className="inline-flex items-center md:justify-end gap-1.5 text-xs font-black uppercase tracking-wider text-black mt-1.5 bg-[#FAF6EE] border-2 border-black px-2.5 py-0.5 rounded-lg shadow-[1px_1px_0px_#000]">
+                            <GitCommit className="w-3.5 h-3.5 text-black" />
                             <span>Submissions Done</span>
                         </div>
                     </div>
@@ -333,14 +333,14 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
             </div>
 
             {/* Platform Filter Chips Row */}
-            <div className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y border-neutral-200 relative z-10 scrollbar-none">
+            <div className="flex items-center gap-2 overflow-x-auto py-3 my-2 border-y-2 border-black/15 relative z-10 scrollbar-none">
                 <button
                     type="button"
                     onClick={() => setSelectedPortal("all")}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex-shrink-0 ${
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex-shrink-0 border-2 border-black shadow-[2px_2px_0px_#000] ${
                         selectedPortal === "all"
-                            ? "bg-black text-white shadow-xs font-black"
-                            : "bg-black/[0.04] hover:bg-black/[0.08] text-neutral-700 border border-neutral-300"
+                            ? "bg-black text-[#a2ff86]"
+                            : "bg-[#FAF6EE] hover:bg-neutral-200 text-black"
                     }`}
                 >
                     <Layers className="w-3.5 h-3.5" />
@@ -354,18 +354,18 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                             key={plat.portal}
                             type="button"
                             onClick={() => setSelectedPortal(plat.portal)}
-                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs sm:text-sm font-bold transition-all cursor-pointer flex-shrink-0 ${
+                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex-shrink-0 border-2 border-black shadow-[2px_2px_0px_#000] ${
                                 isSelected
-                                    ? "bg-black text-white shadow-xs font-black"
-                                    : "bg-black/[0.04] hover:bg-black/[0.08] text-neutral-700 border border-neutral-300"
+                                    ? "bg-black text-[#a2ff86]"
+                                    : "bg-[#FAF6EE] hover:bg-neutral-200 text-black"
                             }`}
                         >
                             <div className="w-4 h-4 flex items-center justify-center">
                                 {getPortalIcon(plat.portal, "w-full h-full object-contain")}
                             </div>
                             <span className="capitalize">{plat.portal}</span>
-                            <span className={`text-xs font-mono font-semibold px-1.5 py-0.5 rounded-md ${
-                                isSelected ? "bg-white/20 text-white" : "bg-black/5 text-neutral-600"
+                            <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded border border-black ${
+                                isSelected ? "bg-[#a2ff86] text-black" : "bg-white text-black"
                             }`}>
                                 {Math.max(plat.submissions || 0, plat.solved || 0)}
                             </span>
@@ -379,7 +379,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                 <div className="min-w-[700px] flex flex-col space-y-2">
                     {/* Month Labels Row aligned across columns */}
                     <div
-                        className="grid text-xs font-mono text-neutral-500 font-semibold select-none pl-7 pr-1"
+                        className="grid text-xs font-mono text-black font-black select-none pl-7 pr-1"
                         style={{ gridTemplateColumns: `repeat(${monthNames.length}, minmax(0, 1fr))` }}
                     >
                         {monthNames.map((m, idx) => (
@@ -392,7 +392,7 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                     {/* Day Labels Column + Week Columns Grid */}
                     <div className="flex items-center gap-2.5">
                         {/* Day labels (Sun through Sat, showing Mon, Wed, Fri aligned with square rows) */}
-                        <div className="flex flex-col gap-1.5 text-[11px] font-mono text-neutral-400 select-none w-5 flex-shrink-0 text-right">
+                        <div className="flex flex-col gap-1.5 text-[11px] font-mono text-neutral-600 font-bold select-none w-5 flex-shrink-0 text-right">
                             <div className="aspect-square flex items-center justify-end leading-none" />
                             <div className="aspect-square flex items-center justify-end leading-none">Mon</div>
                             <div className="aspect-square flex items-center justify-end leading-none" />
@@ -427,56 +427,54 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
             </div>
 
             {/* Hover Tooltip Info Banner if cell is hovered */}
-            <div className="min-h-[28px] flex items-center text-xs sm:text-sm font-mono text-neutral-700 pt-1">
+            <div className="min-h-[32px] flex items-center text-xs sm:text-sm font-mono text-neutral-800 pt-1">
                 {hoveredCell ? (
-                    <div className="flex items-center gap-2">
-                        <span className="font-bold text-neutral-900">{hoveredCell.displayDate}:</span>
-                        <span className="text-emerald-800 font-extrabold bg-emerald-100/80 px-2 py-0.5 rounded-md border border-emerald-300">
+                    <div className="inline-flex items-center gap-2 bg-[#FAF6EE] border-2 border-black rounded-xl px-3 py-1 shadow-[2px_2px_0px_#000]">
+                        <span className="font-black text-black">{hoveredCell.displayDate}:</span>
+                        <span className="text-black font-black bg-[#a2ff86] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
                             {hoveredCell.count === 0
                                 ? "No submissions"
                                 : `${hoveredCell.count} ${hoveredCell.count === 1 ? "submission" : "submissions"}`}
                         </span>
                         {hoveredCell.platforms.length > 0 && (
-                            <span className="text-neutral-500 font-sans font-medium">
-                                via <span className="capitalize text-neutral-800 font-bold">{hoveredCell.platforms.join(", ")}</span>
+                            <span className="text-neutral-700 font-sans font-bold">
+                                via <span className="capitalize text-black font-black">{hoveredCell.platforms.join(", ")}</span>
                             </span>
                         )}
                     </div>
                 ) : (
-                    <span className="text-neutral-400 text-xs font-sans">Hover over any circular dot to view daily submission breakdown.</span>
+                    <span className="text-neutral-600 text-xs font-bold font-sans">Hover over any circular dot to view daily submission breakdown.</span>
                 )}
             </div>
 
             {/* Bottom Footer Row with Metrics and Circular Curvy Legend */}
-            <div className="pt-4 mt-2 border-t border-neutral-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono text-neutral-500 relative z-10">
-                <div className="flex items-center gap-4 flex-wrap">
-                    <div className="flex items-center gap-1.5 text-neutral-800 font-bold">
-                        <Flame className="w-4 h-4 text-neutral-900" />
+            <div className="pt-4 mt-2 border-t-2 border-black/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono text-neutral-800 relative z-10">
+                <div className="flex items-center gap-3 flex-wrap">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FAF6EE] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] text-xs font-black text-black">
+                        <Flame className="w-4 h-4 text-black" />
                         <span>{dayStreak} day streak</span>
                     </div>
-                    <span className="text-neutral-300">•</span>
-                    <div className="flex items-center gap-1.5 text-neutral-800 font-bold">
-                        <Calendar className="w-4 h-4 text-neutral-900" />
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FAF6EE] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] text-xs font-black text-black">
+                        <Calendar className="w-4 h-4 text-black" />
                         <span>{activeDays} active coding days</span>
                     </div>
-                    <span className="text-neutral-300">•</span>
-                    <div className="flex items-center gap-1.5 text-neutral-800 font-bold">
-                        <CheckCircle2 className="w-4 h-4 text-neutral-900" />
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FAF6EE] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] text-xs font-black text-black">
+                        <CheckCircle2 className="w-4 h-4 text-black" />
                         <span>{connectedPlatformsList.length} platform{connectedPlatformsList.length === 1 ? "" : "s"} synced</span>
                     </div>
                 </div>
 
                 {/* Circular Curvy Legend: Less (o)(o)(o)(o)(o) More */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider">Less</span>
+                <div className="flex items-center gap-2 flex-shrink-0 bg-[#FAF6EE] border-2 border-black rounded-lg px-3 py-1 shadow-[2px_2px_0px_#000]">
+                    <span className="text-[10px] uppercase font-black text-black tracking-wider">Less</span>
                     <div className="flex items-center gap-1.5">
-                        <span className="w-3 h-3 rounded-full bg-neutral-100 border border-neutral-300" />
+                        <span className="w-3 h-3 rounded-full bg-neutral-100 border border-neutral-400" />
                         <span className="w-3 h-3 rounded-full bg-[#9be9a8] border border-[#7cd88c]" />
                         <span className="w-3 h-3 rounded-full bg-[#40c463] border border-[#33b255]" />
                         <span className="w-3 h-3 rounded-full bg-[#30a14e] border border-[#248941]" />
                         <span className="w-3 h-3 rounded-full bg-[#216e39] border border-[#17562a] shadow-xs" />
                     </div>
-                    <span className="text-[10px] uppercase font-bold text-neutral-500 tracking-wider">More</span>
+                    <span className="text-[10px] uppercase font-black text-black tracking-wider">More</span>
                 </div>
             </div>
         </div>

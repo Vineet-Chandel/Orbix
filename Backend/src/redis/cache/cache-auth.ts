@@ -3,30 +3,43 @@ import redis from "../client.js";
 export interface IUserDetails {
     id: string;
     firstName: string;
-    middleName: string | undefined;
+    middleName?: string | undefined;
     lastName: string;
     gmail: string;
     username: string;
     password_hash?: string;
     termsAccepted: boolean | string;
+    firstname?: string;
+    middlename?: string;
+    lastname?: string;
+    termsaccepted?: boolean | string;
 }
 
 const CACHE_TTL = 24 * 60 * 60; // 1 day
 
 const userDetailsCache = async (user: IUserDetails) => {
     try {
-        if (!user.gmail) return;
-        const key = `auth:user:gmail:${user.gmail}`;
-        await redis.hset(key, {
-            id: user.id,
-            firstName: user.firstName,
-            middleName: user.middleName ?? "",
-            lastName: user.lastName,
-            gmail: user.gmail,
-            username: user.username,
-            password_hash: user.password_hash ?? "",
-            termsAccepted: String(user.termsAccepted)
-        });
+        if (!user || !user.gmail) return;
+        const normalizedGmail = user.gmail.toLowerCase().trim();
+        const key = `auth:user:gmail:${normalizedGmail}`;
+
+        const dataToSet: Record<string, string> = {
+            id: user.id || "",
+            firstName: user.firstName || user.firstname || "",
+            middleName: user.middleName || user.middlename || "",
+            lastName: user.lastName || user.lastname || "",
+            gmail: normalizedGmail,
+            username: user.username || "",
+            termsAccepted: String(user.termsAccepted ?? user.termsaccepted ?? false),
+        };
+
+        // Only store password_hash if a valid non-empty hash is provided (e.g., bcrypt hash)
+        // Never overwrite an existing hash with an empty string
+        if (user.password_hash && typeof user.password_hash === "string" && user.password_hash.trim().length >= 20) {
+            dataToSet.password_hash = user.password_hash.trim();
+        }
+
+        await redis.hset(key, dataToSet);
         await redis.expire(key, CACHE_TTL);
     } catch (err: any) {
         console.warn("[Redis Cache] Failed to cache user details:", err?.message || err);
@@ -36,15 +49,33 @@ const userDetailsCache = async (user: IUserDetails) => {
 const getUserDetailsCache = async (gmail: string): Promise<IUserDetails | null> => {
     try {
         if (!gmail) return null;
-        const key = `auth:user:gmail:${gmail}`;
+        const normalizedGmail = gmail.toLowerCase().trim();
+        const key = `auth:user:gmail:${normalizedGmail}`;
 
         const user = await redis.hgetall(key);
         if (!user || Object.keys(user).length === 0) {
             return null;
         }
+
+        const firstName = user.firstName || user.firstname || "";
+        const middleName = user.middleName || user.middlename || "";
+        const lastName = user.lastName || user.lastname || "";
+        const termsAccepted = user.termsAccepted === "true" || user.termsaccepted === "true";
+
         return {
             ...(user as any),
-            termsAccepted: user.termsAccepted === "true"
+            id: user.id || "",
+            firstName,
+            middleName,
+            lastName,
+            firstname: firstName,
+            middlename: middleName,
+            lastname: lastName,
+            gmail: user.gmail || normalizedGmail,
+            username: user.username || "",
+            password_hash: user.password_hash || "",
+            termsAccepted,
+            termsaccepted: termsAccepted,
         } as IUserDetails;
     } catch (err: any) {
         console.warn("[Redis Cache] Failed to get user details from cache:", err?.message || err);
@@ -54,11 +85,13 @@ const getUserDetailsCache = async (gmail: string): Promise<IUserDetails | null> 
 
 const deleteUserDetailsCache = async (gmail: string) => {
     try {
-        const key = `auth:user:gmail:${gmail}`;
+        if (!gmail) return;
+        const normalizedGmail = gmail.toLowerCase().trim();
+        const key = `auth:user:gmail:${normalizedGmail}`;
 
         await redis.del(key);
     } catch (err: any) {
-        throw new Error("Key not founded")
+        console.warn("[Redis Cache] Failed to delete user details cache:", err?.message || err);
     }
 };
 

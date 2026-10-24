@@ -37,23 +37,23 @@ export const DevelopmentMetricCards: React.FC<DevelopmentMetricCardsProps> = ({
     ];
 
     return (
-        <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-neutral-200 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 w-full">
             {metrics.map((metric, idx) => (
                 <div
                     key={idx}
-                    className="flex flex-col items-center justify-center text-center py-2 px-4 select-none"
+                    className="flex flex-col items-center justify-center text-center p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-y-[-1px] transition-all select-none"
                 >
                     {isLoading && !data && !totalContributionsFallback ? (
                         <div className="animate-pulse space-y-2 flex flex-col items-center w-full">
-                            <div className="h-8 w-16 bg-neutral-200 rounded-lg" />
+                            <div className="h-8 w-16 bg-neutral-200 rounded-lg border border-black/20" />
                             <div className="h-3.5 w-20 bg-neutral-100 rounded" />
                         </div>
                     ) : (
                         <>
-                            <span className="text-3xl sm:text-4xl md:text-5xl font-black text-neutral-900 tracking-tight font-sans block leading-none">
+                            <span className="text-3xl sm:text-4xl md:text-5xl font-black text-black tracking-tight font-sans block leading-none">
                                 {metric.value}
                             </span>
-                            <span className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider mt-2 sm:mt-2.5">
+                            <span className="text-xs sm:text-sm font-black text-neutral-700 uppercase tracking-wider mt-2 sm:mt-2.5">
                                 {metric.label}
                             </span>
                         </>

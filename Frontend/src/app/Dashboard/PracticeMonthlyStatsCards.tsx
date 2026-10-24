@@ -221,17 +221,14 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
             {cards.map((card, idx) => (
                 <div
                     key={idx}
-                    className="relative group rounded-2xl bg-white border border-neutral-300 hover:border-neutral-400 p-5 sm:p-6 flex flex-col justify-between transition-all duration-200 shadow-sm overflow-hidden"
+                    className="relative group rounded-2xl bg-white border-2 border-black p-5 sm:p-6 flex flex-col justify-between transition-all duration-200 shadow-[4px_4px_0px_#000] hover:translate-y-[-2px] hover:shadow-[6px_6px_0px_#000] overflow-hidden"
                 >
-                    {/* Subtle top edge highlight */}
-                    <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-black/[0.04] to-transparent pointer-events-none" />
-
                     {/* Top Row: Icon container + Title */}
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center flex-shrink-0 shadow-2xs">
+                        <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center flex-shrink-0 shadow-[2px_2px_0px_#000]">
                             {card.icon}
                         </div>
-                        <h4 className="text-base sm:text-lg font-bold text-neutral-800 tracking-tight">
+                        <h4 className="text-base sm:text-lg font-black text-black tracking-tight">
                             {card.title}
                         </h4>
                     </div>
@@ -239,12 +236,12 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
                     {/* Bottom Row: Big Bold Metric Value, Delta Subtitle, and Sparkline */}
                     <div className="flex items-end justify-between gap-3 mt-4 sm:mt-5">
                         <div className="min-w-0">
-                            <span className="text-4xl sm:text-5xl font-black text-neutral-900 tracking-tight leading-none block font-sans">
+                            <span className="text-4xl sm:text-5xl font-black text-black tracking-tight leading-none block font-sans">
                                 {card.value}
                             </span>
-                            <div className="flex items-center gap-2 text-xs sm:text-sm text-neutral-600 mt-2.5 sm:mt-3 whitespace-nowrap font-medium">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-neutral-700 mt-2.5 sm:mt-3 whitespace-nowrap font-bold">
                                 {card.delta !== null && (
-                                    <span className="text-neutral-950 font-black inline-flex items-center">
+                                    <span className="px-2 py-0.5 rounded-md bg-[#a2ff86] border border-black font-black text-xs text-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
                                         ↗ {card.delta}
                                     </span>
                                 )}
@@ -262,7 +259,7 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
                                         d={card.sparkline.d}
                                         fill="none"
                                         stroke="#000000"
-                                        strokeWidth="2.4"
+                                        strokeWidth="3"
                                         strokeLinecap="round"
                                         strokeLinejoin="round"
                                     />
@@ -272,7 +269,7 @@ export const PracticeMonthlyStatsCards: React.FC<PracticeMonthlyStatsCardsProps>
                                         r="3.5"
                                         fill="#ffffff"
                                         stroke="#000000"
-                                        strokeWidth="2.4"
+                                        strokeWidth="3"
                                     />
                                 </svg>
                             </div>

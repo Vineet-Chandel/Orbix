@@ -186,20 +186,17 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             });
         }
 
-        // Caching with redis
-        let user = await getUserDetailsCache(validatedData.gmail);
-
-        if (!user) {
-            const Result = await query(
-                `SELECT
+        // Always query authoritative database for credentials and full user profile
+        const Result = await query(
+            `SELECT
                 id,
-                firstName,
-                middleName,
-                lastName,
+                firstname AS "firstName",
+                middlename AS "middleName",
+                lastname AS "lastName",
                 email AS gmail,
                 username,
                 password AS password_hash,
-                termsAccepted,
+                termsaccepted AS "termsAccepted",
                 headline,
                 bio,
                 avatar_url AS "avatarUrl",
@@ -219,25 +216,23 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
                 is_public AS "isPublic",
                 created_at AS "createdAt"
             FROM users
-            WHERE email = $1 OR username = $1
+            WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
             LIMIT 1;`,
-                [validatedData.gmail]
-            );
-            user = Result.rows[0];
-            if (!user) {
-                await bcrypt.compare("dummy", "$2b$10$XN4E5x6gT3x7l3eUaR9UOuQYx8wO1bU1Jv3bT6D2p7t3Z6U1q9F4W");
-                await failsOccursSignin({ email: validatedData.gmail, ip: req.ip || "unknown" });
-                return res.status(401).json({
-                    success: false,
-                    message: "Invalid Credentials"
-                });
-            }
+            [validatedData.gmail]
+        );
+        const user = Result.rows[0];
+
+        if (!user || !user.password_hash) {
+            await bcrypt.compare("dummy", "$2b$10$XN4E5x6gT3x7l3eUaR9UOuQYx8wO1bU1Jv3bT6D2p7t3Z6U1q9F4W");
+            await failsOccursSignin({ email: validatedData.gmail, ip: req.ip || "unknown" });
+            return res.status(401).json({
+                success: false,
+                message: "Invalid Credentials"
+            });
         }
 
-        // Password verification
-        const isPasswordValid = user.password_hash
-            ? await bcrypt.compare(validatedData.password, user.password_hash)
-            : false;
+        // Password verification against real database hash
+        const isPasswordValid = await bcrypt.compare(validatedData.password, user.password_hash);
 
         if (!isPasswordValid) {
             await failsOccursSignin({ email: validatedData.gmail, ip: req.ip || "unknown" });
@@ -397,26 +392,41 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
             });
         }
 
-        // Validate user existence in Redis Cache or Database
-        let user = await getUserDetailsCache(userGmail);
-        if (!user) {
-            const Result = await query(
-                `SELECT
-                    id,
-                    firstName,
-                    middleName,
-                    lastName,
-                    email AS gmail,
-                    username,
-                    password AS password_hash,
-                    termsAccepted
-                FROM users
-                WHERE email = $1 OR username = $1
-                LIMIT 1;`,
-                [userGmail]
-            );
-            user = Result.rows[0];
-        }
+        // Fetch full authoritative user profile from database
+        const Result = await query(
+            `SELECT
+                id,
+                firstname AS "firstName",
+                middlename AS "middleName",
+                lastname AS "lastName",
+                email AS gmail,
+                username,
+                password AS password_hash,
+                termsaccepted AS "termsAccepted",
+                headline,
+                bio,
+                avatar_url AS "avatarUrl",
+                photo_url AS "photoUrl",
+                previous_photo_url AS "previousPhotoUrl",
+                (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
+                cover_image_url AS "coverImageUrl",
+                website,
+                linkedin,
+                github,
+                custom_link AS "customLink",
+                location,
+                skills,
+                links,
+                is_open_to_work AS "isOpenToWork",
+                is_hireable AS "isHireable",
+                is_public AS "isPublic",
+                created_at AS "createdAt"
+            FROM users
+            WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
+            LIMIT 1;`,
+            [userGmail]
+        );
+        const user = Result.rows[0];
 
         if (!user) {
             res.clearCookie("token", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });

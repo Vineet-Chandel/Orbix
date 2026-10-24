@@ -77,7 +77,7 @@ export const DevelopmentAnalyticsSection: React.FC<DevelopmentAnalyticsSectionPr
     return (
         <section
             aria-label="Development Analytics"
-            className="w-full rounded-3xl bg-white border border-neutral-300 text-neutral-900 p-6 sm:p-8 shadow-sm relative overflow-hidden select-none font-sans"
+            className="w-full rounded-2xl bg-white border-2 border-black text-black p-6 sm:p-8 shadow-[4px_4px_0px_#000] relative overflow-hidden select-none font-sans"
         >
             <div className="relative z-10">
                 {/* Languages (left) & Top Repositories (right) */}
@@ -85,7 +85,7 @@ export const DevelopmentAnalyticsSection: React.FC<DevelopmentAnalyticsSectionPr
                     <div className="flex flex-col justify-between h-full">
                         <LanguagesCard languages={data?.languages} isLoading={isLoading} />
                     </div>
-                    <div className="flex flex-col justify-between h-full lg:border-l lg:border-neutral-300 lg:pl-8 pt-6 lg:pt-0 border-t lg:border-t-0 border-neutral-300">
+                    <div className="flex flex-col justify-between h-full lg:border-l-2 lg:border-black/15 lg:pl-8 pt-6 lg:pt-0 border-t-2 lg:border-t-0 border-black/15">
                         <DevelopmentHighlightsCard
                             repositories={data?.topRepositories}
                             githubHandle={data?.githubHandle || githubHandle}

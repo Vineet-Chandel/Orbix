@@ -32,7 +32,7 @@ export const PracticeAnalyticsSection: React.FC<PracticeAnalyticsSectionProps> =
     return (
         <section
             aria-label="Practice Analytics Section"
-            className="w-full rounded-3xl bg-white border border-neutral-300 text-neutral-900 p-6 sm:p-8 shadow-sm relative overflow-hidden select-none font-sans"
+            className="w-full rounded-2xl bg-white border-2 border-black text-neutral-900 p-6 sm:p-8 shadow-[4px_4px_0px_#000] relative overflow-hidden select-none font-sans"
         >
             <div className="relative z-10 space-y-8">
                 {/* Row 1: Topic strength (left) & Recently solved (right) */}
@@ -40,26 +40,26 @@ export const PracticeAnalyticsSection: React.FC<PracticeAnalyticsSectionProps> =
                     <div className="flex flex-col justify-between h-full">
                         <TopicStrengthCard data={data} isLoading={isLoading} />
                     </div>
-                    <div className="flex flex-col justify-between h-full lg:border-l lg:border-neutral-300 lg:pl-8 pt-6 lg:pt-0 border-t lg:border-t-0 border-neutral-300">
+                    <div className="flex flex-col justify-between h-full lg:border-l-2 lg:border-black/15 lg:pl-8 pt-6 lg:pt-0 border-t-2 lg:border-t-0 border-black/15">
                         <RecentlySolvedCard data={data} isLoading={isLoading} />
                     </div>
                 </div>
 
                 {/* Horizontal divider between Row 1 and Row 2 */}
-                <div className="w-full h-px bg-neutral-200" />
+                <div className="w-full h-[2px] bg-black/15" />
 
                 {/* Row 2: DSA topic analysis (left) & Problems solved (right) */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch">
                     <div className="flex flex-col justify-between h-full">
                         <DsaTopicAnalysisCard data={data} isLoading={isLoading} />
                     </div>
-                    <div className="flex flex-col justify-between h-full lg:border-l lg:border-neutral-300 lg:pl-8 pt-6 lg:pt-0 border-t lg:border-t-0 border-neutral-300">
+                    <div className="flex flex-col justify-between h-full lg:border-l-2 lg:border-black/15 lg:pl-8 pt-6 lg:pt-0 border-t-2 lg:border-t-0 border-black/15">
                         <ProblemsSolvedCard data={data} isLoading={isLoading} />
                     </div>
                 </div>
 
                 {/* Horizontal divider between Row 2 and Row 3 (Badges) */}
-                <div className="w-full h-px bg-neutral-200" />
+                <div className="w-full h-[2px] bg-black/15" />
 
                 {/* Row 3: Badges Trophy Grid */}
                 <div className="w-full pt-1">

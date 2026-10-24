@@ -165,17 +165,17 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                 onClick={handleOpenDropdown}
                 aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ""}`}
                 title="Notifications"
-                className={`relative flex items-center justify-center w-10 h-10 rounded-full transition-all cursor-pointer focus:outline-hidden ${
+                className={`relative flex items-center justify-center w-9 h-9 rounded-xl transition-all cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none ${
                     isDark
-                        ? "text-neutral-300 hover:text-white hover:bg-white/[0.08] active:scale-95"
-                        : "text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 active:scale-95"
-                } ${isOpen ? (isDark ? "bg-white/[0.12] text-white" : "bg-neutral-100 text-neutral-900") : ""}`}
+                        ? "text-neutral-300 hover:text-white hover:bg-white/[0.08] active:translate-x-0.5 active:translate-y-0.5"
+                        : "text-black hover:bg-[#FAF6EE] active:translate-x-0.5 active:translate-y-0.5"
+                } ${isOpen ? (isDark ? "bg-white/[0.12] text-white" : "bg-[#FAF6EE] text-black") : ""}`}
             >
-                <Bell className="w-5 h-5 transition-transform group-hover:rotate-6" />
+                <Bell className="w-4.5 h-4.5 transition-transform group-hover:rotate-6" />
 
                 {/* Automatic Unread Counter Badge */}
                 {unreadCount > 0 && (
-                    <span className="absolute top-1.5 right-1.5 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-black leading-none text-white bg-gradient-to-r from-rose-500 to-red-600 rounded-full shadow-md ring-2 ring-[#0c0d0e] animate-pulse">
+                    <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-black leading-none text-black bg-[#FFE566] rounded-full border-2 border-black shadow-[1px_1px_0px_#000]">
                         {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                 )}
@@ -184,81 +184,71 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
             {/* Notification Dropdown Flyout */}
             {isOpen && (
                 <div
-                    className={`absolute right-0 mt-2.5 w-[360px] sm:w-[410px] max-w-[94vw] rounded-2xl shadow-2xl border z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 ${
+                    className={`absolute right-0 mt-3 w-[360px] sm:w-[420px] max-w-[94vw] rounded-2xl border-2 border-black z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150 select-none ${
                         isDark
-                            ? "bg-[#0B0F17]/95 backdrop-blur-xl border-neutral-800 text-neutral-100 shadow-[0_20px_50px_rgba(0,0,0,0.7)]"
-                            : "bg-white/95 backdrop-blur-xl border-neutral-200 text-neutral-900 shadow-[0_20px_40px_rgba(0,0,0,0.12)]"
+                            ? "bg-[#0B0F17] text-neutral-100 shadow-[6px_6px_0px_#000]"
+                            : "bg-white text-black shadow-[6px_6px_0px_#000]"
                     }`}
                 >
-                    {/* Minimalist Header */}
+                    {/* Header */}
                     <div
-                        className={`flex items-center justify-between px-4 py-3 border-b ${
-                            isDark ? "border-neutral-800/80 bg-neutral-900/50" : "border-neutral-100 bg-neutral-50/70"
+                        className={`flex items-center justify-between px-4 py-3 border-b-2 border-black ${
+                            isDark ? "bg-neutral-900" : "bg-[#FAF6EE]"
                         }`}
                     >
                         <div className="flex items-center gap-2">
-                            <span className="text-xs sm:text-sm font-extrabold tracking-tight">
+                            <span className="text-xs sm:text-sm font-black tracking-tight">
                                 Notifications
                             </span>
                             {notifications.length > 0 && (
-                                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
-                                    isDark ? "bg-neutral-800 text-neutral-300" : "bg-neutral-200 text-neutral-700"
-                                }`}>
+                                <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-md bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]">
                                     {notifications.length}
                                 </span>
                             )}
                         </div>
 
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-2">
                             <button
                                 type="button"
                                 onClick={handleViewAll}
-                                className={`text-[11px] font-bold px-2 py-1 rounded-lg transition-colors cursor-pointer flex items-center gap-1 ${
-                                    isDark
-                                        ? "text-blue-400 hover:text-white hover:bg-neutral-800"
-                                        : "text-blue-600 hover:text-blue-800 hover:bg-blue-50"
-                                }`}
+                                className="text-[11px] font-black px-3 py-1 rounded-xl transition-all cursor-pointer flex items-center gap-1 border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 bg-[#FFE566] text-black hover:bg-[#FFE566]/90"
                             >
                                 <span>Open Inbox</span>
-                                <ArrowUpRight className="w-3 h-3" />
+                                <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setIsOpen(false)}
-                                className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                                className={`p-1 rounded-lg transition-all cursor-pointer border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 ${
                                     isDark
-                                        ? "text-neutral-400 hover:text-white hover:bg-neutral-800"
-                                        : "text-neutral-400 hover:text-neutral-900 hover:bg-neutral-200"
+                                        ? "bg-neutral-800 text-neutral-200 hover:text-white"
+                                        : "bg-white text-black hover:bg-neutral-100"
                                 }`}
                                 aria-label="Close"
                             >
-                                <X className="w-3.5 h-3.5" />
+                                <X className="w-3.5 h-3.5 stroke-[2.5]" />
                             </button>
                         </div>
                     </div>
 
                     {/* Notification Items List */}
-                    <div className={`max-h-[380px] overflow-y-auto divide-y ${isDark ? "divide-neutral-800/40" : "divide-neutral-100"}`}>
+                    <div className={`max-h-[380px] overflow-y-auto divide-y-2 ${isDark ? "divide-neutral-800" : "divide-black/10"}`}>
                         {loading && notifications.length === 0 ? (
                             <div className="py-12 flex flex-col items-center justify-center gap-2">
-                                <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
-                                <span className={`text-xs ${isDark ? "text-neutral-400" : "text-neutral-500"}`}>
+                                <Loader2 className="w-5 h-5 animate-spin text-black" />
+                                <span className={`text-xs font-bold ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>
                                     Checking updates...
                                 </span>
                             </div>
                         ) : notifications.length === 0 ? (
-                            <div className="py-12 px-6 text-center flex flex-col items-center justify-center">
-                                <div
-                                    className={`w-10 h-10 rounded-2xl flex items-center justify-center mb-2.5 ${
-                                        isDark ? "bg-neutral-900 text-neutral-500" : "bg-neutral-100 text-neutral-400"
-                                    }`}
-                                >
-                                    <Inbox className="w-5 h-5" />
+                            <div className="py-10 px-6 text-center flex flex-col items-center justify-center">
+                                <div className="w-12 h-12 rounded-2xl flex items-center justify-center mb-3 border-2 border-black shadow-[3px_3px_0px_#000] bg-[#FFE566] text-black">
+                                    <Inbox className="w-6 h-6 stroke-[2.5]" />
                                 </div>
-                                <p className={`text-xs font-bold ${isDark ? "text-neutral-200" : "text-neutral-800"}`}>
+                                <p className={`text-sm font-black tracking-tight ${isDark ? "text-neutral-100" : "text-black"}`}>
                                     Inbox Zero
                                 </p>
-                                <p className={`text-[11px] mt-0.5 ${isDark ? "text-neutral-500" : "text-neutral-400"}`}>
+                                <p className={`text-xs font-bold mt-1 ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>
                                     Recruiter messages will appear here.
                                 </p>
                             </div>
@@ -280,31 +270,27 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                                         key={item.id}
                                         onClick={() => handleOpenItem(item.id)}
                                         className={`group p-3.5 transition-colors text-left cursor-pointer ${
-                                            isDark ? "hover:bg-neutral-900/70" : "hover:bg-neutral-50"
+                                            isDark ? "hover:bg-neutral-900" : "hover:bg-[#FAF6EE]"
                                         }`}
                                     >
                                         <div className="flex items-start justify-between gap-2.5">
                                             {/* Left: Sender & Company */}
                                             <div className="min-w-0 flex-1">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className={`text-xs font-bold truncate ${
-                                                        isDark ? "text-neutral-100" : "text-neutral-900"
+                                                    <span className={`text-xs font-black truncate ${
+                                                        isDark ? "text-neutral-100" : "text-black"
                                                     }`}>
                                                         {senderName}
                                                     </span>
                                                     {company && (
-                                                        <span className={`text-[10px] font-semibold px-1.5 py-0.2 rounded-md truncate max-w-[140px] ${
-                                                            isDark
-                                                                ? "bg-neutral-800 text-neutral-300"
-                                                                : "bg-neutral-100 text-neutral-700 border border-neutral-200/60"
-                                                        }`}>
+                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md border border-black shadow-[1px_1px_0px_#000] truncate max-w-[140px] bg-[#FFE566] text-black">
                                                             {company}
                                                         </span>
                                                     )}
                                                 </div>
 
-                                                <p className={`text-[11px] line-clamp-2 mt-1 leading-relaxed ${
-                                                    isDark ? "text-neutral-400" : "text-neutral-600"
+                                                <p className={`text-xs font-medium line-clamp-2 mt-1 leading-relaxed ${
+                                                    isDark ? "text-neutral-300" : "text-neutral-700"
                                                 }`}>
                                                     {snippet}
                                                 </p>
@@ -312,24 +298,20 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
 
                                             {/* Right: Timestamp & Actions */}
                                             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                                                <span className={`text-[10px] font-mono ${
-                                                    isDark ? "text-neutral-500" : "text-neutral-400"
+                                                <span className={`text-[10px] font-mono font-bold ${
+                                                    isDark ? "text-neutral-400" : "text-neutral-500"
                                                 }`}>
                                                     {formatRelativeTime(item.createdAt)}
                                                 </span>
 
-                                                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                                     {commEmail && (
                                                         <a
                                                             href={mailtoUrl}
                                                             onClick={(e) => e.stopPropagation()}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
-                                                            className={`p-1 rounded-md transition-colors ${
-                                                                isDark
-                                                                    ? "text-blue-400 hover:text-blue-300 hover:bg-blue-950/40"
-                                                                    : "text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                                            }`}
+                                                            className="p-1.5 rounded-lg bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all"
                                                             title="Reply via email"
                                                         >
                                                             <Mail className="w-3.5 h-3.5" />
@@ -339,11 +321,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                                                         type="button"
                                                         onClick={(e) => handleDelete(e, item.id)}
                                                         disabled={isDeleting}
-                                                        className={`p-1 rounded-md transition-colors cursor-pointer ${
-                                                            isDark
-                                                                ? "text-neutral-400 hover:text-rose-400 hover:bg-rose-950/40"
-                                                                : "text-neutral-400 hover:text-rose-600 hover:bg-rose-50"
-                                                        }`}
+                                                        className="p-1.5 rounded-lg bg-white hover:bg-rose-50 text-black hover:text-rose-600 border border-black shadow-[1px_1px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
                                                         title="Delete"
                                                     >
                                                         {isDeleting ? (
@@ -361,22 +339,20 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                         )}
                     </div>
 
-                    {/* Minimalist Footer Link to Dedicated Page */}
+                    {/* Footer Link to Dedicated Page */}
                     {notifications.length > 0 && (
                         <div
-                            className={`px-4 py-2.5 border-t text-center ${
-                                isDark ? "border-neutral-800/80 bg-neutral-900/40" : "border-neutral-100 bg-neutral-50/70"
+                            className={`p-3 border-t-2 border-black text-center ${
+                                isDark ? "bg-neutral-900" : "bg-[#FAF6EE]"
                             }`}
                         >
                             <button
                                 type="button"
                                 onClick={handleViewAll}
-                                className={`text-xs font-bold transition-colors cursor-pointer inline-flex items-center gap-1 ${
-                                    isDark ? "text-neutral-300 hover:text-white" : "text-neutral-700 hover:text-black"
-                                }`}
+                                className="w-full py-2 px-4 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                             >
                                 <span>View all in dedicated Inbox</span>
-                                <ArrowUpRight className="w-3.5 h-3.5 text-neutral-400" />
+                                <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
                             </button>
                         </div>
                     )}

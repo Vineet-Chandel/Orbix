@@ -24,12 +24,12 @@ export const RecentlySolvedCard: React.FC<RecentlySolvedCardProps> = ({ data, is
         >
             <div>
                 {/* Header Row */}
-                <div className="flex items-center justify-between pb-4 border-b border-neutral-300 relative z-10">
+                <div className="flex items-center justify-between pb-4 border-b-2 border-black/15 relative z-10">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs">
-                            <ListOrdered className="w-5 h-5 text-neutral-800" />
+                        <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000]">
+                            <ListOrdered className="w-5 h-5 text-black" />
                         </div>
-                        <h3 id="recently-solved-title" className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
+                        <h3 id="recently-solved-title" className="text-lg sm:text-xl font-black text-black tracking-tight">
                             Recently solved
                         </h3>
                     </div>
@@ -42,7 +42,7 @@ export const RecentlySolvedCard: React.FC<RecentlySolvedCardProps> = ({ data, is
                             {Array.from({ length: 8 }).map((_, idx) => (
                                 <div key={idx} className="flex items-center justify-between animate-pulse py-1">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-6 h-6 rounded-md bg-neutral-200" />
+                                        <div className="w-6 h-6 rounded-md bg-neutral-200 border border-black/20" />
                                         <div className="w-56 sm:w-80 h-4 bg-neutral-200 rounded-full" />
                                     </div>
                                     <div className="w-14 h-4 bg-neutral-100 rounded-full" />
@@ -51,31 +51,31 @@ export const RecentlySolvedCard: React.FC<RecentlySolvedCardProps> = ({ data, is
                         </div>
                     ) : list.length === 0 ? (
                         <div className="py-16 text-center max-w-xs mx-auto space-y-2">
-                            <p className="text-xs sm:text-sm text-neutral-500">
+                            <p className="text-xs sm:text-sm text-neutral-600 font-bold">
                                 No recently solved problems found on connected accounts.
                             </p>
                         </div>
                     ) : (
-                        <div className="divide-y divide-neutral-200">
+                        <div className="divide-y divide-black/10">
                             {list.slice(0, 8).map((item) => (
                                 <div
                                     key={item.id}
                                     onClick={() => handleOpenProblem(item.url)}
-                                    className="py-3 sm:py-3.5 px-2.5 -mx-2.5 rounded-xl group hover:bg-neutral-100/70 transition-all cursor-pointer flex items-center justify-between gap-3"
+                                    className="py-3 px-3 -mx-2 rounded-xl group hover:bg-[#FAF6EE] border-2 border-transparent hover:border-black transition-all cursor-pointer flex items-center justify-between gap-3 hover:shadow-[2px_2px_0px_#000]"
                                     title={`View problem on ${item.platformName}`}
                                 >
                                     {/* Left: Platform Icon + Problem Title */}
-                                    <div className="flex items-center gap-3.5 min-w-0">
-                                        <div className="w-5 h-5 flex-shrink-0 flex items-center justify-center">
-                                            {getPortalIcon(item.portal, "w-5 h-5 object-contain")}
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <div className="w-7 h-7 rounded-lg bg-white border-2 border-black shadow-[1px_1px_0px_#000] p-1 flex items-center justify-center flex-shrink-0">
+                                            {getPortalIcon(item.portal, "w-full h-full object-contain")}
                                         </div>
-                                        <span className="text-sm sm:text-base font-bold text-neutral-900 group-hover:text-black transition-colors truncate max-w-[240px] sm:max-w-[420px]">
+                                        <span className="text-sm sm:text-base font-black text-black group-hover:underline transition-colors truncate max-w-[240px] sm:max-w-[420px]">
                                             {item.title}
                                         </span>
                                     </div>
 
                                     {/* Right: Relative Time */}
-                                    <span className="text-xs sm:text-sm text-neutral-500 flex-shrink-0 font-semibold font-mono">
+                                    <span className="text-xs sm:text-sm text-black flex-shrink-0 font-bold font-mono bg-[#FAF6EE] border border-black px-2 py-0.5 rounded shadow-[1px_1px_0px_#000]">
                                         {item.relativeTime}
                                     </span>
                                 </div>

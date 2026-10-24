@@ -90,12 +90,12 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
         >
             <div>
                 {/* Header Row */}
-                <div className="flex items-center justify-between pb-4 border-b border-neutral-300 relative z-10">
+                <div className="flex items-center justify-between pb-4 border-b-2 border-black/15 relative z-10">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs">
-                            <Compass className="w-5 h-5 text-neutral-800" />
+                        <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000]">
+                            <Compass className="w-5 h-5 text-black" />
                         </div>
-                        <h3 id="topic-strength-title" className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
+                        <h3 id="topic-strength-title" className="text-lg sm:text-xl font-black text-black tracking-tight">
                             Topic strength
                         </h3>
                     </div>
@@ -104,7 +104,7 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
                 {/* Body: SVG Radar Chart */}
                 <div className="pt-4 pb-2 relative z-10 flex-1 flex items-center justify-center min-h-[360px] sm:min-h-[400px]">
                     {isLoading && !data ? (
-                        <div className="w-56 h-56 rounded-full border border-neutral-200 animate-pulse" />
+                        <div className="w-56 h-56 rounded-full border-2 border-dashed border-black/30 animate-pulse" />
                     ) : (
                         <div className="w-full max-w-[420px] sm:max-w-[460px] aspect-square flex items-center justify-center">
                             <svg
@@ -117,8 +117,8 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
                                         key={idx}
                                         points={pts}
                                         fill="none"
-                                        stroke="rgba(0, 0, 0, 0.12)"
-                                        strokeWidth="1.2"
+                                        stroke="rgba(0, 0, 0, 0.22)"
+                                        strokeWidth="1.5"
                                     />
                                 ))}
 
@@ -130,17 +130,17 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
                                         y1={spoke.y1}
                                         x2={spoke.x2}
                                         y2={spoke.y2}
-                                        stroke="rgba(0, 0, 0, 0.12)"
-                                        strokeWidth="1.2"
+                                        stroke="rgba(0, 0, 0, 0.22)"
+                                        strokeWidth="1.5"
                                     />
                                 ))}
 
-                                {/* Filled Radar Data Area (Apple Monochrome) */}
+                                {/* Filled Radar Data Area (Neo-Brutalist Green & Black Outline) */}
                                 <polygon
                                     points={radar.dataPolygonPoints}
-                                    fill="rgba(0, 0, 0, 0.08)"
+                                    fill="rgba(162, 255, 134, 0.35)"
                                     stroke="#000000"
-                                    strokeWidth="2.5"
+                                    strokeWidth="2.8"
                                     strokeLinejoin="round"
                                     className="transition-all duration-700"
                                 />
@@ -151,15 +151,15 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
                                         key={idx}
                                         cx={pt.x}
                                         cy={pt.y}
-                                        r="4.5"
+                                        r="5"
                                         fill="#000000"
                                         stroke="#ffffff"
-                                        strokeWidth="2"
+                                        strokeWidth="2.5"
                                         className="transition-all duration-700"
                                     />
                                 ))}
 
-                                {/* Perimeter Axis Labels with Increased Font Size */}
+                                {/* Perimeter Axis Labels */}
                                 {radar.labelPositions.map((lbl, idx) => (
                                     <text
                                         key={idx}
@@ -167,7 +167,7 @@ export const TopicStrengthCard: React.FC<TopicStrengthCardProps> = ({ data, isLo
                                         y={lbl.y}
                                         textAnchor={lbl.textAnchor}
                                         dominantBaseline="middle"
-                                        className="text-sm sm:text-base font-extrabold fill-neutral-900 select-none tracking-tight"
+                                        className="text-sm sm:text-base font-black fill-black select-none tracking-tight"
                                     >
                                         {lbl.text}
                                     </text>

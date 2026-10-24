@@ -162,24 +162,24 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
         return (
             <div className="flex flex-col gap-4 sm:gap-6 w-full font-sans select-none animate-pulse">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 w-full">
-                    <div className="rounded-3xl bg-white border border-neutral-300 p-5 sm:p-6 h-56 flex flex-col justify-between shadow-xs">
+                    <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 h-56 flex flex-col justify-between shadow-[4px_4px_0px_#000]">
                         <div className="h-4 w-40 bg-neutral-200 rounded" />
                         <div className="grid grid-cols-12 gap-2 items-end h-36">
                             {Array.from({ length: 12 }).map((_, i) => (
-                                <div key={i} className="h-24 bg-neutral-100 rounded-t-lg" />
+                                <div key={i} className="h-24 bg-[#FAF6EE] border border-black/20 rounded-t-lg" />
                             ))}
                         </div>
                     </div>
-                    <div className="rounded-3xl bg-white border border-neutral-300 p-5 sm:p-6 h-56 flex flex-col justify-between shadow-xs">
+                    <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 h-56 flex flex-col justify-between shadow-[4px_4px_0px_#000]">
                         <div className="h-4 w-48 bg-neutral-200 rounded" />
                         <div className="grid grid-cols-7 gap-3 items-end h-36">
                             {Array.from({ length: 7 }).map((_, i) => (
-                                <div key={i} className="h-24 bg-neutral-100 rounded-t-lg" />
+                                <div key={i} className="h-24 bg-[#FAF6EE] border border-black/20 rounded-t-lg" />
                             ))}
                         </div>
                     </div>
                 </div>
-                <div className="w-full rounded-3xl bg-white border border-neutral-300 p-5 sm:p-6 flex flex-col gap-4 shadow-xs">
+                <div className="w-full rounded-2xl bg-[#FAF6EE] border-2 border-black p-5 sm:p-6 flex flex-col gap-4 shadow-[4px_4px_0px_#000]">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <div className="h-3 w-20 bg-neutral-200 rounded" />
@@ -188,17 +188,6 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                         <div className="space-y-2">
                             <div className="h-3 w-20 bg-neutral-200 rounded" />
                             <div className="h-4 w-48 bg-neutral-100 rounded" />
-                        </div>
-                    </div>
-                    <div className="h-px bg-neutral-200" />
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <div className="h-3 w-24 bg-neutral-200 rounded" />
-                            <div className="h-4 w-52 bg-neutral-100 rounded" />
-                        </div>
-                        <div className="space-y-2">
-                            <div className="h-3 w-24 bg-neutral-200 rounded" />
-                            <div className="h-4 w-52 bg-neutral-100 rounded" />
                         </div>
                     </div>
                 </div>
@@ -211,13 +200,13 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
             {/* Top Charts: Contributions by month & Your coding days */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 w-full">
                 {/* Card 1: Contributions by month */}
-                <div className="rounded-3xl bg-white border border-neutral-300 p-5 sm:p-6 shadow-sm relative overflow-hidden flex flex-col justify-between transition-all hover:border-neutral-400">
+                <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 shadow-[4px_4px_0px_#000] relative overflow-hidden flex flex-col justify-between transition-all hover:translate-x-0.5 hover:-translate-y-0.5">
                     {/* Header */}
                     <div className="flex items-center gap-3 mb-4">
-                        <div className="w-9 h-9 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs flex-shrink-0">
-                            <Calendar className="w-4.5 h-4.5 text-neutral-900" />
+                        <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] flex-shrink-0">
+                            <Calendar className="w-4.5 h-4.5 text-black" />
                         </div>
-                        <h4 className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
+                        <h4 className="text-lg sm:text-xl font-black text-black tracking-tight">
                             Contributions by month
                         </h4>
                     </div>
@@ -238,7 +227,7 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                         }`}
                                 >
                                     {/* Value directly above bar */}
-                                    <span className="text-xs font-bold text-neutral-900 text-center mb-1.5 transition-transform group-hover:scale-110">
+                                    <span className="text-xs font-mono font-black text-black text-center mb-1.5 transition-transform group-hover:scale-110">
                                         {item.count}
                                     </span>
 
@@ -246,15 +235,15 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                     <div className="w-full flex items-end justify-center h-32 sm:h-36">
                                         <div
                                             style={{ height: `${heightPct}%` }}
-                                            className={`w-full max-w-[26px] sm:max-w-[32px] rounded-t-lg sm:rounded-t-xl transition-all duration-500 ease-out ${item.isMax
-                                                ? "bg-black shadow-xs"
-                                                : "bg-neutral-200 group-hover:bg-neutral-300"
+                                            className={`w-full max-w-[26px] sm:max-w-[32px] rounded-t-lg sm:rounded-t-xl transition-all duration-300 ease-out border-t-2 border-x-2 border-black ${item.isMax
+                                                ? "bg-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                : "bg-[#FAF6EE] group-hover:bg-[#FFE566]"
                                                 }`}
                                         />
                                     </div>
 
                                     {/* Month label below */}
-                                    <span className="text-xs font-semibold text-neutral-500 text-center mt-2 truncate w-full">
+                                    <span className="text-[11px] font-mono font-bold text-neutral-600 text-center mt-2 truncate w-full uppercase">
                                         {item.label}
                                     </span>
                                 </div>
@@ -264,18 +253,18 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                 </div>
 
                 {/* Card 2: Your coding days */}
-                <div className="rounded-3xl bg-white border border-neutral-300 p-5 sm:p-6 shadow-sm relative overflow-hidden flex flex-col justify-between transition-all hover:border-neutral-400">
+                <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 shadow-[4px_4px_0px_#000] relative overflow-hidden flex flex-col justify-between transition-all hover:translate-x-0.5 hover:-translate-y-0.5">
                     {/* Header with dynamic busiest day */}
                     <div className="flex items-center gap-3 mb-4 flex-wrap">
-                        <div className="w-9 h-9 rounded-xl bg-black/[0.04] border border-neutral-300 flex items-center justify-center text-neutral-900 shadow-2xs flex-shrink-0">
-                            <Flame className="w-4.5 h-4.5 text-neutral-900" />
+                        <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] flex-shrink-0">
+                            <Flame className="w-4.5 h-4.5 text-black" />
                         </div>
                         <div className="flex items-baseline gap-2 flex-wrap">
-                            <h4 className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
+                            <h4 className="text-lg sm:text-xl font-black text-black tracking-tight">
                                 Your coding days
                             </h4>
-                            <span className="text-xs sm:text-sm font-semibold text-neutral-500">
-                                · busiest on {busiestDay}
+                            <span className="text-xs sm:text-sm font-bold text-neutral-600">
+                                · busiest on <span className="text-black font-black underline decoration-[#a2ff86] decoration-2">{busiestDay}</span>
                             </span>
                         </div>
                     </div>
@@ -296,7 +285,7 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                         }`}
                                 >
                                     {/* Value directly above bar */}
-                                    <span className="text-xs font-bold text-neutral-900 text-center mb-1.5 transition-transform group-hover:scale-110">
+                                    <span className="text-xs font-mono font-black text-black text-center mb-1.5 transition-transform group-hover:scale-110">
                                         {item.count}
                                     </span>
 
@@ -304,15 +293,15 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                     <div className="w-full flex items-end justify-center h-32 sm:h-36">
                                         <div
                                             style={{ height: `${heightPct}%` }}
-                                            className={`w-full max-w-[36px] sm:max-w-[44px] rounded-t-lg sm:rounded-t-xl transition-all duration-500 ease-out ${item.isMax
-                                                ? "bg-black shadow-xs"
-                                                : "bg-neutral-200 group-hover:bg-neutral-300"
+                                            className={`w-full max-w-[36px] sm:max-w-[44px] rounded-t-lg sm:rounded-t-xl transition-all duration-300 ease-out border-t-2 border-x-2 border-black ${item.isMax
+                                                ? "bg-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                : "bg-[#FAF6EE] group-hover:bg-[#FFE566]"
                                                 }`}
                                         />
                                     </div>
 
                                     {/* Day label below */}
-                                    <span className="text-xs font-semibold text-neutral-500 text-center mt-2">
+                                    <span className="text-xs font-mono font-bold text-neutral-600 text-center mt-2">
                                         {item.label}
                                     </span>
                                 </div>
@@ -323,38 +312,38 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
             </div>
 
             {/* Profile Activity Highlights Section: Best month, Best day, Most starred, Latest work */}
-            <div className="w-full rounded-3xl bg-white border border-neutral-300 p-6 sm:p-7 shadow-sm select-none">
+            <div className="w-full rounded-2xl bg-[#FAF6EE] border-2 border-black p-6 sm:p-7 shadow-[4px_4px_0px_#000] select-none">
                 {/* Row 1: Best month & Best day */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
                     <div>
-                        <div className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider">
+                        <div className="text-xs sm:text-sm font-black text-black/60 uppercase tracking-wider">
                             Best month
                         </div>
-                        <div className="mt-1.5 text-base sm:text-lg font-black text-neutral-900">
+                        <div className="mt-1.5 text-base sm:text-lg font-black text-black">
                             {bestMonthText}
                         </div>
                     </div>
 
                     <div>
-                        <div className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider">
+                        <div className="text-xs sm:text-sm font-black text-black/60 uppercase tracking-wider">
                             Best day
                         </div>
-                        <div className="mt-1.5 text-base sm:text-lg font-black text-neutral-900">
+                        <div className="mt-1.5 text-base sm:text-lg font-black text-black">
                             {bestDayText}
                         </div>
                     </div>
                 </div>
 
                 {/* Horizontal Divider Line */}
-                <div className="h-px bg-neutral-200 my-4 sm:my-5" />
+                <div className="h-0.5 bg-black/10 my-4 sm:my-5" />
 
                 {/* Row 2: Most starred & Latest work */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 gap-x-8">
                     <div>
-                        <div className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider">
+                        <div className="text-xs sm:text-sm font-black text-black/60 uppercase tracking-wider">
                             Most starred
                         </div>
-                        <div className="mt-1.5 text-base sm:text-lg font-black text-neutral-900 truncate">
+                        <div className="mt-1.5 text-base sm:text-lg font-black text-black truncate">
                             {mostStarred ? (
                                 <span>
                                     {mostStarred.url ? (
@@ -369,19 +358,21 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                     ) : (
                                         mostStarred.name
                                     )}{" "}
-                                    with {mostStarred.stars} star{mostStarred.stars === 1 ? "" : "s"}
+                                    <span className="text-xs font-mono font-black bg-[#FFE566] px-1.5 py-0.5 rounded border border-black ml-1">
+                                        ★ {mostStarred.stars}
+                                    </span>
                                 </span>
                             ) : (
-                                <span className="text-neutral-400 font-medium text-sm">No public repositories</span>
+                                <span className="text-neutral-500 font-medium text-sm">No public repositories</span>
                             )}
                         </div>
                     </div>
 
                     <div>
-                        <div className="text-xs sm:text-sm font-bold text-neutral-500 uppercase tracking-wider">
+                        <div className="text-xs sm:text-sm font-black text-black/60 uppercase tracking-wider">
                             Latest work
                         </div>
-                        <div className="mt-1.5 text-base sm:text-lg font-black text-neutral-900 truncate">
+                        <div className="mt-1.5 text-base sm:text-lg font-black text-black truncate">
                             {latestWork ? (
                                 <span>
                                     {latestWork.url ? (
@@ -396,10 +387,14 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                     ) : (
                                         latestWork.name
                                     )}
-                                    {latestWork.relativeTime ? `, pushed ${latestWork.relativeTime}` : ""}
+                                    {latestWork.relativeTime ? (
+                                        <span className="text-xs font-mono font-bold text-neutral-600 ml-1">
+                                            · {latestWork.relativeTime}
+                                        </span>
+                                    ) : ""}
                                 </span>
                             ) : (
-                                <span className="text-neutral-400 font-medium text-sm">No recent activity</span>
+                                <span className="text-neutral-500 font-medium text-sm">No recent activity</span>
                             )}
                         </div>
                     </div>
