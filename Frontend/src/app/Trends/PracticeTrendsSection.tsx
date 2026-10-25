@@ -93,132 +93,132 @@ export const PracticeTrendsSection: React.FC<PracticeTrendsSectionProps> = ({
     }, [platforms]);
 
     return (
-        <div className="space-y-10">
-            {/* Top Practice Activity Overview Block (Matching media_1792423732472_9a9c7c70.png) */}
+        <div className="space-y-8">
+            {/* Top Practice Activity Overview Block */}
             <PracticeActivityOverview
                 connectedPortals={connectedPortals}
                 username={effectiveUser}
             />
 
             {/* Rating history Section */}
-            <div className="space-y-6 pt-4 border-t border-black/[0.06]">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-black/[0.06]">
-                <div className="flex items-center gap-3">
-                    <span className="text-2xl sm:text-3xl" role="img" aria-label="Trending chart">
-                        📈
-                    </span>
-                    <div>
-                        <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
-                            Rating history
-                        </h2>
-                        <p className="text-xs text-neutral-500 mt-0.5">
-                            Real-time competitive rating trajectory and contest records across all connected platforms
-                        </p>
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3 self-start sm:self-auto">
-                    {/* Live platform count badge */}
-                    <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/[0.04] border border-black/10 text-xs font-semibold text-neutral-700">
-                        <span className="w-2 h-2 rounded-full bg-neutral-900" />
-                        <span>{platforms.length} {platforms.length === 1 ? "platform" : "platforms"} linked</span>
-                    </div>
-
-                    {/* Manual Refresh Button */}
-                    <button
-                        type="button"
-                        onClick={handleRefresh}
-                        disabled={isLoading}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black hover:bg-neutral-800 text-xs font-bold text-white transition-all cursor-pointer disabled:opacity-50 shadow-xs"
-                        title="Sync real-time contest performance"
-                    >
-                        <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-white" : ""}`} />
-                        <span>{isLoading ? "Syncing..." : "Sync"}</span>
-                    </button>
-                </div>
-            </div>
-
-            {/* Quick summary stats bar */}
-            {platforms.length > 0 && (
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-                    <div className="p-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] flex flex-col justify-between">
-                        <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-                            Total Contests
-                        </span>
-                        <div className="mt-1 flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl font-black text-neutral-900">{totalContests}</span>
-                            <span className="text-xs text-neutral-500 font-medium">participations</span>
+            <div className="space-y-6 pt-6 border-t-2 border-black/10">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-black/10">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <TrendingUp className="w-5 h-5 text-black stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
+                                Rating history
+                            </h2>
+                            <p className="text-xs sm:text-sm font-bold text-neutral-600 mt-0.5">
+                                Real-time competitive rating trajectory and contest records across all connected platforms
+                            </p>
                         </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] flex flex-col justify-between">
-                        <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-                            Peak Competitive Rating
-                        </span>
-                        <div className="mt-1 flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl font-black text-neutral-900">
-                                {peakPlatform ? peakPlatform.rating : "—"}
+                    <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
+                        {/* Live platform count badge */}
+                        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black animate-pulse" />
+                            <span>{platforms.length} {platforms.length === 1 ? "platform" : "platforms"} linked</span>
+                        </div>
+
+                        {/* Manual Refresh Button */}
+                        <button
+                            type="button"
+                            onClick={handleRefresh}
+                            disabled={isLoading}
+                            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black transition-all cursor-pointer disabled:opacity-50 active:translate-x-0.5 active:translate-y-0.5"
+                            title="Sync real-time contest performance"
+                        >
+                            <RefreshCw className={`w-3.5 h-3.5 stroke-[2.5] ${isLoading ? "animate-spin text-[#a2ff86]" : ""}`} />
+                            <span>{isLoading ? "Syncing..." : "Sync"}</span>
+                        </button>
+                    </div>
+                </div>
+
+                {/* Quick summary stats bar */}
+                {platforms.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                            <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
+                                Total Contests
                             </span>
-                            {peakPlatform && (
-                                <span className="text-xs text-neutral-500 truncate font-medium">
-                                    on {peakPlatform.portalName}
+                            <div className="mt-1 flex items-baseline gap-2">
+                                <span className="text-2xl sm:text-3xl font-black text-black font-mono">{totalContests}</span>
+                                <span className="text-xs text-neutral-600 font-bold">participations</span>
+                            </div>
+                        </div>
+
+                        <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                            <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
+                                Peak Competitive Rating
+                            </span>
+                            <div className="mt-1 flex items-baseline gap-2 flex-wrap">
+                                <span className="text-2xl sm:text-3xl font-black text-black font-mono">
+                                    {peakPlatform ? peakPlatform.rating : "—"}
                                 </span>
-                            )}
+                                {peakPlatform && (
+                                    <span className="text-xs font-black text-black px-2 py-0.5 rounded bg-[#FFE566] border border-black shadow-[1px_1px_0px_#000] truncate">
+                                        on {peakPlatform.portalName}
+                                    </span>
+                                )}
+                            </div>
                         </div>
-                    </div>
 
-                    <div className="p-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] flex flex-col justify-between">
-                        <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-                            Active Platforms
-                        </span>
-                        <div className="mt-1 flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl font-black text-neutral-900">{platforms.length}</span>
-                            <span className="text-xs text-neutral-500 font-medium">portals</span>
-                        </div>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-black/[0.02] border border-black/[0.06] flex flex-col justify-between">
-                        <span className="text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-                            Data Source
-                        </span>
-                        <div className="mt-1 flex items-baseline gap-2">
-                            <span className="text-xs font-mono text-neutral-700 bg-black/[0.04] px-2 py-1 rounded-md border border-black/10">
-                                Official APIs Verified
+                        <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                            <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
+                                Active Platforms
                             </span>
+                            <div className="mt-1 flex items-baseline gap-2">
+                                <span className="text-2xl sm:text-3xl font-black text-black font-mono">{platforms.length}</span>
+                                <span className="text-xs text-neutral-600 font-bold">portals</span>
+                            </div>
+                        </div>
+
+                        <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-2">
+                            <span className="text-xs font-black text-neutral-600 uppercase tracking-wider">
+                                Data Source
+                            </span>
+                            <div className="mt-1 flex items-baseline gap-2">
+                                <span className="text-xs font-black text-black bg-[#a2ff86] px-2.5 py-1 rounded-md border border-black shadow-[1px_1px_0px_#000] font-mono">
+                                    Official APIs Verified
+                                </span>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Platform Rating History Cards Grid (2-column on desktop, matching screenshot) */}
-            {platforms.length > 0 ? (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {platforms.map((platform) => (
-                        <PlatformRatingHistoryCard key={platform.portal} platform={platform} />
-                    ))}
-                </div>
-            ) : (
-                /* Empty state when no coding platforms are linked */
-                <div className="w-full rounded-3xl bg-black/[0.02] border border-dashed border-black/10 p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-black/[0.04] border border-black/10 flex items-center justify-center text-neutral-800">
-                        <TrendingUp className="w-8 h-8" />
+                {/* Platform Rating History Cards Grid (2-column on desktop) */}
+                {platforms.length > 0 ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {platforms.map((platform) => (
+                            <PlatformRatingHistoryCard key={platform.portal} platform={platform} />
+                        ))}
                     </div>
-                    <div className="max-w-md space-y-1">
-                        <h3 className="text-lg font-bold text-neutral-900">No Connected Platforms Found</h3>
-                        <p className="text-xs text-neutral-500 leading-relaxed">
-                            Connect your competitive coding handles (LeetCode, Codeforces, CodeChef, AtCoder, etc.) to
-                            track dynamic rating histories and contest timelines.
-                        </p>
+                ) : (
+                    /* Empty state when no coding platforms are linked */
+                    <div className="w-full rounded-2xl bg-[#FAF6EE] border-2 border-dashed border-black p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-4 shadow-[4px_4px_0px_#000]">
+                        <div className="w-16 h-16 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center text-black">
+                            <TrendingUp className="w-8 h-8 stroke-[2.5]" />
+                        </div>
+                        <div className="max-w-md space-y-1">
+                            <h3 className="text-lg font-black text-black">No Connected Platforms Found</h3>
+                            <p className="text-xs sm:text-sm font-bold text-neutral-600 leading-relaxed">
+                                Connect your competitive coding handles (LeetCode, Codeforces, CodeChef, AtCoder, etc.) to
+                                track dynamic rating histories and contest timelines.
+                            </p>
+                        </div>
+                        <Link
+                            to="/onboarding"
+                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] text-xs font-black hover:bg-neutral-900 transition-all border-2 border-black shadow-[3px_3px_0px_#000] cursor-pointer"
+                        >
+                            <Plus className="w-4 h-4 stroke-[2.5]" />
+                            <span>Connect Coding Platforms</span>
+                        </Link>
                     </div>
-                    <Link
-                        to="/onboarding"
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-black text-white text-xs font-extrabold hover:bg-neutral-800 transition-all shadow-xs"
-                    >
-                        <Plus className="w-4 h-4" />
-                        <span>Connect Coding Platforms</span>
-                    </Link>
-                </div>
-            )}
+                )}
             </div>
         </div>
     );

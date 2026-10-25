@@ -259,121 +259,184 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
             {/* ROW 1: Top 3 Solved Metric Cards (Last 7 days, Last 30 days, Last 12 months) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
                 {/* Last 7 days */}
-                <div className="rounded-3xl bg-white border border-black/[0.06] p-6 shadow-xs flex flex-col justify-between transition-all hover:border-black/10">
-                    <span className="text-xs sm:text-sm font-semibold text-neutral-500">
-                        Last 7 days
-                    </span>
-                    <div className="my-2">
-                        <span className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
+                <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 shadow-[4px_4px_0px_#000] flex flex-col justify-between transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_#000]">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                            Last 7 days
+                        </span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#FFE566] border border-black shadow-[1px_1px_0px_#000]" />
+                    </div>
+                    <div className="my-3">
+                        <span className="text-3xl sm:text-4xl font-black text-black tracking-tight font-mono">
                             {trends.last7Days}
                         </span>
                     </div>
-                    <span className="text-xs text-neutral-400 font-medium">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black text-xs font-black text-neutral-800 shadow-[1px_1px_0px_#000] self-start">
                         problems solved
                     </span>
                 </div>
 
                 {/* Last 30 days */}
-                <div className="rounded-3xl bg-white border border-black/[0.06] p-6 shadow-xs flex flex-col justify-between transition-all hover:border-black/10">
-                    <span className="text-xs sm:text-sm font-semibold text-neutral-500">
-                        Last 30 days
-                    </span>
-                    <div className="my-2">
-                        <span className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
+                <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 shadow-[4px_4px_0px_#000] flex flex-col justify-between transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_#000]">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                            Last 30 days
+                        </span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]" />
+                    </div>
+                    <div className="my-3">
+                        <span className="text-3xl sm:text-4xl font-black text-black tracking-tight font-mono">
                             {trends.last30Days}
                         </span>
                     </div>
-                    <span className="text-xs text-neutral-400 font-medium">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black text-xs font-black text-neutral-800 shadow-[1px_1px_0px_#000] self-start">
                         problems solved
                     </span>
                 </div>
 
                 {/* Last 12 months */}
-                <div className="rounded-3xl bg-white border border-black/[0.06] p-6 shadow-xs flex flex-col justify-between transition-all hover:border-black/10">
-                    <span className="text-xs sm:text-sm font-semibold text-neutral-500">
-                        Last 12 months
-                    </span>
-                    <div className="my-2">
-                        <span className="text-3xl sm:text-4xl font-extrabold text-neutral-900 tracking-tight">
+                <div className="rounded-2xl bg-white border-2 border-black p-5 sm:p-6 shadow-[4px_4px_0px_#000] flex flex-col justify-between transition-all hover:translate-x-[-1px] hover:translate-y-[-1px] hover:shadow-[5px_5px_0px_#000]">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                            Last 12 months
+                        </span>
+                        <span className="w-2.5 h-2.5 rounded-full bg-black border border-black shadow-[1px_1px_0px_#000]" />
+                    </div>
+                    <div className="my-3">
+                        <span className="text-3xl sm:text-4xl font-black text-black tracking-tight font-mono">
                             {trends.last12Months}
                         </span>
                     </div>
-                    <span className="text-xs text-neutral-400 font-medium">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black text-xs font-black text-neutral-800 shadow-[1px_1px_0px_#000] self-start">
                         problems solved
                     </span>
                 </div>
             </div>
 
             {/* ROW 2: Month So Far Card (<Month> <Year> so far) */}
-            <div className="rounded-3xl bg-white border border-black/[0.06] p-6 sm:p-7 shadow-xs space-y-6">
+            <div className="rounded-2xl bg-white border-2 border-black p-6 sm:p-7 shadow-[4px_4px_0px_#000] space-y-6">
                 {/* Header */}
-                <div className="flex items-center gap-2.5 pb-2">
-                    <FileText className="w-4 h-4 text-neutral-800" />
-                    <h3 className="text-base sm:text-lg font-extrabold text-neutral-900 tracking-tight">
+                <div className="flex items-center gap-3 pb-2 border-b-2 border-black/10">
+                    <div className="p-1.5 rounded-lg bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]">
+                        <FileText className="w-4 h-4 text-black stroke-[2.5]" />
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-black text-black tracking-tight">
                         {trends.monthSoFar.monthName}
                     </h3>
                 </div>
 
                 {/* 4 Sub-stat Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     {/* Problems solved */}
-                    <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-1.5 flex flex-col justify-between">
-                        <span className="text-xs text-neutral-500 font-medium">Problems solved</span>
-                        <div className="text-2xl sm:text-3xl font-black text-neutral-900">
+                    <div className="rounded-xl bg-[#FAF6EE] border-2 border-black p-4 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                            Problems solved
+                        </span>
+                        <div className="text-2xl sm:text-3xl font-black text-black font-mono">
                             {trends.monthSoFar.problemsSolved}
                         </div>
-                        <div className="text-xs font-semibold text-neutral-600 flex items-center gap-1">
-                            <span>{trends.monthSoFar.problemsSolvedDelta}</span>
+                        <div className="pt-1">
+                            <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] ${
+                                    trends.monthSoFar.problemsSolvedDelta.includes("more")
+                                        ? "bg-[#a2ff86] text-black"
+                                        : trends.monthSoFar.problemsSolvedDelta.includes("less")
+                                        ? "bg-[#ff9494] text-black"
+                                        : "bg-white text-neutral-800"
+                                }`}
+                            >
+                                {trends.monthSoFar.problemsSolvedDelta}
+                            </span>
                         </div>
                     </div>
 
                     {/* Active days */}
-                    <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-1.5 flex flex-col justify-between">
-                        <span className="text-xs text-neutral-500 font-medium">Active days</span>
-                        <div className="text-2xl sm:text-3xl font-black text-neutral-900">
+                    <div className="rounded-xl bg-[#FAF6EE] border-2 border-black p-4 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                            Active days
+                        </span>
+                        <div className="text-2xl sm:text-3xl font-black text-black font-mono">
                             {trends.monthSoFar.activeDays}
                         </div>
-                        <div className="text-xs font-semibold text-neutral-600 flex items-center gap-1">
-                            <span>{trends.monthSoFar.activeDaysDelta}</span>
+                        <div className="pt-1">
+                            <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] ${
+                                    trends.monthSoFar.activeDaysDelta.includes("more")
+                                        ? "bg-[#a2ff86] text-black"
+                                        : trends.monthSoFar.activeDaysDelta.includes("less")
+                                        ? "bg-[#ff9494] text-black"
+                                        : "bg-white text-neutral-800"
+                                }`}
+                            >
+                                {trends.monthSoFar.activeDaysDelta}
+                            </span>
                         </div>
                     </div>
 
                     {/* Hard problems */}
-                    <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-1.5 flex flex-col justify-between">
-                        <span className="text-xs text-neutral-500 font-medium">Hard problems</span>
-                        <div className="text-2xl sm:text-3xl font-black text-neutral-900">
+                    <div className="rounded-xl bg-[#FAF6EE] border-2 border-black p-4 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                            Hard problems
+                        </span>
+                        <div className="text-2xl sm:text-3xl font-black text-black font-mono">
                             {trends.monthSoFar.hardProblems}
                         </div>
-                        <div className="text-xs font-semibold text-neutral-600 flex items-center gap-1">
-                            <span>{trends.monthSoFar.hardProblemsDelta}</span>
+                        <div className="pt-1">
+                            <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] ${
+                                    trends.monthSoFar.hardProblemsDelta.includes("more")
+                                        ? "bg-[#a2ff86] text-black"
+                                        : trends.monthSoFar.hardProblemsDelta.includes("less")
+                                        ? "bg-[#ff9494] text-black"
+                                        : "bg-white text-neutral-800"
+                                }`}
+                            >
+                                {trends.monthSoFar.hardProblemsDelta}
+                            </span>
                         </div>
                     </div>
 
                     {/* Contests */}
-                    <div className="rounded-2xl bg-black/[0.02] border border-black/[0.06] p-4 space-y-1.5 flex flex-col justify-between">
-                        <span className="text-xs text-neutral-500 font-medium">Contests</span>
-                        <div className="text-2xl sm:text-3xl font-black text-neutral-900">
+                    <div className="rounded-xl bg-[#FAF6EE] border-2 border-black p-4 sm:p-5 space-y-2 flex flex-col justify-between shadow-[3px_3px_0px_#000]">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                            Contests
+                        </span>
+                        <div className="text-2xl sm:text-3xl font-black text-black font-mono">
                             {trends.monthSoFar.contests}
                         </div>
-                        <div className="text-xs font-medium text-neutral-600 flex items-center gap-1">
-                            <span>{trends.monthSoFar.contestsDelta}</span>
+                        <div className="pt-1">
+                            <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] ${
+                                    trends.monthSoFar.contestsDelta.includes("more")
+                                        ? "bg-[#a2ff86] text-black"
+                                        : trends.monthSoFar.contestsDelta.includes("less")
+                                        ? "bg-[#ff9494] text-black"
+                                        : "bg-white text-neutral-800"
+                                }`}
+                            >
+                                {trends.monthSoFar.contestsDelta}
+                            </span>
                         </div>
                     </div>
                 </div>
 
                 {/* Details Breakdown Row (2 columns) */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t border-black/[0.06]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-3 border-t-2 border-black/10">
                     {/* Left Column: Best day & Rating changes */}
                     <div className="space-y-4">
-                        <div>
-                            <span className="text-xs text-neutral-500 font-medium block">Best day</span>
-                            <span className="text-sm font-semibold text-neutral-900 mt-0.5 block">
+                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <span className="text-xs font-black uppercase tracking-wider text-neutral-600 block">
+                                Best day
+                            </span>
+                            <span className="text-sm font-black text-black mt-1 block">
                                 {trends.monthSoFar.bestDay.text}
                             </span>
                         </div>
-                        <div>
-                            <span className="text-xs text-neutral-500 font-medium block">Rating changes</span>
-                            <span className="text-sm font-semibold text-neutral-900 mt-0.5 block">
+                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <span className="text-xs font-black uppercase tracking-wider text-neutral-600 block">
+                                Rating changes
+                            </span>
+                            <span className="text-sm font-black text-black mt-1 block">
                                 {trends.monthSoFar.ratingChanges}
                             </span>
                         </div>
@@ -381,26 +444,36 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
 
                     {/* Right Column: Where you solved & Topics practiced most */}
                     <div className="space-y-4">
-                        <div>
-                            <span className="text-xs text-neutral-500 font-medium block">Where you solved</span>
-                            <span className="text-sm font-semibold text-neutral-900 mt-0.5 block">
+                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <span className="text-xs font-black uppercase tracking-wider text-neutral-600 block">
+                                Where you solved
+                            </span>
+                            <span className="text-sm font-black text-black mt-1 block">
                                 {trends.monthSoFar.whereYouSolved}
                             </span>
                         </div>
-                        <div>
-                            <span className="text-xs text-neutral-500 font-medium block mb-2">
+                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <span className="text-xs font-black uppercase tracking-wider text-neutral-600 block mb-2.5">
                                 Topics you practised most
                             </span>
                             <div className="flex flex-wrap gap-2">
-                                {trends.monthSoFar.topicsPracticedMost.map((item, idx) => (
-                                    <span
-                                        key={idx}
-                                        className="rounded-md bg-black/[0.03] border border-black/[0.06] px-2.5 py-1 text-xs text-neutral-800 font-medium inline-flex items-center gap-1.5 shadow-2xs hover:border-black/10 transition-colors"
-                                    >
-                                        <span>{item.topic}</span>
-                                        <span className="text-neutral-500 font-mono text-[11px]">{item.count}</span>
+                                {trends.monthSoFar.topicsPracticedMost.length > 0 ? (
+                                    trends.monthSoFar.topicsPracticedMost.map((item, idx) => (
+                                        <span
+                                            key={idx}
+                                            className="rounded-lg bg-white border-2 border-black px-3 py-1 text-xs text-black font-black inline-flex items-center gap-2 shadow-[2px_2px_0px_#000] hover:bg-[#FFE566] transition-all cursor-default"
+                                        >
+                                            <span>{item.topic}</span>
+                                            <span className="px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black font-mono text-[11px] font-black">
+                                                {item.count}
+                                            </span>
+                                        </span>
+                                    ))
+                                ) : (
+                                    <span className="text-xs font-bold text-neutral-500">
+                                        No recent practice topics
                                     </span>
-                                ))}
+                                )}
                             </div>
                         </div>
                     </div>
@@ -408,25 +481,27 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
             </div>
 
             {/* ROW 3: Problems Solved Stacked Bar Chart */}
-            <div className="rounded-3xl bg-white border border-black/[0.06] p-6 sm:p-7 shadow-xs space-y-6">
+            <div className="rounded-2xl bg-white border-2 border-black p-6 sm:p-7 shadow-[4px_4px_0px_#000] space-y-6">
                 {/* Header with Switcher */}
-                <div className="flex items-center justify-between pb-2">
-                    <div className="flex items-center gap-2.5">
-                        <Calendar className="w-4 h-4 text-neutral-800" />
-                        <h3 className="text-base sm:text-lg font-extrabold text-neutral-900 tracking-tight">
+                <div className="flex items-center justify-between pb-3 border-b-2 border-black/10 flex-wrap gap-3">
+                    <div className="flex items-center gap-3">
+                        <div className="p-1.5 rounded-lg bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <Calendar className="w-4 h-4 text-black stroke-[2.5]" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-black text-black tracking-tight">
                             Problems solved
                         </h3>
                     </div>
 
                     {/* Weeks / Months toggle */}
-                    <div className="inline-flex items-center p-1 rounded-xl bg-black/[0.04] border border-black/[0.06]">
+                    <div className="inline-flex items-center p-1 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
                         <button
                             type="button"
                             onClick={() => setChartMode("weeks")}
-                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            className={`px-3.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
                                 chartMode === "weeks"
-                                    ? "bg-black text-white shadow-xs"
-                                    : "text-neutral-500 hover:text-black"
+                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black border-2 border-transparent"
                             }`}
                         >
                             Weeks
@@ -434,10 +509,10 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                         <button
                             type="button"
                             onClick={() => setChartMode("months")}
-                            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            className={`px-3.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
                                 chartMode === "months"
-                                    ? "bg-black text-white shadow-xs"
-                                    : "text-neutral-500 hover:text-black"
+                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black border-2 border-transparent"
                             }`}
                         >
                             Months
@@ -447,7 +522,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
 
                 {/* The Stacked Bar Chart Container */}
                 <div className="w-full pt-4 pb-2 relative">
-                    <div className="w-full h-48 sm:h-56 flex items-end justify-between gap-1 sm:gap-2 px-1 relative">
+                    <div className="w-full h-52 sm:h-60 flex items-end justify-between gap-1 sm:gap-2 px-1 relative">
                         {activeChartData.map((bucket, idx) => {
                             const isZero = bucket.total === 0;
                             // In Weeks mode, show dates every 2 weeks to match the screenshot
@@ -474,7 +549,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                 >
                                     {/* Number above the bar */}
                                     {!isZero && (
-                                        <span className="text-[10px] sm:text-[11px] font-bold text-neutral-900 font-mono mb-1 select-none">
+                                        <span className="text-[10px] sm:text-[11px] font-black text-black font-mono mb-1 select-none">
                                             {bucket.total}
                                         </span>
                                     )}
@@ -482,15 +557,15 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                     {/* Stacked Bar Container */}
                                     <div
                                         style={{ height: `${heightPercent}%` }}
-                                        className={`w-full max-w-[20px] sm:max-w-[26px] rounded-t-md overflow-hidden flex flex-col-reverse transition-all duration-200 ${
-                                            isHovered ? "ring-2 ring-black/20" : ""
+                                        className={`w-full max-w-[20px] sm:max-w-[26px] rounded-t-md border-2 border-black overflow-hidden flex flex-col-reverse shadow-[1px_1px_0px_#000] transition-all duration-200 ${
+                                            isHovered ? "ring-2 ring-black scale-105" : ""
                                         }`}
                                     >
                                         {/* Easy (Bottom) */}
                                         {bucket.easy > 0 && (
                                             <div
                                                 style={{ height: `${easyH}%` }}
-                                                className="w-full bg-[#d4d4d4] transition-all"
+                                                className="w-full bg-[#d4d4d4] transition-all border-b border-black/20"
                                                 title={`Easy: ${bucket.easy}`}
                                             />
                                         )}
@@ -498,7 +573,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                         {bucket.medium > 0 && (
                                             <div
                                                 style={{ height: `${medH}%` }}
-                                                className="w-full bg-[#737373] transition-all"
+                                                className="w-full bg-[#737373] transition-all border-b border-black/20"
                                                 title={`Medium: ${bucket.medium}`}
                                             />
                                         )}
@@ -523,7 +598,7 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                                     {/* Date tick label */}
                                     <div className="h-6 flex items-center justify-center mt-2">
                                         {shouldShowLabel && (
-                                            <span className="text-[9px] sm:text-[10px] text-neutral-500 whitespace-nowrap font-medium">
+                                            <span className="text-[9px] sm:text-[10px] text-neutral-800 whitespace-nowrap font-black font-mono">
                                                 {bucket.label}
                                             </span>
                                         )}
@@ -531,23 +606,26 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
 
                                     {/* Hover Tooltip */}
                                     {isHovered && !isZero && (
-                                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-30 p-2.5 rounded-xl bg-white border border-black/10 shadow-2xl text-[11px] whitespace-nowrap pointer-events-none">
-                                            <div className="font-bold text-neutral-900 mb-1">{bucket.label}</div>
-                                            <div className="space-y-0.5 text-neutral-600">
+                                        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-30 p-3 rounded-xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-xs whitespace-nowrap pointer-events-none">
+                                            <div className="font-black text-black mb-1.5 pb-1 border-b border-black/15">
+                                                {bucket.label}
+                                            </div>
+                                            <div className="space-y-1 font-bold text-neutral-800">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full bg-[#d4d4d4]" />
+                                                    <span className="w-2.5 h-2.5 rounded-sm bg-[#d4d4d4] border border-black" />
                                                     <span>Easy: {bucket.easy}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full bg-[#737373]" />
+                                                    <span className="w-2.5 h-2.5 rounded-sm bg-[#737373] border border-black" />
                                                     <span>Medium: {bucket.medium}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <span className="w-2 h-2 rounded-full bg-[#000000]" />
+                                                    <span className="w-2.5 h-2.5 rounded-sm bg-[#000000] border border-black" />
                                                     <span>Hard: {bucket.hard}</span>
                                                 </div>
-                                                <div className="pt-1 mt-1 border-t border-black/[0.06] font-bold text-neutral-900">
-                                                    Total: {bucket.total}
+                                                <div className="pt-1 mt-1 border-t-2 border-black/10 font-black text-black flex items-center justify-between gap-4">
+                                                    <span>Total:</span>
+                                                    <span className="font-mono">{bucket.total}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -558,22 +636,22 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
                     </div>
                 </div>
 
-                {/* Legend at bottom-left matching screenshot */}
-                <div className="flex items-center gap-4 text-xs text-neutral-500 font-medium pt-2">
-                    <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#d4d4d4]" />
+                {/* Legend at bottom-left matching Neo-Brutalism */}
+                <div className="flex items-center gap-3 text-xs font-black text-black pt-2 flex-wrap">
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000]">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-[#d4d4d4] border border-black" />
                         <span>Easy</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#737373]" />
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000]">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-[#737373] border border-black" />
                         <span>Medium</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#000000]" />
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000]">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-[#000000] border border-black" />
                         <span>Hard</span>
                     </div>
-                    <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#a3a3a3]" />
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000]">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-[#a3a3a3] border border-black" />
                         <span>No level</span>
                     </div>
                 </div>

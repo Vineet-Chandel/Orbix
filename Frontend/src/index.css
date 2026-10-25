@@ -378,3 +378,223 @@ body::-webkit-scrollbar,
 .embedded-showcase-container .font-mono * {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
 }
+
+/* ==========================================================================
+   BLOG / AWS DOCS — Neo-Brutalist Styles (scoped to .blog-container)
+   ========================================================================== */
+
+/* Neo-Brutalist Dot Grid Background — applied to body, blog container, and neo-grid-bg elements */
+.neo-grid-bg,
+.blog-container,
+.blog-container.neo-grid-bg,
+.blog-container .neo-grid-bg,
+body:has(.blog-container) {
+  background-color: #f7f6f1 !important;
+  background-image: radial-gradient(#d5d2c8 1.15px, transparent 1.15px) !important;
+  background-size: 18px 18px !important;
+  background-attachment: fixed !important;
+}
+
+.dark .neo-grid-bg,
+.dark .blog-container,
+.dark .blog-container.neo-grid-bg,
+.dark .blog-container .neo-grid-bg,
+html.dark body:has(.blog-container) {
+  background-color: #0e0f12 !important;
+  background-image: radial-gradient(#27272a 1.15px, transparent 1.15px) !important;
+  background-size: 18px 18px !important;
+  background-attachment: fixed !important;
+}
+
+/* Neo-Brutalist Card Utility Classes for Blog */
+.blog-container .neo-box {
+  background-color: #ffffff;
+  border: 2px solid #000000;
+  box-shadow: 4px 4px 0px #000000;
+}
+
+.blog-container .neo-box-sm {
+  background-color: #ffffff;
+  border: 2px solid #000000;
+  box-shadow: 2.5px 2.5px 0px #000000;
+}
+
+.blog-container .neo-box-lg {
+  background-color: #ffffff;
+  border: 2px solid #000000;
+  box-shadow: 6px 6px 0px #000000;
+}
+
+.dark .blog-container .neo-box {
+  background-color: #18181b;
+  border: 2px solid #ffffff;
+  box-shadow: 4px 4px 0px #ffffff;
+}
+
+.dark .blog-container .neo-box-sm {
+  background-color: #18181b;
+  border: 2px solid #ffffff;
+  box-shadow: 2.5px 2.5px 0px #ffffff;
+}
+
+.dark .blog-container .neo-box-lg {
+  background-color: #18181b;
+  border: 2px solid #ffffff;
+  box-shadow: 6px 6px 0px #ffffff;
+}
+
+/* Neo-Brutalist Universal Callouts for Blog */
+.blog-container [class*="border-l-4"] {
+  border-left-width: 5px !important;
+  border-top-width: 2px !important;
+  border-right-width: 2px !important;
+  border-bottom-width: 2px !important;
+  border-color: #000000 !important;
+  box-shadow: 4px 4px 0px #000000 !important;
+  border-radius: 0px !important;
+}
+
+.dark .blog-container [class*="border-l-4"] {
+  border-color: #ffffff !important;
+  box-shadow: 4px 4px 0px #ffffff !important;
+}
+
+.blog-container [class*="rounded-xl"][class*="border-workbook-border"],
+.blog-container [class*="rounded-2xl"][class*="border-workbook-border"],
+.blog-container [class*="rounded-xl"][class*="border-slate-200"],
+.blog-container [class*="rounded-2xl"][class*="border-slate-200"],
+.blog-container [class*="rounded-xl"][class*="border-slate-300"],
+.blog-container [class*="rounded-2xl"][class*="border-slate-300"],
+.blog-container [class*="overflow-x-auto"][class*="rounded-xl"] {
+  border: 2px solid #000000 !important;
+  box-shadow: 4px 4px 0px #000000 !important;
+  border-radius: 0px !important;
+}
+
+.dark .blog-container [class*="rounded-xl"][class*="border-workbook-border"],
+.dark .blog-container [class*="rounded-2xl"][class*="border-workbook-border"],
+.dark .blog-container [class*="rounded-xl"][class*="border-slate-200"],
+.dark .blog-container [class*="rounded-2xl"][class*="border-slate-200"],
+.dark .blog-container [class*="rounded-xl"][class*="border-slate-300"],
+.dark .blog-container [class*="rounded-2xl"][class*="border-slate-300"],
+.dark .blog-container [class*="overflow-x-auto"][class*="rounded-xl"] {
+  border: 2px solid #ffffff !important;
+  box-shadow: 4px 4px 0px #ffffff !important;
+}
+
+/* Neo-Brutalist Badges for Blog */
+.blog-container .neo-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1.5px solid #000000;
+  padding: 0.125rem 0.5rem;
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+/* Custom scrollbar for blog sidebar and search modal */
+.blog-container .custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.blog-container .custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.blog-container .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(161, 161, 170, 0.3);
+  border-radius: 9999px;
+}
+
+.blog-container .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(161, 161, 170, 0.5);
+}
+
+.dark .blog-container .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(82, 82, 91, 0.4);
+}
+
+.dark .blog-container .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(82, 82, 91, 0.7);
+}
+
+/* Prism syntax highlighting theme for blog code blocks */
+.blog-container .token.comment,
+.blog-container .token.prolog,
+.blog-container .token.doctype,
+.blog-container .token.cdata {
+  color: #71717a;
+  font-style: italic;
+}
+
+.blog-container .token.punctuation {
+  color: #a1a1aa;
+}
+
+.blog-container .token.namespace {
+  opacity: 0.7;
+}
+
+.blog-container .token.property,
+.blog-container .token.tag,
+.blog-container .token.constant,
+.blog-container .token.symbol,
+.blog-container .token.deleted {
+  color: #f87171;
+}
+
+.blog-container .token.boolean,
+.blog-container .token.number {
+  color: #fb923c;
+}
+
+.blog-container .token.selector,
+.blog-container .token.attr-name,
+.blog-container .token.string,
+.blog-container .token.char,
+.blog-container .token.builtin,
+.blog-container .token.inserted {
+  color: #34d399;
+}
+
+.blog-container .token.operator,
+.blog-container .token.entity,
+.blog-container .token.url,
+.blog-container .language-css .token.string,
+.blog-container .style .token.string {
+  color: #38bdf8;
+}
+
+.blog-container .token.atrule,
+.blog-container .token.attr-value,
+.blog-container .token.keyword {
+  color: #a78bfa;
+}
+
+.blog-container .token.function,
+.blog-container .token.class-name {
+  color: #60a5fa;
+}
+
+.blog-container .token.regex,
+.blog-container .token.important,
+.blog-container .token.variable {
+  color: #fbbf24;
+}
+
+.blog-container .token.important,
+.blog-container .token.bold {
+  font-weight: bold;
+}
+
+.blog-container .token.italic {
+  font-style: italic;
+}
+
+.blog-container .token.entity {
+  cursor: help;
+}

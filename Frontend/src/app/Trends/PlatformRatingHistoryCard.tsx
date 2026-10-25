@@ -55,11 +55,11 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
         if (!hasHistory) return null;
 
         const svgWidth = 540;
-        const svgHeight = 170;
+        const svgHeight = 175;
         const padLeft = 20;
         const padRight = 20;
         const padTop = 15;
-        const padBottom = 28;
+        const padBottom = 30;
         const plotWidth = svgWidth - padLeft - padRight;
         const plotHeight = svgHeight - padTop - padBottom;
 
@@ -119,7 +119,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
             }
         }
 
-        // Generate 3 subtle horizontal dashed guidelines
+        // Generate 3 horizontal dashed guidelines
         const gridRatios = [0.15, 0.55, 0.95];
         const gridLines = gridRatios.map((ratio) => {
             const y = svgHeight - padBottom - ratio * plotHeight;
@@ -201,17 +201,17 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                 : "—";
 
     return (
-        <div className="w-full rounded-3xl bg-white border border-black/[0.06] p-5 sm:p-6 text-neutral-900 font-sans select-none flex flex-col justify-between transition-all hover:border-black/10 shadow-xs relative overflow-hidden group">
+        <div className="w-full rounded-2xl bg-white border-2 border-black p-5 sm:p-6 text-black font-sans select-none flex flex-col justify-between shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all relative overflow-hidden group">
             {/* Top Card Header */}
             <div>
-                <div className="flex items-center justify-between gap-3 pb-2.5">
+                <div className="flex items-center justify-between gap-3 pb-3">
                     {/* Platform Logo + Name */}
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-7 h-7 rounded-lg bg-black/[0.04] border border-black/10 flex items-center justify-center flex-shrink-0 text-neutral-800">
-                            {getPortalIcon(platform.portal, "w-4 h-4")}
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center flex-shrink-0 text-black">
+                            {getPortalIcon(platform.portal, "w-5 h-5")}
                         </div>
                         <div className="min-w-0 flex items-center gap-2">
-                            <h3 className="text-base sm:text-lg font-extrabold text-neutral-900 tracking-tight truncate">
+                            <h3 className="text-base sm:text-lg font-black text-black tracking-tight truncate">
                                 {platform.portalName}
                             </h3>
                             {platform.profileUrl && (
@@ -219,54 +219,53 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                     href={platform.profileUrl}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="text-neutral-400 hover:text-black transition-colors p-0.5 rounded"
+                                    className="p-1 rounded-md border border-black bg-white hover:bg-[#FFE566] text-black shadow-[1px_1px_0px_#000] transition-colors"
                                     title={`View ${platform.portalUsername} on ${platform.portalName}`}
                                 >
-                                    <ExternalLink className="w-3.5 h-3.5" />
+                                    <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
                                 </a>
                             )}
                         </div>
                     </div>
 
-                    {/* Total Contests Count (e.g. "11 contests") */}
-                    <div className="flex-shrink-0 bg-black/[0.04] border border-black/10 px-3 py-1 rounded-full">
-                        <span className="text-xs font-semibold text-neutral-800">
+                    {/* Total Contests Count (e.g. "2 contests") */}
+                    <div className="flex-shrink-0 bg-[#FAF6EE] border-2 border-black px-3 py-1 rounded-lg shadow-[2px_2px_0px_#000]">
+                        <span className="text-xs font-black text-black">
                             {platform.ratedContestsCount} {platform.ratedContestsCount === 1 ? "contest" : "contests"}
                         </span>
                     </div>
                 </div>
 
                 {/* Subheader: Now | Best | Last 90 days */}
-                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm text-neutral-500 font-medium pb-4 flex-wrap">
-                    <span>
-                        Now <strong className="text-neutral-900 font-bold ml-1">{currentRating !== null && currentRating !== undefined ? currentRating : "—"}</strong>
+                <div className="flex items-center gap-2 sm:gap-3 text-xs sm:text-sm font-bold text-neutral-600 pb-3 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000]">
+                        Now <strong className="text-black font-black font-mono ml-0.5">{currentRating !== null && currentRating !== undefined ? currentRating : "—"}</strong>
                     </span>
-                    <span className="text-neutral-300 font-mono">•</span>
-                    <span>
-                        Best <strong className="text-neutral-900 font-bold ml-1">{peakRating !== null && peakRating !== undefined ? peakRating : "—"}</strong>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000]">
+                        Best <strong className="text-black font-black font-mono ml-0.5">{peakRating !== null && peakRating !== undefined ? peakRating : "—"}</strong>
                     </span>
-                    <span className="text-neutral-300 font-mono">•</span>
-                    <span>
-                        Last 90 days{" "}
-                        <strong
-                            className={`ml-1 font-bold ${typeof change90d === "number" && change90d > 0
-                                ? "text-neutral-900"
-                                : typeof change90d === "number" && change90d < 0
-                                    ? "text-neutral-500"
-                                    : "text-neutral-600"
-                                }`}
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#FAF6EE] border border-black shadow-[1px_1px_0px_#000]">
+                        Last 90 days
+                        <span
+                            className={`px-1.5 py-0.2 rounded border border-black text-[11px] font-black font-mono ${
+                                typeof change90d === "number" && change90d > 0
+                                    ? "bg-[#a2ff86] text-black"
+                                    : typeof change90d === "number" && change90d < 0
+                                    ? "bg-[#ff9494] text-black"
+                                    : "bg-white text-neutral-800"
+                            }`}
                         >
                             {changeFormatted}
-                        </strong>
+                        </span>
                     </span>
                 </div>
 
                 {/* Active / Hover Contest Row */}
-                <div className="flex items-baseline justify-between gap-3 pb-3 border-b border-black/[0.06] min-h-[36px]">
+                <div className="flex items-baseline justify-between gap-3 pb-3 border-b-2 border-black/10 min-h-[40px]">
                     {/* Left: Rating value */}
                     <div className="flex items-baseline gap-2 flex-shrink-0">
-                        <span className="text-xs sm:text-sm font-medium text-neutral-500">Rating</span>
-                        <span className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
+                        <span className="text-xs font-black uppercase tracking-wider text-neutral-500">Rating</span>
+                        <span className="text-2xl sm:text-3xl font-black text-black tracking-tight font-mono">
                             {activePoint ? activePoint.rating : currentRating ?? "—"}
                         </span>
                     </div>
@@ -274,18 +273,18 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                     {/* Right: Date and Contest Name */}
                     {activePoint ? (
                         <div className="flex items-center gap-2 text-right min-w-0 truncate">
-                            <span className="text-xs sm:text-sm text-neutral-500 flex-shrink-0 font-medium">
+                            <span className="text-xs font-mono font-black text-neutral-600 flex-shrink-0">
                                 {formatDate(activePoint.date || activePoint.timestamp)}
                             </span>
                             <span
-                                className="text-xs sm:text-sm text-neutral-900 font-medium truncate max-w-[160px] sm:max-w-xs"
+                                className="text-xs sm:text-sm font-black text-black truncate max-w-[160px] sm:max-w-xs px-2.5 py-0.5 rounded-md bg-[#FFE566] border border-black shadow-[1px_1px_0px_#000]"
                                 title={activePoint.contestName}
                             >
                                 {activePoint.contestName}
                             </span>
                         </div>
                     ) : (
-                        <div className="text-xs text-neutral-400 font-medium">
+                        <div className="text-xs text-neutral-500 font-bold">
                             No contest data
                         </div>
                     )}
@@ -293,7 +292,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
             </div>
 
             {/* Sparkline / Area Curve Chart */}
-            <div className="w-full pt-3 relative">
+            <div className="w-full pt-4 relative">
                 {chartData && hasHistory ? (
                     <div className="w-full relative">
                         <svg
@@ -304,9 +303,9 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                         >
                             <defs>
                                 <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#000000" stopOpacity="0.08" />
-                                    <stop offset="85%" stopColor="#000000" stopOpacity="0.01" />
-                                    <stop offset="100%" stopColor="#000000" stopOpacity="0.0" />
+                                    <stop offset="0%" stopColor="#FFE566" stopOpacity="0.45" />
+                                    <stop offset="85%" stopColor="#FAF6EE" stopOpacity="0.1" />
+                                    <stop offset="100%" stopColor="#FAF6EE" stopOpacity="0.0" />
                                 </linearGradient>
                             </defs>
 
@@ -318,9 +317,9 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                     y1={grid.y}
                                     x2={chartData.svgWidth - chartData.padRight}
                                     y2={grid.y}
-                                    stroke="rgba(0,0,0,0.06)"
+                                    stroke="rgba(0,0,0,0.12)"
                                     strokeDasharray="4 4"
-                                    strokeWidth="1"
+                                    strokeWidth="1.5"
                                 />
                             ))}
 
@@ -335,7 +334,7 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                     d={chartData.pathD}
                                     fill="none"
                                     stroke="#000000"
-                                    strokeWidth="2.5"
+                                    strokeWidth="3"
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                 />
@@ -348,10 +347,10 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                     x={tick.x}
                                     y={chartData.svgHeight - 6}
                                     textAnchor="middle"
-                                    fill="#9ca3af"
+                                    fill="#000000"
                                     fontSize="10"
-                                    fontFamily="sans-serif"
-                                    fontWeight="500"
+                                    fontFamily="monospace"
+                                    fontWeight="800"
                                 >
                                     {tick.label}
                                 </text>
@@ -369,17 +368,18 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                             y1={chartData.padTop}
                                             x2={pt.x}
                                             y2={chartData.svgHeight - chartData.padBottom}
-                                            stroke="rgba(0,0,0,0.3)"
+                                            stroke="#000000"
                                             strokeDasharray="3 3"
-                                            strokeWidth="1"
+                                            strokeWidth="1.5"
                                         />
                                         {/* Outer pulse aura */}
                                         <circle
                                             cx={pt.x}
                                             cy={pt.y}
-                                            r="7"
-                                            fill="#000000"
-                                            fillOpacity="0.1"
+                                            r="8"
+                                            fill="#FFE566"
+                                            stroke="#000000"
+                                            strokeWidth="2"
                                         />
                                         {/* Dot */}
                                         <circle
@@ -387,8 +387,6 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                                             cy={pt.y}
                                             r="4.5"
                                             fill="#000000"
-                                            stroke="#ffffff"
-                                            strokeWidth="2"
                                         />
                                     </g>
                                 );
@@ -397,12 +395,14 @@ export const PlatformRatingHistoryCard: React.FC<PlatformRatingHistoryCardProps>
                     </div>
                 ) : (
                     /* Clean empty state for connected platform with 0 contests */
-                    <div className="w-full h-36 flex flex-col items-center justify-center text-center p-4 rounded-2xl bg-black/[0.02] border border-black/10 border-dashed">
-                        <Award className="w-8 h-8 text-neutral-400 mb-2" />
-                        <p className="text-xs font-semibold text-neutral-700">
+                    <div className="w-full h-40 flex flex-col items-center justify-center text-center p-4 rounded-xl bg-[#FAF6EE] border-2 border-black border-dashed shadow-[2px_2px_0px_#000]">
+                        <div className="w-10 h-10 rounded-lg bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center mb-2">
+                            <Award className="w-5 h-5 text-black stroke-[2.5]" />
+                        </div>
+                        <p className="text-xs font-black text-black">
                             No rated contests recorded yet on {platform.portalName}
                         </p>
-                        <p className="text-[11px] text-neutral-400 mt-1 max-w-xs">
+                        <p className="text-[11px] font-bold text-neutral-600 mt-1 max-w-xs">
                             Compete in a rated contest to begin plotting your dynamic rating progression.
                         </p>
                     </div>

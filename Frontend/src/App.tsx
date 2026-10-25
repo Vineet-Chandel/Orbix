@@ -7,6 +7,7 @@ import CustomersPage from "./LandingPages/Customers/Landing";
 import PricingPage from "./LandingPages/Pricing/Landing";
 import SupportPage from "./LandingPages/Support/Landing";
 import PlatformPage from "./LandingPages/Platform/Landing";
+import BlogLanding from "./LandingPages/Blog/Landing";
 import Dashboard from "./app/Dashboard/Landing";
 import ProfileManager from "./app/Profile/ProfileManager";
 import PublicProfilePage from "./app/Profile/PublicProfilePage";
@@ -31,6 +32,14 @@ const LegacyProfileRedirect = () => {
     return <ProfilesOnboardingPage />;
   }
   return <Navigate to={`/profile/u/${encodeURIComponent(username)}`} replace />;
+};
+
+const SingleBlogParamRedirect = () => {
+  const { pageId } = useParams<{ pageId: string }>();
+  if (!pageId || pageId === 'overview') {
+    return <Navigate to="/blog/aws-sbg-psit/aws-launchpad-2026" replace />;
+  }
+  return <Navigate to={`/blog/aws-sbg-psit/aws-launchpad-2026/${pageId}`} replace />;
 };
 
 const App = () => {
@@ -60,6 +69,17 @@ const App = () => {
           <Route path="/orbit" element={<Platform />} />
           <Route path="/events-showcase" element={<Events />} />
           <Route path="/event-calendar" element={<Events />} />
+
+          {/* Blog / Documentation Pages — /blog/hoster_name/blog_name/:pageId */}
+          <Route path="/blog/:hoster/:blogName" element={<BlogLanding />} />
+          <Route path="/blog/:hoster/:blogName/:pageId" element={<BlogLanding />} />
+
+          {/* Blog Aliases & Redirects */}
+          <Route path="/blog" element={<Navigate to="/blog/aws-sbg-psit/aws-launchpad-2026" replace />} />
+          <Route path="/blogs" element={<Navigate to="/blog/aws-sbg-psit/aws-launchpad-2026" replace />} />
+          <Route path="/blogs/:hoster/:blogName" element={<BlogLanding />} />
+          <Route path="/blogs/:hoster/:blogName/:pageId" element={<BlogLanding />} />
+          <Route path="/blog/:pageId" element={<SingleBlogParamRedirect />} />
 
           {/* Public Shareable Profile Showcase Route */}
           <Route path="/profile/u/:username" element={<PublicProfilePage />} />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Code2, GitBranch } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "../../store";
 import { NotificationBell } from "../../components/NotificationBell";
@@ -34,7 +34,6 @@ export default function Dashboard() {
 
     const [activeTab, setActiveTab] = useState<SidebarTab>(() => getTabFromPath(location.pathname));
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
     const [activeDashboardField, setActiveDashboardField] = useState<"practice" | "development">("practice");
 
     useEffect(() => {
@@ -139,7 +138,7 @@ export default function Dashboard() {
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col h-full overflow-y-auto min-w-0 p-3 sm:p-5 lg:p-7">
+            <div className="flex-1 flex flex-col h-full overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
                 {activeTab === "resume" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
                         <ResumeManager onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
@@ -167,7 +166,11 @@ export default function Dashboard() {
                         className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
                         <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
-                            <TrendsView connectedPortals={connectedPortals} username={user?.username || ""} />
+                            <TrendsView
+                                connectedPortals={connectedPortals}
+                                username={user?.username || ""}
+                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                            />
                         </div>
                         <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
                             <img
@@ -302,43 +305,10 @@ export default function Dashboard() {
                                         </button>
                                     </div>
 
-                                    {/* Quick Search */}
-                                    <div className="relative hidden xl:block w-48">
-                                        <input
-                                            type="text"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder="Search jump..."
-                                            className="w-full pl-8 pr-3 py-1.5 bg-white text-xs rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] text-black font-bold focus:outline-none placeholder:text-neutral-400"
-                                        />
-                                        <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-neutral-500">
-                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                                <circle cx="11" cy="11" r="8" />
-                                                <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                                            </svg>
-                                        </div>
-                                    </div>
-
                                     {/* Notification Bell */}
                                     <div className="p-1 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                         <NotificationBell variant="light" />
                                     </div>
-
-                                    {/* Profile Avatar Badge */}
-                                    <Link
-                                        to="/profile"
-                                        title="Profile Settings"
-                                        className="flex items-center gap-2 p-1 pl-1.5 pr-2.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#FAF6EE] transition-colors"
-                                    >
-                                        <img
-                                            src={user?.photoUrl || user?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=111827&color=fff&size=64&bold=true`}
-                                            alt={displayName}
-                                            className="w-6 h-6 rounded-lg object-cover border border-black"
-                                        />
-                                        <span className="hidden sm:inline text-xs font-black text-black">
-                                            {displayName}
-                                        </span>
-                                    </Link>
                                 </div>
                             </div>
 

@@ -127,6 +127,12 @@ async function apiFetch<T = any>(
             return json as T;
         }
 
+        // If a proxy gateway error (502/503/504) occurred on the local proxy, try the direct backend port
+        if ((response.status === 502 || response.status === 503 || response.status === 504) && !url.includes("localhost:3000")) {
+            lastError = `Backend server unreachable (${response.status}: ${response.statusText}). Please ensure backend is running.`;
+            continue;
+        }
+
         // Authoritative server response: do NOT try subsequent endpoints and mask error
         const errJson = await response.json().catch(() => null);
         const errMsg =
@@ -134,6 +140,8 @@ async function apiFetch<T = any>(
             errJson?.error ||
             (response.status === 401
                 ? "Authentication required. Please log in."
+                : response.status === 502
+                ? "Backend server is unavailable (502 Bad Gateway). Please ensure the backend server is running."
                 : `Server returned error (${response.status}): ${response.statusText}`);
         throw new Error(errMsg);
     }

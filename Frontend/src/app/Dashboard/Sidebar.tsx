@@ -703,10 +703,10 @@ export const Sidebar = ({
     return (
         <>
             {/* Desktop Fixed Floating Sidebar:
-                Fixed-width placeholder rail (w-[96px] sm:w-[104px]) keeps dashboard width 100% static so UI never hangs or reflows.
+                Fixed-width placeholder rail keeps dashboard width 100% static so UI never hangs or reflows.
                 The expanding aside floats on top (absolute top-3 left-3 z-50).
             */}
-            <div className="hidden lg:block h-screen sticky top-0 p-3 sm:p-4 flex-shrink-0 w-[96px] sm:w-[104px] z-40 relative">
+            <div className="hidden lg:block h-screen sticky top-0 flex-shrink-0 w-[84px] sm:w-[88px] z-40 relative">
                 {sidebarContent}
             </div>
 
