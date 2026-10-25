@@ -1,26 +1,30 @@
-import { useEffect } from "react";
+import { useEffect, Suspense, lazy } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
-import SignInPage from './LandingPages/Auth-Pages/Signin/Landing';
-import SignUpPage from './LandingPages/Auth-Pages/Signup/Landing';
 import MainLanding from "./LandingPages/Main-Landing-Pages/Landing";
-import CustomersPage from "./LandingPages/Customers/Landing";
-import PricingPage from "./LandingPages/Pricing/Landing";
-import SupportPage from "./LandingPages/Support/Landing";
-import PlatformPage from "./LandingPages/Platform/Landing";
-import BlogLanding from "./LandingPages/Blog/Landing";
-import BlogCollectionPage from "./LandingPages/Blog/BlogCollectionPage";
-import Dashboard from "./app/Dashboard/Landing";
-import ProfileManager from "./app/Profile/ProfileManager";
-import PublicProfilePage from "./app/Profile/PublicProfilePage";
-import ProfilesOnboardingPage from "./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage";
-import LeaderboardPage from "./app/Leaderboard/LeaderboardPage";
-import EventTrackerPage from "./app/Events/EventTrackerPage";
-import { Card } from "./LandingPages/Main-Landing-Pages/Card";
-import { Platform } from "./LandingPages/Main-Landing-Pages/Platform";
-import { Events } from "./LandingPages/Main-Landing-Pages/Events";
 import ProtectedRoute from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
+
+// Code-split other routes & showcases to keep initial homepage bundle ultra-lean
+const SignInPage = lazy(() => import('./LandingPages/Auth-Pages/Signin/Landing'));
+const SignUpPage = lazy(() => import('./LandingPages/Auth-Pages/Signup/Landing'));
+const CustomersPage = lazy(() => import("./LandingPages/Customers/Landing"));
+const PricingPage = lazy(() => import("./LandingPages/Pricing/Landing"));
+const SupportPage = lazy(() => import("./LandingPages/Support/Landing"));
+const PlatformPage = lazy(() => import("./LandingPages/Platform/Landing"));
+const BlogLanding = lazy(() => import("./LandingPages/Blog/Landing"));
+const BlogCollectionPage = lazy(() => import("./LandingPages/Blog/BlogCollectionPage"));
+const DocsHubPage = lazy(() => import("./LandingPages/Docs/DocsHubPage"));
+const DocsViewerPage = lazy(() => import("./LandingPages/Docs/DocsViewerPage"));
+const Dashboard = lazy(() => import("./app/Dashboard/Landing"));
+const ProfileManager = lazy(() => import("./app/Profile/ProfileManager"));
+const PublicProfilePage = lazy(() => import("./app/Profile/PublicProfilePage"));
+const ProfilesOnboardingPage = lazy(() => import("./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage"));
+const LeaderboardPage = lazy(() => import("./app/Leaderboard/LeaderboardPage"));
+const EventTrackerPage = lazy(() => import("./app/Events/EventTrackerPage"));
+const Card = lazy(() => import("./LandingPages/Main-Landing-Pages/Card").then(m => ({ default: m.Card })));
+const Platform = lazy(() => import("./LandingPages/Main-Landing-Pages/Platform").then(m => ({ default: m.Platform })));
+const Events = lazy(() => import("./LandingPages/Main-Landing-Pages/Events").then(m => ({ default: m.Events })));
 
 const WorkspaceRedirect = () => {
   const { user } = useAppSelector((state) => state.user);
@@ -54,7 +58,8 @@ const App = () => {
   return (
     <ToastProvider>
       <BrowserRouter>
-        <Routes>
+        <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-black/20 border-t-black animate-spin" /></div>}>
+          <Routes>
           {/* Public Landing & Marketing Pages */}
           <Route path="/" element={<MainLanding />} />
           <Route path="/customers" element={<CustomersPage />} />
@@ -83,8 +88,10 @@ const App = () => {
           <Route path="/blog/:pageId" element={<SingleBlogParamRedirect />} />
 
           {/* Docs Routes */}
-          <Route path="/docs" element={<Navigate to="/blog/aws-sbg-psit/aws-launchpad-2026" replace />} />
-          <Route path="/docs/:pageId" element={<SingleBlogParamRedirect />} />
+          <Route path="/docs" element={<DocsHubPage />} />
+          <Route path="/docs/algorithm" element={<DocsViewerPage />} />
+          <Route path="/docs/:slug" element={<DocsViewerPage />} />
+          <Route path="/docs/:folderId/:docId" element={<DocsViewerPage />} />
 
           {/* Public Shareable Profile Showcase Route */}
           <Route path="/profile/u/:username" element={<PublicProfilePage />} />
@@ -114,6 +121,7 @@ const App = () => {
             <Route path="/projects" element={<Dashboard />} />
           </Route>
         </Routes>
+        </Suspense>
       </BrowserRouter>
     </ToastProvider>
   );

@@ -36,7 +36,6 @@ export const ALL_16_PLATFORMS = [
     { id: "interviewbit", name: "InterviewBit", color: "#0D8BD9", defaultType: "contest" },
     { id: "cses", name: "CSES", color: "#214478", defaultType: "contest" },
     { id: "spoj", name: "SPOJ", color: "#1B6AC9", defaultType: "contest" },
-    { id: "algorithmxlr8", name: "AlgorithmXlr8", color: "#0284C7", defaultType: "contest" },
 ];
 
 // Helper: Format duration
@@ -641,31 +640,6 @@ function generateScheduledEventsForWindow(
                         endTimestamp: end,
                         durationSeconds: duration,
                         durationFormatted: "4h",
-                        type: "contest",
-                        status: now > end ? "FINISHED" : now >= start ? "LIVE" : "UPCOMING",
-                        rated: true,
-                    });
-                }
-            }
-
-            // AlgorithmXlr8: Speed Cup (Alternate Thursdays)
-            if (dayOfWeek === 4 && (day >= 7 && day <= 14 || day >= 21 && day <= 28)) {
-                const start = new Date(y, m, day, 19, 30, 0).getTime();
-                const duration = 5400;
-                const end = start + duration * 1000;
-                if (start >= startMs && start <= endMs) {
-                    items.push({
-                        id: `algoxlr8-${y}-${m}-${day}`,
-                        platform: "algorithmxlr8",
-                        platformName: "AlgorithmXlr8",
-                        title: `AlgorithmXlr8 Speed Cup #${day}`,
-                        url: "https://algorithmxlr8.com",
-                        startTime: new Date(start).toISOString(),
-                        endTime: new Date(end).toISOString(),
-                        startTimestamp: start,
-                        endTimestamp: end,
-                        durationSeconds: duration,
-                        durationFormatted: "1h 30m",
                         type: "contest",
                         status: now > end ? "FINISHED" : now >= start ? "LIVE" : "UPCOMING",
                         rated: true,

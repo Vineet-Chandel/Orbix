@@ -168,11 +168,11 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
     };
 
     return (
-        <header className="fixed top-6 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+        <header className="fixed top-3 sm:top-6 left-0 right-0 z-50 flex justify-center px-2 sm:px-4 pointer-events-none">
             <nav
                 ref={navRef}
                 aria-label="Main Navigation"
-                className="w-[80%] pointer-events-auto relative flex items-center justify-between gap-1.5 sm:gap-2.5 p-[3px] pl-3.5 sm:pl-4 pr-[3px] rounded-full bg-white/85 backdrop-blur-xl border border-black/10 shadow-[0_10px_35px_-5px_rgba(0,0,0,0.08),0_1px_2px_0_rgba(0,0,0,0.04)] transition-all duration-300 h-[52px]"
+                className="w-[96%] sm:w-[92%] md:w-[86%] lg:w-[80%] max-w-5xl pointer-events-auto relative flex items-center justify-between gap-1 sm:gap-2.5 p-[3px] pl-2.5 sm:pl-4 pr-[3px] rounded-full bg-white/95 backdrop-blur-md border-2 border-black shadow-[4px_4px_0px_#000] transition-all duration-300 h-[48px] sm:h-[52px]"
             >
                 {/* Brand Logo & Title */}
                 <Link
@@ -220,7 +220,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                     id={`nav-item-${item.id}`}
                                     type="button"
                                     onClick={() => handleTabClick(item.id)}
-                                    className={`relative z-10 flex items-center h-[46px] px-3.5 sm:px-4 rounded-full text-xs sm:text-sm transition-colors duration-200 focus:outline-none select-none cursor-pointer ${isSelected
+                                    className={`relative z-10 flex items-center h-[40px] sm:h-[46px] px-2.5 sm:px-4 rounded-full text-xs sm:text-sm transition-colors duration-200 focus:outline-none select-none cursor-pointer ${isSelected
                                         ? 'text-white font-semibold'
                                         : isHovered
                                             ? 'text-neutral-950 font-medium'
@@ -290,7 +290,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                     {/* Demo Profile Link */}
                     <Link
                         to="/profile/u/Vineet-Chandel"
-                        className="h-[46px] px-3.5 sm:px-4 flex items-center justify-center text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-950 transition-colors rounded-full hover:bg-neutral-100 focus:outline-none whitespace-nowrap"
+                        className="hidden md:flex h-[40px] sm:h-[46px] px-3 sm:px-4 items-center justify-center text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-950 transition-colors rounded-full hover:bg-neutral-100 focus:outline-none whitespace-nowrap"
                         title="View live demo showcase profile (@Vineet-Chandel)"
                     >
                         Demo Profile
@@ -305,7 +305,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         onClick={handleWorkspaceClick}
                         disabled={loading}
                         title={isLoggedIn ? `${displayName} - Open Workspace` : "Sign in to Orbix"}
-                        className={`group relative inline-flex items-center h-[46px] gap-2 rounded-full bg-neutral-950 text-white font-semibold text-xs sm:text-sm shadow-sm hover:bg-black transition-all duration-200 hover:shadow-[0_4px_16px_rgba(0,0,0,0.18)] hover:scale-[1.02] active:scale-[0.98] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden ${isLoggedIn ? "pl-1.5 sm:pl-2 pr-2.5 sm:pr-3" : "pl-4 sm:pl-5 pr-2.5 sm:pr-3"
+                        className={`group relative inline-flex items-center h-[40px] sm:h-[46px] gap-1.5 sm:gap-2 rounded-full bg-black text-white font-black text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden ${isLoggedIn ? "pl-1 sm:pl-2 pr-2 sm:pr-3" : "pl-3.5 sm:pl-5 pr-2.5 sm:pr-3"
                             }`}
                     >
                         {isLoggedIn && (

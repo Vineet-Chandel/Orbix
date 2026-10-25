@@ -154,16 +154,6 @@ export const getPortalIcon = (portalId: string, className = "w-5 h-5"): ReactNod
                 </svg>
             );
 
-        case "algorithmxlr8":
-            return (
-                <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="24" height="24" rx="6" fill="#F0F9FF" />
-                    <path d="M4.5 19L11.5 5H14.5L10.5 19H4.5Z" fill="#0284C7" />
-                    <path d="M12.5 12L18.5 19H14.5L10.5 14.2L12.5 12Z" fill="#38BDF8" />
-                    <path d="M7.5 14H16.5" stroke="#0284C7" strokeWidth="2.2" strokeLinecap="round" />
-                </svg>
-            );
-
         case "medium":
             return (
                 <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -182,6 +172,13 @@ export const getPortalIcon = (portalId: string, className = "w-5 h-5"): ReactNod
                     <path d="M6 6.5H18V8.2H6V6.5Z" fill="white" />
                     <path d="M6 9.8H18V11.5H6V9.8Z" fill="white" />
                     <path d="M6 13.1H18L12 17.5L6 13.1Z" fill="white" />
+                </svg>
+            );
+
+        case "kaggle":
+            return (
+                <svg className={className} viewBox="0 0 24 24" fill="#20BEFF">
+                    <path d="M18.825 23.859c-.022.09-.117.141-.281.141h-3.139a.7.7 0 0 1-.58-.291l-4.99-6.425-1.579 1.516v4.739c0 .324-.15.461-.462.461H5.163c-.324 0-.462-.137-.462-.461V.461C4.7.138 4.839 0 5.163 0h2.631c.312 0 .462.138.462.461v14.471l6.236-6.289a.8.8 0 0 1 .58-.242h3.292c.164 0 .258.05.281.14.024.114-.023.208-.14.282l-6.84 6.7 7.056 8.055c.117.07.164.164.14.281Z" />
                 </svg>
             );
 

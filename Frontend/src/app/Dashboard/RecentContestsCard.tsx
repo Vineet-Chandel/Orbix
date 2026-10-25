@@ -131,11 +131,11 @@ export const RecentContestsCard: React.FC<RecentContestsCardProps> = ({
 
                 {/* Optional platform filter chips if contests from multiple platforms exist */}
                 {platformsList.length > 1 && (
-                    <div className="flex items-center gap-2 overflow-x-auto py-3 border-b-2 border-black/15 relative z-10 scrollbar-none text-xs sm:text-sm">
+                    <div className="portal-filter-container flex items-center gap-2 overflow-x-auto py-3 border-b-2 border-black/15 relative z-10 scrollbar-none text-xs sm:text-sm">
                         <button
                             type="button"
                             onClick={() => setSelectedPortal("all")}
-                            className={`px-3.5 py-1.5 rounded-xl font-black transition-all cursor-pointer text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] ${
+                            className={`px-3 sm:px-3.5 py-1.5 rounded-xl font-black transition-all cursor-pointer text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] shrink-0 ${
                                 selectedPortal === "all"
                                     ? "bg-black text-[#a2ff86]"
                                     : "bg-[#FAF6EE] text-black hover:bg-neutral-200"
@@ -150,17 +150,19 @@ export const RecentContestsCard: React.FC<RecentContestsCardProps> = ({
                                     key={p}
                                     type="button"
                                     onClick={() => setSelectedPortal(p)}
-                                    className={`px-3.5 py-1.5 rounded-xl font-black capitalize transition-all cursor-pointer flex items-center gap-1.5 text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] ${
+                                    title={p}
+                                    aria-label={p}
+                                    className={`px-2.5 sm:px-3.5 py-1.5 rounded-xl font-black capitalize transition-all cursor-pointer flex items-center gap-1.5 text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] shrink-0 ${
                                         selectedPortal === p
                                             ? "bg-black text-[#a2ff86]"
                                             : "bg-[#FAF6EE] text-black hover:bg-neutral-200"
                                     }`}
                                 >
-                                    <span className="w-3.5 h-3.5 flex items-center justify-center">
+                                    <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
                                         {getPortalIcon(p, "w-full h-full object-contain")}
                                     </span>
-                                    <span>{p}</span>
-                                    <span className="text-xs font-mono font-bold">({count})</span>
+                                    <span className="portal-tab-label hidden sm:inline capitalize">{p}</span>
+                                    <span className="text-[11px] sm:text-xs font-mono font-bold">({count})</span>
                                 </button>
                             );
                         })}

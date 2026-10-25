@@ -14,6 +14,8 @@ import {
     TrendingUp,
     Sparkles,
     X,
+    Eye,
+    EyeOff,
 } from "lucide-react";
 import {
     useAppDispatch,
@@ -43,7 +45,6 @@ export const ALL_16_PLATFORMS = [
     { id: "interviewbit", name: "InterviewBit", color: "#0D8BD9" },
     { id: "cses", name: "CSES", color: "#214478" },
     { id: "spoj", name: "SPOJ", color: "#1B6AC9" },
-    { id: "algorithmxlr8", name: "AlgorithmXlr8", color: "#0284C7" },
 ];
 
 const MONTH_NAMES = [
@@ -236,6 +237,9 @@ export const EventTrackerPage: React.FC = () => {
     // Mobile Sidebar toggle
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
+    // Toggle to see or remove finished contests from the list (default false to keep list focused on upcoming)
+    const [showFinished, setShowFinished] = useState<boolean>(false);
+
     // Live ticking clock for hero timer (updates every second)
     const [nowMs, setNowMs] = useState<number>(Date.now());
     useEffect(() => {
@@ -324,8 +328,8 @@ export const EventTrackerPage: React.FC = () => {
         }
     };
 
-    // Filter events by selectedType (contests vs hackathons) and selectedPlatform
-    const filteredEvents = useMemo(() => {
+    // Base filtered events by selectedType (contests vs hackathons) and selectedPlatform
+    const baseFilteredEvents = useMemo(() => {
         const targetType = selectedType === "contests" ? "contest" : "hackathon";
         return allEvents.filter((e) => {
             if (e.type !== targetType) return false;
@@ -333,6 +337,19 @@ export const EventTrackerPage: React.FC = () => {
             return true;
         });
     }, [allEvents, selectedType, selectedPlatform]);
+
+    // Count how many contests in this filter are finished
+    const finishedCount = useMemo(() => {
+        return baseFilteredEvents.filter((e) => e.status === "FINISHED" || (e.endTimestamp && e.endTimestamp < nowMs)).length;
+    }, [baseFilteredEvents, nowMs]);
+
+    // Filtered events: removes finished contests when showFinished is false
+    const filteredEvents = useMemo(() => {
+        if (showFinished) {
+            return baseFilteredEvents;
+        }
+        return baseFilteredEvents.filter((e) => e.status !== "FINISHED" && (!e.endTimestamp || e.endTimestamp >= nowMs));
+    }, [baseFilteredEvents, showFinished, nowMs]);
 
     // Group filtered events by Date in IST for List View
     const groupedDateEvents = useMemo(() => {
@@ -1059,29 +1076,74 @@ export const EventTrackerPage: React.FC = () => {
                         ) : (
                             /* 4b. List View Mode (Grouped by Date with Brackets) */
                             <>
-                                <div className="flex items-center justify-between gap-3 border-b border-neutral-800 pb-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-800 pb-3">
                                     <div className="flex items-center gap-2">
                                         <h3 className="text-xl font-bold tracking-tight text-white">
-                                            All {selectedType === "contests" ? "Contests" : "Hackathons"} ({filteredEvents.length})
+                                            {showFinished ? `All ${selectedType === "contests" ? "Contests" : "Hackathons"}` : `Upcoming ${selectedType === "contests" ? "Contests" : "Hackathons"}`} ({filteredEvents.length})
                                         </h3>
                                         {groupedDateEvents.length > 0 && (
-                                            <span className="text-xs px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-neutral-400 font-mono">
+                                            <span className="text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/15 text-neutral-300 font-mono">
                                                 {groupedDateEvents.length} Days
                                             </span>
                                         )}
                                     </div>
-                                    <span className="text-xs text-neutral-400">
-                                        Sorted by Start Time
-                                    </span>
+                                    <div className="flex items-center gap-3 flex-wrap">
+                                        {/* Button to see or remove finished contests from the list */}
+                                        {finishedCount > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowFinished(!showFinished)}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border-2 cursor-pointer ${
+                                                    showFinished
+                                                        ? "bg-[#FFE566] text-black border-black shadow-[2px_2px_0px_#000]"
+                                                        : "bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border-neutral-700 shadow-sm"
+                                                }`}
+                                                title={showFinished ? "Click to remove finished contests from this list" : "Click to view finished contests in this list"}
+                                            >
+                                                {showFinished ? (
+                                                    <>
+                                                        <EyeOff className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                        <span>Remove Finished from List</span>
+                                                        <span className="bg-black text-[#FFE566] text-[10px] px-1.5 py-0.5 rounded-md font-mono">
+                                                            {finishedCount}
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                        <span>See Finished Contests</span>
+                                                        <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded-md font-mono">
+                                                            {finishedCount}
+                                                        </span>
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
+                                        <span className="text-xs text-neutral-400">
+                                            Sorted by Start Time
+                                        </span>
+                                    </div>
                                 </div>
 
                                 {groupedDateEvents.length === 0 ? (
-                                    <div className="py-16 text-center rounded-2xl bg-neutral-950 border border-neutral-800 p-8">
-                                        <CalendarIcon className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
-                                        <h4 className="text-base font-bold text-white mb-1">No contests found</h4>
+                                    <div className="py-16 text-center rounded-2xl bg-neutral-950 border border-neutral-800 p-8 space-y-3">
+                                        <CalendarIcon className="w-12 h-12 text-neutral-600 mx-auto" />
+                                        <h4 className="text-base font-bold text-white mb-1">No upcoming contests found</h4>
                                         <p className="text-xs text-neutral-400 max-w-sm mx-auto">
-                                            There are no scheduled contests matching your current platform or month filters.
+                                            {finishedCount > 0
+                                                ? `There are ${finishedCount} concluded contests matching this filter.`
+                                                : "There are no scheduled contests matching your current platform or month filters."}
                                         </p>
+                                        {finishedCount > 0 && !showFinished && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowFinished(true)}
+                                                className="px-4 py-2 rounded-xl text-xs font-black bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-yellow-300 transition cursor-pointer inline-flex items-center gap-2 mt-2"
+                                            >
+                                                <Eye className="w-4 h-4 stroke-[2.5]" />
+                                                <span>See Finished Contests ({finishedCount})</span>
+                                            </button>
+                                        )}
                                     </div>
                                 ) : (
                                     <div className="space-y-4 sm:space-y-5">

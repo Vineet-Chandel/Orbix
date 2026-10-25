@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { RotateCcw } from "lucide-react";
+import { RotateCcw, Sparkles } from "lucide-react";
 import { LinkedInCard } from "../../../app/Profile/CardStudio/LinkedInCard";
 import { InstagramStoryCard } from "../../../app/Profile/CardStudio/InstagramStoryCard";
 import type { CardThemeConfig } from "../../../app/Profile/CardStudio/types";
@@ -96,13 +96,10 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
 
     return (
         <section
-            className={`relative w-full bg-[#ffffff] text-white py-12 sm:py-16 px-4 sm:px-6 lg:px-8 overflow-hidden font-sans select-none ${className}`}
+            className={`relative w-full bg-[#FAF6EE] text-neutral-900 py-14 sm:py-20 px-4 sm:px-6 lg:px-8 overflow-hidden font-sans select-none ${className}`}
         >
-            {/* Ambient Midnight Indigo Lighting */}
-            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] sm:w-[1300px] h-[600px] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-600/18 via-purple-900/10 to-transparent blur-3xl pointer-events-none -z-10" />
-            <div className="absolute bottom-10 right-1/4 w-[600px] h-[350px] bg-indigo-500/8 blur-[150px] pointer-events-none -z-10" />
-
-
+            {/* Warm, eye-friendly dot grid matching Orbix platform canvas */}
+            <div className="absolute inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
 
             {/* Side-by-Side Parallel Cards: Instagram Story on LEFT, LinkedIn on RIGHT */}
             <div className="relative w-full max-w-[1540px] mx-auto flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-10 xl:gap-12">
@@ -110,9 +107,6 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                     CARD 1 (LEFT): INSTAGRAM STORY CARD (Portrait 1080 x 1920) 1.5x
                 ========================================================================= */}
                 <div className="flex flex-col items-center">
-                    {/* Format Header Pill */}
-
-
                     {/* 3D Motion Card Container (Scale effect on hover strictly turned OFF) */}
                     <div style={{ perspective: 1800 }}>
                         <motion.div
@@ -137,11 +131,10 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                         >
                             {/* Front Face (Default View) */}
                             <div
-                                className="absolute inset-0 w-full h-full rounded-[28px] sm:rounded-[36px] overflow-hidden border border-slate-800 shadow-2xl"
+                                className="absolute inset-0 w-full h-full rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-black shadow-[8px_8px_0px_#000]"
                                 style={{
                                     backfaceVisibility: "hidden",
                                     WebkitBackfaceVisibility: "hidden",
-                                    boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 50px -10px rgba(99, 102, 241, 0.35)",
                                 }}
                             >
                                 <div
@@ -173,12 +166,11 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
 
                             {/* Back Face (Revealed on 3D Flip) */}
                             <div
-                                className="absolute inset-0 w-full h-full rounded-[28px] sm:rounded-[36px] overflow-hidden border border-slate-800 shadow-2xl"
+                                className="absolute inset-0 w-full h-full rounded-[28px] sm:rounded-[36px] overflow-hidden border-2 border-black shadow-[8px_8px_0px_#000]"
                                 style={{
                                     backfaceVisibility: "hidden",
                                     WebkitBackfaceVisibility: "hidden",
                                     transform: "rotateY(180deg)",
-                                    boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 50px -10px rgba(99, 102, 241, 0.35)",
                                 }}
                             >
                                 <div
@@ -214,10 +206,10 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                     <button
                         type="button"
                         onClick={() => setIsStoryFlipped((prev) => !prev)}
-                        className="mt-4 px-5 py-2.5 rounded-full text-xs font-bold transition-all flex items-center gap-2 shadow-lg cursor-pointer active:scale-95 bg-white hover:bg-neutral-100 text-neutral-900 border border-white/80 hover:border-neutral-200"
+                        className="mt-4 px-5 py-2.5 rounded-full text-xs font-black transition-all flex items-center gap-2 border-2 border-black bg-white text-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                         title="Rotate Instagram story card in 3D"
                     >
-                        <RotateCcw className={`w-3.5 h-3.5 text-neutral-900 transition-transform duration-500 ${isStoryFlipped ? "rotate-180" : ""}`} />
+                        <RotateCcw className={`w-3.5 h-3.5 text-black stroke-[2.5] transition-transform duration-500 ${isStoryFlipped ? "rotate-180" : ""}`} />
                         <span>
                             {isStoryFlipped ? "Showing Back (QR & Activity) · Flip to Front" : "Showing Front Face · Flip to Back"}
                         </span>
@@ -255,11 +247,10 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                         >
                             {/* Front Face (Default View) */}
                             <div
-                                className="absolute inset-0 w-full h-full rounded-[26px] sm:rounded-[32px] overflow-hidden border border-slate-800 shadow-2xl"
+                                className="absolute inset-0 w-full h-full rounded-[26px] sm:rounded-[32px] overflow-hidden border-2 border-black shadow-[8px_8px_0px_#000]"
                                 style={{
                                     backfaceVisibility: "hidden",
                                     WebkitBackfaceVisibility: "hidden",
-                                    boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 50px -10px rgba(99, 102, 241, 0.35)",
                                 }}
                             >
                                 <div
@@ -291,12 +282,11 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
 
                             {/* Back Face (Revealed on 3D Flip) */}
                             <div
-                                className="absolute inset-0 w-full h-full rounded-[26px] sm:rounded-[32px] overflow-hidden border border-slate-800 shadow-2xl"
+                                className="absolute inset-0 w-full h-full rounded-[26px] sm:rounded-[32px] overflow-hidden border-2 border-black shadow-[8px_8px_0px_#000]"
                                 style={{
                                     backfaceVisibility: "hidden",
                                     WebkitBackfaceVisibility: "hidden",
                                     transform: "rotateY(180deg)",
-                                    boxShadow: "0 30px 70px -15px rgba(0, 0, 0, 0.9), 0 0 50px -10px rgba(99, 102, 241, 0.35)",
                                 }}
                             >
                                 <div
@@ -332,10 +322,10 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                     <button
                         type="button"
                         onClick={() => setIsLinkedInFlipped((prev) => !prev)}
-                        className="mt-4 px-5 py-2.5 rounded-full text-xs font-bold transition-all flex items-center gap-2 shadow-lg cursor-pointer active:scale-95 bg-white hover:bg-neutral-100 text-neutral-900 border border-white/80 hover:border-neutral-200"
+                        className="mt-4 px-5 py-2.5 rounded-full text-xs font-black transition-all flex items-center gap-2 border-2 border-black bg-white text-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                         title="Rotate LinkedIn card in 3D"
                     >
-                        <RotateCcw className={`w-3.5 h-3.5 text-neutral-900 transition-transform duration-500 ${isLinkedInFlipped ? "rotate-180" : ""}`} />
+                        <RotateCcw className={`w-3.5 h-3.5 text-black stroke-[2.5] transition-transform duration-500 ${isLinkedInFlipped ? "rotate-180" : ""}`} />
                         <span>
                             {isLinkedInFlipped ? "Showing Back (QR & Links) · Flip to Front" : "Showing Front Face · Flip to Back"}
                         </span>
@@ -343,30 +333,7 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                 </div>
             </div>
 
-            {/* Header: Clean, Uncluttered, Developer-Centric */}
-            <div className="text-center  mx-auto mt-14">
 
-
-                <h2 className="text-3xl sm:text-6xl font-black text-[#000000] tracking-tight leading-tight">
-                    {title === "One card. Every place that matters." ? (
-                        <>
-                            One card.{" "}
-                            <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-300 bg-clip-text text-transparent">
-                                Every place
-                            </span>{" "}
-                            that matters.
-                        </>
-                    ) : (
-                        title
-                    )}
-                </h2>
-
-                <p className="text-slate-400 text-sm sm:text-base mt-3 max-w-xl mx-auto leading-relaxed">
-                    {subtitle}
-                </p>
-
-
-            </div>
         </section>
     );
 };

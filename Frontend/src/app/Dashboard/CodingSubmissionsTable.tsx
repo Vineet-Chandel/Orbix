@@ -3,18 +3,20 @@ import { Link } from "react-router-dom";
 import {
     GitCommit,
     Flame,
-    Calendar,
     Code2,
     Layers,
     Sparkles,
     CheckCircle2,
     ArrowRight,
+    Trophy,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUnifiedSubmissions, invalidateSubmissions } from "../../store";
 import { getPortalIcon } from "../../utils/portalIcons";
 import {
     aggregateClientPortalsSubmissions,
     buildWeeklySubmissionColumns,
+    calculateUnifiedStreak,
+    normalizeDateKey,
     type DaySubmissionCell,
     type PlatformSubmissionStat,
 } from "../../utils/submissionsAggregator";
@@ -150,50 +152,80 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     }, [selectedPortal, connectedPlatformsList]);
 
     // Build weeks, daily counts, and totals from sanitized data (strictly excluding removed platforms)
-    const { weeks, monthNames, totalSubmissions, activeDays, dayStreak } = useMemo(() => {
-        const rawMap = remoteData?.dailyMerged || {};
-        const activePortalsSet = new Set(Object.keys(platformBreakdown));
+    const { weeks, monthNames, totalSubmissions, streakMetrics } = useMemo(() => {
+        const rawMap = (remoteData?.dailyMerged && Object.keys(remoteData.dailyMerged).length > 0)
+            ? remoteData.dailyMerged
+            : (clientAgg.dailyMerged || {});
+        const activePortalsSet = new Set(Object.keys(platformBreakdown).map((p) => p.toLowerCase()));
 
         const sanitizedMap: Record<string, { count: number; platforms: string[] }> = {};
         let totalCount = 0;
 
-        if (Object.keys(rawMap).length > 0) {
-            for (const [dateStr, entry] of Object.entries(rawMap)) {
-                const filteredPlatforms = (entry.platforms || []).filter((p) => activePortalsSet.has(p.toLowerCase()));
-                if (filteredPlatforms.length === 0) continue;
+        const isPlatformSpecific = selectedPortal !== "all";
+        const targetPortal = selectedPortal.toLowerCase().trim();
 
-                if (selectedPortal !== "all" && !filteredPlatforms.includes(selectedPortal)) {
+        for (const [rawDateStr, entry] of Object.entries(rawMap)) {
+            if (!entry || entry.count <= 0) continue;
+            const dateStr = normalizeDateKey(rawDateStr) || rawDateStr;
+
+            const entryPlatforms = (entry.platforms || []).map((p) => p.toLowerCase().trim());
+            const platformCounts = (entry as any).platformCounts as Record<string, number> | undefined;
+
+            if (isPlatformSpecific) {
+                // Strictly verify if this entry has submissions for the selected platform
+                let specificCount = 0;
+                if (platformCounts && typeof platformCounts === "object") {
+                    specificCount = platformCounts[targetPortal] ?? 0;
+                } else if (entryPlatforms.length === 1 && entryPlatforms[0] === targetPortal) {
+                    specificCount = entry.count;
+                } else if (entryPlatforms.includes(targetPortal)) {
+                    // Fallback if platformCounts was omitted
+                    specificCount = entry.count;
+                }
+
+                // STRICT FILTERING: If there were 0 submissions on targetPortal on this day, SKIP!
+                if (specificCount <= 0) {
+                    continue;
+                }
+
+                sanitizedMap[dateStr] = {
+                    count: specificCount,
+                    platforms: [targetPortal], // STRICTLY only the selected platform!
+                };
+                totalCount += specificCount;
+            } else {
+                // "all" platforms view: filter only by active portals
+                const filteredPlatforms = entryPlatforms.filter((p) => activePortalsSet.has(p));
+                if (activePortalsSet.size > 0 && entryPlatforms.length > 0 && filteredPlatforms.length === 0) {
                     continue;
                 }
 
                 let cellCount = entry.count;
-                if ((entry as any).platformCounts) {
-                    cellCount = filteredPlatforms.reduce(
-                        (sum, p) => sum + ((entry as any).platformCounts[p] || 0),
+                if (platformCounts && filteredPlatforms.length > 0) {
+                    const sum = filteredPlatforms.reduce(
+                        (s: number, p: string) => s + (platformCounts[p] || 0),
                         0
                     );
+                    if (sum > 0) cellCount = sum;
                 }
                 if (cellCount <= 0) cellCount = 1;
 
-                sanitizedMap[dateStr] = {
-                    count: cellCount,
-                    platforms: filteredPlatforms,
-                };
-                totalCount += cellCount;
-            }
-        } else {
-            // Instant client fallback
-            for (const [dateStr, cell] of clientAgg.weeks.flat().map((c) => [c.dateStr, c] as const)) {
-                if (cell.count <= 0) continue;
-                const filteredPlatforms = cell.platforms.filter((p) => activePortalsSet.has(p.toLowerCase()));
-                if (filteredPlatforms.length === 0) continue;
-                if (selectedPortal !== "all" && !filteredPlatforms.includes(selectedPortal)) continue;
+                const effectivePlatforms = filteredPlatforms.length > 0 ? filteredPlatforms : entryPlatforms;
 
-                sanitizedMap[dateStr] = {
-                    count: cell.count,
-                    platforms: filteredPlatforms,
-                };
-                totalCount += cell.count;
+                if (!sanitizedMap[dateStr]) {
+                    sanitizedMap[dateStr] = {
+                        count: cellCount,
+                        platforms: effectivePlatforms,
+                    };
+                } else {
+                    sanitizedMap[dateStr].count += cellCount;
+                    for (const p of effectivePlatforms) {
+                        if (!sanitizedMap[dateStr].platforms.includes(p)) {
+                            sanitizedMap[dateStr].platforms.push(p);
+                        }
+                    }
+                }
+                totalCount += cellCount;
             }
         }
 
@@ -209,26 +241,24 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
             ? Math.max(totalCount, sumPlatform)
             : (platformBreakdown[selectedPortal]?.submissions || totalCount);
 
-        let streak = 0;
-        const today = new Date();
-        for (let i = 0; i < 365; i++) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
-            const dateStr = d.toISOString().split("T")[0] || "";
-            const entry = sanitizedMap[dateStr];
-            if (entry && entry.count > 0) {
-                streak++;
-            } else if (i > 0) {
-                break;
-            }
+        // Production unified streak algorithm across all active platforms
+        const computedStreak = calculateUnifiedStreak(sanitizedMap);
+
+        // Synchronize with remote server metrics if available and larger
+        if (remoteData?.dayStreak && remoteData.dayStreak > computedStreak.currentStreak) {
+            computedStreak.currentStreak = remoteData.dayStreak;
         }
+        if (remoteData?.maxStreak && remoteData.maxStreak > computedStreak.maxStreak) {
+            computedStreak.maxStreak = remoteData.maxStreak;
+        }
+        computedStreak.maxStreak = Math.max(computedStreak.maxStreak, computedStreak.currentStreak);
 
         return {
             weeks: built.weeks,
             monthNames: built.monthNames,
             totalSubmissions: finalTotal,
             activeDays: daysCount || (finalTotal > 0 ? 1 : 0),
-            dayStreak: Math.max(streak, finalTotal > 0 ? 1 : 0),
+            streakMetrics: computedStreak,
         };
     }, [remoteData, clientAgg, platformBreakdown, selectedPortal, weeksCount]);
 
@@ -337,14 +367,16 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                 <button
                     type="button"
                     onClick={() => setSelectedPortal("all")}
-                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex-shrink-0 border-2 border-black shadow-[2px_2px_0px_#000] ${
+                    className={`inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex-shrink-0 border-2 border-black shadow-[2px_2px_0px_#000] ${
                         selectedPortal === "all"
                             ? "bg-black text-[#a2ff86]"
                             : "bg-[#FAF6EE] hover:bg-neutral-200 text-black"
                     }`}
                 >
-                    <Layers className="w-3.5 h-3.5" />
-                    <span>All Platforms ({connectedPlatformsList.length})</span>
+                    <Layers className="w-3.5 h-3.5 shrink-0" />
+                    <span className="hidden sm:inline">All Platforms</span>
+                    <span className="sm:hidden">All</span>
+                    <span>({connectedPlatformsList.length})</span>
                 </button>
 
                 {connectedPlatformsList.map((plat) => {
@@ -354,16 +386,18 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
                             key={plat.portal}
                             type="button"
                             onClick={() => setSelectedPortal(plat.portal)}
-                            className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex-shrink-0 border-2 border-black shadow-[2px_2px_0px_#000] ${
+                            title={plat.portal}
+                            aria-label={plat.portal}
+                            className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer flex-shrink-0 border-2 border-black shadow-[2px_2px_0px_#000] ${
                                 isSelected
                                     ? "bg-black text-[#a2ff86]"
                                     : "bg-[#FAF6EE] hover:bg-neutral-200 text-black"
                             }`}
                         >
-                            <div className="w-4 h-4 flex items-center justify-center">
+                            <div className="w-4 h-4 flex items-center justify-center shrink-0">
                                 {getPortalIcon(plat.portal, "w-full h-full object-contain")}
                             </div>
-                            <span className="capitalize">{plat.portal}</span>
+                            <span className="portal-tab-label hidden sm:inline capitalize">{plat.portal}</span>
                             <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded border border-black ${
                                 isSelected ? "bg-[#a2ff86] text-black" : "bg-white text-black"
                             }`}>
@@ -451,16 +485,30 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
             <div className="pt-4 mt-2 border-t-2 border-black/15 flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono text-neutral-800 relative z-10">
                 <div className="flex items-center gap-3 flex-wrap">
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FAF6EE] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] text-xs font-black text-black">
-                        <Flame className="w-4 h-4 text-black" />
-                        <span>{dayStreak} day streak</span>
+                        <Flame className={`w-4 h-4 ${streakMetrics.currentStreak > 0 ? "text-orange-500 fill-orange-400" : "text-neutral-400"}`} />
+                        <span>{streakMetrics.currentStreak} day streak</span>
+                        {streakMetrics.isActiveToday ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-400 font-bold ml-0.5 select-none">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Active today
+                            </span>
+                        ) : streakMetrics.canExtendToday ? (
+                            <span className="inline-flex items-center text-[10px] text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-400 font-bold ml-0.5 select-none">
+                                Extend today
+                            </span>
+                        ) : null}
                     </div>
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FAF6EE] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] text-xs font-black text-black">
-                        <Calendar className="w-4 h-4 text-black" />
-                        <span>{activeDays} active coding days</span>
+                        <Trophy className="w-4 h-4 text-amber-500 fill-amber-300" />
+                        <span>{streakMetrics.maxStreak} day best streak</span>
                     </div>
                     <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FAF6EE] border-2 border-black rounded-lg shadow-[2px_2px_0px_#000] text-xs font-black text-black">
-                        <CheckCircle2 className="w-4 h-4 text-black" />
-                        <span>{connectedPlatformsList.length} platform{connectedPlatformsList.length === 1 ? "" : "s"} synced</span>
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                        <span>
+                            {selectedPortal === "all"
+                                ? `${connectedPlatformsList.length} platform${connectedPlatformsList.length === 1 ? "" : "s"} synced`
+                                : `${selectedPortal.charAt(0).toUpperCase() + selectedPortal.slice(1)} active`}
+                        </span>
                     </div>
                 </div>
 

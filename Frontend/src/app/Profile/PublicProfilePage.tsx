@@ -19,7 +19,6 @@ import {
     extractGitHubStats,
 } from "../../utils/cardStatsAggregator";
 import { CodingSubmissionsTable } from "../Dashboard/CodingSubmissionsTable";
-import { PracticeMonthlyStatsCards } from "../Dashboard/PracticeMonthlyStatsCards";
 import { PracticeAnalyticsSection } from "../Dashboard/PracticeAnalytics/PracticeAnalyticsSection";
 import { ContestPerformanceSection } from "../Dashboard/ContestPerformanceSection";
 import { DevelopmentContributionsTable } from "../Dashboard/DevelopmentContributionsTable";
@@ -362,7 +361,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
         )}&background=0c1017&color=fff&size=256&bold=true`;
 
     return (
-        <div className={`${isEmbedded ? "pb-4 embedded-showcase-container" : "min-h-screen pb-16"} bg-[#F0F2F6] text-neutral-900 font-sans antialiased selection:bg-neutral-900 selection:text-white`}>
+        <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen pb-16 bg-[#F0F2F6]"} text-neutral-900 font-sans antialiased selection:bg-neutral-900 selection:text-white`}>
             {/* Minimal Orbix Button Only — Navigates to "/" (Hidden when embedded in hero showcase) */}
             {!isEmbedded && (
                 <div className="w-full px-4 sm:px-8 pt-4 pb-2 flex items-center justify-between">
@@ -875,10 +874,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                     {activeField === "practice" && (
                         <div className="w-full animate-fadeIn space-y-6">
                             <CodingSubmissionsTable
-                                connectedPortals={connectedPortals}
-                                username={profile.username}
-                            />
-                            <PracticeMonthlyStatsCards
                                 connectedPortals={connectedPortals}
                                 username={profile.username}
                             />

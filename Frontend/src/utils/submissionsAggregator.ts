@@ -22,10 +22,20 @@ export interface DaySubmissionCell {
     platforms: string[]; // ["leetcode", "hackerrank"]
 }
 
+export interface UnifiedStreakMetrics {
+    currentStreak: number;
+    maxStreak: number;
+    isActiveToday: boolean;
+    canExtendToday: boolean;
+    streakStatus: "ACTIVE_TODAY" | "AT_RISK" | "INACTIVE";
+}
+
 export interface UnifiedSubmissionsResult {
     totalSubmissions: number;
     activeDays: number;
     dayStreak: number;
+    maxStreak?: number;
+    streakMetrics?: UnifiedStreakMetrics;
     connectedPlatformsCount: number;
     platformBreakdown: Record<string, PlatformSubmissionStat>;
     weeks: DaySubmissionCell[][];
@@ -49,7 +59,6 @@ const BRAND_COLORS: Record<string, string> = {
     hackerearth: "#2C3454",
     cses: "#214478",
     spoj: "#1B6AC9",
-    algorithmxlr8: "#0284C7",
 };
 
 /**
@@ -64,6 +73,171 @@ export function getSubmissionLevel(count: number): 0 | 1 | 2 | 3 | 4 {
 }
 
 /**
+ * Robust date key normalizer: standardizes timestamps (seconds/ms), slashes,
+ * and varying date formats to canonical "YYYY-MM-DD".
+ */
+export function normalizeDateKey(raw: string | number): string | null {
+    if (!raw) return null;
+    const str = String(raw).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+        return str;
+    }
+    // Unix epoch in seconds (9-11 digits) or milliseconds (12-14 digits)
+    if (/^\d{9,14}$/.test(str)) {
+        const num = parseInt(str, 10);
+        const ms = str.length <= 11 ? num * 1000 : num;
+        const d = new Date(ms);
+        if (!isNaN(d.getTime())) {
+            return d.toISOString().split("T")[0] || null;
+        }
+    }
+    // Slashes or spaces or T: YYYY/MM/DD or YYYY.MM.DD
+    const matchYMD = str.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if (matchYMD) {
+        const y = matchYMD[1];
+        const m = matchYMD[2].padStart(2, "0");
+        const d = matchYMD[3].padStart(2, "0");
+        return `${y}-${m}-${d}`;
+    }
+    // DD/MM/YYYY or DD-MM-YYYY
+    const matchDMY = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/);
+    if (matchDMY) {
+        const d = matchDMY[1].padStart(2, "0");
+        const m = matchDMY[2].padStart(2, "0");
+        const y = matchDMY[3];
+        return `${y}-${m}-${d}`;
+    }
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) {
+        return parsed.toISOString().split("T")[0] || null;
+    }
+    return null;
+}
+
+/**
+ * Production & Scalable Unified Multi-Platform Streak Calculator:
+ * Merges practice across all platforms into a continuous chronological timeline.
+ * Features:
+ *  1. Day-level deduplication across all platforms.
+ *  2. Grace window (today has not had a submission yet, but yesterday did -> streak is preserved!).
+ *  3. All-time longest/best streak detection.
+ *  4. Timezone-safe local calendar day arithmetic.
+ */
+export function calculateUnifiedStreak(
+    dailyMap: Record<string, { count: number; platforms?: string[] } | number>,
+    referenceDate: Date = new Date()
+): UnifiedStreakMetrics {
+    const activeDateStrings = new Set<string>();
+    for (const [rawKey, entry] of Object.entries(dailyMap || {})) {
+        const count = typeof entry === "number" ? entry : (entry?.count ?? 0);
+        if (count > 0) {
+            const normKey = normalizeDateKey(rawKey);
+            if (normKey) activeDateStrings.add(normKey);
+        }
+    }
+
+    if (activeDateStrings.size === 0) {
+        return {
+            currentStreak: 0,
+            maxStreak: 0,
+            isActiveToday: false,
+            canExtendToday: false,
+            streakStatus: "INACTIVE",
+        };
+    }
+
+    const toYMD = (d: Date): string => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+    };
+
+    const subDays = (base: Date, days: number): Date => {
+        const res = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+        res.setDate(res.getDate() - days);
+        return res;
+    };
+
+    const sortedDates = Array.from(activeDateStrings).sort();
+    let anchor = new Date(referenceDate);
+    if (sortedDates.length > 0) {
+        const latestStr = sortedDates[sortedDates.length - 1];
+        const latestTime = new Date(`${latestStr}T12:00:00Z`).getTime();
+        if (latestTime > anchor.getTime() || (anchor.getTime() - latestTime > 365 * 86400000)) {
+            anchor = new Date(`${latestStr}T12:00:00Z`);
+        }
+    }
+
+    const todayStr = toYMD(anchor);
+    const yesterdayStr = toYMD(subDays(anchor, 1));
+
+    const isActiveToday = activeDateStrings.has(todayStr);
+    const hadYesterday = activeDateStrings.has(yesterdayStr);
+
+    let currentStreak = 0;
+    let canExtendToday = false;
+    let streakStatus: UnifiedStreakMetrics["streakStatus"] = "INACTIVE";
+
+    if (isActiveToday) {
+        currentStreak = 1;
+        streakStatus = "ACTIVE_TODAY";
+        let offset = 1;
+        while (activeDateStrings.has(toYMD(subDays(anchor, offset)))) {
+            currentStreak++;
+            offset++;
+        }
+    } else if (hadYesterday) {
+        // Grace period: streak from yesterday is still valid!
+        currentStreak = 1;
+        canExtendToday = true;
+        streakStatus = "AT_RISK";
+        let offset = 2;
+        while (activeDateStrings.has(toYMD(subDays(anchor, offset)))) {
+            currentStreak++;
+            offset++;
+        }
+    } else {
+        currentStreak = 0;
+        streakStatus = "INACTIVE";
+    }
+
+    // All-time longest streak
+    let maxStreak = 0;
+    let runningStreak = 0;
+    let prevEpochDay: number | null = null;
+
+    const epochDays = Array.from(activeDateStrings)
+        .map((ds) => {
+            const [y, m, d] = ds.split("-").map(Number);
+            return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+        })
+        .sort((a, b) => a - b);
+
+    for (const ed of epochDays) {
+        if (prevEpochDay === null || ed === prevEpochDay + 1) {
+            runningStreak = prevEpochDay === null ? 1 : runningStreak + 1;
+        } else if (ed > prevEpochDay + 1) {
+            runningStreak = 1;
+        }
+        prevEpochDay = ed;
+        if (runningStreak > maxStreak) {
+            maxStreak = runningStreak;
+        }
+    }
+
+    maxStreak = Math.max(maxStreak, currentStreak);
+
+    return {
+        currentStreak,
+        maxStreak,
+        isActiveToday,
+        canExtendToday,
+        streakStatus,
+    };
+}
+
+/**
  * Builds weekly columns for a given period (weeksCount: 52 for full 1 year, 16 for 4 months)
  * from daily submission dictionary.
  */
@@ -72,22 +246,60 @@ export function buildWeeklySubmissionColumns(
     weeksCount = 52
 ): { weeks: DaySubmissionCell[][]; monthNames: string[] } {
     const totalDays = weeksCount * 7;
-    const today = new Date();
+    const now = new Date();
+
+    // 1. Build a normalized map where all keys are canonical YYYY-MM-DD
+    const normalizedMap: Record<string, { count: number; platforms: string[] }> = {};
+    for (const [rawKey, entry] of Object.entries(dailyMap || {})) {
+        if (!entry || entry.count <= 0) continue;
+        const normKey = normalizeDateKey(rawKey) || rawKey;
+        if (!normalizedMap[normKey]) {
+            normalizedMap[normKey] = { count: 0, platforms: [] };
+        }
+        normalizedMap[normKey].count += entry.count;
+        for (const p of entry.platforms || []) {
+            const pKey = p.toLowerCase();
+            if (!normalizedMap[normKey].platforms.includes(pKey)) {
+                normalizedMap[normKey].platforms.push(pKey);
+            }
+        }
+    }
+
+    // 2. Determine anchorDate:
+    // If the latest submission date is in the future (e.g. clock skew)
+    // or if all user submissions are older than the default 52-week window (e.g. past year activity),
+    // anchor the 52 weeks to the latest submission date so the user's active dots are clearly displayed.
+    const sortedDates = Object.keys(normalizedMap).sort();
+    let anchorDate = new Date(now);
+
+    if (sortedDates.length > 0) {
+        const latestDateStr = sortedDates[sortedDates.length - 1];
+        const latestTime = new Date(`${latestDateStr}T12:00:00Z`).getTime();
+        const nowTime = now.getTime();
+        const msInWindow = weeksCount * 7 * 86400000;
+
+        if (latestTime > nowTime) {
+            anchorDate = new Date(latestTime);
+        } else if (nowTime - latestTime > msInWindow) {
+            anchorDate = new Date(latestTime);
+        }
+    }
+
     const days: DaySubmissionCell[] = [];
 
     for (let i = totalDays - 1; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(today.getDate() - i);
+        const d = new Date(anchorDate);
+        d.setDate(anchorDate.getDate() - i);
         const dateStr = d.toISOString().split("T")[0] || "";
         const localDateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         const displayDate = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-        const entry = dailyMap[dateStr] || dailyMap[localDateKey];
+        const entry = normalizedMap[dateStr] || normalizedMap[localDateKey];
         const count = entry ? entry.count : 0;
         const platforms = entry ? entry.platforms : [];
 
         days.push({
-            dateStr,
+            dateStr: localDateKey,
             displayDate,
             count,
             level: getSubmissionLevel(count),
@@ -100,12 +312,12 @@ export function buildWeeklySubmissionColumns(
         weeks.push(days.slice(w * 7, (w + 1) * 7));
     }
 
-    // Compute month names spread across the columns
+    // Compute month names spread across the columns anchored to anchorDate
     const monthsCount = weeksCount === 52 ? 12 : 4;
     const monthNames: string[] = [];
     for (let m = monthsCount - 1; m >= 0; m--) {
-        const mDate = new Date(today);
-        mDate.setMonth(today.getMonth() - m);
+        const mDate = new Date(anchorDate);
+        mDate.setMonth(anchorDate.getMonth() - m);
         monthNames.push(mDate.toLocaleDateString("en-US", { month: "short" }));
     }
 
@@ -166,22 +378,53 @@ export function aggregateClientPortalsSubmissions(
         if (effectiveCount <= 0) continue;
 
         // If platform has submission calendar attached
-        if (profile.submissionCalendar && typeof profile.submissionCalendar === "object") {
-            for (const [key, val] of Object.entries(profile.submissionCalendar)) {
+        let calObj = profile.submissionCalendar;
+        if (typeof calObj === "string") {
+            try {
+                calObj = JSON.parse(calObj);
+            } catch {
+                calObj = null;
+            }
+        }
+        if (calObj && typeof calObj === "object") {
+            for (const [key, val] of Object.entries(calObj)) {
                 const count = typeof val === "number" ? val : parseInt(String(val), 10) || 0;
                 if (count <= 0) continue;
 
-                let dateStr = key;
-                if (/^\d{9,11}$/.test(key)) {
-                    dateStr = new Date(parseInt(key, 10) * 1000).toISOString().split("T")[0] || key;
-                }
-
+                const dateStr = normalizeDateKey(key) || key;
                 if (!dailyMap[dateStr]) {
-                    dailyMap[dateStr] = { count: 0, platforms: [] };
+                    dailyMap[dateStr] = { count: 0, platforms: [], platformCounts: {} } as any;
                 }
                 dailyMap[dateStr].count += count;
                 if (!dailyMap[dateStr].platforms.includes(lowerId)) {
                     dailyMap[dateStr].platforms.push(lowerId);
+                }
+                if (!(dailyMap[dateStr] as any).platformCounts) {
+                    (dailyMap[dateStr] as any).platformCounts = {};
+                }
+                (dailyMap[dateStr] as any).platformCounts[lowerId] = ((dailyMap[dateStr] as any).platformCounts[lowerId] || 0) + count;
+            }
+        }
+
+        // Also merge recent verified submissions if available
+        if (Array.isArray(profile.recentSubmissions)) {
+            for (const item of profile.recentSubmissions) {
+                if (item.timestamp) {
+                    const ms = item.timestamp > 1e11 ? item.timestamp : item.timestamp * 1000;
+                    const dateStr = new Date(ms).toISOString().split("T")[0];
+                    if (dateStr) {
+                        if (!dailyMap[dateStr]) {
+                            dailyMap[dateStr] = { count: 0, platforms: [], platformCounts: {} } as any;
+                        }
+                        dailyMap[dateStr].count = Math.max(dailyMap[dateStr].count, 1);
+                        if (!dailyMap[dateStr].platforms.includes(lowerId)) {
+                            dailyMap[dateStr].platforms.push(lowerId);
+                        }
+                        if (!(dailyMap[dateStr] as any).platformCounts) {
+                            (dailyMap[dateStr] as any).platformCounts = {};
+                        }
+                        (dailyMap[dateStr] as any).platformCounts[lowerId] = Math.max((dailyMap[dateStr] as any).platformCounts[lowerId] || 0, 1);
+                    }
                 }
             }
         }
@@ -201,31 +444,22 @@ export function aggregateClientPortalsSubmissions(
     const sumPlatform = Object.values(platformBreakdown).reduce((acc, p) => acc + p.submissions, 0);
     totalSubmissions = Math.max(sumDaily, sumPlatform);
 
-    // Calculate streak
-    const today = new Date();
-    let dayStreak = 0;
-    for (let i = 0; i < 365; i++) {
-        const d = new Date(today);
-        d.setDate(today.getDate() - i);
-        const dateStr = d.toISOString().split("T")[0] || "";
-        const entry = dailyMap[dateStr];
-        if (entry && entry.count > 0) {
-            dayStreak++;
-        } else if (i > 0) {
-            break;
-        }
-    }
+    // Calculate production unified multi-platform streak
+    const streakMetrics = calculateUnifiedStreak(dailyMap);
 
     const { weeks, monthNames } = buildWeeklySubmissionColumns(dailyMap, weeksCount);
 
     return {
         totalSubmissions,
         activeDays: Object.keys(dailyMap).length,
-        dayStreak,
+        dayStreak: streakMetrics.currentStreak,
+        maxStreak: streakMetrics.maxStreak,
+        streakMetrics,
         connectedPlatformsCount: Object.keys(platformBreakdown).length,
         platformBreakdown,
         weeks,
         monthNames,
+        dailyMerged: dailyMap,
         isLoading: false,
         error: null,
     };

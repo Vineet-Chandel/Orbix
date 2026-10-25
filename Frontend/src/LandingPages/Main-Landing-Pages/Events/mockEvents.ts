@@ -301,19 +301,6 @@ export const MOCK_EVENT_LIST: EventItem[] = [
         null,
         true
     ),
-    createContest(
-        "algo-xlr8-sprint",
-        "algorithmxlr8",
-        "AlgorithmXlr8",
-        "AlgorithmXLR8 High-Throughput Sprint",
-        "https://orbix.dev/algorithms",
-        "2026-10-09T20:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
 
     // Oct 10 (Sat)
     createContest(
@@ -940,19 +927,6 @@ export const MOCK_EVENT_LIST: EventItem[] = [
         null,
         true
     ),
-    createContest(
-        "algo-gpu-sprint",
-        "algorithmxlr8",
-        "AlgorithmXlr8",
-        "AlgorithmXLR8 GPU Computing Challenge",
-        "https://orbix.dev/algorithms",
-        "2026-10-29T20:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
 
     // Oct 30 (Fri)
     createContest(
@@ -1098,5 +1072,4 @@ export const MOCK_COUNTS: Record<string, number> = {
     interviewbit: 3,
     cses: 4,
     spoj: 2,
-    algorithmxlr8: 2,
 };

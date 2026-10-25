@@ -184,18 +184,6 @@ export const PLATFORM_REGISTRY: PlatformDefinition[] = [
         validateUsername: (u) => PORTALS.github.validateUsername(u),
     },
     {
-        id: "algorithmxlr8",
-        name: "AlgorithmXlr8",
-        category: "Developer and coding community",
-        categoryGroup: "Coding Practice",
-        placeholder: "username or algorithmxlr8.com/user/yourname",
-        brandColor: "#0284C7",
-        domainKeywords: ["algorithmxlr8.com"],
-        buildUrl: (u) => PORTALS.algorithmxlr8.buildUrl(u),
-        extractFromUrl: (url) => PORTALS.algorithmxlr8.extractFromUrl(url),
-        validateUsername: (u) => PORTALS.algorithmxlr8.validateUsername(u),
-    },
-    {
         id: "medium",
         name: "Medium",
         category: "Publishing",
@@ -218,6 +206,18 @@ export const PLATFORM_REGISTRY: PlatformDefinition[] = [
         buildUrl: (u) => PORTALS.substack.buildUrl(u),
         extractFromUrl: (url) => PORTALS.substack.extractFromUrl(url),
         validateUsername: (u) => PORTALS.substack.validateUsername(u),
+    },
+    {
+        id: "kaggle",
+        name: "Kaggle",
+        category: "Developer and coding practice",
+        categoryGroup: "Portfolio & Publishing",
+        placeholder: "username or kaggle.com/yourname",
+        brandColor: "#20BEFF",
+        domainKeywords: ["kaggle.com"],
+        buildUrl: (u) => PORTALS.kaggle ? PORTALS.kaggle.buildUrl(u) : `https://www.kaggle.com/${u}`,
+        extractFromUrl: (url) => PORTALS.kaggle ? PORTALS.kaggle.extractFromUrl(url) : null,
+        validateUsername: (u) => PORTALS.kaggle ? PORTALS.kaggle.validateUsername(u) : true,
     },
 ];
 

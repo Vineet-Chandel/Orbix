@@ -60,11 +60,16 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     // Active platform selection
     const [selectedPortal, setSelectedPortal] = useState<string>("codeforces");
-    const [hasUserSelected, setHasUserSelected] = useState<boolean>(false);
     const [timeRange, setTimeRange] = useState<TimeRangeFilter>("ALL");
     const [hoveredPoint, setHoveredPoint] = useState<ContestHistoryPoint | null>(null);
     const [isTierModalOpen, setIsTierModalOpen] = useState<boolean>(false);
     const chartContainerRef = useRef<HTMLDivElement>(null);
+    const initialSelectionDoneRef = useRef<boolean>(false);
+
+    const handleSelectPortal = (portalKey: string) => {
+        setSelectedPortal(portalKey);
+        setHoveredPoint(null);
+    };
 
     const activePortalsMap = useMemo(() => {
         const map = new Map<string, string>();
@@ -170,21 +175,35 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
     // Default select the first connected platform that has contests or is connected
     useEffect(() => {
-        if (platformsList.length > 0) {
-            const currentSelected = platformsList.find((p) => p.portal === selectedPortal);
-            if (!hasUserSelected || !currentSelected) {
-                const firstWithContests = platformsList.find((p) => p.ratedContestsCount > 0);
-                const target = firstWithContests || platformsList[0];
-                if (target && target.portal !== selectedPortal) {
-                    setSelectedPortal(target.portal);
-                }
+        if (platformsList.length === 0) return;
+
+        // Run once on initial load when platformsList is first populated
+        if (!initialSelectionDoneRef.current) {
+            const firstWithContests = platformsList.find((p) => p.ratedContestsCount > 0);
+            const target = firstWithContests || platformsList[0];
+            if (target) {
+                setSelectedPortal(target.portal);
+            }
+            initialSelectionDoneRef.current = true;
+            return;
+        }
+
+        // If currently selected platform is no longer present in platformsList (e.g. disconnected)
+        const isCurrentValid = platformsList.some(
+            (p) => p.portal.toLowerCase() === selectedPortal.toLowerCase()
+        );
+        if (!isCurrentValid) {
+            const firstWithContests = platformsList.find((p) => p.ratedContestsCount > 0);
+            const target = firstWithContests || platformsList[0];
+            if (target) {
+                setSelectedPortal(target.portal);
             }
         }
-    }, [platformsList, selectedPortal, hasUserSelected]);
+    }, [platformsList, selectedPortal]);
 
     // Active platform analytics
     const activePlatform = useMemo(() => {
-        return platformsList.find((p) => p.portal === selectedPortal) || platformsList[0];
+        return platformsList.find((p) => p.portal.toLowerCase() === selectedPortal.toLowerCase()) || platformsList[0];
     }, [platformsList, selectedPortal]);
 
     // Filter history by time range
@@ -195,12 +214,36 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
         if (timeRange === "ALL") {
             return activePlatform.history;
         }
-        const now = Date.now();
+
+        // Normalize timestamps to milliseconds
+        const normalized = activePlatform.history.map((pt) => ({
+            ...pt,
+            timestamp: pt.timestamp > 1e11 ? pt.timestamp : pt.timestamp * 1000,
+        }));
+
+        const latestTimestamp = Math.max(...normalized.map((p) => p.timestamp));
         const days = timeRange === "6M" ? 180 : 365;
-        const cutoff = now - days * 24 * 60 * 60 * 1000;
-        const filtered = activePlatform.history.filter((pt) => pt.timestamp >= cutoff);
-        // If the filtered range has at least 1 point, return it; otherwise fallback to all available
-        return filtered.length > 0 ? filtered : activePlatform.history;
+        const windowMs = days * 24 * 60 * 60 * 1000;
+
+        // If the latest contest occurred within the last 365 days, measure from Date.now()
+        // If the contests are historical (e.g. 2023), measure relative to latestTimestamp
+        // so that 6M/1Y visibly zooms in on that contest season!
+        const isRecent = Date.now() - latestTimestamp < 365 * 24 * 60 * 60 * 1000;
+        const referenceTime = isRecent ? Date.now() : latestTimestamp;
+        const cutoff = referenceTime - windowMs;
+
+        const filtered = normalized.filter((pt) => pt.timestamp >= cutoff);
+
+        if (filtered.length >= 2) {
+            return filtered;
+        }
+
+        // Fallback for sparse or historical profiles:
+        // 6M: slice up to the most recent 12 contests (or half if fewer)
+        // 1Y: slice up to the most recent 25 contests
+        const targetCount = timeRange === "6M" ? 12 : 25;
+        const count = Math.max(2, Math.min(normalized.length, targetCount));
+        return normalized.slice(-count);
     }, [activePlatform, timeRange]);
 
     // Latest contest point in the active platform's history
@@ -413,10 +456,10 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                 {/* Primary Column: Rating & Progression Graph (8 of 12 cols on desktop) */}
                 <div className="lg:col-span-8 flex flex-col justify-between">
                     {/* Section Header & Platform Selector */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b-2 border-black/15">
+                    <div className="portal-header-container flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b-2 border-black/15">
                         {/* Title & Icon */}
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000]">
+                            <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] shrink-0">
                                 <ChartIcon className="w-5 h-5 text-black" />
                             </div>
                             <div>
@@ -437,31 +480,29 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                             <div
                                 role="tablist"
                                 aria-label="Connected Contest Platforms"
-                                className="flex items-center gap-1.5 p-1 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] overflow-x-auto no-scrollbar self-start sm:self-auto max-w-full"
+                                className="flex items-center gap-1.5 p-1 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] overflow-x-auto no-scrollbar self-start sm:self-auto max-w-full shrink-0"
                             >
                                 {platformsList.map((platform) => {
-                                    const isActive = platform.portal === selectedPortal;
+                                    const isActive = platform.portal.toLowerCase() === selectedPortal.toLowerCase();
                                     return (
                                         <button
                                             key={platform.portal}
                                             type="button"
                                             role="tab"
                                             aria-selected={isActive}
-                                            onClick={() => {
-                                                setSelectedPortal(platform.portal);
-                                                setHasUserSelected(true);
-                                                setHoveredPoint(null);
-                                            }}
-                                            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                                            aria-label={platform.portalName}
+                                            title={platform.portalName}
+                                            onClick={() => handleSelectPortal(platform.portal)}
+                                            className={`inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                                                 isActive
                                                     ? "bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]"
                                                     : "text-neutral-700 hover:text-black hover:bg-neutral-200"
                                             }`}
                                         >
-                                            <span className="w-3.5 h-3.5 flex items-center justify-center">
+                                            <span className="w-3.5 h-3.5 flex items-center justify-center shrink-0">
                                                 {getPortalIcon(platform.portal, "w-3.5 h-3.5")}
                                             </span>
-                                            <span>{platform.portalName}</span>
+                                            <span className="portal-tab-label hidden xl:inline">{platform.portalName}</span>
                                         </button>
                                     );
                                 })}
@@ -478,7 +519,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                     </div>
 
                     {/* Rating Summary (Primary & Supporting Metrics) */}
-                    <div className="pt-5 pb-4 flex flex-col md:flex-row md:items-end justify-between gap-5 relative z-10">
+                    <div className="pt-5 pb-4 flex flex-col xl:flex-row xl:items-end justify-between gap-5 relative z-10">
                         {/* Rating, Tier badge, Peak & Contests */}
                         <div className="space-y-1.5">
                             <span className="text-[11px] font-black text-neutral-500 uppercase tracking-wider block">
@@ -579,22 +620,24 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
 
                         {/* Top-Right Info Highlight on Hover / Latest Contest */}
                         {displayedPoint && (
-                            <div className="flex flex-col items-start md:items-end text-left md:text-right space-y-1 bg-[#FAF6EE] p-3 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000]">
-                                <div className="flex items-center gap-2 md:justify-end">
-                                    <span className="text-[11px] font-bold text-neutral-500 uppercase">Rating</span>
-                                    <span className="text-xl sm:text-2xl font-black text-black font-mono">
+                            <div className="shrink-0 min-w-[220px] max-w-full bg-[#FAF6EE] p-3 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] space-y-1.5 self-start xl:self-end">
+                                <div className="flex items-center justify-between gap-3">
+                                    <span className="text-[10px] font-black text-neutral-500 uppercase tracking-wider">Rating</span>
+                                    <span className="text-xl sm:text-2xl font-black text-black font-mono leading-none">
                                         {displayedPoint.rating}
                                     </span>
                                 </div>
-                                <div className="text-xs font-black text-black max-w-xs truncate">
+                                <div className="text-xs font-black text-black truncate max-w-[260px]" title={displayedPoint.contestName}>
                                     {displayedPoint.contestName}
                                 </div>
-                                <div className="text-[11px] font-bold text-neutral-600 flex items-center gap-2 md:justify-end">
-                                    <span>{formatDateStr(displayedPoint.date || displayedPoint.timestamp)}</span>
+                                <div className="text-[11px] font-bold text-neutral-600 flex items-center gap-2 whitespace-nowrap pt-0.5">
+                                    <span className="whitespace-nowrap">{formatDateStr(displayedPoint.date || displayedPoint.timestamp)}</span>
                                     {displayedPoint.rank && (
                                         <>
-                                            <span className="w-1.5 h-1.5 rounded-full bg-black" />
-                                            <span>Rank {formatNumber(displayedPoint.rank)}</span>
+                                            <span className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
+                                            <span className="whitespace-nowrap font-mono font-black text-black">
+                                                Rank {formatNumber(displayedPoint.rank)}
+                                            </span>
                                         </>
                                     )}
                                 </div>
@@ -612,7 +655,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                     onClick={() => setTimeRange(r)}
                                     className={`px-3 py-1 rounded-lg transition-all cursor-pointer font-black ${
                                         timeRange === r
-                                            ? "bg-black text-white shadow-[1px_1px_0px_#000]"
+                                            ? "bg-black text-[#a2ff86] shadow-[1px_1px_0px_#000]"
                                             : "text-neutral-700 hover:text-black"
                                     }`}
                                 >
@@ -899,9 +942,9 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                 <button
                                     key={item.portal}
                                     type="button"
-                                    onClick={() => setSelectedPortal(item.portal)}
+                                    onClick={() => handleSelectPortal(item.portal)}
                                     className={`w-full flex flex-col gap-2 p-3 rounded-xl border-2 border-black transition-all cursor-pointer group text-left shadow-[2px_2px_0px_#000] ${
-                                        selectedPortal === item.portal
+                                        selectedPortal.toLowerCase() === item.portal.toLowerCase()
                                             ? "bg-[#FAF6EE]"
                                             : "bg-white hover:bg-[#FAF6EE]"
                                     }`}
@@ -1015,7 +1058,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                     {platformsList.length > 0 ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                             {platformsList.map((platform) => {
-                                const isSelected = platform.portal === selectedPortal;
+                                const isSelected = platform.portal.toLowerCase() === selectedPortal.toLowerCase();
                                 const hasContests = platform.ratedContestsCount > 0;
                                 const hasRating = platform.currentRating !== null && platform.currentRating !== undefined;
 
@@ -1024,8 +1067,7 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                                         key={platform.portal}
                                         type="button"
                                         onClick={() => {
-                                            setSelectedPortal(platform.portal);
-                                            setHasUserSelected(true);
+                                            handleSelectPortal(platform.portal);
                                             chartContainerRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
                                         }}
                                         className={`flex flex-col justify-between p-4 sm:p-5 rounded-2xl transition-all cursor-pointer text-left relative overflow-hidden border-2 border-black shadow-[4px_4px_0px_#000] ${

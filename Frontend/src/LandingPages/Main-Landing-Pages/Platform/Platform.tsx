@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
 import { motion, useScroll, useMotionValue, useSpring, useTransform } from "framer-motion";
+import { Sparkles, ArrowRight, BookOpen, RefreshCw, Layers, ShieldCheck } from "lucide-react";
 
 export interface PlatformItem {
     id: string;
@@ -355,7 +357,7 @@ export interface PlatformShowcaseProps {
 }
 
 export const Platform: React.FC<PlatformShowcaseProps> = ({
-    title = "Connect every platform that matters",
+    title = "All your platforms. Zero tab-switching.",
     subtitle = "Connect your handles once. We sync solved problems, contest ratings, badges and commits every few hours, automatically. New platforms keep joining.",
     showHeading = true,
     className = "",
@@ -452,37 +454,120 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
         <section
             ref={sectionRef}
             onWheel={handleWheel}
-            className={`relative w-full py-20 px-4 sm:px-6 lg:px-8 text-black overflow-hidden select-none flex flex-col items-center justify-center ${className}`}
+            className={`relative w-full py-20 px-4 sm:px-6 lg:px-8 bg-[#FAF6EE] text-neutral-900 overflow-hidden select-none flex flex-col items-center justify-center ${className}`}
         >
-            {/* Deep Ambient Background Glows */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] bg-indigo-600/10 rounded-full blur-[180px] pointer-events-none -z-10" />
-            <div className="absolute top-1/3 left-1/4 w-[550px] h-[550px] bg-purple-600/10 rounded-full blur-[150px] pointer-events-none -z-10" />
-            <div className="absolute bottom-1/4 right-1/4 w-[600px] h-[600px] bg-blue-600/8 rounded-full blur-[160px] pointer-events-none -z-10" />
+            {/* Warm, eye-friendly dot grid matching Orbix platform canvas */}
+            <div className="absolute inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
 
-            {/* Optional Section Header */}
+            {/* Section Header: Inspired by Leaderboard Header Layout & Context */}
             {showHeading && (
-                <div className="text-center max-w-4xl mx-auto mb-12 sm:mb-16 relative z-10">
+                <div className="w-full max-w-7xl mx-auto mb-14 sm:mb-20 relative z-10">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+                        {/* Left Column: Headline, Subtitle & Dual Redirections */}
+                        <div className="lg:col-span-6 space-y-6">
+                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black tracking-wide uppercase">
+                                <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                                <span>Supported Platform Registry</span>
+                            </div>
 
+                            <h2 className="text-4xl sm:text-6xl md:text-7xl font-black text-black tracking-tight leading-[1.08]">
+                                {title.includes("Zero tab-switching") || title.includes("every platform") ? (
+                                    <>
+                                        All your platforms.
+                                        <br />
+                                        <span className="inline-block mt-3 bg-[#FFE566] text-black px-5 sm:px-8 py-1.5 sm:py-2.5 rounded-2xl font-black -rotate-1 border-2 border-black shadow-[4px_4px_0px_#000]">
+                                            Zero tab-switching.
+                                        </span>
+                                    </>
+                                ) : (
+                                    title
+                                )}
+                            </h2>
 
-                    <h2 className="text-3xl sm:text-5xl md:text-6xl font-black text-black tracking-tight leading-tight">
-                        {title.includes("every platform") ? (
-                            <>
-                                Connect{" "}
-                                <span className="bg-gradient-to-r from-indigo-400 via-purple-300 to-indigo-300 bg-clip-text text-transparent">
-                                    every platform
-                                </span>{" "}
-                                that matters.
-                            </>
-                        ) : (
-                            title
-                        )}
-                    </h2>
+                            <p className="text-neutral-700 font-medium text-base sm:text-lg md:text-xl max-w-xl leading-relaxed">
+                                {subtitle}
+                            </p>
 
-                    <p className="text-slate-400 text-sm sm:text-base mt-4 max-w-2xl mx-auto leading-relaxed">
-                        {subtitle}
-                    </p>
+                            {/* Dual Redirections: 1. Connect Platforms & 2. Platform Registry Docs */}
+                            <div className="flex flex-wrap items-center gap-4 pt-2">
+                                <Link
+                                    to="/auth/profiles"
+                                    className="inline-flex items-center gap-2 text-base sm:text-lg font-black text-black hover:text-neutral-800 transition-colors group cursor-pointer"
+                                    title="Connect your coding handles"
+                                >
+                                    <span className="underline decoration-4 underline-offset-4 decoration-[#FFE566] group-hover:decoration-black">
+                                        Connect your platforms
+                                    </span>
+                                    <ArrowRight className="w-5 h-5 text-black group-hover:translate-x-1.5 transition-transform stroke-[2.5]" />
+                                </Link>
 
+                                <span className="text-black/30 hidden sm:inline">•</span>
 
+                                <Link
+                                    to="/docs/supported-platform-registry"
+                                    className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-bold text-neutral-600 hover:text-black transition-colors"
+                                    title="Supported Platform Registry Documentation"
+                                >
+                                    <BookOpen className="w-3.5 h-3.5" />
+                                    <span>Platform Registry Docs →</span>
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* Right Column: 3 Feature Cards matching Leaderboard style */}
+                        <div className="lg:col-span-6 space-y-4">
+                            {/* Card 1: Automated Sync */}
+                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] transition-all">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                        <RefreshCw className="w-6 h-6 text-black stroke-[2.5]" />
+                                    </div>
+                                    <div className="space-y-1 min-w-0">
+                                        <h3 className="text-base sm:text-lg font-black text-black tracking-tight">
+                                            Automated Background Sync
+                                        </h3>
+                                        <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
+                                            Solved problems, contest ratings, badges and commits refreshed every few hours automatically.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Card 2: 16 Genuine Platforms */}
+                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] transition-all">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                        <Layers className="w-6 h-6 text-black stroke-[2.5]" />
+                                    </div>
+                                    <div className="space-y-1 min-w-0">
+                                        <h3 className="text-base sm:text-lg font-black text-black tracking-tight">
+                                            16 Genuine Platforms
+                                        </h3>
+                                        <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
+                                            LeetCode, Codeforces, CodeChef, GeeksforGeeks, AtCoder, HackerRank, GitHub, CSES, and more.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Card 3: Zero Password Sharing */}
+                            <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] transition-all">
+                                <div className="flex items-start gap-4">
+                                    <div className="w-12 h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                        <ShieldCheck className="w-6 h-6 text-black stroke-[2.5]" />
+                                    </div>
+                                    <div className="space-y-1 min-w-0">
+                                        <h3 className="text-base sm:text-lg font-black text-black tracking-tight">
+                                            Zero Password Sharing
+                                        </h3>
+                                        <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
+                                            Connect securely with only your public profile handles. No passwords, private tokens, or access keys needed.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -518,17 +603,24 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                             fill="none"
                             xmlns="http://www.w3.org/2000/svg"
                         >
-                            {/* Outer Orbit Dashed Circle */}
+                            {/* Outer Orbit Guide Track & Visible Dashed Ring */}
                             <circle
                                 cx="0"
                                 cy="0"
                                 r={OUTER_RADIUS}
-                                stroke="rgba(255, 255, 255, 0.16)"
-                                strokeWidth="1.5"
-                                strokeDasharray="5 7"
+                                stroke="rgba(0, 0, 0, 0.12)"
+                                strokeWidth="1.2"
+                            />
+                            <circle
+                                cx="0"
+                                cy="0"
+                                r={OUTER_RADIUS}
+                                stroke="rgba(0, 0, 0, 0.3)"
+                                strokeWidth="1.6"
+                                strokeDasharray="6 8"
                             />
 
-                            {/* Pinpoint Tracking Laser for Outer Orbit Platforms */}
+                            {/* Crisp Pinpoint Tracking Laser for Outer Orbit Platforms */}
                             {hoveredPlatform && hoveredPlatform.ring === "outer" && hoveredCoord && (
                                 <g>
                                     <line
@@ -536,35 +628,16 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                         y1="0"
                                         x2={hoveredCoord.x}
                                         y2={hoveredCoord.y}
-                                        stroke={hoveredPlatform.brandColor || "#863bff"}
-                                        strokeWidth="5"
-                                        strokeOpacity="0.3"
-                                        strokeLinecap="round"
-                                    />
-                                    <line
-                                        x1="0"
-                                        y1="0"
-                                        x2={hoveredCoord.x}
-                                        y2={hoveredCoord.y}
-                                        stroke={hoveredPlatform.brandColor || "#863bff"}
-                                        strokeWidth="2.5"
+                                        stroke={hoveredPlatform.brandColor || "#4f46e5"}
+                                        strokeWidth="2"
                                         strokeDasharray="5 4"
                                         strokeLinecap="round"
                                     />
                                     <circle
                                         cx={hoveredCoord.x}
                                         cy={hoveredCoord.y}
-                                        r="14"
-                                        fill="none"
-                                        stroke={hoveredPlatform.brandColor || "#863bff"}
-                                        strokeWidth="2"
-                                        className="animate-ping opacity-60"
-                                    />
-                                    <circle
-                                        cx={hoveredCoord.x}
-                                        cy={hoveredCoord.y}
                                         r="5"
-                                        fill={hoveredPlatform.brandColor || "#863bff"}
+                                        fill={hoveredPlatform.brandColor || "#4f46e5"}
                                     />
                                 </g>
                             )}
@@ -594,20 +667,14 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                     <motion.div style={{ rotate: outerCounterRotate }}>
                                         <motion.button
                                             type="button"
-                                            whileHover={{ scale: 1.18 }}
+                                            whileHover={{ scale: 1.15 }}
                                             whileTap={{ scale: 0.94 }}
-                                            className={`relative w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-[22px] sm:rounded-[24px] bg-white border flex items-center justify-center shadow-xl cursor-pointer transition-colors duration-200 ${isHovered
-                                                ? "border-white ring-4 ring-indigo-500/50 shadow-[0_0_35px_rgba(255,255,255,0.6)] z-30"
-                                                : "border-slate-200/50 hover:border-white shadow-[0_10px_30px_rgba(0,0,0,0.65)]"
+                                            className={`relative w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-[22px] sm:rounded-[24px] bg-white flex items-center justify-center cursor-pointer transition-all duration-200 ${isHovered
+                                                ? "border-2 border-black shadow-[5px_5px_0px_#000] -translate-y-1 z-30"
+                                                : "border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:-translate-y-0.5"
                                                 }`}
                                             aria-label={`${platform.name} integration`}
                                         >
-                                            {isHovered && (
-                                                <div
-                                                    className="absolute inset-0 rounded-[22px] sm:rounded-[24px] blur-xl opacity-50 pointer-events-none"
-                                                    style={{ backgroundColor: platform.brandColor }}
-                                                />
-                                            )}
                                             <div className="relative z-10 flex items-center justify-center">
                                                 {platform.renderIcon("w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0")}
                                             </div>
@@ -632,17 +699,24 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                             fill="none"
                             xmlns="http://www.w3.org/2000/svg"
                         >
-                            {/* Inner Orbit Dashed Circle */}
+                            {/* Inner Orbit Guide Track & Visible Dashed Ring */}
                             <circle
                                 cx="0"
                                 cy="0"
                                 r={INNER_RADIUS}
-                                stroke="rgba(255, 255, 255, 0.16)"
-                                strokeWidth="1.5"
-                                strokeDasharray="5 7"
+                                stroke="rgba(0, 0, 0, 0.12)"
+                                strokeWidth="1.2"
+                            />
+                            <circle
+                                cx="0"
+                                cy="0"
+                                r={INNER_RADIUS}
+                                stroke="rgba(0, 0, 0, 0.35)"
+                                strokeWidth="1.6"
+                                strokeDasharray="6 8"
                             />
 
-                            {/* Pinpoint Tracking Laser for Inner Orbit Platforms */}
+                            {/* Crisp Pinpoint Tracking Laser for Inner Orbit Platforms */}
                             {hoveredPlatform && hoveredPlatform.ring === "inner" && hoveredCoord && (
                                 <g>
                                     <line
@@ -651,28 +725,9 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                         x2={hoveredCoord.x}
                                         y2={hoveredCoord.y}
                                         stroke={hoveredPlatform.brandColor || "#FFA116"}
-                                        strokeWidth="5"
-                                        strokeOpacity="0.3"
-                                        strokeLinecap="round"
-                                    />
-                                    <line
-                                        x1="0"
-                                        y1="0"
-                                        x2={hoveredCoord.x}
-                                        y2={hoveredCoord.y}
-                                        stroke={hoveredPlatform.brandColor || "#FFA116"}
-                                        strokeWidth="2.5"
+                                        strokeWidth="2"
                                         strokeDasharray="5 4"
                                         strokeLinecap="round"
-                                    />
-                                    <circle
-                                        cx={hoveredCoord.x}
-                                        cy={hoveredCoord.y}
-                                        r="14"
-                                        fill="none"
-                                        stroke={hoveredPlatform.brandColor || "#FFA116"}
-                                        strokeWidth="2"
-                                        className="animate-ping opacity-60"
                                     />
                                     <circle
                                         cx={hoveredCoord.x}
@@ -708,20 +763,14 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                     <motion.div style={{ rotate: innerCounterRotate }}>
                                         <motion.button
                                             type="button"
-                                            whileHover={{ scale: 1.18 }}
+                                            whileHover={{ scale: 1.15 }}
                                             whileTap={{ scale: 0.94 }}
-                                            className={`relative w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-[22px] sm:rounded-[24px] bg-white border flex items-center justify-center shadow-xl cursor-pointer transition-colors duration-200 ${isHovered
-                                                ? "border-white ring-4 ring-indigo-500/50 shadow-[0_0_35px_rgba(255,255,255,0.6)] z-30"
-                                                : "border-slate-200/50 hover:border-white shadow-[0_10px_30px_rgba(0,0,0,0.65)]"
+                                            className={`relative w-[68px] h-[68px] sm:w-[74px] sm:h-[74px] rounded-[22px] sm:rounded-[24px] bg-white flex items-center justify-center cursor-pointer transition-all duration-200 ${isHovered
+                                                ? "border-2 border-black shadow-[5px_5px_0px_#000] -translate-y-1 z-30"
+                                                : "border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:-translate-y-0.5"
                                                 }`}
                                             aria-label={`${platform.name} integration`}
                                         >
-                                            {isHovered && (
-                                                <div
-                                                    className="absolute inset-0 rounded-[22px] sm:rounded-[24px] blur-xl opacity-50 pointer-events-none"
-                                                    style={{ backgroundColor: platform.brandColor }}
-                                                />
-                                            )}
                                             <div className="relative z-10 flex items-center justify-center">
                                                 {platform.renderIcon("w-8 h-8 sm:w-9 sm:h-9 flex-shrink-0")}
                                             </div>
@@ -741,22 +790,19 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                         onMouseEnter={() => setIsCenterHovered(true)}
                         onMouseLeave={() => setIsCenterHovered(false)}
                     >
-                        {/* Pulsing Ambient Halo behind Orbix badge */}
-                        <div className="absolute inset-0 w-44 h-44 -translate-x-3 -translate-y-3 rounded-full bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-blue-500/30 blur-3xl animate-pulse pointer-events-none" />
-
-                        {/* Center Card Badge: Minimalist Pure Logo */}
+                        {/* Center Card Badge: Minimalist Pure Logo with crisp neo-brutalist border and shadow */}
                         <motion.div
-                            whileHover={{ scale: 1.08 }}
+                            whileHover={{ scale: 1.06 }}
                             whileTap={{ scale: 0.96 }}
-                            className={`relative w-36 h-36 sm:w-40 sm:h-40 rounded-full bg-[#0c101d]/95 backdrop-blur-2xl border flex items-center justify-center shadow-2xl transition-all duration-300 ${isCenterHovered
-                                ? "border-indigo-400/80 shadow-[0_0_60px_rgba(134,59,255,0.7)]"
-                                : "border-white/15 hover:border-indigo-500/50 shadow-[0_25px_60px_rgba(0,0,0,0.95)]"
+                            className={`relative w-36 h-36 sm:w-40 sm:h-40 rounded-full bg-[#0c101d] border-2 border-black flex items-center justify-center transition-all duration-300 ${isCenterHovered
+                                ? "shadow-[7px_7px_0px_#000] -translate-y-1"
+                                : "shadow-[5px_5px_0px_#000]"
                                 }`}
                         >
                             {/* Pure White Orbix Brand Star Emblem */}
                             <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center">
                                 <svg
-                                    className="w-full h-full text-black drop-shadow-[0_4px_16px_rgba(134,59,255,0.75)]"
+                                    className="w-full h-full text-white"
                                     viewBox="0 0 271 270"
                                     fill="none"
                                     xmlns="http://www.w3.org/2000/svg"

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import { Sparkles } from 'lucide-react';
 import PublicProfilePage from '../../../app/Profile/PublicProfilePage';
 
 export interface PlatformItem {
@@ -479,7 +480,7 @@ const Landing = () => {
     const trackRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
-    const [maxScroll, setMaxScroll] = useState(2000);
+    const [maxScroll, setMaxScroll] = useState(2500);
 
     // Measure height difference dynamically so the entire PublicProfilePage scrolls flush to bottom
     useEffect(() => {
@@ -488,14 +489,15 @@ const Landing = () => {
                 const ch = contentRef.current.scrollHeight;
                 const vh = viewportRef.current.clientHeight;
                 if (ch > 0 && vh > 0) {
-                    setMaxScroll(Math.max(0, ch - vh));
+                    setMaxScroll(Math.max(0, ch - vh + 60));
                 }
             }
         };
 
         updateHeight();
-        const t1 = setTimeout(updateHeight, 400);
-        const t2 = setTimeout(updateHeight, 1200);
+        const t1 = setTimeout(updateHeight, 300);
+        const t2 = setTimeout(updateHeight, 800);
+        const t3 = setTimeout(updateHeight, 1600);
 
         const ro = new ResizeObserver(() => {
             updateHeight();
@@ -508,6 +510,7 @@ const Landing = () => {
         return () => {
             clearTimeout(t1);
             clearTimeout(t2);
+            clearTimeout(t3);
             ro.disconnect();
             window.removeEventListener('resize', updateHeight);
         };
@@ -519,16 +522,23 @@ const Landing = () => {
         offset: ["start start", "end end"],
     });
 
-    // Content smoothly scrolls up while box is pinned, resting briefly at bottom before box unpins
-    const contentY = useTransform(scrollYProgress, [0, 0.92], [0, -maxScroll]);
+    // Content smoothly scrolls up while box is pinned, resting comfortably at bottom before box unpins
+    const contentY = useTransform(scrollYProgress, [0.02, 0.88], [0, -maxScroll], { clamp: true });
 
     return (
-        <div className="w-full flex flex-col items-center">
+        <div className="relative w-full flex flex-col items-center bg-[#FAF6EE] text-neutral-900 select-none">
+            {/* Warm, eye-friendly dot grid matching Orbix platform canvas */}
+            <div className="absolute inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
+
             {/* Hero Headline (Scoped to MyCustomFont3) */}
-            <div className="flex flex-col items-center justify-center gap-9 text-7xl text-black font-MyCustomFont3 pt-[170px]">
+            <div className="w-full flex flex-col items-center justify-center gap-3 sm:gap-5 md:gap-7 lg:gap-8 text-3xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-7xl text-black font-MyCustomFont3 pt-[100px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-3 sm:px-6 max-w-full text-center leading-[1.2] sm:leading-[1.18] md:leading-[1.15]">
+                {/* Section Badge matching Platform and Contest Sections */}
+                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black font-sans tracking-wide uppercase">
+                    <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                    <span>Real-Time Developer Sync & Identity Hub</span>
+                </div>
 
-
-                <div className='flex items-center justify-center gap-2'>
+                <div className='flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-3 gap-y-2 text-center max-w-full'>
                     <span>A developer tool to connect</span>
 
                     <motion.div
@@ -539,11 +549,11 @@ const Landing = () => {
                         whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.94 }}
                         transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                        className="bg-[#f0f0ee] rounded-full px-4 py-2 inline-flex items-center gap-4 cursor-pointer select-none"
+                        className="bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 inline-flex items-center gap-2 sm:gap-3 md:gap-4 cursor-pointer select-none shrink-0 transition-all"
                         title="Click to switch platform"
                     >
                         <div
-                            className="relative w-9 h-9 sm:w-10 sm:h-10 -my-3 flex items-center justify-center shrink-0 overflow-visible"
+                            className="relative w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 lg:w-10 lg:h-10 -my-1 sm:-my-2 md:-my-3 flex items-center justify-center shrink-0 overflow-visible"
                             style={{ filter: WHITE_STICKER_FILTER }}
                         >
                             <AnimatePresence mode="popLayout" initial={false}>
@@ -585,16 +595,17 @@ const Landing = () => {
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 1.05, opacity: 0 }}
                                 transition={{ duration: 0.12, ease: "easeOut" }}
-                                className="text-6xl text-black font-MyCustomFont3 whitespace-nowrap inline-block"
+                                className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl text-black font-MyCustomFont3 whitespace-nowrap inline-block"
                             >
                                 {current.name}
                             </motion.span>
                         </AnimatePresence>
-                    </motion.div> <span>,</span>
-
+                    </motion.div>
+                    <span>,</span>
                 </div>
-                <div className='flex items-center justify-center gap-2'>
-                    <span>and redirecting </span>
+
+                <div className='flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-3 gap-y-2 text-center max-w-full'>
+                    <span>and redirecting</span>
                     <motion.div
                         layout
                         onClick={handleNextOpp}
@@ -603,11 +614,11 @@ const Landing = () => {
                         whileHover={{ scale: 1.04 }}
                         whileTap={{ scale: 0.94 }}
                         transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                        className="bg-[#f0f0ee] rounded-full px-4 py-2 inline-flex items-center gap-4 cursor-pointer select-none"
+                        className="bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 inline-flex items-center gap-2 sm:gap-3 md:gap-4 cursor-pointer select-none shrink-0 transition-all"
                         title="Click to switch opportunity"
                     >
                         <div
-                            className="relative w-9 h-9 sm:w-10 sm:h-10 -my-3 flex items-center justify-center shrink-0 overflow-visible"
+                            className="relative w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 lg:w-10 lg:h-10 -my-1 sm:-my-2 md:-my-3 flex items-center justify-center shrink-0 overflow-visible"
                             style={{ filter: WHITE_STICKER_FILTER }}
                         >
                             <AnimatePresence mode="popLayout" initial={false}>
@@ -649,15 +660,16 @@ const Landing = () => {
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 1.05, opacity: 0 }}
                                 transition={{ duration: 0.12, ease: "easeOut" }}
-                                className="text-6xl text-black font-MyCustomFont3 whitespace-nowrap inline-block"
+                                className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl text-black font-MyCustomFont3 whitespace-nowrap inline-block"
                             >
                                 {currentOpp.name}
                             </motion.span>
                         </AnimatePresence>
                     </motion.div>
-                    <span>economics for </span>
+                    <span>economics for</span>
                 </div>
-                <div className='flex items-center justify-center gap-2'>
+
+                <div className='flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-3 gap-y-2 text-center max-w-full'>
                     <span>our developers.</span>
                 </div>
             </div>
@@ -665,30 +677,30 @@ const Landing = () => {
             {/* Pinned Scroll Showcase Section: Holds the box fixed in screen center while inner page scrolls */}
             <div
                 ref={trackRef}
-                className="relative w-full h-[320vh] sm:h-[360vh] mt-6 sm:mt-10 font-sans"
+                className="relative w-full h-[360vh] sm:h-[440vh] mt-4 sm:mt-8 lg:mt-10 font-sans"
             >
                 {/* Sticky Centered Device Container */}
-                <div className="sticky top-[6vh] sm:top-[7vh] w-[94%] max-w-[1550px] mx-auto z-20">
-                    <div className="w-full p-2.5 sm:p-4 bg-black/10 rounded-[28px] sm:rounded-[36px] shadow-2xl backdrop-blur-xs border border-black/10">
+                <div className="sticky top-[4vh] sm:top-[6vh] lg:top-[7vh] w-[96%] sm:w-[94%] max-w-[1550px] mx-auto z-20">
+                    <div className="w-full">
                         <div
-                            className="embedded-showcase-container relative w-full h-[85vh] sm:h-[88vh] lg:h-[89vh] max-h-[1200px] min-h-[640px] rounded-[20px] sm:rounded-[28px] overflow-hidden border border-black/90 bg-[#F0F2F6] shadow-2xl flex flex-col font-sans text-base font-normal normal-case tracking-normal text-slate-900 select-auto"
+                            className="embedded-showcase-container relative w-full h-[78vh] sm:h-[84vh] lg:h-[89vh] max-h-[1200px] min-h-[360px] sm:min-h-[480px] md:min-h-[580px] lg:min-h-[640px] rounded-[18px] sm:rounded-[24px] lg:rounded-[30px] overflow-hidden border-2 border-black bg-[#FAF6EE] shadow-[8px_8px_0px_#000] flex flex-col font-sans text-base font-normal normal-case tracking-normal text-slate-900 select-auto"
                         >
                             {/* Browser Mockup Header Bar */}
-                            <div className="w-full bg-white/95 backdrop-blur-md border-b border-black/[0.08] px-4 py-2.5 flex items-center justify-between shrink-0 select-none z-10">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-3 h-3 rounded-full bg-[#FF5F56] border border-[#E0443E]/60 inline-block" />
-                                    <span className="w-3 h-3 rounded-full bg-[#FFBD2E] border border-[#DEA123]/60 inline-block" />
-                                    <span className="w-3 h-3 rounded-full bg-[#27C93F] border border-[#1AAB29]/60 inline-block" />
+                            <div className="w-full bg-[#FAF6EE] border-b-2 border-black px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shrink-0 select-none z-10">
+                                <div className="flex items-center gap-1.5 sm:gap-2">
+                                    <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#FF5F56] border border-black inline-block" />
+                                    <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#FFBD2E] border border-black inline-block" />
+                                    <span className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-[#27C93F] border border-black inline-block" />
                                 </div>
-                                <div className="flex items-center gap-2 px-3 sm:px-4 py-1 rounded-full bg-black/[0.04] border border-black/[0.06] text-xs font-mono text-black/75 font-medium max-w-[340px] sm:max-w-[440px] truncate shadow-inner">
-                                    <svg className="w-3 h-3 text-black/50 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <div className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-4 py-0.5 sm:py-1 rounded-full bg-[#FAF6EE] border border-black text-[10px] sm:text-xs font-mono text-black font-bold max-w-[200px] sm:max-w-[340px] md:max-w-[440px] truncate shadow-[1px_1px_0px_#000]">
+                                    <svg className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-black shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                     </svg>
                                     <span className="truncate">orbix.dev/profile/u/Vineet-Chandel</span>
                                 </div>
-                                <div className="flex items-center gap-2 text-xs font-mono text-black/50">
-                                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="hidden sm:inline font-semibold">LIVE PROFILE</span>
+                                <div className="flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs font-mono text-black font-black">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 border border-black animate-pulse" />
+                                    <span className="hidden sm:inline font-black tracking-wider">LIVE PROFILE</span>
                                 </div>
                             </div>
 

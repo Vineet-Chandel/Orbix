@@ -8,7 +8,6 @@ import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
 import { DevelopmentContributionsTable } from "./DevelopmentContributionsTable";
 import { ContestPerformanceSection } from "./ContestPerformanceSection";
 import { PracticeAnalyticsSection } from "./PracticeAnalytics/PracticeAnalyticsSection";
-import { PracticeMonthlyStatsCards } from "./PracticeMonthlyStatsCards";
 import { DevelopmentAnalyticsSection } from "./DevelopmentAnalytics/DevelopmentAnalyticsSection";
 import { NotificationsView } from "../Notifications/NotificationsView";
 import { TrendsView } from "../Trends/TrendsView";
@@ -27,6 +26,8 @@ export default function Dashboard() {
         if (path.includes("/profile")) return "profile";
         if (path.includes("/resume")) return "resume";
         if (path.includes("/projects")) return "projects";
+        if (path.includes("/blogs") || path.includes("/blog")) return "blogs";
+        if (path.includes("/docs")) return "docs";
         if (path.includes("/onboarding") || path.includes("/connect")) return "connect-platform";
         if (path.includes("/leaderboard")) return "leaderboard";
         return "dashboard";
@@ -130,6 +131,8 @@ export default function Dashboard() {
                     if (tab === "profile") navigate("/profile");
                     if (tab === "resume") navigate("/resume");
                     if (tab === "projects") navigate("/projects");
+                    if (tab === "blogs") navigate("/blogs");
+                    if (tab === "docs") navigate("/docs");
                     if (tab === "leaderboard") navigate("/leaderboard");
                     if (tab === "connect-platform") navigate("/onboarding");
                 }}
@@ -316,10 +319,6 @@ export default function Dashboard() {
                             {activeDashboardField === "practice" && (
                                 <div className="w-full space-y-6 animate-in fade-in duration-200">
                                     <CodingSubmissionsTable
-                                        connectedPortals={connectedPortals}
-                                        username={user?.username || ""}
-                                    />
-                                    <PracticeMonthlyStatsCards
                                         connectedPortals={connectedPortals}
                                         username={user?.username || ""}
                                     />

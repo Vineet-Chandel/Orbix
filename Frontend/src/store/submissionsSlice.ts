@@ -8,6 +8,7 @@ export interface UnifiedSubmissionsData {
     totalSolved?: number;
     activeDays: number;
     dayStreak: number;
+    maxStreak?: number;
     platformBreakdown: Record<string, PlatformSubmissionStat>;
     dailyMerged: Record<string, { count: number; platforms: string[] }>;
     connectedPlatformsCount: number;
@@ -142,6 +143,7 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
                             totalSubmissions: data.totalSubmissions || 0,
                             activeDays: data.activeDays || 0,
                             dayStreak: data.dayStreak || 0,
+                            maxStreak: data.maxStreak || 0,
                             platformBreakdown: data.platformBreakdown || {},
                             dailyMerged: data.dailyMerged || {},
                             connectedPlatformsCount:

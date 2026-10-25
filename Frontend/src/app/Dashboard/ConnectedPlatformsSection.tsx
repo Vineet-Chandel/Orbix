@@ -133,7 +133,6 @@ export function getPlatformProblemStats(
                     "hackerearth",
                     "cses",
                     "spoj",
-                    "algorithmxlr8",
                 ].includes(portalId.toLowerCase());
 
             if (numericStat.label?.toLowerCase().includes("rating")) {
@@ -241,13 +240,6 @@ export const PLATFORM_PROBLEM_TOTALS: Record<string, PlatformProblemMeta> = {
         easyTotal: 1200,
         mediumTotal: 1500,
         hardTotal: 800,
-        hasDifficulty: true,
-    },
-    algorithmxlr8: {
-        totalQuestions: 850,
-        easyTotal: 400,
-        mediumTotal: 320,
-        hardTotal: 130,
         hasDifficulty: true,
     },
     github: {

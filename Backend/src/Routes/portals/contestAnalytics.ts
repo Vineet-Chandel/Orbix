@@ -1112,7 +1112,7 @@ export async function fetchCode360Contests(username: string): Promise<{
 
 // --- Supported Contest Platforms Registry ---
 // ONLY platforms that arrange contest systems are included here.
-// Non-contest platforms (GitHub, Medium, Substack, CSES, SPOJ, AlgorithmXlr8) are excluded.
+// Non-contest platforms (GitHub, Medium, Substack, CSES, SPOJ) are excluded.
 
 export interface EligiblePlatformConfig {
     name: string;

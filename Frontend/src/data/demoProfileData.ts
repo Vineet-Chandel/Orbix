@@ -484,12 +484,16 @@ for (const pKey of practicePlatforms) {
         const count = typeof cnt === "number" ? cnt : 0;
         if (count <= 0) continue;
         if (!mergedDailyPractice[dStr]) {
-            mergedDailyPractice[dStr] = { count: 0, platforms: [] };
+            mergedDailyPractice[dStr] = { count: 0, platforms: [], platformCounts: {} } as any;
         }
         mergedDailyPractice[dStr].count += count;
         if (!mergedDailyPractice[dStr].platforms.includes(pKey)) {
             mergedDailyPractice[dStr].platforms.push(pKey);
         }
+        if (!(mergedDailyPractice[dStr] as any).platformCounts) {
+            (mergedDailyPractice[dStr] as any).platformCounts = {};
+        }
+        (mergedDailyPractice[dStr] as any).platformCounts[pKey] = ((mergedDailyPractice[dStr] as any).platformCounts[pKey] || 0) + count;
     }
 }
 

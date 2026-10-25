@@ -95,8 +95,8 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
         return badges.filter((b) => b.platform.toLowerCase() === selectedPlatform.toLowerCase());
     }, [badges, selectedPlatform]);
 
-    // Initial visible slice: 32 badges unless expanded
-    const INITIAL_LIMIT = 32;
+    // Initial visible slice: 24 badges (first 3 lines of 8 badges on desktop) unless expanded
+    const INITIAL_LIMIT = 24;
     const displayedBadges = useMemo(() => {
         if (isExpanded || filteredBadges.length <= INITIAL_LIMIT) {
             return filteredBadges;
@@ -136,11 +136,11 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
 
                 {/* Optional platform filter chips if badges from multiple platforms exist */}
                 {platformsList.length > 1 && (
-                    <div className="flex items-center gap-2 overflow-x-auto py-3 border-b-2 border-black/15 relative z-10 scrollbar-none text-sm">
+                    <div className="portal-filter-container flex items-center gap-2 overflow-x-auto py-3 border-b-2 border-black/15 relative z-10 scrollbar-none text-sm">
                         <button
                             type="button"
                             onClick={() => setSelectedPlatform("all")}
-                            className={`px-4 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 border-black shadow-[2px_2px_0px_#000] ${
+                            className={`px-3 sm:px-4 py-1.5 rounded-xl font-black text-xs sm:text-sm transition-all cursor-pointer border-2 border-black shadow-[2px_2px_0px_#000] shrink-0 ${
                                 selectedPlatform === "all"
                                     ? "bg-black text-[#a2ff86]"
                                     : "bg-[#FAF6EE] text-black hover:bg-neutral-200"
@@ -153,16 +153,18 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
                                 key={p}
                                 type="button"
                                 onClick={() => setSelectedPlatform(p)}
-                                className={`px-4 py-1.5 rounded-xl font-black text-xs sm:text-sm capitalize transition-all cursor-pointer flex items-center gap-2 border-2 border-black shadow-[2px_2px_0px_#000] ${
+                                title={p}
+                                aria-label={p}
+                                className={`px-2.5 sm:px-4 py-1.5 rounded-xl font-black text-xs sm:text-sm capitalize transition-all cursor-pointer flex items-center gap-1.5 sm:gap-2 border-2 border-black shadow-[2px_2px_0px_#000] shrink-0 ${
                                     selectedPlatform === p
                                         ? "bg-black text-[#a2ff86]"
                                         : "bg-[#FAF6EE] text-black hover:bg-neutral-200"
                                 }`}
                             >
-                                <span className="w-4 h-4 flex items-center justify-center">
+                                <span className="w-4 h-4 flex items-center justify-center shrink-0">
                                     {getPortalIcon(p, "w-full h-full object-contain")}
                                 </span>
-                                <span>{p}</span>
+                                <span className="portal-tab-label hidden sm:inline">{p}</span>
                                 <span className="text-xs font-mono font-bold">({remoteData?.platformCounts[p] || 0})</span>
                             </button>
                         ))}

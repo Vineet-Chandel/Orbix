@@ -329,21 +329,6 @@ export const PORTALS: Record<string, PortalConfig> = {
         },
         validateUsername: (u) => /^[a-zA-Z0-9_\-]{3,30}$/.test(u),
     },
-    algorithmxlr8: {
-        id: "algorithmxlr8",
-        name: "AlgorithmXlr8",
-        placeholder: "AlgorithmXlr8 username or algorithmxlr8.com/user/yourname",
-        domainKeywords: ["algorithmxlr8.com", "algorithmxlr8"],
-        category: "practice",
-        brandColor: "#0284C7",
-        buildUrl: (u) => `https://algorithmxlr8.com/user/${u}`,
-        extractFromUrl: (url) => {
-            const clean = sanitizeUrl(url);
-            const match = clean.match(/algorithmxlr8\.com\/(?:user|profile|u)\/([a-zA-Z0-9_\-]+)$/i);
-            return match ? match[1] ?? null : null;
-        },
-        validateUsername: (u) => /^[a-zA-Z0-9_\-]{2,30}$/.test(u),
-    },
     medium: {
         id: "medium",
         name: "Medium",
@@ -377,6 +362,21 @@ export const PORTALS: Record<string, PortalConfig> = {
         },
         validateUsername: (u) => /^[a-zA-Z0-9_\-]{2,30}$/.test(u),
     },
+    kaggle: {
+        id: "kaggle",
+        name: "Kaggle",
+        placeholder: "username or kaggle.com/yourname",
+        domainKeywords: ["kaggle.com"],
+        category: "dev",
+        brandColor: "#20BEFF",
+        buildUrl: (u) => `https://www.kaggle.com/${u}`,
+        extractFromUrl: (url) => {
+            const clean = sanitizeUrl(url);
+            const match = clean.match(/kaggle\.com\/([a-zA-Z0-9_\-]+)$/i);
+            return match ? match[1] ?? null : null;
+        },
+        validateUsername: (u) => /^[a-zA-Z0-9_\-]{3,30}$/.test(u),
+    },
 };
 
 export const DASHBOARD_PLATFORMS_ORDER = [
@@ -393,7 +393,6 @@ export const DASHBOARD_PLATFORMS_ORDER = [
     "cses",
     "spoj",
     "github",
-    "algorithmxlr8",
     "medium",
     "substack",
 ];

@@ -81,7 +81,7 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
             maxPts: "500 pts",
             icon: <BookOpen className="w-5 h-5 text-black" />,
             color: "bg-[#fef08a]",
-            description: "Published technical articles, developer guides, and newsletter publications on Medium, Substack, and AlgorithmXlr8.",
+            description: "Published technical articles, developer guides, and newsletter publications on Medium and Substack.",
             details: [
                 "Article Publications: Up to 50 subscore points for quality developer tutorials and solutions",
                 "Verified Readership & Followers: Logarithmic scaling for readers and newsletter subscribers",
@@ -104,7 +104,7 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
         { name: "CSES", category: "Algorithm Practice", metrics: "Problem set tasks solved", pillars: "P1 (35%)" },
         { name: "SPOJ", category: "Competitive Programming", metrics: "Classical problems solved, World rank", pillars: "P1 (35%)" },
         { name: "GitHub", category: "Code Hosting & OS", metrics: "Repos, Stars, Commits, PRs merged, Issues, Reviews", pillars: "P3 (20%), P4 (10%)" },
-        { name: "AlgorithmXlr8", category: "Developer Community", metrics: "Community problems solved, Solutions published", pillars: "P1 (35%), P6 (5%)" },
+        { name: "Kaggle", category: "Data Science & ML", metrics: "Tiers, Medals (Gold/Silver/Bronze), Notebooks upvotes", pillars: "P1 (35%), P2 (20%), P4 (10%)" },
         { name: "Medium", category: "Technical Writing", metrics: "Published technical stories, Followers, Claps", pillars: "P6 (5%)" },
         { name: "Substack", category: "Technical Writing", metrics: "Newsletter posts, Subscribers, Publications", pillars: "P6 (5%)" },
     ];

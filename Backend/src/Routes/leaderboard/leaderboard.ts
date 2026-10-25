@@ -532,7 +532,7 @@ leaderboardRouter.get("/algorithm", async (_req: Request, res: Response) => {
                 supportedPlatforms: [
                     "LeetCode", "Codeforces", "CodeChef", "GeeksforGeeks", "HackerRank",
                     "AtCoder", "Code360 / CodingNinjas", "InterviewBit", "TopCoder",
-                    "HackerEarth", "CSES", "SPOJ", "AlgorithmXlr8"
+                    "HackerEarth", "CSES", "SPOJ"
                 ],
             },
             {
@@ -585,7 +585,7 @@ leaderboardRouter.get("/algorithm", async (_req: Request, res: Response) => {
                 weight: 0.05,
                 weightPercentage: 5,
                 maxPoints: 500,
-                description: "Published technical articles, developer guides, and newsletter publications on Medium, Substack, and AlgorithmXlr8.",
+                description: "Published technical articles, developer guides, and newsletter publications on Medium and Substack.",
                 formula: "S_writing = min(100, min(50, Articles * 5) + min(30, ln(1 + Followers) * 5) + min(20, Platforms * 10))",
             },
         ],
@@ -719,16 +719,6 @@ leaderboardRouter.get("/algorithm", async (_req: Request, res: Response) => {
                 availableMetrics: "Public repositories, Stars, Commits, PRs merged/opened, Issues, Followers",
                 dataCompleteness: "Full",
                 scoreIntegration: "Pillar 3 (Open Source 20%), Pillar 4 (Repositories 10%)",
-            },
-            {
-                platform: "AlgorithmXlr8",
-                providerId: "algorithmxlr8",
-                category: "Developer Community",
-                connectionSource: "user_links",
-                syncMechanism: "Native Community API",
-                availableMetrics: "Community problems solved, Solutions published, Streak",
-                dataCompleteness: "Full",
-                scoreIntegration: "Pillar 1 (Problems 35%), Pillar 6 (Writing 5%)",
             },
             {
                 platform: "Medium",

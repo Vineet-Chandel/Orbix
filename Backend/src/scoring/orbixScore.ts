@@ -28,7 +28,7 @@
  *   - Total active coding days, trailing 30-day practice density, and daily streak consistency.
  * 
  * Pillar 6: Technical Writing & Community (5% weight / max 500 pts)
- *   - Technical articles and documentation on Medium, Substack, and AlgorithmXlr8.
+ *   - Technical articles and documentation on Medium and Substack.
  * 
  * Standard Display Scale: 0 to 10,000 points.
  */
@@ -871,8 +871,8 @@ export function computeOrbixScoreFromPortals(
             if (snap.pullRequests && typeof snap.pullRequests === "number") ghPRs = snap.pullRequests;
         }
 
-        // 5. Technical Writing (Medium, Substack, AlgorithmXlr8)
-        if (portal === "medium" || portal === "substack" || portal === "algorithmxlr8") {
+        // 5. Technical Writing (Medium, Substack)
+        if (portal === "medium" || portal === "substack") {
             writingPlatforms.push(portal);
             for (const s of stats) {
                 const lbl = (s.label || "").toLowerCase();

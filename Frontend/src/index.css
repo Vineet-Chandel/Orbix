@@ -598,3 +598,35 @@ html.dark body:has(.blog-container) {
 .blog-container .token.entity {
   cursor: help;
 }
+
+/* ==========================================================================
+   PERFORMANCE: Defer offscreen rendering (Modern Web Guidance)
+   Using content-visibility: auto + contain-intrinsic-size
+   ========================================================================== */
+.defer-offscreen {
+  content-visibility: auto;
+  contain-intrinsic-size: auto none auto 750px;
+}
+
+@supports not (content-visibility: auto) {
+  .defer-offscreen {
+    contain: layout paint;
+  }
+}
+
+/* ==========================================================================
+   RESPONSIVE PLATFORM TABS & CHIPS (Modern Web Guidance: Container Queries)
+   Auto-collapse text labels to show only icons when space is constrained
+   ========================================================================== */
+.portal-header-container,
+.portal-filter-container {
+  container-type: inline-size;
+}
+
+@container (max-width: 600px) {
+  .portal-tab-label {
+    display: none !important;
+  }
+}
+
+

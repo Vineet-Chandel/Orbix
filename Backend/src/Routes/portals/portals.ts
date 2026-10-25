@@ -181,7 +181,7 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
                 "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
             },
             body: JSON.stringify({
-                query: `query userPublicProfile($username: String!) {
+                query: `query userPublicProfile($username: String!, $year0: Int, $year1: Int, $year2: Int) {
                     allQuestionsCount {
                         difficulty
                         count
@@ -205,6 +205,15 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
                             totalActiveDays
                             submissionCalendar
                         }
+                        cal0: userCalendar(year: $year0) {
+                            submissionCalendar
+                        }
+                        cal1: userCalendar(year: $year1) {
+                            submissionCalendar
+                        }
+                        cal2: userCalendar(year: $year2) {
+                            submissionCalendar
+                        }
                     }
                     userContestRanking(username: $username) {
                         attendedContestsCount
@@ -216,14 +225,19 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
                             name
                         }
                     }
-                    recentAcSubmissionList(username: $username, limit: 30) {
+                    recentAcSubmissionList(username: $username, limit: 50) {
                         id
                         title
                         titleSlug
                         timestamp
                     }
                 }`,
-                variables: { username },
+                variables: {
+                    username,
+                    year0: new Date().getFullYear(),
+                    year1: new Date().getFullYear() - 1,
+                    year2: new Date().getFullYear() - 2,
+                },
             }),
             signal: AbortSignal.timeout(6000),
         });
@@ -254,17 +268,31 @@ async function fetchLeetCode(username: string): Promise<PortalProfileData | null
         const userCalendar = user.userCalendar;
         let submissionCalendar: Record<string, number> = {};
         let totalCalendarSubs = 0;
-        if (userCalendar?.submissionCalendar) {
+
+        const mergeCalendarJson = (rawJson?: string) => {
+            if (!rawJson) return;
             try {
-                const parsed = JSON.parse(userCalendar.submissionCalendar);
+                const parsed = JSON.parse(rawJson);
                 if (parsed && typeof parsed === "object") {
-                    submissionCalendar = parsed;
-                    totalCalendarSubs = Object.values(parsed).reduce((acc: number, c: any) => acc + (typeof c === "number" ? c : 0), 0);
+                    for (const [k, v] of Object.entries(parsed)) {
+                        const cnt = typeof v === "number" ? v : parseInt(String(v), 10) || 0;
+                        if (cnt > 0) {
+                            submissionCalendar[k] = (submissionCalendar[k] || 0) + cnt;
+                        }
+                    }
                 }
             } catch {
                 // ignore
             }
-        }
+        };
+
+        // Merge calendars for default year, curYear, curYear - 1, and curYear - 2
+        mergeCalendarJson(userCalendar?.submissionCalendar);
+        mergeCalendarJson(user?.cal0?.submissionCalendar);
+        mergeCalendarJson(user?.cal1?.submissionCalendar);
+        mergeCalendarJson(user?.cal2?.submissionCalendar);
+
+        totalCalendarSubs = Object.values(submissionCalendar).reduce((acc: number, c: any) => acc + (typeof c === "number" ? c : 0), 0);
 
         // Parse recent accepted problem-solving records
         const rawRecent = data?.data?.recentAcSubmissionList || [];
@@ -1465,25 +1493,6 @@ async function fetchSubstack(username: string): Promise<PortalProfileData | null
     };
 }
 
-async function fetchAlgorithmXlr8(username: string): Promise<PortalProfileData | null> {
-    const clean = username.trim().replace(/^@+/, "");
-    if (!/^[a-zA-Z0-9_\-]{2,30}$/.test(clean)) return null;
-
-    return {
-        success: true,
-        portal: "algorithmxlr8",
-        username: clean,
-        name: clean,
-        avatar: getFallbackAvatar(clean),
-        stats: [
-            { label: "portal", value: "AlgorithmXlr8" },
-            { label: "member", value: "Verified" },
-        ],
-        profileUrl: `https://algorithmxlr8.com/user/${clean}`,
-        verified: true,
-    };
-}
-
 export async function verifyAndFetchPortal(portal: string, username: string): Promise<PortalProfileData | null> {
     const cleanPortal = String(portal || "").toLowerCase().trim();
     const cleanUsername = String(username || "").trim();
@@ -1521,8 +1530,6 @@ export async function verifyAndFetchPortal(portal: string, username: string): Pr
             return await fetchMedium(cleanUsername);
         case "substack":
             return await fetchSubstack(cleanUsername);
-        case "algorithmxlr8":
-            return await fetchAlgorithmXlr8(cleanUsername);
         default:
             return null;
     }
@@ -1699,21 +1706,31 @@ export async function calculateUnifiedSubmissions(
                     if (count <= 0) continue;
 
                     let dateStr = key;
-                    // If key is unix epoch timestamp in seconds
-                    if (/^\d{9,11}$/.test(key)) {
-                        dateStr = new Date(parseInt(key, 10) * 1000).toISOString().split("T")[0] || key;
+                    if (/^\d{9,14}$/.test(key)) {
+                        const num = parseInt(key, 10);
+                        const ms = key.length <= 11 ? num * 1000 : num;
+                        const d = new Date(ms);
+                        if (!isNaN(d.getTime())) {
+                            dateStr = d.toISOString().split("T")[0] || key;
+                        }
+                    } else if (key.includes("/") || key.includes(".")) {
+                        const d = new Date(key);
+                        if (!isNaN(d.getTime())) {
+                            dateStr = d.toISOString().split("T")[0] || key;
+                        }
                     }
 
+                    const portalKey = portal.toLowerCase();
                     if (!dailyMerged[dateStr]) {
                         dailyMerged[dateStr] = { count: 0, platforms: [], platformCounts: {} };
                     }
                     const entry = dailyMerged[dateStr];
                     if (entry) {
                         entry.count += count;
-                        if (!entry.platforms.includes(portal)) {
-                            entry.platforms.push(portal);
+                        if (!entry.platforms.includes(portalKey)) {
+                            entry.platforms.push(portalKey);
                         }
-                        entry.platformCounts[portal] = (entry.platformCounts[portal] || 0) + count;
+                        entry.platformCounts[portalKey] = (entry.platformCounts[portalKey] || 0) + count;
                     }
                 }
             }
@@ -1737,20 +1754,22 @@ export async function calculateUnifiedSubmissions(
     // Reconcile dailyMerged with dates from verified recent solves
     for (const solve of collectedRecentSolves) {
         if (solve.timestamp) {
-            const dateStr = new Date(solve.timestamp * 1000).toISOString().split("T")[0];
-            if (dateStr) {
+            const ms = solve.timestamp > 1e11 ? solve.timestamp : solve.timestamp * 1000;
+            const dateStr = new Date(ms).toISOString().split("T")[0];
+            const pKey = (solve.portal || "").toLowerCase();
+            if (dateStr && pKey) {
                 if (!dailyMerged[dateStr]) {
                     dailyMerged[dateStr] = { count: 0, platforms: [], platformCounts: {} };
                 }
                 const entry = dailyMerged[dateStr];
                 if (entry) {
-                    if (!entry.platforms.includes(solve.portal)) {
-                        entry.platforms.push(solve.portal);
+                    if (!entry.platforms.includes(pKey)) {
+                        entry.platforms.push(pKey);
                     }
                     if (entry.count === 0) {
                         entry.count = 1;
                     }
-                    entry.platformCounts[solve.portal] = (entry.platformCounts[solve.portal] || 0) + 1;
+                    entry.platformCounts[pKey] = (entry.platformCounts[pKey] || 0) + 1;
                 }
             }
         }
@@ -1908,19 +1927,80 @@ export async function calculateUnifiedSubmissions(
     const calendarActiveDays = Object.keys(dailyMerged).length;
     const activeDays = Math.max(calendarActiveDays, sumPlatformActiveDays);
 
-    // Calculate streak up to today
-    let dayStreak = 0;
-    for (let i = 0; i < 365; i++) {
-        const d = new Date(now);
-        d.setDate(now.getDate() - i);
-        const dateStr = d.toISOString().split("T")[0] || "";
-        const entry = dailyMerged[dateStr];
+    // Calculate multi-platform unified streak and longest all-time streak
+    const activeDateStrings = new Set<string>();
+    for (const [dStr, entry] of Object.entries(dailyMerged)) {
         if (entry && entry.count > 0) {
-            dayStreak++;
-        } else if (i > 0) {
-            break;
+            activeDateStrings.add(dStr);
         }
     }
+
+    const toYMD = (d: Date): string => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
+    };
+
+    const subDays = (base: Date, days: number): Date => {
+        const res = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+        res.setDate(res.getDate() - days);
+        return res;
+    };
+
+    let anchor = new Date(now);
+    const sortedDates = Array.from(activeDateStrings).sort();
+    if (sortedDates.length > 0) {
+        const latestStr = sortedDates[sortedDates.length - 1];
+        const latestTime = new Date(`${latestStr}T12:00:00Z`).getTime();
+        if (latestTime > anchor.getTime() || (anchor.getTime() - latestTime > 365 * 86400000)) {
+            anchor = new Date(`${latestStr}T12:00:00Z`);
+        }
+    }
+
+    const todayStr = toYMD(anchor);
+    const yesterdayStr = toYMD(subDays(anchor, 1));
+    const isActiveToday = activeDateStrings.has(todayStr);
+    const hadYesterday = activeDateStrings.has(yesterdayStr);
+
+    let dayStreak = 0;
+    if (isActiveToday) {
+        dayStreak = 1;
+        let offset = 1;
+        while (activeDateStrings.has(toYMD(subDays(anchor, offset)))) {
+            dayStreak++;
+            offset++;
+        }
+    } else if (hadYesterday) {
+        dayStreak = 1;
+        let offset = 2;
+        while (activeDateStrings.has(toYMD(subDays(anchor, offset)))) {
+            dayStreak++;
+            offset++;
+        }
+    }
+
+    // Longest streak across all platforms
+    let maxStreak = 0;
+    let running = 0;
+    let prevDayNum: number | null = null;
+    const epochDays = Array.from(activeDateStrings)
+        .map((ds) => {
+            const [y, m, d] = ds.split("-").map(Number);
+            return Math.round(Date.UTC(y, m - 1, d) / 86400000);
+        })
+        .sort((a, b) => a - b);
+
+    for (const ed of epochDays) {
+        if (prevDayNum === null || ed === prevDayNum + 1) {
+            running = prevDayNum === null ? 1 : running + 1;
+        } else if (ed > prevDayNum + 1) {
+            running = 1;
+        }
+        prevDayNum = ed;
+        if (running > maxStreak) maxStreak = running;
+    }
+    maxStreak = Math.max(maxStreak, dayStreak);
 
     return {
         success: true,
@@ -1928,7 +2008,8 @@ export async function calculateUnifiedSubmissions(
         totalSubmissions: totalMergedSubmissions,
         totalSolved,
         activeDays: activeDays || 1,
-        dayStreak: Math.max(dayStreak, 1),
+        dayStreak,
+        maxStreak,
         platformBreakdown,
         dailyMerged,
         recentMetrics: {
@@ -2791,7 +2872,6 @@ export function detectPortalFromUrl(url: string): string | null {
     if (low.includes("spoj.com")) return "spoj";
     if (low.includes("medium.com")) return "medium";
     if (low.includes("substack.com")) return "substack";
-    if (low.includes("algorithmxlr8.com")) return "algorithmxlr8";
 
     return null;
 }
@@ -2882,11 +2962,6 @@ export function extractPortalUsername(portal: string, rawInput: string): string 
             if (m && m[1]) return m[1];
             return withoutQuery.split("/").pop() || clean;
         }
-        case "algorithmxlr8": {
-            const m = withoutQuery.match(/algorithmxlr8\.com\/(?:user\/)?([a-zA-Z0-9_\-]+)/i);
-            if (m && m[1]) return m[1];
-            return withoutQuery.split("/").pop() || clean;
-        }
         case "kaggle": {
             const m = withoutQuery.match(/kaggle\.com\/([a-zA-Z0-9_\-]+)/i);
             if (m && m[1]) return m[1];
@@ -2932,8 +3007,6 @@ export function buildPortalLink(portal: string, extractedUsername: string): stri
             return `https://medium.com/@${u}`;
         case "substack":
             return `https://${u}.substack.com`;
-        case "algorithmxlr8":
-            return `https://algorithmxlr8.com/user/${u}`;
         case "kaggle":
             return `https://www.kaggle.com/${u}`;
         default:
