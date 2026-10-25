@@ -1,82 +1,54 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
-// @ts-ignore
 import { AppHeader } from './components/layout/AppHeader';
-// @ts-ignore
 import { Sidebar } from './components/layout/Sidebar';
-// @ts-ignore
 import { RightTableOfContents } from './components/layout/RightTableOfContents';
-// @ts-ignore
 import { ReadingProgress } from './components/ReadingProgress';
-// @ts-ignore
 import { DocumentSearch } from './components/DocumentSearch';
-// @ts-ignore
 import { BackToTop } from './components/BackToTop';
-// @ts-ignore
 import { FullWidthBottomBanner } from './components/layout/FullWidthBottomBanner';
-// @ts-ignore
 import { NeoButton } from './components/ui/NeoButton';
 
 // Introduction Overview Page
-// @ts-ignore
 import { IntroductionPage, INTRODUCTION_HEADINGS } from './pages/IntroductionPage';
 
 // Chapter 1 Pages
-// @ts-ignore
 import { DeploymentOverviewPage, PAGE_1_HEADINGS } from './pages/DeploymentOverviewPage';
-// @ts-ignore
 import { Ec2ArchitecturePage, PAGE_2_HEADINGS } from './pages/Ec2ArchitecturePage';
-// @ts-ignore
 import { AwsServicesPage, PAGE_3_HEADINGS } from './pages/AwsServicesPage';
-// @ts-ignore
 import { PreflightPage, PAGE_4_HEADINGS } from './pages/PreflightPage';
 
 // Chapter 2 Pages
-// @ts-ignore
 import { InspectAndLaunchPage, DEPLOY_PAGE_1_HEADINGS } from './pages/step-by-step-deployment/InspectAndLaunchPage';
-// @ts-ignore
 import { NetworkingPage, DEPLOY_PAGE_2_HEADINGS } from './pages/step-by-step-deployment/NetworkingPage';
-// @ts-ignore
 import { ConnectAndInstallPage, DEPLOY_PAGE_3_HEADINGS } from './pages/step-by-step-deployment/ConnectAndInstallPage';
-// @ts-ignore
 import { DeployAndVerifyPage, DEPLOY_PAGE_4_HEADINGS } from './pages/step-by-step-deployment/DeployAndVerifyPage';
 
 // Chapter 3 Pages
-// @ts-ignore
 import { VerificationChecklistPage, VERIFICATION_PAGE_HEADINGS } from './pages/VerificationChecklistPage';
 
 // Chapter 4 Pages
-// @ts-ignore
 import { CommonErrorsPage, COMMON_ERRORS_PAGE_HEADINGS } from './pages/troubleshooting/CommonErrorsPage';
-// @ts-ignore
 import { DebuggingToolkitPage, DEBUGGING_TOOLKIT_HEADINGS } from './pages/troubleshooting/DebuggingToolkitPage';
 
 // Chapter 5 Pages
-// @ts-ignore
 import { ProjectTwoPage, PROJECT_TWO_PAGE_HEADINGS } from './pages/independent-challenge/ProjectTwoPage';
-// @ts-ignore
 import { IndependentChecklistPage, INDEPENDENT_CHECKLIST_HEADINGS } from './pages/independent-challenge/IndependentChecklistPage';
 
 // Chapter 6 Pages
-// @ts-ignore
 import { SecurityAndPermissionsPage, SECURITY_PAGE_HEADINGS } from './pages/SecurityAndPermissionsPage';
 
 // Chapter 7 Pages
-// @ts-ignore
 import { CostAwarenessAndCleanupPage, COST_AND_CLEANUP_HEADINGS } from './pages/CostAwarenessAndCleanupPage';
 
 // Chapter 8 Pages
-// @ts-ignore
 import { FurtherLearningResourcesPage, FURTHER_LEARNING_HEADINGS } from './pages/FurtherLearningResourcesPage';
 
 // Chapter 9 Pages
-// @ts-ignore
 import { InstructorOrganiserChecklistPage, INSTRUCTOR_CHECKLIST_HEADINGS } from './pages/InstructorOrganiserChecklistPage';
 
-// @ts-ignore
 import { PlaceholderPage } from './pages/PlaceholderPage';
-// @ts-ignore
 import { useTheme } from './hooks/useTheme';
 
 const VALID_PAGES = [
@@ -100,8 +72,8 @@ const VALID_PAGES = [
   'instructor-checklist',
 ];
 
-const BlogLanding: React.FC = () => {
-  const { hoster, blogName, pageId } = useParams<{ hoster?: string; blogName?: string; pageId?: string }>();
+const BlogLanding = () => {
+  const { hoster, blogName, pageId } = useParams();
   const navigate = useNavigate();
 
   // Normalize hoster and blogName slugs
@@ -138,7 +110,7 @@ const BlogLanding: React.FC = () => {
   }, []);
 
   // Navigate using react-router with /blog/:hoster/:blogName pattern
-  const handleNavigate = (targetPageId: string) => {
+  const handleNavigate = (targetPageId) => {
     const target = targetPageId || 'overview';
     if (target === 'overview') {
       navigate(`/blog/${hosterSlug}/${blogNameSlug}`);
@@ -273,7 +245,7 @@ const BlogLanding: React.FC = () => {
     <div className="blog-container min-h-screen neo-grid-bg text-black dark:text-zinc-100 flex flex-col font-sans transition-colors duration-150">
       {/* Sticky Top Header */}
       <AppHeader
-        onToggleSidebar={() => setIsSidebarOpen((prev: boolean) => !prev)}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
         isSidebarOpen={isSidebarOpen}
         onOpenSearch={() => setIsSearchOpen(true)}
         theme={theme}
@@ -342,8 +314,8 @@ const BlogLanding: React.FC = () => {
       <DocumentSearch
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
-        onSelectResult={(item: { pageId?: string }) => {
-          if (item.pageId) {
+        onSelectResult={(item) => {
+          if (item?.pageId) {
             handleNavigate(item.pageId);
           }
         }}
