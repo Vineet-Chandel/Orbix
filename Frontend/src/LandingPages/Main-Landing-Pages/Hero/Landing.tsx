@@ -658,7 +658,7 @@ const Landing = () => {
                     <span>economics for </span>
                 </div>
                 <div className='flex items-center justify-center gap-2'>
-                    <span>our developers . </span>
+                    <span>our developers.</span>
                 </div>
             </div>
 

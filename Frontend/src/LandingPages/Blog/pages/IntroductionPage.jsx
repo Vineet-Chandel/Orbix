@@ -72,6 +72,16 @@ export function IntroductionPage({ onNavigate = () => {} }) {
             Hands-on learning
           </span>
         </div>
+
+        {/* Featured Blog Image Banner */}
+        <div className="mt-6 rounded-xl overflow-hidden border-2 border-black dark:border-white shadow-[4px_4px_0px_#000000] dark:shadow-[4px_4px_0px_#ffffff] bg-black">
+          <img
+            src="https://res.cloudinary.com/dj0ivep44/image/upload/v1792919453/AWS_EC2_Deployment_Banner_samf2y.png"
+            alt="AWS EC2 Deployment Guide Banner"
+            className="w-full h-auto object-cover max-h-[460px] block"
+            loading="eager"
+          />
+        </div>
       </header>
 
       {/* SECTION 2: FROM REPOSITORY TO LIVE WEBSITE */}

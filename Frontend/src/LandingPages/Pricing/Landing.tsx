@@ -22,7 +22,7 @@ export default function PricingPage() {
             <div className="absolute top-40 right-10 w-[500px] h-[400px] bg-indigo-50/50 rounded-full blur-[140px] pointer-events-none -z-10" />
 
             {/* Global Floating Pill Navigation */}
-            <NavBar activeTab="pricing" />
+            <NavBar />
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 sm:pt-36 sm:pb-32">

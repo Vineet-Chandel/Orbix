@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { RotateCcw, Sparkles } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { LinkedInCard } from "../../../app/Profile/CardStudio/LinkedInCard";
 import { InstagramStoryCard } from "../../../app/Profile/CardStudio/InstagramStoryCard";
 import type { CardThemeConfig } from "../../../app/Profile/CardStudio/types";
@@ -61,13 +61,6 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
         return () => window.removeEventListener("resize", handleResize);
     }, []);
 
-    // Global toggle to flip both cards in 3D simultaneously
-    const handleFlipBoth = () => {
-        const nextState = !isStoryFlipped || !isLinkedInFlipped;
-        setIsStoryFlipped(nextState);
-        setIsLinkedInFlipped(nextState);
-    };
-
     // Responsive 1.5x sizing calculation
     // Base 1.5x targets:
     // Instagram Story: 486px × 864px (native 1080 × 1920, scale: 0.45)
@@ -86,8 +79,8 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
         viewportWidth < 640
             ? Math.min(viewportWidth - 32, 340)
             : viewportWidth < 1024
-            ? 380
-            : Math.round(486 * sizeFactor);
+                ? 380
+                : Math.round(486 * sizeFactor);
     const storyScale = storyWidth / 1080;
     const storyHeight = Math.round(storyWidth * (1920 / 1080));
 
@@ -96,56 +89,20 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
         viewportWidth < 640
             ? Math.min(viewportWidth - 32, 380)
             : viewportWidth < 1024
-            ? Math.min(viewportWidth - 48, 640)
-            : Math.round(936 * sizeFactor);
+                ? Math.min(viewportWidth - 48, 640)
+                : Math.round(936 * sizeFactor);
     const linkedInScale = linkedInWidth / 1200;
     const linkedInHeight = Math.round(linkedInWidth * (627 / 1200));
 
     return (
         <section
-            className={`relative w-full bg-[#05070D] text-white py-12 sm:py-16 px-4 sm:px-6 lg:px-8 overflow-hidden font-sans select-none ${className}`}
+            className={`relative w-full bg-[#ffffff] text-white py-12 sm:py-16 px-4 sm:px-6 lg:px-8 overflow-hidden font-sans select-none ${className}`}
         >
             {/* Ambient Midnight Indigo Lighting */}
             <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] sm:w-[1300px] h-[600px] bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-indigo-600/18 via-purple-900/10 to-transparent blur-3xl pointer-events-none -z-10" />
             <div className="absolute bottom-10 right-1/4 w-[600px] h-[350px] bg-indigo-500/8 blur-[150px] pointer-events-none -z-10" />
 
-            {/* Header: Clean, Uncluttered, Developer-Centric */}
-            <div className="text-center max-w-3xl mx-auto mb-10 sm:mb-12">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-300 mb-3.5 shadow-xs">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Orbix Card Studio · Dual Format Showcase</span>
-                </div>
 
-                <h2 className="text-3xl sm:text-5xl font-black text-[#F8FAFC] tracking-tight leading-tight">
-                    {title === "One card. Every place that matters." ? (
-                        <>
-                            One card.{" "}
-                            <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-300 bg-clip-text text-transparent">
-                                Every place
-                            </span>{" "}
-                            that matters.
-                        </>
-                    ) : (
-                        title
-                    )}
-                </h2>
-
-                <p className="text-slate-400 text-sm sm:text-base mt-3 max-w-xl mx-auto leading-relaxed">
-                    {subtitle}
-                </p>
-
-                {/* Quick Action: Flip Both Cards in 3D */}
-                <div className="mt-5 flex items-center justify-center">
-                    <button
-                        type="button"
-                        onClick={handleFlipBoth}
-                        className="px-5 py-2.5 rounded-full bg-white hover:bg-neutral-100 border border-white/80 hover:border-neutral-200 text-neutral-900 text-xs font-bold transition-all flex items-center gap-2 shadow-lg cursor-pointer active:scale-95"
-                    >
-                        <RotateCcw className="w-3.5 h-3.5 text-neutral-900" />
-                        <span>Flip Both Cards (3D)</span>
-                    </button>
-                </div>
-            </div>
 
             {/* Side-by-Side Parallel Cards: Instagram Story on LEFT, LinkedIn on RIGHT */}
             <div className="relative w-full max-w-[1540px] mx-auto flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-10 xl:gap-12">
@@ -154,19 +111,7 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                 ========================================================================= */}
                 <div className="flex flex-col items-center">
                     {/* Format Header Pill */}
-                    <div
-                        className="flex items-center justify-between w-full mb-3 px-2"
-                        style={{ maxWidth: storyWidth }}
-                    >
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-                            <span className="w-2 h-2 rounded-full bg-[#E1306C]" />
-                            <span>Instagram Story</span>
-                            <span className="text-slate-500 font-mono font-normal">9:16</span>
-                        </div>
-                        <span className="text-[11px] font-mono text-indigo-400 uppercase tracking-wider font-semibold">
-                            Midnight Indigo
-                        </span>
-                    </div>
+
 
                     {/* 3D Motion Card Container (Scale effect on hover strictly turned OFF) */}
                     <div style={{ perspective: 1800 }}>
@@ -284,19 +229,7 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                 ========================================================================= */}
                 <div className="flex flex-col items-center">
                     {/* Format Header Pill */}
-                    <div
-                        className="flex items-center justify-between w-full mb-3 px-2"
-                        style={{ maxWidth: linkedInWidth }}
-                    >
-                        <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-                            <span className="w-2 h-2 rounded-full bg-[#0077B5]" />
-                            <span>LinkedIn Card</span>
-                            <span className="text-slate-500 font-mono font-normal">1200 × 627</span>
-                        </div>
-                        <span className="text-[11px] font-mono text-indigo-400 uppercase tracking-wider font-semibold">
-                            Midnight Indigo
-                        </span>
-                    </div>
+
 
                     {/* 3D Motion Card Container (Scale effect on hover strictly turned OFF) */}
                     <div style={{ perspective: 1800 }}>
@@ -408,6 +341,31 @@ export const Card: React.FC<ProfileCardSectionProps> = ({
                         </span>
                     </button>
                 </div>
+            </div>
+
+            {/* Header: Clean, Uncluttered, Developer-Centric */}
+            <div className="text-center  mx-auto mt-14">
+
+
+                <h2 className="text-3xl sm:text-6xl font-black text-[#000000] tracking-tight leading-tight">
+                    {title === "One card. Every place that matters." ? (
+                        <>
+                            One card.{" "}
+                            <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-300 bg-clip-text text-transparent">
+                                Every place
+                            </span>{" "}
+                            that matters.
+                        </>
+                    ) : (
+                        title
+                    )}
+                </h2>
+
+                <p className="text-slate-400 text-sm sm:text-base mt-3 max-w-xl mx-auto leading-relaxed">
+                    {subtitle}
+                </p>
+
+
             </div>
         </section>
     );

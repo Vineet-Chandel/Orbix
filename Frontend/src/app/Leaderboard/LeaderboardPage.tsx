@@ -587,7 +587,7 @@ export const LeaderboardPage: React.FC = () => {
                             <>
                                 {/* TOP-3 PODIUM: Visible on Page 1 when not actively filtering by search */}
                                 {page === 1 && !debouncedSearch && podium.length > 0 && (
-                                    <div className="space-y-3">
+                                    <div className="space-y-4 pt-2 pb-6">
                                         <div className="flex items-center justify-between">
                                             <div className="flex items-center gap-2">
                                                 <Sparkles className="w-4 h-4 text-black stroke-[2.5]" />
@@ -609,7 +609,7 @@ export const LeaderboardPage: React.FC = () => {
                                 )}
 
                                 {/* RANKING TABLE SECTION */}
-                                <div className="space-y-3">
+                                <div className="space-y-4 pt-6 sm:pt-8 border-t-2 border-black/15">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <Trophy className="w-4 h-4 text-black stroke-[2.5]" />

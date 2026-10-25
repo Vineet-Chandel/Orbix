@@ -20,7 +20,7 @@ export default function CustomersPage() {
             <div className="absolute top-20 right-10 w-[500px] h-[400px] bg-purple-50/60 rounded-full blur-[140px] pointer-events-none -z-10" />
 
             {/* Global Floating Pill Navigation */}
-            <NavBar activeTab="customers" />
+            <NavBar />
 
             {/* Main Content Container with top padding for floating navbar */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 sm:pt-36 sm:pb-32">

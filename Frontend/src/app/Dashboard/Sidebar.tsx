@@ -292,8 +292,8 @@ export const Sidebar = ({
             url: "https://github.com",
             icon: (
                 <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 141 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M28.001 9.5L2.50104 54.5C0.998939 58.5834 0.64081 60.8842 0.501038 65C0.938524 68.5876 1.28381 70.4643 2.50104 73L30.001 120.5C35.4895 125.639 38.9529 126.875 45.501 127.5H99.001C105.055 125.113 108.146 123.091 113.001 118L138.001 74.5C137.555 72.8604 137.011 72.6945 136.001 72.5H120.501C115.678 74.645 113.297 76.327 109.501 80C100.469 95.3741 95.8945 104.483 85.001 118C79.395 121.617 75.9883 122.881 69.001 122.5C61.7381 121.647 58.3542 120.112 53.501 115.5L26.501 70C24.9477 65.1254 24.8433 61.7609 27.501 57L52.501 14.5C56.0812 9.93194 58.5322 7.57464 64.001 6H73.501C80.5078 6.26746 82.9476 8.58767 87.501 13C95.4738 21.4342 94.5253 25.7724 102.001 37C105.329 43.6932 111.503 52.4157 121.001 56H137.501C138.562 54.4501 138.56 53.4612 137.501 51.5L110.001 6.5C104.567 2.11059 101.303 0.697955 95.001 0.5H42.001C35.9066 2.76829 32.8347 4.72468 28.001 9.5Z" fill="white" />
-                    <path d="M73.001 28.5L72.501 12.5C70.7058 11.0543 69.8735 11.3238 68.501 12.5V28.5C66.6181 38.531 63.7181 43.4648 56.501 51.5C48.4748 57.6826 43.6156 60.3666 33.501 62C31.6617 63.574 30.9902 64.4922 33.501 66.5C43.8214 67.5752 48.5852 70.34 56.501 76.5C62.7019 83.5583 65.51 88.1063 68.501 98V115.5C70.2071 116.947 71.1914 116.977 73.001 115.5V98C75.4015 88.542 78.0024 83.8767 84.501 76.5C91.0133 71.4181 95.0765 69.1031 103.501 66.5H139.001C140.933 64.5141 140.478 63.5826 139.001 62L103.501 61.5C95.2528 59.0485 91.2098 56.5163 84.501 51C78.304 44.7688 75.3678 39.8531 73.001 28.5Z" fill="white" />
+                    <path d="M28.001 9.5L2.50104 54.5C0.998939 58.5834 0.64081 60.8842 0.501038 65C0.938524 68.5876 1.28381 70.4643 2.50104 73L30.001 120.5C35.4895 125.639 38.9529 126.875 45.501 127.5H99.001C105.055 125.113 108.146 123.091 113.001 118L138.001 74.5C137.555 72.8604 137.011 72.6945 136.001 72.5H120.501C115.678 74.645 113.297 76.327 109.501 80C100.469 95.3741 95.8945 104.483 85.001 118C79.395 121.617 75.9883 122.881 69.001 122.5C61.7381 121.647 58.3542 120.112 53.501 115.5L26.501 70C24.9477 65.1254 24.8433 61.7609 27.501 57L52.501 14.5C56.0812 9.93194 58.5322 7.57464 64.001 6H73.501C80.5078 6.26746 82.9476 8.58767 87.501 13C95.4738 21.4342 94.5253 25.7724 102.001 37C105.329 43.6932 111.503 52.4157 121.001 56H137.501C138.562 54.4501 138.56 53.4612 137.501 51.5L110.001 6.5C104.567 2.11059 101.303 0.697955 95.001 0.5H42.001C35.9066 2.76829 32.8347 4.72468 28.001 9.5Z" fill="currentColor" />
+                    <path d="M73.001 28.5L72.501 12.5C70.7058 11.0543 69.8735 11.3238 68.501 12.5V28.5C66.6181 38.531 63.7181 43.4648 56.501 51.5C48.4748 57.6826 43.6156 60.3666 33.501 62C31.6617 63.574 30.9902 64.4922 33.501 66.5C43.8214 67.5752 48.5852 70.34 56.501 76.5C62.7019 83.5583 65.51 88.1063 68.501 98V115.5C70.2071 116.947 71.1914 116.977 73.001 115.5V98C75.4015 88.542 78.0024 83.8767 84.501 76.5C91.0133 71.4181 95.0765 69.1031 103.501 66.5H139.001C140.933 64.5141 140.478 63.5826 139.001 62L103.501 61.5C95.2528 59.0485 91.2098 56.5163 84.501 51C78.304 44.7688 75.3678 39.8531 73.001 28.5Z" fill="currentColor" />
                 </svg>
             ),
         },
@@ -304,8 +304,8 @@ export const Sidebar = ({
             url: "https://huggingface.co",
             icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" viewBox="0 0 121 89" fill="none">
-                    <path d="M1.70876 4.5C0.12191 2.90864 0.0724409 1.99494 1.70876 0.5H117.709C119.545 1.97671 119.977 2.8261 117.709 4.5C104.181 12.5622 98.954 17.9449 94.2088 29C92.6688 30.6466 91.6861 30.6173 89.7088 29C79.7437 10.5806 72.2203 6.69689 59.7088 6.5C45.4453 8.09559 38.2192 11.668 31.7088 27.5C30.4283 40.9054 30.4372 48.3489 31.7088 61.5C37.9917 76.5533 44.5975 80.7771 60.7088 82.5C77.7677 78.9809 83.6949 73.7856 89.7088 60.5C91.7028 57.2348 93.1523 57.7809 94.7085 60.5C102.674 75.3508 108.536 78.7372 119.209 84C119.834 85.9888 119.8 86.9752 117.709 88H1.70876C0.183632 86.2274 0.0547327 85.3401 1.70876 84C13.7194 76.5162 20.6745 70.4354 22.7088 61.5C24.6139 49.0868 24.218 41.4629 22.7088 27.5C18.6733 17.3207 14.491 12.1814 1.70876 4.5Z" fill="white" />
-                    <path d="M62.7085 19C61.538 18.0534 60.879 17.5934 59.7088 19C53.2869 30.3265 48.6067 35.5219 37.2085 41.5C34.6732 43.3691 34.2664 44.4424 37.2085 46.5C48.0841 52.2247 52.886 56.9754 58.7085 68.5C60.5486 69.8018 61.5591 70.1832 63.2085 68.5C68.5928 57.3944 73.8336 52.8094 85.7085 46.5C87.027 45.0962 87.7324 44.308 85.7085 42.5C75.5879 36.7207 70.2354 32.5144 62.7085 19Z" fill="white" />
+                    <path d="M1.70876 4.5C0.12191 2.90864 0.0724409 1.99494 1.70876 0.5H117.709C119.545 1.97671 119.977 2.8261 117.709 4.5C104.181 12.5622 98.954 17.9449 94.2088 29C92.6688 30.6466 91.6861 30.6173 89.7088 29C79.7437 10.5806 72.2203 6.69689 59.7088 6.5C45.4453 8.09559 38.2192 11.668 31.7088 27.5C30.4283 40.9054 30.4372 48.3489 31.7088 61.5C37.9917 76.5533 44.5975 80.7771 60.7088 82.5C77.7677 78.9809 83.6949 73.7856 89.7088 60.5C91.7028 57.2348 93.1523 57.7809 94.7085 60.5C102.674 75.3508 108.536 78.7372 119.209 84C119.834 85.9888 119.8 86.9752 117.709 88H1.70876C0.183632 86.2274 0.0547327 85.3401 1.70876 84C13.7194 76.5162 20.6745 70.4354 22.7088 61.5C24.6139 49.0868 24.218 41.4629 22.7088 27.5C18.6733 17.3207 14.491 12.1814 1.70876 4.5Z" fill="currentColor" />
+                    <path d="M62.7085 19C61.538 18.0534 60.879 17.5934 59.7088 19C53.2869 30.3265 48.6067 35.5219 37.2085 41.5C34.6732 43.3691 34.2664 44.4424 37.2085 46.5C48.0841 52.2247 52.886 56.9754 58.7085 68.5C60.5486 69.8018 61.5591 70.1832 63.2085 68.5C68.5928 57.3944 73.8336 52.8094 85.7085 46.5C87.027 45.0962 87.7324 44.308 85.7085 42.5C75.5879 36.7207 70.2354 32.5144 62.7085 19Z" fill="currentColor" />
                 </svg>
             ),
         },
@@ -316,8 +316,8 @@ export const Sidebar = ({
             url: "https://linear.app",
             icon: (
                 <svg className="w-5 h-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 475 462" fill="none">
-                    <path d="M121.238 43.9466C59.009 80.5035 33.1605 107.594 0.738281 165.947C105.26 197.551 137.021 234.274 172.238 314.947C184.063 377.952 179.633 409.761 153.238 460.447C214.254 425.34 239.644 395.514 273.738 329.447C304.125 246.736 306.738 196.516 281.238 98.9466C199.34 161.027 147.684 179.97 73.2383 165.947C130.596 158.31 160.167 149.436 207.738 124.447C274.352 86.5932 300.141 57.7559 338.738 1.44657C241.336 -2.43033 190.709 4.44276 121.238 43.9466Z" fill="white" />
-                    <path d="M294.238 94.013C349.223 86.4663 369.977 68.9291 386.724 10.9463C395.658 59.6846 411.018 80.3366 474.238 94.013C426.713 105.579 402.401 115.84 386.724 178.946C371.021 121.546 348.728 105.363 294.238 94.013Z" fill="white" />
+                    <path d="M121.238 43.9466C59.009 80.5035 33.1605 107.594 0.738281 165.947C105.26 197.551 137.021 234.274 172.238 314.947C184.063 377.952 179.633 409.761 153.238 460.447C214.254 425.34 239.644 395.514 273.738 329.447C304.125 246.736 306.738 196.516 281.238 98.9466C199.34 161.027 147.684 179.97 73.2383 165.947C130.596 158.31 160.167 149.436 207.738 124.447C274.352 86.5932 300.141 57.7559 338.738 1.44657C241.336 -2.43033 190.709 4.44276 121.238 43.9466Z" fill="currentColor" />
+                    <path d="M294.238 94.013C349.223 86.4663 369.977 68.9291 386.724 10.9463C395.658 59.6846 411.018 80.3366 474.238 94.013C426.713 105.579 402.401 115.84 386.724 178.946C371.021 121.546 348.728 105.363 294.238 94.013Z" fill="currentColor" />
                 </svg>
             ),
         },
@@ -329,43 +329,38 @@ export const Sidebar = ({
             onMouseLeave={() => {
                 setIsHovered(false);
             }}
-            className={`h-[calc(100vh-1rem)] sm:h-[calc(100vh-1.5rem)] flex flex-col justify-between rounded-[36px] bg-black border border-neutral-800 text-white px-2 py-2.5 sm:px-2 sm:py-3 select-none transition-[width,box-shadow] duration-250 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-2 sm:top-3 left-2 sm:left-3 z-50 overflow-x-hidden will-change-[width] ${isExpanded
-                ? "w-64 sm:w-[264px] shadow-2xl shadow-black/80 ring-1 ring-white/10"
-                : "w-[68px] sm:w-[72px] shadow-lg shadow-black/40"
+            className={`h-[calc(100vh-1rem)] sm:h-[calc(100vh-1.5rem)] flex flex-col justify-between rounded-2xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] border-2 border-black text-black px-2 py-2.5 sm:px-2 sm:py-3 select-none transition-[width,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-2 sm:top-3 left-2 sm:left-3 z-50 overflow-x-hidden will-change-[width] ${isExpanded
+                ? "w-64 sm:w-[264px] shadow-[6px_6px_0px_#000]"
+                : "w-[68px] sm:w-[72px] shadow-[4px_4px_0px_#000]"
                 }`}
         >
-            {/* Top Brand Header without border or bg around logo */}
+            {/* Top Brand Header */}
             <div className="flex-1 min-h-0 flex flex-col overflow-y-auto no-scrollbar overflow-x-hidden">
-                <div className={`flex items-center pb-3 pt-0.5 border-b border-white/[0.07] overflow-x-hidden ${isExpanded ? "px-1 justify-start" : "justify-center"}`}>
+                <div className={`flex items-center pb-3 pt-0.5 border-b-2 border-black/15 overflow-x-hidden ${isExpanded ? "px-1 justify-start" : "justify-center"}`}>
                     <Link
                         to="/dashboard"
                         onClick={() => handleItemClick("dashboard")}
                         className={`flex items-center group cursor-pointer overflow-x-hidden ${isExpanded ? "gap-3 min-w-0" : "justify-center mx-auto"}`}
                         title="Orbix — AI Powered Ecosystem"
                     >
-                        {/* Pure White Orbix Brand Star Logo (DEAD CENTER when collapsed) */}
+                        {/* Pure Black Orbix Brand Star Logo (DEAD CENTER when collapsed) */}
                         <div className="w-7 h-7 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
-                            <svg className="w-full h-full text-white" viewBox="0 0 271 270" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" fill="white" />
-                                <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" fill="white" />
-                                <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" fill="white" />
-                                <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" fill="white" />
-                                <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" fill="white" />
-                                <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" stroke="white" />
-                                <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" stroke="white" />
-                                <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" stroke="white" />
-                                <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" stroke="white" />
-                                <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" stroke="white" />
+                            <svg className="w-full h-full text-black" viewBox="0 0 271 270" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M35.7546 229.323C26.0879 240.49 6.65458 262.923 6.25458 263.323L40.7546 233.823L35.7546 229.323Z" fill="currentColor" stroke="currentColor" />
+                                <path d="M53.7546 205.823L48.2546 212.323L57.2546 221.323L65.2546 215.323C74.8231 211.374 80.0947 211.498 89.2546 217.823L150.255 269.323C151.599 269.664 151.792 269.3 151.255 267.823L100.255 208.823C94.2785 197.493 95.4056 191.535 102.255 181.323L166.255 110.323L158.755 102.823L88.7546 167.823C80.219 174.004 75.0339 175.364 64.7546 172.323L1.75458 118.823C0.567752 118.381 0.195533 118.445 0.754584 119.823L55.7546 184.823C57.7904 194.038 57.7027 198.753 53.7546 205.823Z" fill="currentColor" stroke="currentColor" />
+                                <path d="M266.755 1.82346L187.255 76.3234L193.755 82.8234L268.255 3.32346C270.433 -0.184225 269.718 -0.104027 266.755 1.82346Z" fill="currentColor" stroke="currentColor" />
+                                <path d="M14.7546 92.8234C14.1237 92.5691 13.9006 92.6957 13.7546 93.3234L27.2546 129.823L39.2546 108.823C44.2542 102.132 47.5956 98.6552 54.2546 92.8234C63.7668 85.9272 69.7421 82.7129 81.7546 78.3234C93.6331 75.5802 100.206 74.8392 111.755 74.8234C124.18 75.7502 131.191 77.6279 143.755 82.8234C155.92 89.3264 161.853 93.8621 170.755 103.323C177.919 111.853 181.514 116.726 186.255 125.823C191.462 138.675 193.486 145.476 194.255 156.323C194.64 167.269 194.277 173.22 192.255 183.323C188.262 193.355 186.286 197.749 183.255 204.323C178.472 212.881 175.344 217.107 168.755 223.323C157.882 232.721 151.699 237.453 140.255 243.323L145.755 249.823L159.755 243.323L177.255 232.323C185.967 224.954 190.539 220.533 196.755 210.823C201.571 203.377 204.319 197.806 209.255 186.823C212.123 176.505 213.158 170.313 213.755 158.323C214.403 146.976 213.413 140.502 210.255 128.823C206.613 116.388 204.342 109.646 196.755 97.8228C192.573 91.4961 189.255 89.3234 183.255 82.8234C177.255 76.3234 169.064 72.995 162.255 67.8234C152.88 62.2428 141.129 60.1925 129.255 57.3235C119.697 56.1358 114.09 56.2036 103.755 57.3235C89.4772 59.7228 82.1412 62.2062 69.7546 67.8234C59.8735 72.627 53.2546 77.3241 46.2546 84.3234C39.2546 91.3228 34.8186 95.658 28.7546 104.323C27.1776 106.06 26.1099 106.178 23.7546 104.323L14.7546 92.8234Z" fill="currentColor" stroke="currentColor" />
+                                <path d="M22.2546 155.323L15.2546 148.823C15.018 156.006 15.0209 160.057 15.2546 167.323C17.8791 185.587 21.4392 195.175 31.7546 211.323C39.7971 222.376 44.9249 227.657 55.2546 235.323C70.367 245.366 78.9482 249.952 94.7546 253.323C105.628 254.844 111.413 255.025 121.255 254.323L113.255 247.823L95.2546 247.323C79.7836 244.684 71.1464 239.794 55.7546 229.823C46.036 221.441 41.3344 216.182 34.2546 205.823C25.8201 191.444 23.7142 181.22 22.2546 155.323Z" fill="currentColor" stroke="currentColor" />
                             </svg>
                         </div>
 
                         {/* Title and Subtitle with overflow-x-hidden and whitespace-nowrap */}
                         {isExpanded && (
                             <div className="flex flex-col min-w-0 overflow-x-hidden animate-fadeIn">
-                                <span className="text-base font-extrabold tracking-tight text-white leading-tight whitespace-nowrap truncate">
+                                <span className="text-base font-black tracking-tight text-black leading-tight whitespace-nowrap truncate">
                                     Orbix
                                 </span>
-                                <span className="text-[11px] font-medium text-neutral-400 whitespace-nowrap truncate">
+                                <span className="text-[11px] font-bold text-neutral-600 whitespace-nowrap truncate">
                                     Empowering Dev Workflows
                                 </span>
                             </div>
@@ -377,10 +372,10 @@ export const Sidebar = ({
                         <button
                             type="button"
                             onClick={onClose}
-                            className="lg:hidden p-1.5 text-neutral-400 hover:text-white rounded-xl hover:bg-white/[0.08] transition-colors cursor-pointer ml-auto"
+                            className="lg:hidden p-1.5 text-black hover:bg-black/10 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer ml-auto"
                             aria-label="Close Sidebar"
                         >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                 <line x1="18" y1="6" x2="6" y2="18" />
                                 <line x1="6" y1="6" x2="18" y2="18" />
                             </svg>
@@ -400,15 +395,15 @@ export const Sidebar = ({
                                 key={item.id}
                                 to={item.path}
                                 onClick={() => handleItemClick(item.id)}
-                                className={`flex items-center h-11 rounded-2xl text-xs sm:text-sm font-semibold transition-all duration-200 group cursor-pointer overflow-x-hidden relative w-full ${isCurrentActive
-                                    ? "bg-white/[0.1] text-white"
-                                    : "text-neutral-400 hover:text-white hover:bg-white/[0.04]"
+                                className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer overflow-x-hidden relative w-full ${isCurrentActive
+                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                                    : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                                     }`}
                                 title={!isExpanded ? item.label : undefined}
                             >
                                 {/* Active vertical accent bar */}
                                 <span
-                                    className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-200 ${isCurrentActive && isExpanded ? "bg-white opacity-100" : "bg-transparent opacity-0"
+                                    className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${isCurrentActive && isExpanded ? "bg-[#a2ff86] opacity-100" : "bg-transparent opacity-0"
                                         }`}
                                 />
 
@@ -417,8 +412,8 @@ export const Sidebar = ({
                                     <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
                                         <span
                                             className={`w-5 h-5 flex items-center justify-center transition-colors ${isCurrentActive
-                                                ? "text-white"
-                                                : "text-neutral-400 group-hover:text-white"
+                                                ? "text-[#a2ff86]"
+                                                : "text-neutral-700 group-hover:text-black"
                                                 }`}
                                         >
                                             {item.icon}
@@ -427,7 +422,7 @@ export const Sidebar = ({
 
                                     {/* Text label only rendered when expanded */}
                                     {isExpanded && (
-                                        <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5">
+                                        <span className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${isCurrentActive ? "text-[#a2ff86] font-black" : "text-neutral-800 font-bold"}`}>
                                             {item.label}
                                         </span>
                                     )}
@@ -435,11 +430,11 @@ export const Sidebar = ({
 
                                 {item.badge && isExpanded && (
                                     <span
-                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors flex-shrink-0 whitespace-nowrap ml-2 ${(item as any).badgeVariant === "danger"
-                                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30 animate-pulse"
+                                        className={`text-[10px] font-black px-2 py-0.5 rounded-full transition-colors flex-shrink-0 whitespace-nowrap ml-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000] ${(item as any).badgeVariant === "danger"
+                                            ? "bg-[#FF6B6B] text-black animate-pulse"
                                             : isCurrentActive
-                                                ? "bg-white/20 text-white"
-                                                : "bg-white/[0.06] text-neutral-400 group-hover:text-neutral-200"
+                                                ? "bg-[#a2ff86] text-black"
+                                                : "bg-[#FFE566] text-black"
                                             }`}
                                     >
                                         {item.badge}
@@ -448,51 +443,51 @@ export const Sidebar = ({
 
                                 {/* Small badge dot in collapsed rail */}
                                 {item.badge && !isExpanded && (item as any).badgeVariant === "danger" && (
-                                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 animate-pulse ring-2 ring-black" />
+                                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-[#FF6B6B] border border-black animate-pulse" />
                                 )}
                             </Link>
                         );
                     })}
                 </div>
 
-                {/* Subtle Hairline Divider (Matching Image 1 & 2) */}
-                <div className={`my-3 h-px bg-white/[0.07] overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
+                {/* Subtle Hairline Divider */}
+                <div className={`my-3 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
 
                 {/* Section 2: Workspace Redirections (Codexa, Evolexa, Flowexa) */}
                 <div className="space-y-1.5 overflow-x-hidden">
                     {isExpanded && (
-                        <div className="flex items-center justify-between px-3 py-1 text-neutral-400 overflow-x-hidden animate-fadeIn">
-                            <span className="text-[11px] font-bold tracking-wider uppercase whitespace-nowrap truncate">
+                        <div className="flex items-center justify-between px-3 py-1 text-black overflow-x-hidden animate-fadeIn">
+                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800">
                                 Workspaces
                             </span>
-                            <span className="text-[10px] font-mono text-neutral-500 whitespace-nowrap">3 Apps</span>
+                            <span className="text-[10px] font-mono font-black text-black bg-[#FFE566] border border-black px-1.5 py-0.5 rounded-md shadow-[1px_1px_0px_#000] whitespace-nowrap">3 Apps</span>
                         </div>
                     )}
 
                     {workspaceItems.map((item) => (
                         <div
                             key={item.id}
-                            className="flex items-center h-11 rounded-2xl text-xs sm:text-sm font-medium text-neutral-400 select-none overflow-x-hidden relative w-full cursor-default"
+                            className="flex items-center h-11 rounded-xl text-xs sm:text-sm font-bold text-neutral-700 select-none overflow-x-hidden relative w-full cursor-default"
                             title={!isExpanded ? `${item.name} (Coming Soon)` : `${item.name} Workspace — Coming Soon`}
                         >
                             <div className="flex items-center overflow-x-hidden w-full min-w-0">
                                 {/* SVG Icon: DEAD-CENTER in 44px container */}
                                 <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                    <span className="w-5 h-5 flex items-center justify-center text-neutral-400">
+                                    <span className="w-5 h-5 flex items-center justify-center text-neutral-700">
                                         {item.icon}
                                     </span>
                                 </div>
 
                                 {isExpanded && (
-                                    <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 text-neutral-300">
+                                    <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 text-neutral-800 font-bold">
                                         {item.name}
                                     </span>
                                 )}
                             </div>
 
                             {isExpanded && (
-                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-orange-500 bg-orange-500/25 text-orange-400 text-[10px] font-bold tracking-tight whitespace-nowrap flex-shrink-0 mr-1 shadow-xs animate-fadeIn">
-                                    <Lock className="w-2.5 h-2.5 text-orange-500 flex-shrink-0" />
+                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border-2 border-black bg-[#FFE566] text-black text-[10px] font-black tracking-tight whitespace-nowrap flex-shrink-0 mr-1 shadow-[2px_2px_0px_#000] animate-fadeIn">
+                                    <Lock className="w-2.5 h-2.5 text-black stroke-[2.5] flex-shrink-0" />
                                     <span>Coming soon</span>
                                 </div>
                             )}
@@ -502,11 +497,11 @@ export const Sidebar = ({
             </div>
 
             {/* Bottom Section: Profile Card (DEAD CENTER avatar when collapsed) */}
-            <div ref={profileMenuRef} className="pt-2.5 border-t border-white/[0.07] relative flex-shrink-0">
+            <div ref={profileMenuRef} className="pt-2.5 border-t-2 border-black/15 relative flex-shrink-0">
                 <button
                     type="button"
                     onClick={() => setIsProfileMenuOpen((prev) => !prev)}
-                    className="w-full h-14 flex items-center rounded-2xl hover:bg-white/[0.05] transition-colors cursor-pointer group text-left overflow-hidden relative"
+                    className="w-full h-14 flex items-center rounded-xl hover:bg-black/5 border-2 border-transparent hover:border-black/25 transition-all cursor-pointer group text-left overflow-hidden relative"
                     title={`${displayName} (${displayEmail})`}
                     aria-expanded={isProfileMenuOpen}
                     aria-haspopup="menu"
@@ -523,20 +518,20 @@ export const Sidebar = ({
                 conic-gradient(
                     from -75deg,
                     #C084FC 0deg 98deg,
-                    #17191f 98deg 103deg,
+                    #000000 98deg 103deg,
                     #38BDF8 103deg 190deg,
-                    #17191f 190deg 195deg,
+                    #000000 190deg 195deg,
                     #ff80d7ff 195deg 355deg,
-                    #17191f 355deg 360deg
+                    #000000 355deg 360deg
                 )
             `,
                                         padding: "2.5px",
                                     }}
                                 >
                                     {/* Dark separator / inner ring */}
-                                    <div className="w-full h-full rounded-full bg-[#17191f] p-[2px]">
+                                    <div className="w-full h-full rounded-full bg-black p-[2px]">
                                         {/* Avatar image */}
-                                        <div className="w-full h-full rounded-full overflow-hidden bg-neutral-900">
+                                        <div className="w-full h-full rounded-full overflow-hidden bg-white border border-black">
                                             {avatarSrc ? (
                                                 <img
                                                     src={avatarSrc}
@@ -544,12 +539,12 @@ export const Sidebar = ({
                                                     onError={(e) => {
                                                         (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
                                                             displayName
-                                                        )}&background=1f293d&color=fff&size=128&bold=true`;
+                                                        )}&background=000&color=a2ff86&size=128&bold=true`;
                                                     }}
                                                     className="w-full h-full rounded-full object-cover"
                                                 />
                                             ) : (
-                                                <div className="w-full h-full bg-neutral-900 flex items-center justify-center font-bold text-base text-white">
+                                                <div className="w-full h-full bg-black flex items-center justify-center font-black text-base text-[#a2ff86]">
                                                     {displayName.slice(0, 2).toUpperCase()}
                                                 </div>
                                             )}
@@ -559,8 +554,8 @@ export const Sidebar = ({
 
                                 {unreadNotificationsCount > 0 && (
                                     <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
-                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 ring-2 ring-[#0c0d10]" />
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF6B6B] opacity-75" />
+                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-[#FF6B6B] ring-2 ring-black" />
                                     </span>
                                 )}
                             </div>
@@ -569,24 +564,23 @@ export const Sidebar = ({
                         {/* Name & Email fade in */}
                         {isExpanded && (
                             <div className="min-w-0 flex-1 overflow-hidden animate-fadeIn pl-2.5">
-                                <h4 className="text-xs sm:text-sm font-bold text-white whitespace-nowrap truncate group-hover:text-neutral-100">
+                                <h4 className="text-xs sm:text-sm font-black text-black whitespace-nowrap truncate group-hover:text-black">
                                     {displayName}
                                 </h4>
-                                <p className="text-[11px] font-medium text-neutral-400 whitespace-nowrap truncate">
+                                <p className="text-[11px] font-bold text-neutral-600 whitespace-nowrap truncate">
                                     {displayEmail}
                                 </p>
                             </div>
                         )}
 
                         {isExpanded && (
-                            <div className="text-neutral-400 group-hover:text-white transition-colors p-1 flex-shrink-0 pr-2 ml-auto">
+                            <div className="text-black transition-colors p-1 flex-shrink-0 pr-2 ml-auto">
                                 <svg
-                                    className={`w-4 h-4 transition-transform duration-200 ${isProfileMenuOpen ? "rotate-180 text-white" : ""
+                                    className={`w-4 h-4 transition-transform duration-200 stroke-[2.5] ${isProfileMenuOpen ? "rotate-180" : ""
                                         }`}
                                     viewBox="0 0 24 24"
                                     fill="none"
                                     stroke="currentColor"
-                                    strokeWidth="2.2"
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                 >
@@ -601,11 +595,11 @@ export const Sidebar = ({
                 {isProfileMenuOpen && (
                     <div
                         role="menu"
-                        className="absolute bottom-full mb-2 left-0 right-0 p-1.5 rounded-2xl bg-[#0c0d10] border border-neutral-800/90 shadow-2xl z-50 animate-fadeIn text-xs"
+                        className="absolute bottom-full mb-2 left-0 right-0 p-2 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[6px_6px_0px_#000] z-50 animate-fadeIn text-xs text-black"
                     >
-                        <div className="px-3 py-2 border-b border-white/[0.06] mb-1">
-                            <p className="font-bold text-white truncate">{displayName}</p>
-                            <p className="text-[11px] text-neutral-400 truncate">{displayEmail}</p>
+                        <div className="px-3 py-2 border-b-2 border-black/15 mb-1.5">
+                            <p className="font-black text-black truncate">{displayName}</p>
+                            <p className="text-[11px] font-bold text-neutral-600 truncate">{displayEmail}</p>
                         </div>
 
                         <Link
@@ -614,9 +608,9 @@ export const Sidebar = ({
                                 setIsProfileMenuOpen(false);
                                 handleItemClick("profile");
                             }}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/[0.07] transition-colors"
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors"
                         >
-                            <svg className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                             </svg>
                             <span className="truncate">Developer Profile</span>
@@ -628,17 +622,17 @@ export const Sidebar = ({
                                 setIsProfileMenuOpen(false);
                                 handleItemClick("notifications");
                             }}
-                            className="flex items-center justify-between px-3 py-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/[0.07] transition-colors"
+                            className="flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors"
                         >
                             <div className="flex items-center gap-2.5 min-w-0">
-                                <svg className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <svg className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.73 21a2 2 0 01-3.46 0" />
                                 </svg>
                                 <span className="truncate">Notifications</span>
                             </div>
                             {unreadNotificationsCount > 0 && (
-                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white min-w-[18px] text-center leading-none">
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#FF6B6B] text-black border border-black min-w-[18px] text-center leading-none">
                                     {unreadNotificationsCount}
                                 </span>
                             )}
@@ -650,16 +644,16 @@ export const Sidebar = ({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={() => setIsProfileMenuOpen(false)}
-                                className="flex items-center justify-between px-3 py-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/[0.07] transition-colors"
+                                className="flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors"
                             >
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                    <svg className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                    <svg className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                     </svg>
                                     <span className="truncate">Public Showcase</span>
                                 </div>
-                                <svg className="w-3 h-3 text-neutral-500 flex-shrink-0 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                <svg className="w-3 h-3 text-neutral-700 flex-shrink-0 ml-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                                 </svg>
                             </Link>
@@ -671,15 +665,15 @@ export const Sidebar = ({
                                 setIsProfileMenuOpen(false);
                                 handleItemClick("connect-platform");
                             }}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-300 hover:text-white hover:bg-white/[0.07] transition-colors"
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors"
                         >
-                            <svg className="w-3.5 h-3.5 text-neutral-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                             </svg>
                             <span className="truncate">Connected Platforms ({connectedPortalsCount})</span>
                         </Link>
 
-                        <div className="my-1 border-t border-white/[0.06]" />
+                        <div className="my-1.5 border-t-2 border-black/15" />
 
                         <button
                             type="button"
@@ -687,9 +681,9 @@ export const Sidebar = ({
                                 setIsProfileMenuOpen(false);
                                 handleSignOut();
                             }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors cursor-pointer text-left"
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-700 font-black hover:bg-rose-100/60 transition-colors cursor-pointer text-left"
                         >
-                            <svg className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <svg className="w-3.5 h-3.5 text-rose-700 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                             </svg>
                             <span className="truncate">Sign out</span>

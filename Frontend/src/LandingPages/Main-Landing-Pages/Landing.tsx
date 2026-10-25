@@ -16,12 +16,12 @@ export default function MainLanding() {
       <Hero />
 
 
+      <Card />
+
       <Platform />
 
       {/* Flagship Profile Card Showcase: One Card Every Place That Matters (Full Screen) */}
-      <section className="w-full my-6 rounded-[40px] sm:rounded-[48px] overflow-hidden shadow-2xl">
-        <Card />
-      </section>
+
 
       {/* Flagship Event Tracker Showcase: Every Contest, One Calendar (Midnight Indigo Theme) */}
       <section className="w-full my-6 rounded-[40px] sm:rounded-[48px] overflow-hidden shadow-2xl">

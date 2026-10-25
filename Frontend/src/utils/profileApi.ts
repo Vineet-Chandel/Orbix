@@ -146,6 +146,10 @@ async function apiFetch<T = any>(
         throw new Error(errMsg);
     }
 
+    if (lastError === "Failed to fetch" || lastError === "Network request failed") {
+        throw new Error("Unable to connect to server. Please ensure the backend server (port 3000) is running.");
+    }
+
     throw new Error(lastError);
 }
 

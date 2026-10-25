@@ -8,6 +8,7 @@ import PricingPage from "./LandingPages/Pricing/Landing";
 import SupportPage from "./LandingPages/Support/Landing";
 import PlatformPage from "./LandingPages/Platform/Landing";
 import BlogLanding from "./LandingPages/Blog/Landing";
+import BlogCollectionPage from "./LandingPages/Blog/BlogCollectionPage";
 import Dashboard from "./app/Dashboard/Landing";
 import ProfileManager from "./app/Profile/ProfileManager";
 import PublicProfilePage from "./app/Profile/PublicProfilePage";
@@ -74,12 +75,16 @@ const App = () => {
           <Route path="/blog/:hoster/:blogName" element={<BlogLanding />} />
           <Route path="/blog/:hoster/:blogName/:pageId" element={<BlogLanding />} />
 
-          {/* Blog Aliases & Redirects */}
-          <Route path="/blog" element={<Navigate to="/blog/aws-sbg-psit/aws-launchpad-2026" replace />} />
-          <Route path="/blogs" element={<Navigate to="/blog/aws-sbg-psit/aws-launchpad-2026" replace />} />
+          {/* Blog Collection Hub Routes */}
+          <Route path="/blogs" element={<BlogCollectionPage />} />
+          <Route path="/blog" element={<BlogCollectionPage />} />
           <Route path="/blogs/:hoster/:blogName" element={<BlogLanding />} />
           <Route path="/blogs/:hoster/:blogName/:pageId" element={<BlogLanding />} />
           <Route path="/blog/:pageId" element={<SingleBlogParamRedirect />} />
+
+          {/* Docs Routes */}
+          <Route path="/docs" element={<Navigate to="/blog/aws-sbg-psit/aws-launchpad-2026" replace />} />
+          <Route path="/docs/:pageId" element={<SingleBlogParamRedirect />} />
 
           {/* Public Shareable Profile Showcase Route */}
           <Route path="/profile/u/:username" element={<PublicProfilePage />} />

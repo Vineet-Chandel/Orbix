@@ -20,7 +20,7 @@ export default function PlatformPage() {
             <div className="absolute top-32 right-10 w-[550px] h-[450px] bg-sky-50/60 rounded-full blur-[140px] pointer-events-none -z-10" />
 
             {/* Global Floating Pill Navigation */}
-            <NavBar activeTab="products" />
+            <NavBar />
 
             {/* Main Content */}
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 sm:pt-36 sm:pb-32">
