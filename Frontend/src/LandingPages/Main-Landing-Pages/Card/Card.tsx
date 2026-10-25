@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { RotateCcw, Sparkles } from "lucide-react";
+import { RotateCcw } from "lucide-react";
 import { LinkedInCard } from "../../../app/Profile/CardStudio/LinkedInCard";
 import { InstagramStoryCard } from "../../../app/Profile/CardStudio/InstagramStoryCard";
 import type { CardThemeConfig } from "../../../app/Profile/CardStudio/types";
@@ -33,8 +33,8 @@ export interface ProfileCardSectionProps {
 }
 
 export const Card: React.FC<ProfileCardSectionProps> = ({
-    title = "One card. Every place that matters.",
-    subtitle = "Your #OrbixCard looks great on LinkedIn, X, WhatsApp and your resume.",
+    title: _title = "One card. Every place that matters.",
+    subtitle: _subtitle = "Your #OrbixCard looks great on LinkedIn, X, WhatsApp and your resume.",
     user = mockUser,
     stats = mockStats,
     coderType = mockCoderType,

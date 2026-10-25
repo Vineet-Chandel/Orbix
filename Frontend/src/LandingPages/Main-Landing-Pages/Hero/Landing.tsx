@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
 import PublicProfilePage from '../../../app/Profile/PublicProfilePage';
 
 export interface PlatformItem {
@@ -531,29 +530,52 @@ const Landing = () => {
             <div className="absolute inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
 
             {/* Hero Headline (Scoped to MyCustomFont3) */}
-            <div className="w-full flex flex-col items-center justify-center gap-3 sm:gap-5 md:gap-7 lg:gap-8 text-3xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-7xl text-black font-MyCustomFont3 pt-[100px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-3 sm:px-6 max-w-full text-center leading-[1.2] sm:leading-[1.18] md:leading-[1.15]">
-                {/* Section Badge matching Platform and Contest Sections */}
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black font-sans tracking-wide uppercase">
-                    <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                    <span>Real-Time Developer Sync & Identity Hub</span>
-                </div>
-
-                <div className='flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-3 gap-y-2 text-center max-w-full'>
+            <div className="w-full flex flex-col items-center justify-center gap-2 sm:gap-3.5 md:gap-5 lg:gap-6 text-[clamp(1.1rem,3.4vw,4.25rem)] text-black font-MyCustomFont3 pt-[100px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.2] sm:leading-[1.18] md:leading-[1.15] select-none">
+                {/* Line 1: Strictly single line, never wraps */}
+                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-2 sm:gap-x-3 text-center max-w-full'>
                     <span>A developer tool to connect</span>
 
                     <motion.div
                         layout
+                        initial={{
+                            y: 85,
+                            opacity: 0,
+                            scale: 0.35,
+                            rotate: -12,
+                            filter: "brightness(2.4)",
+                        }}
+                        animate={{
+                            y: 0,
+                            opacity: 1,
+                            scale: 1,
+                            rotate: 0,
+                            filter: "brightness(1)",
+                        }}
+                        transition={{
+                            type: "spring",
+                            stiffness: 420,
+                            damping: 13,
+                            mass: 0.85,
+                            delay: 0.2,
+                        }}
                         onClick={handleNext}
                         onMouseEnter={() => setIsPaused(true)}
                         onMouseLeave={() => setIsPaused(false)}
-                        whileHover={{ scale: 1.04 }}
+                        whileHover={{ scale: 1.05, y: -2 }}
                         whileTap={{ scale: 0.94 }}
-                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                        className="bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 inline-flex items-center gap-2 sm:gap-3 md:gap-4 cursor-pointer select-none shrink-0 transition-all"
+                        className="relative bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-2.5 sm:px-3.5 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1.5 sm:gap-2.5 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
                         title="Click to switch platform"
                     >
+                        {/* Flashing light sweep effect as it bounces out of the underground */}
+                        <motion.div
+                            initial={{ x: "-120%", opacity: 1 }}
+                            animate={{ x: "250%", opacity: 0 }}
+                            transition={{ duration: 0.65, delay: 0.32, ease: "easeOut" }}
+                            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent skew-x-12 pointer-events-none z-20"
+                        />
+
                         <div
-                            className="relative w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 lg:w-10 lg:h-10 -my-1 sm:-my-2 md:-my-3 flex items-center justify-center shrink-0 overflow-visible"
+                            className="relative w-[0.85em] h-[0.85em] flex items-center justify-center shrink-0 overflow-visible"
                             style={{ filter: WHITE_STICKER_FILTER }}
                         >
                             <AnimatePresence mode="popLayout" initial={false}>
@@ -595,7 +617,7 @@ const Landing = () => {
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 1.05, opacity: 0 }}
                                 transition={{ duration: 0.12, ease: "easeOut" }}
-                                className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl text-black font-MyCustomFont3 whitespace-nowrap inline-block"
+                                className="text-inherit font-MyCustomFont3 whitespace-nowrap inline-block"
                             >
                                 {current.name}
                             </motion.span>
@@ -604,21 +626,50 @@ const Landing = () => {
                     <span>,</span>
                 </div>
 
-                <div className='flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-3 gap-y-2 text-center max-w-full'>
+                {/* Line 2: Strictly single line, never wraps regardless of text changes */}
+                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-2 sm:gap-x-3 text-center max-w-full'>
                     <span>and redirecting</span>
                     <motion.div
                         layout
+                        initial={{
+                            y: 85,
+                            opacity: 0,
+                            scale: 0.35,
+                            rotate: 12,
+                            filter: "brightness(2.4)",
+                        }}
+                        animate={{
+                            y: 0,
+                            opacity: 1,
+                            scale: 1,
+                            rotate: 0,
+                            filter: "brightness(1)",
+                        }}
+                        transition={{
+                            type: "spring",
+                            stiffness: 420,
+                            damping: 13,
+                            mass: 0.85,
+                            delay: 0.42,
+                        }}
                         onClick={handleNextOpp}
                         onMouseEnter={() => setIsOppPaused(true)}
                         onMouseLeave={() => setIsOppPaused(false)}
-                        whileHover={{ scale: 1.04 }}
+                        whileHover={{ scale: 1.05, y: -2 }}
                         whileTap={{ scale: 0.94 }}
-                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
-                        className="bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] rounded-full px-2.5 py-1 sm:px-3 sm:py-1.5 md:px-4 md:py-2 inline-flex items-center gap-2 sm:gap-3 md:gap-4 cursor-pointer select-none shrink-0 transition-all"
+                        className="relative bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-2.5 sm:px-3.5 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1.5 sm:gap-2.5 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
                         title="Click to switch opportunity"
                     >
+                        {/* Flashing light sweep effect as it bounces out of the underground */}
+                        <motion.div
+                            initial={{ x: "-120%", opacity: 1 }}
+                            animate={{ x: "250%", opacity: 0 }}
+                            transition={{ duration: 0.65, delay: 0.54, ease: "easeOut" }}
+                            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent skew-x-12 pointer-events-none z-20"
+                        />
+
                         <div
-                            className="relative w-6 h-6 sm:w-7 sm:h-7 md:w-9 md:h-9 lg:w-10 lg:h-10 -my-1 sm:-my-2 md:-my-3 flex items-center justify-center shrink-0 overflow-visible"
+                            className="relative w-[0.85em] h-[0.85em] flex items-center justify-center shrink-0 overflow-visible"
                             style={{ filter: WHITE_STICKER_FILTER }}
                         >
                             <AnimatePresence mode="popLayout" initial={false}>
@@ -660,7 +711,7 @@ const Landing = () => {
                                 animate={{ scale: 1, opacity: 1 }}
                                 exit={{ scale: 1.05, opacity: 0 }}
                                 transition={{ duration: 0.12, ease: "easeOut" }}
-                                className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl text-black font-MyCustomFont3 whitespace-nowrap inline-block"
+                                className="text-inherit font-MyCustomFont3 whitespace-nowrap inline-block"
                             >
                                 {currentOpp.name}
                             </motion.span>
@@ -669,7 +720,8 @@ const Landing = () => {
                     <span>economics for</span>
                 </div>
 
-                <div className='flex flex-wrap items-center justify-center gap-x-2 sm:gap-x-3 gap-y-2 text-center max-w-full'>
+                {/* Line 3: Strictly single line */}
+                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center text-center max-w-full'>
                     <span>our developers.</span>
                 </div>
             </div>

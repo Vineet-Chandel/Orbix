@@ -500,11 +500,6 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                 SECTION HEADINGS: Clean, High Contrast, Neo-Brutalist Orbix Platform Style
             ========================================================================= */}
             <div className="text-center max-w-4xl mx-auto mb-12 sm:mb-16 relative z-10 px-4 sm:px-6">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black tracking-wide uppercase mb-5">
-                    <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                    <span>Real-Time Contest & Hackathon Radar</span>
-                </div>
-
                 <h2 className="text-4xl sm:text-6xl md:text-7xl font-black text-black tracking-tight leading-[1.12]">
                     Every contest,
                     <br />

@@ -5,7 +5,6 @@ import {
     GraduationCap,
     Medal,
     ArrowRight,
-    Sparkles,
     Flame,
     CheckCircle2,
     Building2,
@@ -194,11 +193,6 @@ export const LeaderboardShowcase: React.FC = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
                     {/* Left Column: Bold Headline & Redirections */}
                     <div className="lg:col-span-6 space-y-6">
-                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black tracking-wide uppercase">
-                            <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                            <span>National Competitive Programming League</span>
-                        </div>
-
                         <h2 className="text-4xl sm:text-6xl md:text-7xl font-black text-black tracking-tight leading-[1.08]">
                             See where you
                             <br />

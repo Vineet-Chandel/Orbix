@@ -172,7 +172,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
             <nav
                 ref={navRef}
                 aria-label="Main Navigation"
-                className="w-[96%] sm:w-[92%] md:w-[86%] lg:w-[80%] max-w-5xl pointer-events-auto relative flex items-center justify-between gap-1 sm:gap-2.5 p-[3px] pl-2.5 sm:pl-4 pr-[3px] rounded-full bg-white/95 backdrop-blur-md border-2 border-black shadow-[4px_4px_0px_#000] transition-all duration-300 h-[48px] sm:h-[52px]"
+                className="w-[96%] sm:w-[92%] md:w-[86%] lg:w-[80%] max-w-5xl pointer-events-auto relative flex items-center justify-between gap-1 sm:gap-2.5 p-1 pl-2.5 sm:pl-4 pr-1.5 sm:pr-2.5 rounded-full bg-white/95 backdrop-blur-md border-2 border-black shadow-[4px_4px_0px_#000] transition-all duration-300 h-[50px] sm:h-[54px]"
             >
                 {/* Brand Logo & Title */}
                 <Link
@@ -220,7 +220,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                     id={`nav-item-${item.id}`}
                                     type="button"
                                     onClick={() => handleTabClick(item.id)}
-                                    className={`relative z-10 flex items-center h-[40px] sm:h-[46px] px-2.5 sm:px-4 rounded-full text-xs sm:text-sm transition-colors duration-200 focus:outline-none select-none cursor-pointer ${isSelected
+                                    className={`relative z-10 flex items-center h-[36px] sm:h-[40px] px-2.5 sm:px-4 rounded-full text-xs sm:text-sm transition-colors duration-200 focus:outline-none select-none cursor-pointer ${isSelected
                                         ? 'text-white font-semibold'
                                         : isHovered
                                             ? 'text-neutral-950 font-medium'
@@ -290,7 +290,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                     {/* Demo Profile Link */}
                     <Link
                         to="/profile/u/Vineet-Chandel"
-                        className="hidden md:flex h-[40px] sm:h-[46px] px-3 sm:px-4 items-center justify-center text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-950 transition-colors rounded-full hover:bg-neutral-100 focus:outline-none whitespace-nowrap"
+                        className="hidden md:flex h-[36px] sm:h-[40px] px-3 sm:px-4 items-center justify-center text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-950 transition-colors rounded-full hover:bg-neutral-100 focus:outline-none whitespace-nowrap"
                         title="View live demo showcase profile (@Vineet-Chandel)"
                     >
                         Demo Profile
@@ -305,7 +305,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         onClick={handleWorkspaceClick}
                         disabled={loading}
                         title={isLoggedIn ? `${displayName} - Open Workspace` : "Sign in to Orbix"}
-                        className={`group relative inline-flex items-center h-[40px] sm:h-[46px] gap-1.5 sm:gap-2 rounded-full bg-black text-white font-black text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden ${isLoggedIn ? "pl-1 sm:pl-2 pr-2 sm:pr-3" : "pl-3.5 sm:pl-5 pr-2.5 sm:pr-3"
+                        className={`group relative inline-flex items-center h-[36px] sm:h-[40px] gap-1.5 sm:gap-2 rounded-full bg-black text-white font-black text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden mr-0.5 sm:mr-1 ${isLoggedIn ? "pl-1 sm:pl-1.5 pr-2.5 sm:pr-3.5" : "pl-3.5 sm:pl-4 pr-2.5 sm:pr-3.5"
                             }`}
                     >
                         {isLoggedIn && (
@@ -317,7 +317,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                         displayName
                                     )}&background=111827&color=fff&size=128&bold=true`;
                                 }}
-                                className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover ring-1 ring-white/20 shadow-xs flex-shrink-0"
+                                className="w-6 h-6 sm:w-7 sm:h-7 rounded-full object-cover ring-1 ring-white/20 shadow-xs flex-shrink-0"
                             />
                         )}
 

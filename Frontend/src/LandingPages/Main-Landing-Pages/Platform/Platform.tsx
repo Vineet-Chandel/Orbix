@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, useScroll, useMotionValue, useSpring, useTransform } from "framer-motion";
-import { Sparkles, ArrowRight, BookOpen, RefreshCw, Layers, ShieldCheck } from "lucide-react";
+import { ArrowRight, BookOpen, RefreshCw, Layers, ShieldCheck } from "lucide-react";
 
 export interface PlatformItem {
     id: string;
@@ -465,11 +465,6 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
                         {/* Left Column: Headline, Subtitle & Dual Redirections */}
                         <div className="lg:col-span-6 space-y-6">
-                            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black tracking-wide uppercase">
-                                <Sparkles className="w-3.5 h-3.5 text-black stroke-[2.5]" />
-                                <span>Supported Platform Registry</span>
-                            </div>
-
                             <h2 className="text-4xl sm:text-6xl md:text-7xl font-black text-black tracking-tight leading-[1.08]">
                                 {title.includes("Zero tab-switching") || title.includes("every platform") ? (
                                     <>
