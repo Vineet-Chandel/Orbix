@@ -9,6 +9,7 @@ import {
     Lock,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
+import { NeoSelect } from "../../components/NeoSelect";
 
 interface ReviewerApplication {
     id: string;
@@ -477,22 +478,23 @@ export default function ClubReviewerQueuePage() {
                                                     <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-600 mb-1">
                                                         College Contact Status
                                                     </label>
-                                                    <select
+                                                    <NeoSelect
+                                                        size="sm"
                                                         value={editForm.collegeContactStatus}
-                                                        onChange={(e) =>
+                                                        onChange={(val) =>
                                                             setEditForm({
                                                                 ...editForm,
-                                                                collegeContactStatus: e.target.value,
+                                                                collegeContactStatus: val,
                                                             })
                                                         }
-                                                        className="w-full h-9 px-2.5 rounded-xl bg-white border-2 border-black text-xs font-bold focus:outline-none"
-                                                    >
-                                                        <option value="not_started">Not Started</option>
-                                                        <option value="contacted">College Contacted</option>
-                                                        <option value="confirmed">Confirmed with College</option>
-                                                        <option value="not_found">Institution / Club Not Found</option>
-                                                        <option value="no_response">No Response from Institution</option>
-                                                    </select>
+                                                        options={[
+                                                            { value: "not_started", label: "Not Started" },
+                                                            { value: "contacted", label: "College Contacted" },
+                                                            { value: "confirmed", label: "Confirmed with College" },
+                                                            { value: "not_found", label: "Institution / Club Not Found" },
+                                                            { value: "no_response", label: "No Response from Institution" },
+                                                        ]}
+                                                    />
                                                 </div>
 
                                                 {/* Checklist Checkboxes */}

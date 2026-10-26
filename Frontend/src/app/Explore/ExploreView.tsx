@@ -22,6 +22,7 @@ import PublicProfilePage from "../Profile/PublicProfilePage";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
 import { getPlatformIcon } from "../../utils/platformLinks";
+import { NeoSelect } from "../../components/NeoSelect";
 
 interface ExploreViewProps {
     onOpenMobileSidebar?: () => void;
@@ -476,36 +477,41 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                 {uniqueColleges.length > 0 && (
                                     <div className="flex items-center gap-2">
                                         <span className="text-xs font-bold text-neutral-600 shrink-0">College:</span>
-                                        <select
-                                            value={selectedCollege}
-                                            onChange={(e) => setSelectedCollege(e.target.value)}
-                                            className="px-3 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black font-bold text-xs text-black focus:outline-none focus:bg-white shadow-[2px_2px_0px_#000] cursor-pointer max-w-[180px] truncate"
-                                        >
-                                            <option value="all">All Colleges</option>
-                                            {uniqueColleges.map((col, idx) => (
-                                                <option key={idx} value={col}>
-                                                    {col}
-                                                </option>
-                                            ))}
-                                        </select>
+                                        <div className="w-44">
+                                            <NeoSelect
+                                                value={selectedCollege}
+                                                onChange={(val) => setSelectedCollege(val)}
+                                                size="sm"
+                                                options={[
+                                                    { value: "all", label: "All Colleges" },
+                                                    ...uniqueColleges.map((col) => ({
+                                                        value: col,
+                                                        label: col,
+                                                    })),
+                                                ]}
+                                            />
+                                        </div>
                                     </div>
                                 )}
 
                                 {/* Sort Dropdown */}
                                 <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold text-neutral-600 shrink-0">Sort By:</span>
-                                    <select
-                                        value={sortBy}
-                                        onChange={(e) => setSortBy(e.target.value as any)}
-                                        className="px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black font-black text-xs text-black focus:outline-none focus:bg-white shadow-[2px_2px_0px_#000] cursor-pointer"
-                                    >
-                                        <option value="score">Top Orbix Score</option>
-                                        <option value="solved">Most Solved Problems</option>
-                                        <option value="contests">Most Contests</option>
-                                        <option value="streak">Highest Streak</option>
-                                        <option value="recent">Recently Joined</option>
-                                        <option value="name">Alphabetical</option>
-                                    </select>
+                                    <div className="w-44">
+                                        <NeoSelect
+                                            value={sortBy}
+                                            onChange={(val) => setSortBy(val as any)}
+                                            size="sm"
+                                            options={[
+                                                { value: "score", label: "Top Orbix Score" },
+                                                { value: "solved", label: "Most Solved Problems" },
+                                                { value: "contests", label: "Most Contests" },
+                                                { value: "streak", label: "Highest Streak" },
+                                                { value: "recent", label: "Recently Joined" },
+                                                { value: "name", label: "Alphabetical" },
+                                            ]}
+                                        />
+                                    </div>
                                 </div>
                             </div>
 

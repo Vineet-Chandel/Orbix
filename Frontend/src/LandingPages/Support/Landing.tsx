@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import NavBar from '../NavBar/Landing';
 import { useToast } from '../../context/ToastContext';
 import { useAppSelector } from '../../store';
+import { NeoSelect } from '../../components/NeoSelect';
 
 export default function SupportPage() {
     const toast = useToast();
@@ -180,32 +181,32 @@ export default function SupportPage() {
                                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                                     Inquiry Category
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={ticket.category}
-                                    onChange={(e) => setTicket({ ...ticket, category: e.target.value })}
-                                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
-                                >
-                                    <option value="technical">Technical / PR Webhook Issue</option>
-                                    <option value="billing">Billing & Subscription</option>
-                                    <option value="mcp">MCP Server Integration</option>
-                                    <option value="security">Security & Compliance</option>
-                                    <option value="other">General Inquiry</option>
-                                </select>
+                                    onChange={(val) => setTicket({ ...ticket, category: val })}
+                                    options={[
+                                        { value: "technical", label: "Technical / PR Webhook Issue" },
+                                        { value: "billing", label: "Billing & Subscription" },
+                                        { value: "mcp", label: "MCP Server Integration" },
+                                        { value: "security", label: "Security & Compliance" },
+                                        { value: "other", label: "General Inquiry" },
+                                    ]}
+                                />
                             </div>
 
                             <div>
                                 <label className="block text-xs font-bold text-slate-700 mb-1.5">
                                     Priority Level
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={ticket.priority}
-                                    onChange={(e) => setTicket({ ...ticket, priority: e.target.value })}
-                                    className="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50/50 text-xs sm:text-sm text-slate-900 focus:outline-none focus:border-slate-900 focus:bg-white transition-all"
-                                >
-                                    <option value="normal">Normal • General question</option>
-                                    <option value="high">High • Blocking pull requests</option>
-                                    <option value="urgent">Urgent • Outage or build failure</option>
-                                </select>
+                                    onChange={(val) => setTicket({ ...ticket, priority: val })}
+                                    options={[
+                                        { value: "normal", label: "Normal • General question" },
+                                        { value: "high", label: "High • Blocking pull requests" },
+                                        { value: "urgent", label: "Urgent • Outage or build failure" },
+                                    ]}
+                                />
                             </div>
                         </div>
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { X, CheckCircle2, AlertCircle, Building2, Globe, Loader2, ShieldCheck } from "lucide-react";
 import { submitInstitutionVerificationRequest } from "../utils/profileApi";
 import { useToast } from "../context/ToastContext";
+import { NeoSelect } from "./NeoSelect";
 
 const INDIAN_STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
@@ -229,16 +230,16 @@ export function RequestCollegeModal({
                                 <label className="block text-xs font-bold text-neutral-700 mb-1">
                                     State / UT
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={state}
-                                    onChange={(e) => setState(e.target.value)}
-                                    className="w-full px-3 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
-                                >
-                                    <option value="">Select State</option>
-                                    {INDIAN_STATES.map((s) => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
+                                    onChange={(val) => setState(val)}
+                                    placeholder="Select State"
+                                    size="sm"
+                                    options={[
+                                        { value: "", label: "Select State" },
+                                        ...INDIAN_STATES.map((s) => ({ value: s, label: s })),
+                                    ]}
+                                />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-neutral-700 mb-1">

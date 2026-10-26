@@ -5,6 +5,7 @@ import { CARD_THEMES } from "./types";
 import type { CardFormat, CardFace, CardThemeId, SlotShowcaseCategory } from "./types";
 import type { RankedPlatform, RankedContestPlatform } from "../../../utils/cardStatsAggregator";
 import { getPortalIcon } from "../../../utils/portalIcons";
+import { NeoSelect } from "../../../components/NeoSelect";
 
 interface CardCustomizerToolbarProps {
     format: CardFormat;
@@ -407,37 +408,39 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
 
                                 {/* Platform Dropdown Selector */}
                                 <div className="flex-1 min-w-0 relative">
-                                    <select
+                                    <NeoSelect
+                                        size="sm"
                                         value={currentId}
-                                        onChange={(e) => onSlotChange(slotIdx, e.target.value)}
-                                        className="w-full text-xs font-bold bg-[#FAF6EE] hover:bg-white focus:bg-white text-black border-2 border-black rounded-md py-1.5 pl-2.5 pr-7 outline-none cursor-pointer truncate transition-colors shadow-[1px_1px_0px_#000]"
-                                    >
-                                        <option value="">— Empty / Select Platform —</option>
-                                        {platformsToDisplay.map((plat) => {
-                                            const isSelectedElsewhere = currentSlotIds.some(
-                                                (id, idx) => idx !== slotIdx && id === plat.id
-                                            );
+                                        onChange={(val) => onSlotChange(slotIdx, val)}
+                                        placeholder="— Empty / Select Platform —"
+                                        triggerClassName="!rounded-md !py-1 !h-8"
+                                        options={[
+                                            { value: "", label: "— Empty / Select Platform —" },
+                                            ...platformsToDisplay.map((plat) => {
+                                                const isSelectedElsewhere = currentSlotIds.some(
+                                                    (id, idx) => idx !== slotIdx && id === plat.id
+                                                );
 
-                                            let label = "";
-                                            if (plat.isGitHub || plat.category === "dev") {
-                                                const bestStr = plat.bestWorkingDay ? ` • Best: ${plat.bestWorkingDay}` : "";
-                                                label = `${plat.name} (${plat.publicRepos ?? 0} repos, ${plat.contributionsOrCommits ?? 0} commits${bestStr})`;
-                                            } else if (plat.hasGoodRating && plat.rating) {
-                                                const tierStr = plat.tier ? ` ${plat.tier}` : "";
-                                                label = `${plat.name} (Rating: ${plat.rating}${tierStr} • ${plat.solvedCount} solved)`;
-                                            } else if (plat.solvedCount > 0) {
-                                                label = `${plat.name} (${plat.solvedCount} solved)`;
-                                            } else {
-                                                label = `${plat.name} (@${plat.username})`;
-                                            }
+                                                let label = "";
+                                                if (plat.isGitHub || plat.category === "dev") {
+                                                    const bestStr = plat.bestWorkingDay ? ` • Best: ${plat.bestWorkingDay}` : "";
+                                                    label = `${plat.name} (${plat.publicRepos ?? 0} repos, ${plat.contributionsOrCommits ?? 0} commits${bestStr})`;
+                                                } else if (plat.hasGoodRating && plat.rating) {
+                                                    const tierStr = plat.tier ? ` ${plat.tier}` : "";
+                                                    label = `${plat.name} (Rating: ${plat.rating}${tierStr} • ${plat.solvedCount} solved)`;
+                                                } else if (plat.solvedCount > 0) {
+                                                    label = `${plat.name} (${plat.solvedCount} solved)`;
+                                                } else {
+                                                    label = `${plat.name} (@${plat.username})`;
+                                                }
 
-                                            return (
-                                                <option key={plat.id} value={plat.id}>
-                                                    {label} {isSelectedElsewhere ? "(Swap)" : ""}
-                                                </option>
-                                            );
-                                        })}
-                                    </select>
+                                                return {
+                                                    value: plat.id,
+                                                    label: `${label} ${isSelectedElsewhere ? "(Swap)" : ""}`,
+                                                };
+                                            }),
+                                        ]}
+                                    />
                                 </div>
 
                                 {/* Reorder Controls */}

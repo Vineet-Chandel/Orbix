@@ -14,6 +14,7 @@ import { UsernameRulesIndicator } from "../UsernameRulesIndicator";
 import { evaluatePassword } from "../passwordValidator";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
+import { NeoSelect } from "../../../components/NeoSelect";
 
 interface ClubSignupFormProps {
     onSwitchToPersonal: () => void;
@@ -383,22 +384,12 @@ export default function ClubSignupForm({ onSwitchToPersonal }: ClubSignupFormPro
                 </div>
 
                 {/* Club Category Dropdown */}
-                <div>
-                    <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-600 mb-1">
-                        Club Category
-                    </label>
-                    <select
-                        value={formData.clubCategory}
-                        onChange={(e) => setFormData({ ...formData, clubCategory: e.target.value })}
-                        className="w-full h-11 px-3 rounded-2xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none focus:bg-white transition-all cursor-pointer"
-                    >
-                        {CATEGORY_OPTIONS.map((cat) => (
-                            <option key={cat.value} value={cat.value}>
-                                {cat.label}
-                            </option>
-                        ))}
-                    </select>
-                </div>
+                <NeoSelect
+                    label="Club Category"
+                    value={formData.clubCategory}
+                    onChange={(val) => setFormData({ ...formData, clubCategory: val })}
+                    options={CATEGORY_OPTIONS}
+                />
 
                 {/* Club Description */}
                 <div>
@@ -437,17 +428,14 @@ export default function ClubSignupForm({ onSwitchToPersonal }: ClubSignupFormPro
                     />
 
                     <div>
-                        <select
+                        <NeoSelect
                             value={formData.contactPersonRole}
-                            onChange={(e) => setFormData({ ...formData, contactPersonRole: e.target.value })}
-                            className="w-full h-11 px-3 rounded-2xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none focus:bg-white transition-all cursor-pointer"
-                        >
-                            {ROLE_OPTIONS.map((r) => (
-                                <option key={r} value={r}>
-                                    Role: {r}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setFormData({ ...formData, contactPersonRole: val })}
+                            options={ROLE_OPTIONS.map((r) => ({
+                                value: r,
+                                label: `Role: ${r}`,
+                            }))}
+                        />
                     </div>
                 </div>
 
