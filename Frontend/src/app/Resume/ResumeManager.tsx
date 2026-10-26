@@ -18,7 +18,7 @@ import {
     AlertTriangle,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
-import { useAppSelector } from "../../store";
+import { useAppSelector, useAppDispatch, updateUserProfile } from "../../store";
 import {
     fetchResumeDetailsApi,
     reAnalyzeResumeApi,
@@ -44,6 +44,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
     className = "",
 }) => {
     const toast = useToast();
+    const dispatch = useAppDispatch();
     const user = useAppSelector((state) => state.user.user);
 
     // Resume Profile Data & Gemini Analysis Report
@@ -124,6 +125,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
         try {
             await toggleResumeVisibilityApi(newStatus);
             setResumeData((prev: ResumeProfileData | null) => (prev ? { ...prev, isResumePublic: newStatus } : prev));
+            dispatch(updateUserProfile({ isResumePublic: newStatus }));
             toast.success(
                 newStatus
                     ? "Resume is now publicly visible on your profile"

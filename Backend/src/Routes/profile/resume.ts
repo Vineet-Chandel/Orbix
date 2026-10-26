@@ -783,8 +783,46 @@ export const handleToggleResumeVisibility = async (req: Request, res: Response) 
             return res.status(401).json({ success: false, message: "Authentication required" });
         }
 
-        const { isPublic } = req.body;
-        const newVisibility = typeof isPublic === "boolean" ? isPublic : true;
+        const rawVal = req.body.isPublic !== undefined ? req.body.isPublic : req.body.isResumePublic;
+        const newVisibility = typeof rawVal === "boolean" ? rawVal : true;
+
+        // 1. Authoritative check: verify that a resume actually exists for this user in the database
+        const userCheck = await query(
+            `SELECT id, username, resume_url AS "resumeUrl", is_resume_public AS "isResumePublic", is_public AS "isPublic"
+             FROM users
+             WHERE id = $1 OR email = $2 OR username = $3
+             LIMIT 1;`,
+            [authUser.id || null, authUser.gmail || null, authUser.username || null]
+        );
+
+        const userRow = userCheck.rows[0];
+        if (!userRow) {
+            return res.status(404).json({
+                success: false,
+                code: "USER_NOT_FOUND",
+                message: "User account not found",
+            });
+        }
+
+        // Explicitly reject if user has not uploaded any resume
+        if (!userRow.resumeUrl || !String(userRow.resumeUrl).trim()) {
+            return res.status(400).json({
+                success: false,
+                code: "NO_RESUME_FOUND",
+                message: "No resume found. You cannot change visibility status because no resume has been uploaded.",
+                hasResume: false,
+            });
+        }
+
+        // 2. Prevent redundant database writes and cache thrashing if status is identical (anti-spam safeguard)
+        if (Boolean(userRow.isResumePublic) === Boolean(newVisibility)) {
+            return res.status(200).json({
+                success: true,
+                message: newVisibility ? "Resume is already publicly shareable" : "Resume is already hidden from public page",
+                isResumePublic: newVisibility,
+                hasResume: true,
+            });
+        }
 
         const updateSql = authUser.id
             ? `UPDATE users SET is_resume_public = $1 WHERE id = $2;`
@@ -803,6 +841,7 @@ export const handleToggleResumeVisibility = async (req: Request, res: Response) 
             success: true,
             message: newVisibility ? "Resume is now publicly shareable" : "Resume is now hidden from public page",
             isResumePublic: newVisibility,
+            hasResume: true,
         });
     } catch (err: any) {
         console.error("handleToggleResumeVisibility error:", err);

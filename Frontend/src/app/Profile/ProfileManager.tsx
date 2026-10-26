@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Briefcase, Mail, Trash2, Plus } from "lucide-react";
+import { Briefcase, Mail, Trash2, Plus, FileText, Globe, Lock } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
-import { updateProfile, getInstitutionById, type InstitutionItem } from "../../utils/profileApi";
+import { updateProfile, getInstitutionById, updateResumeVisibility, type InstitutionItem } from "../../utils/profileApi";
 import { CollegeAutocomplete } from "../../components/CollegeAutocomplete";
 import { CollegeChangeWarningModal } from "../../components/CollegeChangeWarningModal";
 import { usePlatformSync } from "../../hooks/usePlatformSync";
@@ -358,6 +358,53 @@ export default function ProfileManager() {
             setTimeout(() => flushToggleQueue(), 0);
             return nextVal;
         });
+    };
+
+    // Handle instant toggle for Resume Public / Private visibility
+    const [isTogglingResumeVisibility, setIsTogglingResumeVisibility] = useState(false);
+
+    const handleToggleResumeVisibility = async () => {
+        if (!user?.resumeUrl) {
+            toast.error("No resume uploaded yet. Please upload a resume first.", {
+                title: "No Resume Found",
+            });
+            return;
+        }
+
+        if (user?.isPublic === false) {
+            toast.info(
+                "Resume sharing is disabled while your profile is Private. Switch your profile to Public in Settings to share it.",
+                { title: "Profile is Private" }
+            );
+            return;
+        }
+
+        if (isTogglingResumeVisibility) return;
+
+        const currentVal = user?.isResumePublic !== false;
+        const nextVal = !currentVal;
+
+        setIsTogglingResumeVisibility(true);
+        // Optimistic update in Redux store
+        dispatch(updateUserProfile({ isResumePublic: nextVal }));
+
+        try {
+            await updateResumeVisibility(nextVal);
+            toast.success(
+                nextVal
+                    ? "Your resume is now public and can be viewed or downloaded from your profile."
+                    : "Your resume is now private and hidden from your public profile.",
+                { title: nextVal ? "Resume Public" : "Resume Private" }
+            );
+        } catch (err: any) {
+            // Rollback optimistic update
+            dispatch(updateUserProfile({ isResumePublic: currentVal }));
+            toast.error(err.message || "Failed to update resume visibility", {
+                title: "Update Error",
+            });
+        } finally {
+            setIsTogglingResumeVisibility(false);
+        }
     };
 
     // Determine whether user has made any changes compared to current saved profile state
@@ -874,10 +921,10 @@ export default function ProfileManager() {
                                         </button>
                                     </div>
 
-                                    {/* OPEN TO WORK AND HIRE ME SECTION */}
+                                    {/* OPEN TO WORK, HIRE ME & RESUME VISIBILITY SECTION */}
                                     <div className="space-y-2 pt-4 border-t-2 border-black/10">
                                         <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-600">
-                                            OPEN TO WORK AND HIRE ME
+                                            {Boolean(user?.resumeUrl) ? "OPEN TO WORK, HIRE ME & RESUME VISIBILITY" : "OPEN TO WORK AND HIRE ME"}
                                         </label>
                                         <div className="space-y-2.5">
                                             {/* Toggle 1: Open to work */}
@@ -917,6 +964,35 @@ export default function ProfileManager() {
                                                     ariaLabel="Toggle Hire me recruiter button"
                                                 />
                                             </div>
+
+                                            {/* Toggle 3: Resume Public / Private (only appears when resume is uploaded) */}
+                                            {Boolean(user?.resumeUrl) && (
+                                                <div className="flex items-center justify-between px-4 py-3.5 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] transition-all">
+                                                    <div className="flex items-center gap-3 min-w-0">
+                                                        <FileText className="w-4 h-4 text-black flex-shrink-0 stroke-[2.5]" />
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className="text-xs sm:text-sm font-bold text-black truncate">
+                                                                Make your attached resume public on your profile
+                                                            </span>
+                                                            {user?.resumeFilename && (
+                                                                <span className="text-[11px] text-neutral-500 font-medium truncate">
+                                                                    {user.resumeFilename}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <NeoToggle
+                                                        checked={user?.isResumePublic !== false}
+                                                        onChange={handleToggleResumeVisibility}
+                                                        disabled={isTogglingResumeVisibility}
+                                                        onIcon={<Globe className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                                                        offIcon={<Lock className="w-3.5 h-3.5 text-neutral-700 stroke-[3]" />}
+                                                        onStatusText="Status: Public"
+                                                        offStatusText="Status: Private"
+                                                        ariaLabel="Toggle resume public visibility"
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 </form>
