@@ -176,21 +176,8 @@ export const Sidebar = ({
         }
     };
 
-    // 1 dashboard, 2 leaderboard, 3 event tracker, 4 connect platform, 5 profile, 6 resume, 7 projects
+    // 1 dashboard, 2 leaderboard, 3 connect platform, 4 resume, 5 projects
     const mainNavItems = [
-        {
-            id: "home" as SidebarTab,
-            label: "Home",
-            icon: (
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
-                    <g fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}>
-                        <path d="M21 19v-6.733a4 4 0 0 0-1.245-2.9L13.378 3.31a2 2 0 0 0-2.755 0L4.245 9.367A4 4 0 0 0 3 12.267V19a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2"></path>
-                        <path d="M9 15a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v6H9z"></path>
-                    </g>
-                </svg>
-            ),
-            path: "/",
-        },
         {
             id: "dashboard" as SidebarTab,
             label: "Dashboard",
@@ -236,17 +223,6 @@ export const Sidebar = ({
                 </svg>
             ),
             path: "/onboarding",
-        },
-        {
-            id: "profile" as SidebarTab,
-            label: "Profile",
-            icon: (
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                    <circle cx="12" cy="7" r="4" />
-                </svg>
-            ),
-            path: "/profile",
         },
         {
             id: "resume" as SidebarTab,
