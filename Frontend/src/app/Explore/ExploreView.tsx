@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
     Compass,
     Search,
@@ -27,6 +27,8 @@ interface ExploreViewProps {
     onOpenMobileSidebar?: () => void;
 }
 
+const PAGE_SIZE = 24;
+
 export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar }) => {
     const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
@@ -40,6 +42,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
     // Query & Filter State
     // -------------------------------------------------------------------------
     const [searchQuery, setSearchQuery] = useState("");
+    const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
     const [selectedCollege, setSelectedCollege] = useState("all");
     const [filterOpenToWork, setFilterOpenToWork] = useState(false);
     const [filterVerifiedOnly, setFilterVerifiedOnly] = useState(false);
@@ -48,117 +51,245 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
     const [sortBy, setSortBy] = useState<"score" | "solved" | "contests" | "streak" | "recent" | "name">("score");
 
     // -------------------------------------------------------------------------
-    // Data Fetching State
+    // Data Fetching & Infinite Scroll State
     // -------------------------------------------------------------------------
     const [developers, setDevelopers] = useState<ExploreDeveloper[]>([]);
     const [totalDevelopers, setTotalDevelopers] = useState<number>(0);
+    const [page, setPage] = useState<number>(1);
+    const [hasMore, setHasMore] = useState<boolean>(true);
     const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
     const [fetchError, setFetchError] = useState<string | null>(null);
 
+    // References to control scroll container, observer sentinel, and fetch lock
+    const containerRef = useRef<HTMLElement | null>(null);
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+    const isFetchingRef = useRef<boolean>(false);
+    const pageRef = useRef<number>(1);
+
+    // Debounce search query input (300ms) to avoid over-fetching
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearchQuery(searchQuery);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
     // -------------------------------------------------------------------------
-    // Primary Data Fetcher (Excluding self ID)
+    // Developer List Filtering Helper
     // -------------------------------------------------------------------------
-    const loadDevelopers = useCallback(async (isSilent = false) => {
-        if (!isSilent) setIsLoading(true);
+    const filterDevList = useCallback((rawUsers: ExploreDeveloper[]) => {
+        let list = rawUsers;
+
+        // Exclude self from explore list
+        if (user) {
+            const myId = user.id;
+            const myUsername = (user.username || "").toLowerCase();
+            const myEmailPrefix = ((user as any).email || (user as any).gmail || "").split("@")[0].toLowerCase();
+
+            list = list.filter((u) => {
+                if (myId && u.id === myId) return false;
+                if (myUsername && u.username.toLowerCase() === myUsername) return false;
+                if (myEmailPrefix && u.username.toLowerCase() === myEmailPrefix) return false;
+                return true;
+            });
+        }
+
+        // Client-side additional soft filters
+        if (filterHasResume) {
+            list = list.filter((u) => u.hasResume);
+        }
+        if (filterHighScore) {
+            list = list.filter((u) => (u.orbixScore || 0) >= 1000);
+        }
+
+        return list;
+    }, [user, filterHasResume, filterHighScore]);
+
+    // -------------------------------------------------------------------------
+    // Primary Data Fetcher (Page-based Pagination)
+    // -------------------------------------------------------------------------
+    const fetchPage = useCallback(async (pageToFetch: number, isInitial = false) => {
+        if (isFetchingRef.current) return;
+        isFetchingRef.current = true;
+
+        if (isInitial) {
+            setIsLoading(true);
+        } else {
+            setIsLoadingMore(true);
+        }
         setFetchError(null);
 
         try {
             const res = await fetchExploreProfiles({
-                search: searchQuery.trim() || undefined,
+                search: debouncedSearchQuery.trim() || undefined,
                 college: selectedCollege !== "all" ? selectedCollege : undefined,
                 openToWork: filterOpenToWork ? true : undefined,
                 verifiedOnly: filterVerifiedOnly ? true : undefined,
                 sortBy,
-                limit: 50,
+                page: pageToFetch,
+                limit: PAGE_SIZE,
             });
 
             if (res.success && Array.isArray(res.users)) {
-                let list = res.users;
+                const filtered = filterDevList(res.users);
 
-                // Exclude self from explore list
-                if (user) {
-                    const myId = user.id;
-                    const myUsername = (user.username || "").toLowerCase();
-                    const myEmailPrefix = ((user as any).email || (user as any).gmail || "").split("@")[0].toLowerCase();
-
-                    list = list.filter((u) => {
-                        if (myId && u.id === myId) return false;
-                        if (myUsername && u.username.toLowerCase() === myUsername) return false;
-                        if (myEmailPrefix && u.username.toLowerCase() === myEmailPrefix) return false;
-                        return true;
+                if (isInitial) {
+                    setDevelopers(filtered);
+                } else {
+                    setDevelopers((prev) => {
+                        const existingKeys = new Set(prev.map((d) => d.id || d.username));
+                        const additions = filtered.filter((d) => !existingKeys.has(d.id || d.username));
+                        return [...prev, ...additions];
                     });
                 }
 
-                // Client-side additional soft filters
-                if (filterHasResume) {
-                    list = list.filter((u) => u.hasResume);
-                }
-                if (filterHighScore) {
-                    list = list.filter((u) => (u.orbixScore || 0) >= 1000);
-                }
-
-                setDevelopers(list);
-                setTotalDevelopers(list.length);
+                pageRef.current = pageToFetch;
+                setPage(pageToFetch);
+                setTotalDevelopers((prev) => res.total ?? (isInitial ? filtered.length : prev));
+                setHasMore(res.page < res.totalPages && res.users.length > 0);
             } else {
-                setDevelopers([]);
-                setTotalDevelopers(0);
+                if (isInitial) {
+                    setDevelopers([]);
+                    setTotalDevelopers(0);
+                }
+                setHasMore(false);
             }
         } catch (err: any) {
             console.error("Explore fetch error:", err);
             setFetchError(err.message || "Failed to load developer profiles");
-            // Fallback seed profiles for resilience if database connection is cold
-            const fallbackList: ExploreDeveloper[] = [
-                {
-                    id: "demo-vineet",
-                    username: "Vineet-Chandel",
-                    displayName: "Vineet Singh",
-                    firstName: "Vineet",
-                    lastName: "Singh",
-                    headline: "Distributed Systems & Full-Stack Architect",
-                    bio: "Software Architect and competitive programmer. Designing scalable platforms, real-time engines, and developer-first infrastructure.",
-                    location: "Kanpur, India",
-                    college: "PSIT Kanpur",
-                    skills: ["TypeScript", "Go", "React", "PostgreSQL", "Redis", "Docker", "AWS"],
-                    isOpenToWork: true,
-                    isHireable: true,
-                    isPublic: true,
-                    isVerifiedCoder: true,
-                    hasResume: true,
-                    orbixScore: 15836,
-                    totalSolved: 1570,
-                    totalContests: 64,
-                    streak: 42,
-                    connectedPortals: [
-                        { portal: "leetcode", portalUsername: "CodeMars", verified: true },
-                        { portal: "codeforces", portalUsername: "Code.Mars", verified: true },
-                        { portal: "github", portalUsername: "Vineet-Chandel", verified: true },
-                        { portal: "codechef", portalUsername: "c0demars", verified: true },
-                    ],
-                },
-            ];
 
-            // Exclude self from fallback too if matching
-            const myUsername = (user?.username || "").toLowerCase();
-            const filteredFallback = fallbackList.filter(
-                (u) => !myUsername || u.username.toLowerCase() !== myUsername
-            );
+            // Resilient fallback only on initial cold boot
+            if (isInitial) {
+                const fallbackList: ExploreDeveloper[] = [
+                    {
+                        id: "demo-vineet",
+                        username: "Vineet-Chandel",
+                        displayName: "Vineet Singh",
+                        firstName: "Vineet",
+                        lastName: "Singh",
+                        headline: "Distributed Systems & Full-Stack Architect",
+                        bio: "Software Architect and competitive programmer. Designing scalable platforms, real-time engines, and developer-first infrastructure.",
+                        location: "Kanpur, India",
+                        college: "PSIT Kanpur",
+                        skills: ["TypeScript", "Go", "React", "PostgreSQL", "Redis", "Docker", "AWS"],
+                        isOpenToWork: true,
+                        isHireable: true,
+                        isPublic: true,
+                        isVerifiedCoder: true,
+                        hasResume: true,
+                        orbixScore: 15836,
+                        totalSolved: 1570,
+                        totalContests: 64,
+                        streak: 42,
+                        connectedPortals: [
+                            { portal: "leetcode", portalUsername: "CodeMars", verified: true },
+                            { portal: "codeforces", portalUsername: "Code.Mars", verified: true },
+                            { portal: "github", portalUsername: "Vineet-Chandel", verified: true },
+                            { portal: "codechef", portalUsername: "c0demars", verified: true },
+                        ],
+                    },
+                ];
 
-            setDevelopers(filteredFallback);
-            setTotalDevelopers(filteredFallback.length);
+                const filteredFallback = filterDevList(fallbackList);
+                setDevelopers(filteredFallback);
+                setTotalDevelopers(filteredFallback.length);
+            }
+            setHasMore(false);
         } finally {
             setIsLoading(false);
+            setIsLoadingMore(false);
             setIsRefreshing(false);
+            isFetchingRef.current = false;
         }
-    }, [searchQuery, selectedCollege, filterOpenToWork, filterVerifiedOnly, filterHasResume, filterHighScore, sortBy, user]);
+    }, [
+        debouncedSearchQuery,
+        selectedCollege,
+        filterOpenToWork,
+        filterVerifiedOnly,
+        sortBy,
+        filterDevList,
+    ]);
 
+    // Trigger initial fetch or re-fetch whenever filters or query change
     useEffect(() => {
-        loadDevelopers();
-    }, [loadDevelopers]);
+        pageRef.current = 1;
+        setPage(1);
+        setHasMore(true);
+        fetchPage(1, true);
+
+        // Scroll back to top on filter change
+        if (containerRef.current) {
+            containerRef.current.scrollTop = 0;
+        }
+    }, [
+        debouncedSearchQuery,
+        selectedCollege,
+        filterOpenToWork,
+        filterVerifiedOnly,
+        filterHasResume,
+        filterHighScore,
+        sortBy,
+        fetchPage,
+    ]);
+
+    // -------------------------------------------------------------------------
+    // Load More Action for Scroll Pagination
+    // -------------------------------------------------------------------------
+    const handleLoadMore = useCallback(() => {
+        if (isFetchingRef.current || !hasMore || isLoading || isLoadingMore) {
+            return;
+        }
+        fetchPage(pageRef.current + 1, false);
+    }, [hasMore, isLoading, isLoadingMore, fetchPage]);
+
+    // IntersectionObserver to automatically trigger loadMore when sentinel enters viewport
+    useEffect(() => {
+        if (selectedUsername) return;
+        const sentinel = sentinelRef.current;
+        const container = containerRef.current;
+        if (!sentinel) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const [first] = entries;
+                if (first && first.isIntersecting) {
+                    handleLoadMore();
+                }
+            },
+            {
+                root: container,
+                rootMargin: "300px",
+                threshold: 0,
+            }
+        );
+
+        observer.observe(sentinel);
+        return () => {
+            observer.disconnect();
+        };
+    }, [selectedUsername, handleLoadMore]);
+
+    // Container onScroll fallback handler for instant responsiveness
+    const handleContainerScroll = useCallback(
+        (e: React.UIEvent<HTMLElement>) => {
+            if (selectedUsername) return;
+            const target = e.currentTarget;
+            const remainingScroll = target.scrollHeight - target.scrollTop - target.clientHeight;
+            if (remainingScroll < 350) {
+                handleLoadMore();
+            }
+        },
+        [selectedUsername, handleLoadMore]
+    );
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
-        await loadDevelopers(true);
+        pageRef.current = 1;
+        setPage(1);
+        setHasMore(true);
+        await fetchPage(1, true);
         toast.success("Public developer profiles updated", { title: "Refreshed" });
     };
 
@@ -197,6 +328,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
 
     return (
         <section
+            ref={containerRef}
+            onScroll={handleContainerScroll}
             aria-label="Orbix Explore Developers"
             className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
         >
@@ -459,7 +592,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                 </div>
                                 <button
                                     type="button"
-                                    onClick={() => loadDevelopers()}
+                                    onClick={() => fetchPage(1, true)}
                                     className="px-3 py-1 rounded-lg bg-amber-600 text-white font-black text-[11px] hover:bg-amber-700"
                                 >
                                     Retry
@@ -511,7 +644,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                 </button>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                 {developers.map((candidate) => {
                                     // Default avatar: use /avatar.png if candidate does not have a photo
                                     const avatar =
@@ -661,6 +795,33 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                     );
                                 })}
                             </div>
+
+                            {/* Infinite Scroll: Loading More Indicator */}
+                            {isLoadingMore && (
+                                <div className="py-8 flex flex-col items-center justify-center gap-2.5 animate-in fade-in">
+                                    <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
+                                        <RefreshCw className="w-4 h-4 text-black animate-spin stroke-[2.5]" />
+                                        <span className="text-xs font-black text-black">Loading more developers...</span>
+                                    </div>
+                                    <p className="text-[11px] font-bold text-neutral-500">
+                                        Fetching page {page + 1} of public developers
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Infinite Scroll: End of Results Indicator */}
+                            {!hasMore && !isLoading && developers.length > 0 && (
+                                <div className="py-8 text-center animate-in fade-in">
+                                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border-2 border-black text-neutral-800 font-mono text-xs font-bold shadow-[2px_2px_0px_#000]">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                        <span>All {developers.length} public developers loaded</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* IntersectionObserver Sentinel for smooth scroll pagination */}
+                            <div ref={sentinelRef} className="h-8 w-full pointer-events-none" />
+                        </>
                         )}
                     </div>
                 )}
