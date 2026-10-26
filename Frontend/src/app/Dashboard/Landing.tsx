@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { Code2, GitBranch } from "lucide-react";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "../../store";
+import { useToast } from "../../context/ToastContext";
 import { NotificationBell } from "../../components/NotificationBell";
 import { Sidebar, type SidebarTab } from "./Sidebar";
 import { CodingSubmissionsTable } from "./CodingSubmissionsTable";
@@ -18,6 +19,7 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.user);
+    const toast = useToast();
 
     // Determine initial active tab based on pathname
     const getTabFromPath = (path: string): SidebarTab => {
@@ -202,7 +204,7 @@ export default function Dashboard() {
                                     </div>
                                     <button
                                         type="button"
-                                        onClick={() => alert("Creating new repository integration...")}
+                                        onClick={() => toast.info("Creating new repository integration will be available soon.", { title: "Coming Soon" })}
                                         className="px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black transition-all cursor-pointer"
                                     >
                                         + New Project

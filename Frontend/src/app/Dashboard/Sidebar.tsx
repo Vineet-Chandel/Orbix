@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock, ChevronDown } from "lucide-react";
+import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
@@ -567,25 +567,39 @@ export const Sidebar = ({
 
                 {/* Section 2: Events Dropdown Accordion (Clubs, College Events, Event Tracker, Applications) */}
                 <div className="space-y-1 overflow-x-hidden">
-                    {isExpanded && (
-                        <button
-                            type="button"
-                            onClick={() => handleToggleSection("events")}
-                            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl hover:bg-black/5 transition-all text-neutral-800 hover:text-black group select-none cursor-pointer ${
-                                openSection === "events" ? "bg-black/[0.04]" : ""
-                            }`}
-                            aria-expanded={openSection === "events"}
-                        >
-                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
-                                Events
+                    <button
+                        type="button"
+                        onClick={() => handleToggleSection("events")}
+                        className={`flex items-center transition-all group select-none cursor-pointer ${
+                            isExpanded
+                                ? "w-full justify-between px-3 py-1.5 rounded-xl hover:bg-black/5"
+                                : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
+                        } ${openSection === "events" ? "bg-black/[0.04]" : ""}`}
+                        title={!isExpanded ? "Events" : undefined}
+                        aria-expanded={openSection === "events"}
+                    >
+                        <div className={`flex items-center min-w-0 ${isExpanded ? "gap-2.5" : "justify-center"}`}>
+                            <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                {openSection === "events" ? (
+                                    <span className="text-sm select-none leading-none">🎪</span>
+                                ) : (
+                                    <CalendarDays className="w-4.5 h-4.5 text-neutral-700 group-hover:text-black stroke-[2.2] flex-shrink-0" />
+                                )}
                             </span>
+                            {isExpanded && (
+                                <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
+                                    Events
+                                </span>
+                            )}
+                        </div>
+                        {isExpanded && (
                             <ChevronDown
                                 className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
                                     openSection === "events" ? "rotate-180" : ""
                                 }`}
                             />
-                        </button>
-                    )}
+                        )}
+                    </button>
 
                     <AnimatePresence initial={false}>
                         {openSection === "events" && (
@@ -636,29 +650,43 @@ export const Sidebar = ({
                 </div>
 
                 {/* Divider between Events & Documentation */}
-                <div className={`my-2 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "hidden"}`} />
+                <div className={`my-1.5 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
 
                 {/* Section 3: Documentation Dropdown Accordion (Blogs, Docs) */}
                 <div className="space-y-1 overflow-x-hidden">
-                    {isExpanded && (
-                        <button
-                            type="button"
-                            onClick={() => handleToggleSection("documentation")}
-                            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl hover:bg-black/5 transition-all text-neutral-800 hover:text-black group select-none cursor-pointer ${
-                                openSection === "documentation" ? "bg-black/[0.04]" : ""
-                            }`}
-                            aria-expanded={openSection === "documentation"}
-                        >
-                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
-                                Documentation
+                    <button
+                        type="button"
+                        onClick={() => handleToggleSection("documentation")}
+                        className={`flex items-center transition-all group select-none cursor-pointer ${
+                            isExpanded
+                                ? "w-full justify-between px-3 py-1.5 rounded-xl hover:bg-black/5"
+                                : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
+                        } ${openSection === "documentation" ? "bg-black/[0.04]" : ""}`}
+                        title={!isExpanded ? "Documentation" : undefined}
+                        aria-expanded={openSection === "documentation"}
+                    >
+                        <div className={`flex items-center min-w-0 ${isExpanded ? "gap-2.5" : "justify-center"}`}>
+                            <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                {openSection === "documentation" ? (
+                                    <span className="text-sm select-none leading-none">📚</span>
+                                ) : (
+                                    <BookOpen className="w-4.5 h-4.5 text-neutral-700 group-hover:text-black stroke-[2.2] flex-shrink-0" />
+                                )}
                             </span>
+                            {isExpanded && (
+                                <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
+                                    Documentation
+                                </span>
+                            )}
+                        </div>
+                        {isExpanded && (
                             <ChevronDown
                                 className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
                                     openSection === "documentation" ? "rotate-180" : ""
                                 }`}
                             />
-                        </button>
-                    )}
+                        )}
+                    </button>
 
                     <AnimatePresence initial={false}>
                         {openSection === "documentation" && (
@@ -677,29 +705,43 @@ export const Sidebar = ({
                 </div>
 
                 {/* Divider between Documentation & Workspaces */}
-                <div className={`my-2 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "hidden"}`} />
+                <div className={`my-1.5 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
 
                 {/* Section 4: Workspaces Dropdown Accordion (Codexa, Evolexa, Flowexa) */}
                 <div className="space-y-1 overflow-x-hidden">
-                    {isExpanded && (
-                        <button
-                            type="button"
-                            onClick={() => handleToggleSection("workspaces")}
-                            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl hover:bg-black/5 transition-all text-neutral-800 hover:text-black group select-none cursor-pointer ${
-                                openSection === "workspaces" ? "bg-black/[0.04]" : ""
-                            }`}
-                            aria-expanded={openSection === "workspaces"}
-                        >
-                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
-                                Workspaces
+                    <button
+                        type="button"
+                        onClick={() => handleToggleSection("workspaces")}
+                        className={`flex items-center transition-all group select-none cursor-pointer ${
+                            isExpanded
+                                ? "w-full justify-between px-3 py-1.5 rounded-xl hover:bg-black/5"
+                                : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
+                        } ${openSection === "workspaces" ? "bg-black/[0.04]" : ""}`}
+                        title={!isExpanded ? "Workspaces" : undefined}
+                        aria-expanded={openSection === "workspaces"}
+                    >
+                        <div className={`flex items-center min-w-0 ${isExpanded ? "gap-2.5" : "justify-center"}`}>
+                            <span className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                {openSection === "workspaces" ? (
+                                    <span className="text-sm select-none leading-none">💼</span>
+                                ) : (
+                                    <Briefcase className="w-4.5 h-4.5 text-neutral-700 group-hover:text-black stroke-[2.2] flex-shrink-0" />
+                                )}
                             </span>
+                            {isExpanded && (
+                                <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
+                                    Workspaces
+                                </span>
+                            )}
+                        </div>
+                        {isExpanded && (
                             <ChevronDown
                                 className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
                                     openSection === "workspaces" ? "rotate-180" : ""
                                 }`}
                             />
-                        </button>
-                    )}
+                        )}
+                    </button>
 
                     <AnimatePresence initial={false}>
                         {openSection === "workspaces" && (

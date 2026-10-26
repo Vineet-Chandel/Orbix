@@ -144,7 +144,7 @@ export default function SigninForm() {
                     href="#forgot-password"
                     onClick={(e) => {
                         e.preventDefault();
-                        alert("Password reset instructions will be sent to your registered email.");
+                        toast.info("Password reset instructions will be sent to your registered email.", { title: "Password Reset" });
                     }}
                     className="text-xs font-bold text-neutral-700 hover:text-black underline underline-offset-2 transition-colors cursor-pointer"
                 >

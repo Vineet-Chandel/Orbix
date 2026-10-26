@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { useToast } from "../../context/ToastContext";
 import Right from "./Right";
 
 interface AuthLayoutProps {
@@ -21,6 +22,7 @@ export const AuthLayout = ({
     switchLinkText,
     switchLinkHref,
 }: AuthLayoutProps) => {
+    const toast = useToast();
     return (
         <div className="min-h-screen w-full bg-[#FAF6EE] flex flex-col lg:flex-row overflow-hidden text-neutral-900 font-sans selection:bg-black selection:text-white relative">
             {/* Eye-friendly subtle canvas dot grid across the entire page flow */}
@@ -80,7 +82,7 @@ export const AuthLayout = ({
                         {/* Google */}
                         <button
                             type="button"
-                            onClick={() => alert("Google sign-in will be available soon.")}
+                            onClick={() => toast.info("Google sign-in will be available soon.", { title: "Coming Soon" })}
                             className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                             aria-label="Continue with Google"
                             title="Continue with Google"
@@ -108,7 +110,7 @@ export const AuthLayout = ({
                         {/* GitHub */}
                         <button
                             type="button"
-                            onClick={() => alert("GitHub sign-in will be available soon.")}
+                            onClick={() => toast.info("GitHub sign-in will be available soon.", { title: "Coming Soon" })}
                             className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                             aria-label="Continue with GitHub"
                             title="Continue with GitHub"
@@ -125,7 +127,7 @@ export const AuthLayout = ({
                         {/* Apple */}
                         <button
                             type="button"
-                            onClick={() => alert("Apple sign-in will be available soon.")}
+                            onClick={() => toast.info("Apple sign-in will be available soon.", { title: "Coming Soon" })}
                             className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                             aria-label="Continue with Apple"
                             title="Continue with Apple"

@@ -7,7 +7,6 @@ import {
     ShieldCheck,
     TrendingUp,
     Code2,
-    FileText,
     Brain,
     HelpCircle,
     Check,
@@ -27,7 +26,7 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
     report,
     isAnalyzing,
     onReAnalyze,
-    onUploadClick,
+    onUploadClick: _onUploadClick,
 }) => {
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
 
@@ -48,29 +47,7 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
     }
 
     if (!report) {
-        return (
-            <div className="p-8 sm:p-12 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] text-center space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
-                    <FileText className="w-7 h-7 text-black stroke-[2.5]" />
-                </div>
-                <div className="space-y-1.5 max-w-md mx-auto">
-                    <h3 className="text-lg font-black text-black">No Resume Analysis Available</h3>
-                    <p className="text-xs sm:text-sm text-neutral-600">
-                        Upload your PDF or DOCX resume to trigger instant evaluation and attach it to your public profile.
-                    </p>
-                </div>
-                {onUploadClick && (
-                    <button
-                        type="button"
-                        onClick={onUploadClick}
-                        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
-                    >
-                        <Sparkles className="w-4 h-4 stroke-[2.5]" />
-                        <span>Upload Resume Now</span>
-                    </button>
-                )}
-            </div>
-        );
+        return null;
     }
 
     const {
