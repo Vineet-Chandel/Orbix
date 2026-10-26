@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase } from "lucide-react";
+import { Lock, CalendarDays, BookOpen, Briefcase } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
@@ -572,7 +572,7 @@ export const Sidebar = ({
                         onClick={() => handleToggleSection("events")}
                         className={`flex items-center transition-all group select-none cursor-pointer ${
                             isExpanded
-                                ? "w-full justify-between px-3 py-1.5 rounded-xl hover:bg-black/5"
+                                ? "w-full justify-start px-3 py-1.5 rounded-xl hover:bg-black/5"
                                 : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
                         } ${openSection === "events" ? "bg-black/[0.04]" : ""}`}
                         title={!isExpanded ? "Events" : undefined}
@@ -592,13 +592,6 @@ export const Sidebar = ({
                                 </span>
                             )}
                         </div>
-                        {isExpanded && (
-                            <ChevronDown
-                                className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
-                                    openSection === "events" ? "rotate-180" : ""
-                                }`}
-                            />
-                        )}
                     </button>
 
                     <AnimatePresence initial={false}>
@@ -659,7 +652,7 @@ export const Sidebar = ({
                         onClick={() => handleToggleSection("documentation")}
                         className={`flex items-center transition-all group select-none cursor-pointer ${
                             isExpanded
-                                ? "w-full justify-between px-3 py-1.5 rounded-xl hover:bg-black/5"
+                                ? "w-full justify-start px-3 py-1.5 rounded-xl hover:bg-black/5"
                                 : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
                         } ${openSection === "documentation" ? "bg-black/[0.04]" : ""}`}
                         title={!isExpanded ? "Documentation" : undefined}
@@ -679,13 +672,6 @@ export const Sidebar = ({
                                 </span>
                             )}
                         </div>
-                        {isExpanded && (
-                            <ChevronDown
-                                className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
-                                    openSection === "documentation" ? "rotate-180" : ""
-                                }`}
-                            />
-                        )}
                     </button>
 
                     <AnimatePresence initial={false}>
@@ -714,7 +700,7 @@ export const Sidebar = ({
                         onClick={() => handleToggleSection("workspaces")}
                         className={`flex items-center transition-all group select-none cursor-pointer ${
                             isExpanded
-                                ? "w-full justify-between px-3 py-1.5 rounded-xl hover:bg-black/5"
+                                ? "w-full justify-start px-3 py-1.5 rounded-xl hover:bg-black/5"
                                 : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
                         } ${openSection === "workspaces" ? "bg-black/[0.04]" : ""}`}
                         title={!isExpanded ? "Workspaces" : undefined}
@@ -734,13 +720,6 @@ export const Sidebar = ({
                                 </span>
                             )}
                         </div>
-                        {isExpanded && (
-                            <ChevronDown
-                                className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
-                                    openSection === "workspaces" ? "rotate-180" : ""
-                                }`}
-                            />
-                        )}
                     </button>
 
                     <AnimatePresence initial={false}>

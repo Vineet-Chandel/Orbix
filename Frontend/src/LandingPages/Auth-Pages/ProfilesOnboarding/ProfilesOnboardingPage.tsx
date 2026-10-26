@@ -9,6 +9,7 @@ import { useToast } from "../../../context/ToastContext";
 import { Sidebar } from "../../../app/Dashboard/Sidebar";
 import { disconnectPlatform } from "../../../utils/profileApi";
 import { invalidateConnectedPlatformCaches } from "../../../utils/cacheManager";
+import { SectionBottomIllustration } from "../../../app/common/SectionBottomIllustration";
 
 type CategoryFilter = "all" | "cp" | "practice" | "dev";
 
@@ -648,7 +649,7 @@ export default function ProfilesOnboardingPage() {
             {/* Right Main Content Workspace */}
             <div className="flex-1 min-w-0 flex flex-col min-h-screen p-3 sm:p-4 lg:pl-0">
                 {/* Main Scrollable Content Card */}
-                <div className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between">
+                <div className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between">
                     <div className="p-4 sm:p-6 lg:p-8 flex-1">
                         <div className="mx-auto w-full max-w-7xl my-1">
                             {/* Page Header */}
@@ -981,14 +982,7 @@ export default function ProfilesOnboardingPage() {
                     </div>
 
                     {/* Bottom Full-Width Illustration grounded at the bottom of the container */}
-                    <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
-                        <img
-                            src="/image.png"
-                            alt="Connected platforms workspace illustration"
-                            className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
-                            loading="eager"
-                        />
-                    </div>
+                    <SectionBottomIllustration alt="Connected platforms workspace illustration" />
                 </div>
             </div>
 

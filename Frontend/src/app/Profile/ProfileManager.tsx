@@ -10,6 +10,7 @@ import { Sidebar } from "../Dashboard/Sidebar";
 import { ProfilePhotoFrame } from "./ProfilePhotoFrame";
 import { ConnectedPlatformsSection } from "../Dashboard/ConnectedPlatformsSection";
 import { ProfileCardStudio } from "./CardStudio/ProfileCardStudio";
+import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import {
     detectPlatform,
     getPlatformIcon,
@@ -502,10 +503,10 @@ export default function ProfileManager() {
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col h-full overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
+            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
                 <section
                     aria-label="Developer Profile & Card Studio"
-                    className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                    className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
                     <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                         {/* ========================================================================= */}
@@ -892,14 +893,7 @@ export default function ProfileManager() {
                     {/* ========================================================================= */}
                     {/* BOTTOM FULL-WIDTH DESK ILLUSTRATION (Matching Connected Platforms & Resume) */}
                     {/* ========================================================================= */}
-                    <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
-                        <img
-                            src="/image.png"
-                            alt="Profile workspace illustration"
-                            className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
-                            loading="eager"
-                        />
-                    </div>
+                    <SectionBottomIllustration alt="Profile workspace illustration" />
                 </section>
             </div>
         </div>

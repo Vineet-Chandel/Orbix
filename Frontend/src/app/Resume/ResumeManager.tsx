@@ -31,6 +31,7 @@ import {
 import { ResumeAnalyzerView } from "./Intelligence/ResumeAnalyzerView";
 import { ResumeUploadModal } from "./Intelligence/ResumeUploadModal";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 
 interface ResumeManagerProps {
     onOpenMobileSidebar?: () => void;
@@ -226,7 +227,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
     return (
         <section
             aria-label="Orbix Resume Intelligence & Profile Resume"
-            className={`flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between ${className}`}
+            className={`flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between ${className}`}
         >
             <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                 <div className="mx-auto w-full max-w-7xl my-1">
@@ -695,14 +696,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
             </div>
 
             {/* Bottom Illustration */}
-            <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
-                <img
-                    src="/image.png"
-                    alt="Orbix illustration"
-                    className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
-                    loading="eager"
-                />
-            </div>
+            <SectionBottomIllustration alt="Orbix resume workspace illustration" />
 
             {/* ========================================================================= */}
             {/* UPLOAD MODAL */}

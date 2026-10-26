@@ -13,6 +13,7 @@ import { DevelopmentAnalyticsSection } from "./DevelopmentAnalytics/DevelopmentA
 import { NotificationsView } from "../Notifications/NotificationsView";
 import { TrendsView } from "../Trends/TrendsView";
 import { ResumeManager } from "../Resume/ResumeManager";
+import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 
 export default function Dashboard() {
     const location = useLocation();
@@ -143,7 +144,7 @@ export default function Dashboard() {
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col h-full overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
+            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
                 {activeTab === "resume" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
                         <ResumeManager onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
@@ -151,24 +152,17 @@ export default function Dashboard() {
                 ) : activeTab === "notifications" ? (
                     <section
                         aria-label="Orbix Inbox"
-                        className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                        className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
                         <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                             <NotificationsView />
                         </div>
-                        <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
-                            <img
-                                src="/image.png"
-                                alt="Dashboard illustration"
-                                className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
-                                loading="eager"
-                            />
-                        </div>
+                        <SectionBottomIllustration alt="Notifications illustration" />
                     </section>
                 ) : activeTab === "trends" ? (
                     <section
                         aria-label="Orbix Trends"
-                        className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                        className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
                         <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                             <TrendsView
@@ -177,19 +171,12 @@ export default function Dashboard() {
                                 onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                             />
                         </div>
-                        <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
-                            <img
-                                src="/image.png"
-                                alt="Dashboard illustration"
-                                className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
-                                loading="eager"
-                            />
-                        </div>
+                        <SectionBottomIllustration alt="Trends illustration" />
                     </section>
                 ) : activeTab === "projects" ? (
                     <section
                         aria-label="Orbix Projects"
-                        className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                        className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
                         <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                             <div className="rounded-2xl bg-white border-2 border-black p-6 sm:p-8 shadow-[4px_4px_0px_#000] space-y-6">
@@ -232,20 +219,13 @@ export default function Dashboard() {
                                 </div>
                             </div>
                         </div>
-                        <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
-                            <img
-                                src="/image.png"
-                                alt="Dashboard illustration"
-                                className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
-                                loading="eager"
-                            />
-                        </div>
+                        <SectionBottomIllustration alt="Projects illustration" />
                     </section>
                 ) : (
                     /* Default Dashboard View (Practice vs Development) */
                     <section
                         aria-label="Orbix Developer Dashboard"
-                        className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                        className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                     >
                         <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                             {/* Dashboard Header Bar */}
@@ -351,14 +331,7 @@ export default function Dashboard() {
                         </div>
 
                         {/* Bottom Illustration Banner */}
-                        <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
-                            <img
-                                src="/image.png"
-                                alt="Dashboard illustration"
-                                className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
-                                loading="eager"
-                            />
-                        </div>
+                        <SectionBottomIllustration alt="Dashboard workspace illustration" />
                     </section>
                 )}
             </div>

@@ -31,6 +31,7 @@ import {
 } from "../../store";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { Sidebar } from "../Dashboard/Sidebar";
+import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 
 export const ALL_16_PLATFORMS = [
     { id: "leetcode", name: "LeetCode", color: "#FFA116" },
@@ -582,10 +583,10 @@ export const EventTrackerPage: React.FC = () => {
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col h-full overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
+            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
                 <section
                     aria-label="Event Tracker"
-                    className="flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                    className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
                     <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                         {/* 1. Header Bar */}
@@ -1456,14 +1457,7 @@ export const EventTrackerPage: React.FC = () => {
             {/* ========================================================================= */}
             {/* BOTTOM FULL-WIDTH DESK ILLUSTRATION (Matching Connected Platforms, Resume & Leaderboard) */}
             {/* ========================================================================= */}
-            <div className="w-full mt-auto select-none pointer-events-none overflow-hidden rounded-b-[14px]">
-                <img
-                    src="/image.png"
-                    alt="Events workspace illustration"
-                    className="w-full h-auto object-cover object-bottom block rounded-b-[14px]"
-                    loading="eager"
-                />
-            </div>
+            <SectionBottomIllustration alt="Events workspace illustration" />
         </section>
     </div>
 
