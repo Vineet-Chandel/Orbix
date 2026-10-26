@@ -572,7 +572,7 @@ export const Sidebar = ({
                         onClick={() => handleToggleSection("events")}
                         className={`flex items-center transition-all group select-none cursor-pointer ${
                             isExpanded
-                                ? "w-full justify-start px-3 py-1.5 rounded-xl hover:bg-black/5"
+                                ? "w-full px-3 py-1.5 rounded-xl hover:bg-black/5"
                                 : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
                         } ${openSection === "events" ? "bg-black/[0.04]" : ""}`}
                         title={!isExpanded ? "Events" : undefined}
@@ -652,7 +652,7 @@ export const Sidebar = ({
                         onClick={() => handleToggleSection("documentation")}
                         className={`flex items-center transition-all group select-none cursor-pointer ${
                             isExpanded
-                                ? "w-full justify-start px-3 py-1.5 rounded-xl hover:bg-black/5"
+                                ? "w-full px-3 py-1.5 rounded-xl hover:bg-black/5"
                                 : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
                         } ${openSection === "documentation" ? "bg-black/[0.04]" : ""}`}
                         title={!isExpanded ? "Documentation" : undefined}
@@ -700,7 +700,7 @@ export const Sidebar = ({
                         onClick={() => handleToggleSection("workspaces")}
                         className={`flex items-center transition-all group select-none cursor-pointer ${
                             isExpanded
-                                ? "w-full justify-start px-3 py-1.5 rounded-xl hover:bg-black/5"
+                                ? "w-full px-3 py-1.5 rounded-xl hover:bg-black/5"
                                 : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
                         } ${openSection === "workspaces" ? "bg-black/[0.04]" : ""}`}
                         title={!isExpanded ? "Workspaces" : undefined}
