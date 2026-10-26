@@ -146,18 +146,18 @@ export default function SigninForm() {
                         e.preventDefault();
                         alert("Password reset instructions will be sent to your registered email.");
                     }}
-                    className="text-xs font-medium text-neutral-600 hover:text-neutral-950 transition-colors"
+                    className="text-xs font-bold text-neutral-700 hover:text-black underline underline-offset-2 transition-colors cursor-pointer"
                 >
                     Forgot Password?
                 </a>
             </div>
 
-            {/* Solid Black Capsule Button matching user screenshot */}
+            {/* Neo-brutalist Capsule Button matching landing page theme */}
             <div className="pt-2">
                 <button
                     type="submit"
                     disabled={loading}
-                    className="flex h-12 w-full items-center justify-center rounded-full bg-black text-sm font-semibold text-white shadow-md hover:bg-neutral-800 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+                    className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
                     {loading ? (
                         <div className="flex items-center gap-2">
@@ -168,7 +168,18 @@ export default function SigninForm() {
                             <span>Logging in...</span>
                         </div>
                     ) : (
-                        <span>Login</span>
+                        <span className="inline-flex items-center gap-2">
+                            <span>Login</span>
+                            <svg
+                                className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform stroke-[2.5]"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                            >
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg>
+                        </span>
                     )}
                 </button>
             </div>

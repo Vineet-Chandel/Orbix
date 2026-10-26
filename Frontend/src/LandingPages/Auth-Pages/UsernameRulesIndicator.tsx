@@ -61,17 +61,17 @@ export const UsernameRulesIndicator = ({
     }
 
     return (
-        <div className="mt-2.5 space-y-2.5 rounded-2xl border border-neutral-200 bg-neutral-50/90 p-3.5 transition-all">
+        <div className="mt-2.5 space-y-2.5 rounded-2xl border-2 border-black bg-white p-3.5 sm:p-4 shadow-[3px_3px_0px_#000] transition-all">
             {/* Header: Label & Status Indicator */}
             <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-neutral-700">Username Requirements</span>
+                <span className="font-black uppercase tracking-wider text-black">Username Requirements</span>
                 <span
-                    className={`font-bold transition-colors duration-200 ${
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider border-2 border-black transition-colors duration-200 ${
                         isValid
-                            ? "text-emerald-600"
+                            ? "bg-[#a2ff86] text-black shadow-[1.5px_1.5px_0px_#000]"
                             : hasInput
-                            ? "text-amber-600"
-                            : "text-neutral-400"
+                            ? "bg-[#FFE566] text-black shadow-[1.5px_1.5px_0px_#000]"
+                            : "bg-neutral-100 text-neutral-500 border-neutral-300"
                     }`}
                 >
                     {isValid ? "✓ All Rules Met" : hasInput ? "In Progress" : "Required"}
@@ -87,8 +87,8 @@ export const UsernameRulesIndicator = ({
                             key={crit.id}
                             className={`flex items-center gap-2 text-xs transition-colors duration-200 ${
                                 satisfied
-                                    ? "text-neutral-900 font-medium"
-                                    : "text-neutral-500"
+                                    ? "text-black font-bold"
+                                    : "text-neutral-600 font-medium"
                             }`}
                         >
                             <motion.div
@@ -99,7 +99,7 @@ export const UsernameRulesIndicator = ({
                                 className="flex-shrink-0"
                             >
                                 {satisfied ? (
-                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow-xs">
+                                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white border border-black shadow-[1px_1px_0px_#000]">
                                         <svg
                                             className="h-2.5 w-2.5"
                                             fill="none"
@@ -111,8 +111,8 @@ export const UsernameRulesIndicator = ({
                                         </svg>
                                     </span>
                                 ) : (
-                                    <span className="flex h-4 w-4 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-400">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+                                    <span className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-black/30 bg-neutral-100 text-neutral-400">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-black/20" />
                                     </span>
                                 )}
                             </motion.div>

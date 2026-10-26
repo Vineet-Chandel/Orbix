@@ -209,20 +209,7 @@ function SignInBanner() {
                 ))}
             </div>
 
-            {/* Top Badges */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="absolute top-2 sm:top-3 left-3 sm:left-4 right-3 sm:right-4 z-20 flex justify-between items-center pointer-events-none"
-            >
-                <span className="text-[10px] sm:text-xs font-mono text-black font-extrabold tracking-wider uppercase">
-                    PSIT
-                </span>
-                <span className="text-[10px] sm:text-xs font-mono text-black font-extrabold tracking-wider uppercase">
-                    AWS SBG
-                </span>
-            </motion.div>
+
 
             {/* Center content – 44% of total height */}
             <div className="relative z-10 w-full h-[44%] flex flex-col items-start justify-center px-4 sm:px-6 lg:px-8 min-h-0">
@@ -349,20 +336,7 @@ function SignUpBanner() {
                 ))}
             </div>
 
-            {/* Top Badges */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.6, delay: 0.3 }}
-                className="absolute top-2 sm:top-3 left-3 sm:left-4 right-3 sm:right-4 z-20 flex justify-between items-center pointer-events-none"
-            >
-                <span className="text-[10px] sm:text-xs font-mono text-black font-extrabold tracking-wider uppercase">
-                    PSIT
-                </span>
-                <span className="text-[10px] sm:text-xs font-mono text-black font-extrabold tracking-wider uppercase">
-                    AWS SBG
-                </span>
-            </motion.div>
+
 
             {/* Center content – 44% of total height */}
             <div className="relative z-10 w-full h-[44%] flex flex-col items-start justify-center px-4 sm:px-6 lg:px-8 min-h-0">

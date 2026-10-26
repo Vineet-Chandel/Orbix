@@ -273,7 +273,7 @@ export default function SignupForm() {
 
             {/* Terms & Conditions Checkbox */}
             <div className="pt-1">
-                <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-600">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
                     <input
                         type="checkbox"
                         checked={formData.termsAccepted}
@@ -281,31 +281,31 @@ export default function SignupForm() {
                             setFormData({ ...formData, termsAccepted: e.target.checked });
                             if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: undefined });
                         }}
-                        className="mt-0.5 h-4 w-4 rounded border-neutral-300 text-black focus:ring-0 focus:ring-offset-0 cursor-pointer accent-black"
+                        className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
                     />
-                    <span className="leading-snug">
+                    <span className="leading-snug font-medium">
                         I accept the{" "}
-                        <a href="#terms" className="font-semibold text-neutral-900 underline hover:text-black">
+                        <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
                             Terms of Service
                         </a>{" "}
                         and{" "}
-                        <a href="#privacy" className="font-semibold text-neutral-900 underline hover:text-black">
+                        <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
                             Privacy Policy
                         </a>
                         .
                     </span>
                 </label>
                 {errors.termsAccepted && (
-                    <p className="text-xs text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
+                    <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
                 )}
             </div>
 
-            {/* Solid Black Capsule Button matching screenshot */}
+            {/* Neo-brutalist Capsule Button matching landing page theme */}
             <div className="pt-2">
                 <button
                     type="submit"
                     disabled={loading || !formData.termsAccepted}
-                    className="flex h-12 w-full items-center justify-center rounded-full bg-black text-sm font-semibold text-white shadow-md hover:bg-neutral-800 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                     {loading ? (
                         <div className="flex items-center gap-2">
@@ -316,7 +316,18 @@ export default function SignupForm() {
                             <span>Creating account...</span>
                         </div>
                     ) : (
-                        <span>Register now</span>
+                        <span className="inline-flex items-center gap-2">
+                            <span>Register now</span>
+                            <svg
+                                className="w-4 h-4 text-white group-hover:translate-x-1 transition-transform stroke-[2.5]"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                            >
+                                <line x1="5" y1="12" x2="19" y2="12" />
+                                <polyline points="12 5 19 12 12 19" />
+                            </svg>
+                        </span>
                     )}
                 </button>
             </div>

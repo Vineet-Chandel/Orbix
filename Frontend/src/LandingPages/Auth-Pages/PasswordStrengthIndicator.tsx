@@ -11,13 +11,17 @@ export const PasswordStrengthIndicator = ({
     hasInput,
 }: PasswordStrengthIndicatorProps) => {
     return (
-        <div className="mt-3 space-y-3 rounded-2xl border border-neutral-200 bg-neutral-50/80 p-4">
+        <div className="mt-3 space-y-3 rounded-2xl border-2 border-black bg-white p-4 shadow-[3px_3px_0px_#000]">
             {/* Header: Label & Status Indicator */}
             <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-neutral-600">Password Strength</span>
+                <span className="font-black uppercase tracking-wider text-black">Password Strength</span>
                 <span
-                    className={`font-bold transition-colors duration-200 ${
-                        hasInput ? result.colorClass : "text-neutral-400"
+                    className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider border-2 border-black transition-colors duration-200 ${
+                        hasInput && result.isValid
+                            ? "bg-[#a2ff86] text-black shadow-[1.5px_1.5px_0px_#000]"
+                            : hasInput
+                            ? "bg-[#FFE566] text-black shadow-[1.5px_1.5px_0px_#000]"
+                            : "bg-neutral-100 text-neutral-500 border-neutral-300"
                     }`}
                 >
                     {hasInput ? result.label : "Required"}
@@ -25,7 +29,7 @@ export const PasswordStrengthIndicator = ({
             </div>
 
             {/* Situation Progress Bar */}
-            <div className="relative h-2 w-full overflow-hidden rounded-full bg-neutral-200">
+            <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-neutral-100 border-2 border-black shadow-[1px_1px_0px_#000]">
                 <motion.div
                     className={`h-full rounded-full transition-colors duration-300 ${
                         hasInput ? result.barColorClass : "bg-transparent"
@@ -38,7 +42,7 @@ export const PasswordStrengthIndicator = ({
 
             {/* Conditions Checklist with 'o' transitioning to tick '✓' */}
             <div className="pt-1">
-                <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-neutral-500">
+                <p className="mb-2 text-[11px] font-black uppercase tracking-wider text-neutral-600">
                     Password must satisfy:
                 </p>
                 <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
@@ -49,8 +53,8 @@ export const PasswordStrengthIndicator = ({
                                 key={crit.id}
                                 className={`flex items-center gap-2 text-xs transition-colors duration-200 ${
                                     satisfied
-                                        ? "text-neutral-900 font-medium"
-                                        : "text-neutral-500"
+                                        ? "text-black font-bold"
+                                        : "text-neutral-600 font-medium"
                                 }`}
                             >
                                 {/* Circle 'o' transitioning to tick '✓' */}
@@ -62,7 +66,7 @@ export const PasswordStrengthIndicator = ({
                                     className="flex-shrink-0"
                                 >
                                     {satisfied ? (
-                                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm">
+                                        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 text-white border border-black shadow-[1px_1px_0px_#000]">
                                             <svg
                                                 className="h-2.5 w-2.5"
                                                 fill="none"
@@ -74,9 +78,9 @@ export const PasswordStrengthIndicator = ({
                                             </svg>
                                         </span>
                                     ) : (
-                                        <span className="flex h-4 w-4 items-center justify-center rounded-full border border-neutral-300 bg-white text-neutral-400">
+                                        <span className="flex h-4 w-4 items-center justify-center rounded-full border-2 border-black/30 bg-neutral-100 text-neutral-400">
                                             {/* 'o' empty circle */}
-                                            <span className="h-1.5 w-1.5 rounded-full bg-neutral-300" />
+                                            <span className="h-1.5 w-1.5 rounded-full bg-black/20" />
                                         </span>
                                     )}
                                 </motion.div>
