@@ -283,6 +283,10 @@ export const Sidebar = ({
             ),
             path: "/projects",
         },
+    ];
+
+    // Documentation Items: Blogs, Docs
+    const documentationItems = [
         {
             id: "blogs" as SidebarTab,
             label: "Blogs",
@@ -350,6 +354,79 @@ export const Sidebar = ({
         },
     ];
 
+    const renderNavItem = (item: {
+        id: SidebarTab;
+        label: string;
+        icon: React.ReactNode;
+        path: string;
+        badge?: string;
+        badgeVariant?: "danger" | "default";
+    }) => {
+        const isCurrentActive =
+            activeTab === item.id ||
+            (item.path && location.pathname === item.path) ||
+            (item.id === "docs" && location.pathname.startsWith("/docs")) ||
+            (item.id === "blogs" && (location.pathname.startsWith("/blogs") || location.pathname.startsWith("/blog")));
+
+        return (
+            <Link
+                key={item.id}
+                to={item.path}
+                onClick={() => handleItemClick(item.id)}
+                className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer overflow-x-hidden relative w-full ${isCurrentActive
+                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                    : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
+                    }`}
+                title={!isExpanded ? item.label : undefined}
+            >
+                {/* Active vertical accent bar */}
+                <span
+                    className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${isCurrentActive && isExpanded ? "bg-[#a2ff86] opacity-100" : "bg-transparent opacity-0"
+                        }`}
+                />
+
+                <div className="flex items-center overflow-x-hidden w-full">
+                    {/* SVG Icon: DEAD-CENTER in 44px container */}
+                    <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                        <span
+                            className={`w-5 h-5 flex items-center justify-center transition-colors ${isCurrentActive
+                                ? "text-[#a2ff86]"
+                                : "text-neutral-700 group-hover:text-black"
+                                }`}
+                        >
+                            {item.icon}
+                        </span>
+                    </div>
+
+                    {/* Text label only rendered when expanded */}
+                    {isExpanded && (
+                        <span className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${isCurrentActive ? "text-[#a2ff86] font-black" : "text-neutral-800 font-bold"}`}>
+                            {item.label}
+                        </span>
+                    )}
+                </div>
+
+                {item.badge && isExpanded && (
+                    <span
+                        className={`text-[10px] font-black px-2 py-0.5 rounded-full transition-colors flex-shrink-0 whitespace-nowrap ml-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000] ${(item as any).badgeVariant === "danger"
+                            ? "bg-[#FF6B6B] text-black animate-pulse"
+                            : isCurrentActive
+                                ? "bg-[#a2ff86] text-black"
+                                : "bg-[#FFE566] text-black"
+                            }`}
+                    >
+                        {item.badge}
+                    </span>
+                )}
+
+                {/* Small badge dot in collapsed rail */}
+                {item.badge && !isExpanded && (item as any).badgeVariant === "danger" && (
+                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-[#FF6B6B] border border-black animate-pulse" />
+                )}
+            </Link>
+        );
+    };
+
     const sidebarContent = (
         <aside
             onMouseEnter={() => setIsHovered(true)}
@@ -412,84 +489,34 @@ export const Sidebar = ({
 
                 {/* Main Navigation Items (EXACTLY CENTERED when collapsed) */}
                 <div className="pt-3.5 space-y-1.5 overflow-x-hidden">
-                    {mainNavItems.map((item) => {
-                        const isCurrentActive =
-                            activeTab === item.id ||
-                            (item.path && location.pathname === item.path) ||
-                            (item.id === "docs" && location.pathname.startsWith("/docs")) ||
-                            (item.id === "blogs" && (location.pathname.startsWith("/blogs") || location.pathname.startsWith("/blog")));
-
-                        return (
-                            <Link
-                                key={item.id}
-                                to={item.path}
-                                onClick={() => handleItemClick(item.id)}
-                                className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer overflow-x-hidden relative w-full ${isCurrentActive
-                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
-                                    : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
-                                    }`}
-                                title={!isExpanded ? item.label : undefined}
-                            >
-                                {/* Active vertical accent bar */}
-                                <span
-                                    className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${isCurrentActive && isExpanded ? "bg-[#a2ff86] opacity-100" : "bg-transparent opacity-0"
-                                        }`}
-                                />
-
-                                <div className="flex items-center overflow-x-hidden w-full">
-                                    {/* SVG Icon: DEAD-CENTER in 44px container */}
-                                    <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                        <span
-                                            className={`w-5 h-5 flex items-center justify-center transition-colors ${isCurrentActive
-                                                ? "text-[#a2ff86]"
-                                                : "text-neutral-700 group-hover:text-black"
-                                                }`}
-                                        >
-                                            {item.icon}
-                                        </span>
-                                    </div>
-
-                                    {/* Text label only rendered when expanded */}
-                                    {isExpanded && (
-                                        <span className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${isCurrentActive ? "text-[#a2ff86] font-black" : "text-neutral-800 font-bold"}`}>
-                                            {item.label}
-                                        </span>
-                                    )}
-                                </div>
-
-                                {item.badge && isExpanded && (
-                                    <span
-                                        className={`text-[10px] font-black px-2 py-0.5 rounded-full transition-colors flex-shrink-0 whitespace-nowrap ml-2 border-2 border-black shadow-[1.5px_1.5px_0px_#000] ${(item as any).badgeVariant === "danger"
-                                            ? "bg-[#FF6B6B] text-black animate-pulse"
-                                            : isCurrentActive
-                                                ? "bg-[#a2ff86] text-black"
-                                                : "bg-[#FFE566] text-black"
-                                            }`}
-                                    >
-                                        {item.badge}
-                                    </span>
-                                )}
-
-                                {/* Small badge dot in collapsed rail */}
-                                {item.badge && !isExpanded && (item as any).badgeVariant === "danger" && (
-                                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-[#FF6B6B] border border-black animate-pulse" />
-                                )}
-                            </Link>
-                        );
-                    })}
+                    {mainNavItems.map(renderNavItem)}
                 </div>
 
                 {/* Subtle Hairline Divider */}
                 <div className={`my-3 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
 
-                {/* Section 2: Workspace Redirections (Codexa, Evolexa, Flowexa) */}
+                {/* Section 2: Documentation (Blogs, Docs) */}
+                <div className="space-y-1.5 overflow-x-hidden">
+                    {isExpanded && (
+                        <div className="flex items-center justify-between px-3 py-1 text-black overflow-x-hidden animate-fadeIn">
+                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800">
+                                Documentation
+                            </span>
+                        </div>
+                    )}
+                    {documentationItems.map(renderNavItem)}
+                </div>
+
+                {/* Subtle Hairline Divider */}
+                <div className={`my-3 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
+
+                {/* Section 3: Workspace Redirections (Codexa, Evolexa, Flowexa) */}
                 <div className="space-y-1.5 overflow-x-hidden">
                     {isExpanded && (
                         <div className="flex items-center justify-between px-3 py-1 text-black overflow-x-hidden animate-fadeIn">
                             <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800">
                                 Workspaces
                             </span>
-                            <span className="text-[10px] font-mono font-black text-black bg-[#FFE566] border border-black px-1.5 py-0.5 rounded-md shadow-[1px_1px_0px_#000] whitespace-nowrap">3 Apps</span>
                         </div>
                     )}
 
