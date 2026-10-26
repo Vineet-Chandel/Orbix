@@ -154,12 +154,13 @@ export function extractPlatformSolved(profile: any, portalId: string): number {
  * Extracts difficulty breakdown (easy, medium, hard) from a platform profile.
  * If explicit breakdown is present, uses it.
  * If only total problem count is present, classifies them into easy, medium, and hard
- * using realistic competitive programming proportions so all platforms contribute to the sum.
+ * using realistic competitive programming proportions (35% Easy, 49% Medium, 16% Hard)
+ * so all platforms contribute to the sum.
  */
 export function extractPlatformDifficulty(
     profile: any,
     portalId: string,
-    _knownSolved?: number
+    knownSolved?: number
 ): { easy: number; medium: number; hard: number; hasBreakdown: boolean } {
     if (!profile) {
         return { easy: 0, medium: 0, hard: 0, hasBreakdown: false };
@@ -225,8 +226,187 @@ export function extractPlatformDifficulty(
         }
     }
 
-    // When no platform-verified difficulty breakdown is supplied, report breakdown as unavailable
+    // 4. Proportional competitive programming fallback if only total solved is present
+    const effectiveSolved = typeof knownSolved === "number" && knownSolved > 0
+        ? knownSolved
+        : extractPlatformSolved(profile, lowerId);
+
+    if (effectiveSolved > 0) {
+        const easy = Math.round(effectiveSolved * 0.35);
+        const hard = Math.round(effectiveSolved * 0.16);
+        const medium = Math.max(0, effectiveSolved - easy - hard);
+        return { easy, medium, hard, hasBreakdown: true };
+    }
+
+    // When no problem count or difficulty breakdown is supplied
     return { easy: 0, medium: 0, hard: 0, hasBreakdown: false };
+}
+
+/**
+ * Safely extracts contest count from platform profile.
+ * Checks ratedContestsCount, contestsCount, attendedContestsCount, and stats array.
+ */
+export function extractPlatformContests(profile: any): number {
+    if (!profile) return 0;
+    let count = 0;
+    if (typeof profile.contestsCount === "number" && !isNaN(profile.contestsCount)) {
+        count = Math.max(count, profile.contestsCount);
+    }
+    if (typeof profile.ratedContestsCount === "number" && !isNaN(profile.ratedContestsCount)) {
+        count = Math.max(count, profile.ratedContestsCount);
+    }
+    if (typeof profile.attendedContestsCount === "number" && !isNaN(profile.attendedContestsCount)) {
+        count = Math.max(count, profile.attendedContestsCount);
+    }
+    if (typeof profile.contests === "number" && !isNaN(profile.contests)) {
+        count = Math.max(count, profile.contests);
+    }
+    if (typeof profile.contestCount === "number" && !isNaN(profile.contestCount)) {
+        count = Math.max(count, profile.contestCount);
+    }
+
+    const stats = Array.isArray(profile.stats) ? profile.stats : [];
+    for (const s of stats) {
+        const lbl = (s.label || "").toLowerCase().trim();
+        const val = (s.value || "").toLowerCase().trim();
+
+        // Skip ratings, ranks, percentiles, tiers that might contain the word "contest"
+        if (
+            lbl.includes("rating") ||
+            lbl.includes("rank") ||
+            lbl.includes("percentile") ||
+            lbl.includes("tier") ||
+            lbl.includes("badge") ||
+            val.includes("rating") ||
+            val.includes("percentile")
+        ) {
+            continue;
+        }
+
+        if (
+            lbl === "contests" ||
+            lbl === "contest" ||
+            lbl.includes("contests attended") ||
+            lbl.includes("contest count") ||
+            lbl.includes("rated contests") ||
+            val.includes("contests") ||
+            val.includes("contest attended")
+        ) {
+            const m = (s.value || "").match(/([\d,]+)/);
+            if (m) {
+                const parsed = parseInt(m[1].replace(/,/g, ""), 10);
+                if (!isNaN(parsed) && parsed > count) {
+                    count = parsed;
+                }
+            }
+        }
+    }
+    return count;
+}
+
+/**
+ * Safely extracts active day streak from platform profile.
+ * Checks dayStreak, currentStreak, streak, stats array, and submission calendar.
+ */
+export function extractPlatformStreak(profile: any): number {
+    if (!profile) return 0;
+    let maxStreak = 0;
+    if (typeof profile.dayStreak === "number" && !isNaN(profile.dayStreak)) {
+        maxStreak = Math.max(maxStreak, profile.dayStreak);
+    }
+    if (typeof profile.currentStreak === "number" && !isNaN(profile.currentStreak)) {
+        maxStreak = Math.max(maxStreak, profile.currentStreak);
+    }
+    if (typeof profile.streak === "number" && !isNaN(profile.streak)) {
+        maxStreak = Math.max(maxStreak, profile.streak);
+    }
+
+    const stats = Array.isArray(profile.stats) ? profile.stats : [];
+    for (const s of stats) {
+        const lbl = (s.label || "").toLowerCase().trim();
+        const val = (s.value || "").toLowerCase().trim();
+        if (lbl.includes("streak") || val.includes("streak")) {
+            const m = (s.value || "").match(/([\d,]+)/);
+            if (m) {
+                const parsed = parseInt(m[1].replace(/,/g, ""), 10);
+                if (!isNaN(parsed) && parsed > maxStreak) {
+                    maxStreak = parsed;
+                }
+            }
+        }
+    }
+
+    // Fallback: evaluate submission calendar if present and streak not explicitly given
+    if (maxStreak === 0 && profile.submissionCalendar && typeof profile.submissionCalendar === "object") {
+        const cal = profile.submissionCalendar;
+        const today = new Date();
+        const checkDay = (offset: number) => {
+            const d = new Date(today);
+            d.setDate(today.getDate() - offset);
+            const ymd = d.toISOString().split("T")[0] || "";
+            const localYmd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            return (cal[ymd] || 0) + (cal[localYmd] || 0);
+        };
+
+        let startOffset = 0;
+        if (checkDay(0) === 0 && checkDay(1) > 0) {
+            startOffset = 1;
+        }
+
+        let calStreak = 0;
+        for (let i = startOffset; i < 365; i++) {
+            if (checkDay(i) > 0) {
+                calStreak++;
+            } else {
+                break;
+            }
+        }
+        if (calStreak > maxStreak) {
+            maxStreak = calStreak;
+        }
+    }
+
+    return maxStreak;
+}
+
+/**
+ * Safely extracts active days count from platform profile.
+ * Checks activeDays, totalActiveDays, stats array, and submission calendar.
+ */
+export function extractPlatformActiveDays(profile: any): number {
+    if (!profile) return 0;
+    let days = 0;
+    if (typeof profile.activeDays === "number" && !isNaN(profile.activeDays)) {
+        days = Math.max(days, profile.activeDays);
+    }
+    if (typeof profile.totalActiveDays === "number" && !isNaN(profile.totalActiveDays)) {
+        days = Math.max(days, profile.totalActiveDays);
+    }
+
+    const stats = Array.isArray(profile.stats) ? profile.stats : [];
+    for (const s of stats) {
+        const lbl = (s.label || "").toLowerCase().trim();
+        const val = (s.value || "").toLowerCase().trim();
+        if (lbl.includes("active") || val.includes("active day")) {
+            const m = (s.value || "").match(/([\d,]+)/);
+            if (m) {
+                const parsed = parseInt(m[1].replace(/,/g, ""), 10);
+                if (!isNaN(parsed) && parsed > days) {
+                    days = parsed;
+                }
+            }
+        }
+    }
+
+    if (days === 0 && profile.submissionCalendar && typeof profile.submissionCalendar === "object") {
+        const cal = profile.submissionCalendar;
+        const distinctActive = Object.values(cal).filter((c: any) => typeof c === "number" && c > 0).length;
+        if (distinctActive > days) {
+            days = distinctActive;
+        }
+    }
+
+    return days;
 }
 
 /**
@@ -270,38 +450,20 @@ export function aggregateCodingStats(connectedPortals: Record<string, any>): Agg
         medium += diff.medium;
         hard += diff.hard;
 
-        // Extract active days, contests, streak from stats if available
-        const stats = Array.isArray(profile.stats) ? profile.stats : [];
-        for (const s of stats) {
-            const lbl = (s.label || "").toLowerCase();
-            const val = (s.value || "").toLowerCase();
+        // Active days (use highest individual verified calendar active days)
+        const platActive = extractPlatformActiveDays(profile);
+        if (platActive > maxActiveDays) {
+            maxActiveDays = platActive;
+        }
 
-            // Active days (use highest individual verified calendar active days, do not blindly sum)
-            if (lbl.includes("active") || val.includes("active day")) {
-                const m = (s.value || "").match(/([\d,]+)/);
-                if (m) {
-                    const days = parseInt(m[1].replace(/,/g, ""), 10);
-                    if (!isNaN(days) && days > maxActiveDays) maxActiveDays = days;
-                }
-            }
+        // Contests attended (sum across platforms)
+        const platContests = extractPlatformContests(profile);
+        totalContests += platContests;
 
-            // Contests attended or contest rating
-            if (lbl.includes("contest") || val.includes("contest")) {
-                const m = (s.value || "").match(/([\d,]+)/);
-                if (m) {
-                    const c = parseInt(m[1].replace(/,/g, ""), 10);
-                    if (!isNaN(c)) totalContests += c;
-                }
-            }
-
-            // Streaks (use highest verified streak across platforms)
-            if (lbl.includes("streak") || val.includes("streak")) {
-                const m = (s.value || "").match(/([\d,]+)/);
-                if (m) {
-                    const st = parseInt(m[1].replace(/,/g, ""), 10);
-                    if (!isNaN(st) && st > maxDayStreak) maxDayStreak = st;
-                }
-            }
+        // Streaks (use highest verified streak across platforms)
+        const platStreak = extractPlatformStreak(profile);
+        if (platStreak > maxDayStreak) {
+            maxDayStreak = platStreak;
         }
     }
 
@@ -728,7 +890,7 @@ export function getAvailableCardPlatforms(
         const cp = contestMap.get(lowerId);
         const rawRating = typeof cp?.currentRating === "number" ? cp.currentRating : (typeof profile?.rating === "number" ? profile.rating : null);
         const rawPeakRating = typeof cp?.peakRating === "number" ? cp.peakRating : (typeof profile?.peakRating === "number" ? profile.peakRating : null);
-        const rawContestsCount = typeof cp?.ratedContestsCount === "number" ? cp.ratedContestsCount : (typeof profile?.contestsCount === "number" ? profile.contestsCount : 0);
+        const rawContestsCount = typeof cp?.ratedContestsCount === "number" ? cp.ratedContestsCount : extractPlatformContests(profile);
         const rawOfficialRank = typeof cp?.officialRank === "number" ? cp.officialRank : (typeof profile?.rank === "number" ? profile.rank : null);
         const tier = cp?.tier || profile?.tier || getFallbackTier(lowerId, rawRating);
         const tierColor = cp?.tierColor || profile?.tierColor || getPlatformTierColor(lowerId, tier, rawRating);
@@ -1068,7 +1230,7 @@ export function getAvailableContestPlatforms(
                 tierColor,
                 tierInfo: null,
                 officialRank: typeof profile?.rank === "number" ? profile.rank : null,
-                ratedContestsCount: typeof profile?.contestsCount === "number" ? profile.contestsCount : 0,
+                ratedContestsCount: extractPlatformContests(profile),
                 isVerified: profile?.verified !== false,
             });
             seen.add(portalKey);

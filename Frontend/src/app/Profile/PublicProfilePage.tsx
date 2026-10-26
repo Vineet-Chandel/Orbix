@@ -727,7 +727,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     const userFallback = profile?.username || "developer";
     const profilePageUrl = typeof window !== "undefined" ? `${window.location.origin}/profile/u/${username || userFallback}` : "";
     const stats = useMemo(() => aggregateCodingStats(connectedPortals), [connectedPortals]);
-    const coderType = useMemo(() => getCoderType(stats.totalSolved), [stats.totalSolved]);
+    const coderType = useMemo(() => getCoderType(stats.totalSolved, stats.contests), [stats.totalSolved, stats.contests]);
     const showcasedPlatforms = useMemo(
         () => resolveShowcasedPlatforms(connectedPortals, [], 3, false, userFallback),
         [connectedPortals, userFallback]

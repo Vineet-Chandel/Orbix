@@ -88,7 +88,7 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
     // Multi-Platform Coding Analytics
     const userFallback = user?.username || user?.firstName || "developer";
     const stats = useMemo(() => aggregateCodingStats(connectedPortals), [connectedPortals]);
-    const coderType = useMemo(() => getCoderType(stats.totalSolved), [stats.totalSolved]);
+    const coderType = useMemo(() => getCoderType(stats.totalSolved, stats.contests), [stats.totalSolved, stats.contests]);
     const availablePlatforms = useMemo(
         () => getAvailableCardPlatforms(connectedPortals, userFallback, contestData?.platforms),
         [connectedPortals, userFallback, contestData?.platforms]
