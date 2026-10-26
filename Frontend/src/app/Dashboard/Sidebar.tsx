@@ -11,6 +11,9 @@ export type SidebarTab =
     | "notifications"
     | "leaderboard"
     | "events"
+    | "clubs"
+    | "college-events"
+    | "applications"
     | "connect-platform"
     | "profile"
     | "resume"
@@ -222,19 +225,6 @@ export const Sidebar = ({
             path: "/leaderboard",
         },
         {
-            id: "events" as SidebarTab,
-            label: "Event Tracker",
-            icon: (
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                </svg>
-            ),
-            path: "/events",
-        },
-        {
             id: "connect-platform" as SidebarTab,
             label: "Connect Platform",
             badge: brokenPortalsCount > 0 ? `${brokenPortalsCount} broken` : connectedPortalsCount > 0 ? `${connectedPortalsCount}` : undefined,
@@ -282,6 +272,60 @@ export const Sidebar = ({
                 </svg>
             ),
             path: "/projects",
+        },
+    ];
+
+    // Events Section: Clubs, College Events, Event Tracker, Applications
+    const eventItems = [
+        {
+            id: "clubs" as SidebarTab,
+            label: "Clubs",
+            icon: (
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+            ),
+            isComingSoon: true,
+        },
+        {
+            id: "college-events" as SidebarTab,
+            label: "College Events",
+            icon: (
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                    <path d="M6 12v5c3 3 9 3 12 0v-5" />
+                </svg>
+            ),
+            isComingSoon: true,
+        },
+        {
+            id: "events" as SidebarTab,
+            label: "Event Tracker",
+            icon: (
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+            ),
+            path: "/events",
+            isComingSoon: false,
+        },
+        {
+            id: "applications" as SidebarTab,
+            label: "Applications",
+            icon: (
+                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
+                    <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
+                    <path d="m9 14 2 2 4-4" />
+                </svg>
+            ),
+            isComingSoon: true,
         },
     ];
 
@@ -495,7 +539,54 @@ export const Sidebar = ({
                 {/* Subtle Hairline Divider */}
                 <div className={`my-3 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
 
-                {/* Section 2: Documentation (Blogs, Docs) */}
+                {/* Section 2: Events (Clubs, College Events, Event Tracker, Applications) */}
+                <div className="space-y-1.5 overflow-x-hidden">
+                    {isExpanded && (
+                        <div className="flex items-center justify-between px-3 py-1 text-black overflow-x-hidden animate-fadeIn">
+                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800">
+                                Events
+                            </span>
+                        </div>
+                    )}
+                    {eventItems.map((item) =>
+                        item.isComingSoon || !item.path ? (
+                            <div
+                                key={item.id}
+                                className="flex items-center h-11 rounded-xl text-xs sm:text-sm font-bold text-neutral-700 select-none overflow-x-hidden relative w-full cursor-default"
+                                title={!isExpanded ? `${item.label} (Coming Soon)` : `${item.label} — Coming Soon`}
+                            >
+                                <div className="flex items-center overflow-x-hidden w-full min-w-0">
+                                    {/* SVG Icon: DEAD-CENTER in 44px container */}
+                                    <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                        <span className="w-5 h-5 flex items-center justify-center text-neutral-700">
+                                            {item.icon}
+                                        </span>
+                                    </div>
+
+                                    {isExpanded && (
+                                        <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 text-neutral-800 font-bold">
+                                            {item.label}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {isExpanded && (
+                                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border-2 border-black bg-[#FFE566] text-black text-[10px] font-black tracking-tight whitespace-nowrap flex-shrink-0 mr-1 shadow-[2px_2px_0px_#000] animate-fadeIn">
+                                        <Lock className="w-2.5 h-2.5 text-black stroke-[2.5] flex-shrink-0" />
+                                        <span>Coming soon</span>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            renderNavItem(item as any)
+                        )
+                    )}
+                </div>
+
+                {/* Subtle Hairline Divider */}
+                <div className={`my-3 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
+
+                {/* Section 3: Documentation (Blogs, Docs) */}
                 <div className="space-y-1.5 overflow-x-hidden">
                     {isExpanded && (
                         <div className="flex items-center justify-between px-3 py-1 text-black overflow-x-hidden animate-fadeIn">
