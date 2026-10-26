@@ -49,6 +49,10 @@ export interface User {
         aisheCode?: string | null;
         verificationStatus?: "verified" | "needs_review" | "unverified" | "inactive" | string;
     } | null;
+    collegeUpdatedAt?: string | null;
+    canChangeCollege?: boolean;
+    collegeLockRemainingMs?: number;
+    nextAllowedCollegeChangeAt?: string | null;
 }
 
 export interface UserState {

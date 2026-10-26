@@ -216,7 +216,7 @@ export class ProfileSyncService {
         // Fetch current user row so we have existing links, college_id, etc.
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userIdOrUsername);
         const currentUserRes = await query(
-            `SELECT id, username, links, college, college_id FROM users WHERE ${isUuid ? "id = $1::uuid" : "(id::text = $1 OR username = $1)"} LIMIT 1;`,
+            `SELECT id, username, links, college, college_id, college_updated_at FROM users WHERE ${isUuid ? "id = $1::uuid" : "(id::text = $1 OR username = $1)"} LIMIT 1;`,
             [userIdOrUsername]
         );
         const currentUserRow = currentUserRes.rows[0] || {};
@@ -273,6 +273,15 @@ export class ProfileSyncService {
                     }
                 }
             } else if (field.fieldKey === "college") {
+                // If user college affiliation is locked under the 3-day cooldown rule, do not overwrite it
+                const isCollegeLocked =
+                    currentUserRow.college_updated_at &&
+                    Date.now() - new Date(currentUserRow.college_updated_at).getTime() < 3 * 24 * 60 * 60 * 1000;
+
+                if (isCollegeLocked) {
+                    continue; // Skip locked college update
+                }
+
                 const collegeName = String(field.proposedValue).trim();
                 let matchedCollegeId: string | null = null;
                 let officialName = collegeName;
@@ -301,6 +310,8 @@ export class ProfileSyncService {
                     updateParts.push(`college_id = $${paramIdx++}`);
                     values.push(matchedCollegeId);
                 }
+
+                updateParts.push(`college_updated_at = CURRENT_TIMESTAMP`);
             } else if (field.fieldKey === "skills") {
                 updateParts.push(`skills = $${paramIdx++}::jsonb`);
                 values.push(JSON.stringify(field.proposedValue));

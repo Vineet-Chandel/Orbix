@@ -10,9 +10,12 @@ import {
     PlusCircle,
     ShieldCheck,
     AlertCircle,
+    Lock,
+    Clock,
 } from "lucide-react";
 import { searchInstitutions, type InstitutionItem } from "../utils/profileApi";
 import { RequestCollegeModal } from "./RequestCollegeModal";
+import { CollegeChangeWarningModal } from "./CollegeChangeWarningModal";
 
 export interface CollegeAutocompleteProps {
     value?: string | null; // collegeId (UUID)
@@ -20,6 +23,10 @@ export interface CollegeAutocompleteProps {
     onChange: (college: InstitutionItem | null) => void;
     placeholder?: string;
     disabled?: boolean;
+    canChangeCollege?: boolean;
+    collegeUpdatedAt?: string | null;
+    collegeLockRemainingMs?: number;
+    nextAllowedCollegeChangeAt?: string | null;
 }
 
 export function CollegeAutocomplete({
@@ -28,6 +35,10 @@ export function CollegeAutocomplete({
     onChange,
     placeholder = "Search verified Indian colleges, IITs, NITs, universities...",
     disabled = false,
+    canChangeCollege = true,
+    collegeUpdatedAt: _collegeUpdatedAt,
+    collegeLockRemainingMs = 0,
+    nextAllowedCollegeChangeAt,
 }: CollegeAutocompleteProps) {
     const [queryText, setQueryText] = useState("");
     const [results, setResults] = useState<InstitutionItem[]>([]);
@@ -37,6 +48,7 @@ export function CollegeAutocomplete({
     const [searchError, setSearchError] = useState<string | null>(null);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+    const [isWarningModalOpen, setIsWarningModalOpen] = useState(false);
 
     const inputRef = useRef<HTMLInputElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -214,21 +226,50 @@ export function CollegeAutocomplete({
                         <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
                             <button
                                 type="button"
-                                onClick={handleClearSelection}
-                                className="px-3 py-1.5 rounded-lg text-black hover:bg-neutral-100 border-2 border-black text-xs font-black transition-all flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px]"
-                                title="Change or remove selected institution"
+                                onClick={() => setIsWarningModalOpen(true)}
+                                className={`px-3 py-1.5 rounded-lg text-black border-2 border-black text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-[1px_1px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] ${
+                                    canChangeCollege === false ? "bg-amber-100 hover:bg-amber-200" : "hover:bg-neutral-100"
+                                }`}
+                                title={canChangeCollege === false ? "College affiliation is locked for 3 days" : "Change or remove selected institution"}
                             >
-                                <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Change</span>
+                                {canChangeCollege === false ? (
+                                    <>
+                                        <Lock className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Locked</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Change</span>
+                                    </>
+                                )}
                             </button>
                         </div>
                     )}
                 </div>
 
-                <div className="flex items-center gap-1.5 px-1 text-[11px] text-neutral-600 font-semibold">
-                    <ShieldCheck className="w-3.5 h-3.5 text-black flex-shrink-0 stroke-[2.5]" />
-                    <span>Cross-referenced against official AISHE directory & UGC gazette registers.</span>
-                </div>
+                {canChangeCollege === false ? (
+                    <div className="flex items-center gap-1.5 px-1 text-[11px] text-amber-800 font-bold">
+                        <Clock className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 stroke-[2.5]" />
+                        <span>College identity locked (3-day cooldown active). Click Locked button to view status.</span>
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-1.5 px-1 text-[11px] text-neutral-600 font-semibold">
+                        <ShieldCheck className="w-3.5 h-3.5 text-black flex-shrink-0 stroke-[2.5]" />
+                        <span>Cross-referenced against official AISHE directory & UGC gazette registers.</span>
+                    </div>
+                )}
+
+                {/* College Change / Deletion Warning & Cooldown Modal */}
+                <CollegeChangeWarningModal
+                    isOpen={isWarningModalOpen}
+                    onClose={() => setIsWarningModalOpen(false)}
+                    onConfirm={handleClearSelection}
+                    currentCollegeName={selectedCollege.officialName}
+                    isLocked={canChangeCollege === false}
+                    remainingMs={collegeLockRemainingMs}
+                    nextAllowedDate={nextAllowedCollegeChangeAt}
+                />
             </div>
         );
     }
@@ -293,6 +334,11 @@ export function CollegeAutocomplete({
                 >
                     Can't find your college?
                 </button>
+            </div>
+
+            <div className="flex items-center gap-1.5 px-1 mt-1 text-[11px] text-neutral-600 font-semibold">
+                <ShieldCheck className="w-3.5 h-3.5 text-black flex-shrink-0 stroke-[2.5]" />
+                <span>Selected college identity will be locked for 3 days once saved to your profile.</span>
             </div>
 
             {/* Dropdown Menu */}

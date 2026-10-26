@@ -5,6 +5,7 @@ import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { updateProfile, getInstitutionById, type InstitutionItem } from "../../utils/profileApi";
 import { CollegeAutocomplete } from "../../components/CollegeAutocomplete";
+import { CollegeChangeWarningModal } from "../../components/CollegeChangeWarningModal";
 import { usePlatformSync } from "../../hooks/usePlatformSync";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { ProfilePhotoFrame } from "./ProfilePhotoFrame";
@@ -100,6 +101,8 @@ export default function ProfileManager() {
     const [selectedCollege, setSelectedCollege] = useState<InstitutionItem | null>(user?.college || null);
     const [savingProfile, setSavingProfile] = useState(false);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isCollegeConfirmModalOpen, setIsCollegeConfirmModalOpen] = useState(false);
+    const [hasConfirmedCollegeSave, setHasConfirmedCollegeSave] = useState(false);
 
     // Connected Platforms from localStorage / sync
     const [connectedPortals, setConnectedPortals] = useState<Record<string, any>>(() => {
@@ -443,13 +446,8 @@ export default function ProfileManager() {
         return false;
     }, [user, firstName, lastName, headline, bio, location, skills, links, isOpenToWork, isHireable, selectedCollege]);
 
-    // Handle profile save
-    const handleSaveProfile = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!hasChanges) {
-            toast.info("No profile changes detected to save");
-            return;
-        }
+    // Execute profile save after all validations and confirmations
+    const executeSaveProfile = async () => {
         setSavingProfile(true);
 
         try {
@@ -477,6 +475,7 @@ export default function ProfileManager() {
 
             const updated = await updateProfile(payload);
             dispatch(updateUserProfile(updated));
+            setHasConfirmedCollegeSave(false);
             toast.success("Your profile details have been saved successfully!", {
                 title: "Profile Updated",
             });
@@ -487,6 +486,27 @@ export default function ProfileManager() {
         } finally {
             setSavingProfile(false);
         }
+    };
+
+    // Handle profile save form submission
+    const handleSaveProfile = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!hasChanges) {
+            toast.info("No profile changes detected to save");
+            return;
+        }
+
+        const initialCollegeId = user?.collegeId || user?.college?.id || null;
+        const currentCollegeId = selectedCollege?.id || null;
+        const isCollegeChanging = currentCollegeId !== initialCollegeId;
+
+        // If setting or changing a college and user has not yet confirmed the warning modal
+        if (isCollegeChanging && selectedCollege?.id && !hasConfirmedCollegeSave) {
+            setIsCollegeConfirmModalOpen(true);
+            return;
+        }
+
+        await executeSaveProfile();
     };
 
     // Add skill tag
@@ -693,6 +713,10 @@ export default function ProfileManager() {
                                                 value={selectedCollege?.id}
                                                 selectedCollege={selectedCollege}
                                                 onChange={setSelectedCollege}
+                                                canChangeCollege={user?.canChangeCollege}
+                                                collegeUpdatedAt={user?.collegeUpdatedAt}
+                                                collegeLockRemainingMs={user?.collegeLockRemainingMs}
+                                                nextAllowedCollegeChangeAt={user?.nextAllowedCollegeChangeAt}
                                             />
                                         </div>
 
@@ -923,6 +947,21 @@ export default function ProfileManager() {
                     <SectionBottomIllustration alt="Profile workspace illustration" />
                 </section>
             </div>
+
+            {/* Warning Modal when saving a new college affiliation */}
+            <CollegeChangeWarningModal
+                isOpen={isCollegeConfirmModalOpen}
+                onClose={() => setIsCollegeConfirmModalOpen(false)}
+                onConfirm={() => {
+                    setHasConfirmedCollegeSave(true);
+                    setIsCollegeConfirmModalOpen(false);
+                    setTimeout(() => executeSaveProfile(), 50);
+                }}
+                currentCollegeName={selectedCollege?.officialName}
+                isLocked={user?.canChangeCollege === false}
+                remainingMs={user?.collegeLockRemainingMs}
+                nextAllowedDate={user?.nextAllowedCollegeChangeAt}
+            />
         </div>
     );
 }

@@ -96,6 +96,7 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS previous_photo_url TEXT NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS previous_photo_public_id TEXT NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS college VARCHAR(255) DEFAULT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS college_updated_at TIMESTAMPTZ DEFAULT NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS orbix_score INT DEFAULT 0;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS orbix_score_breakdown JSONB DEFAULT '{}'::jsonb;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS orbix_score_version VARCHAR(20) DEFAULT 'v1.0.0';
@@ -444,6 +445,7 @@ export const testDatabaseConnection = async () => {
             CREATE INDEX IF NOT EXISTS idx_verification_requests_user ON institution_verification_requests (submitted_by_user_id);
 
             ALTER TABLE users ADD COLUMN IF NOT EXISTS college_id UUID;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS college_updated_at TIMESTAMPTZ DEFAULT NULL;
             CREATE INDEX IF NOT EXISTS idx_users_college_id ON users (college_id);
             ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS college_id UUID;
             CREATE INDEX IF NOT EXISTS idx_leaderboard_college_id ON leaderboard_entries (college_id);

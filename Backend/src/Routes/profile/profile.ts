@@ -72,6 +72,45 @@ export function parseLinks(rawLinks: any, row?: any): Array<{ label: string; url
 }
 
 /**
+ * 3-Day (72-hour) cooldown period for changing or removing user college affiliation
+ */
+export const COLLEGE_CHANGE_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000;
+
+export function computeCollegeCooldown(collegeUpdatedAt: Date | string | null | undefined) {
+    if (!collegeUpdatedAt) {
+        return {
+            canChangeCollege: true,
+            collegeLockRemainingMs: 0,
+            nextAllowedCollegeChangeAt: null,
+        };
+    }
+    const updatedAtMs = new Date(collegeUpdatedAt).getTime();
+    if (isNaN(updatedAtMs)) {
+        return {
+            canChangeCollege: true,
+            collegeLockRemainingMs: 0,
+            nextAllowedCollegeChangeAt: null,
+        };
+    }
+    const elapsedMs = Date.now() - updatedAtMs;
+    const remainingMs = COLLEGE_CHANGE_COOLDOWN_MS - elapsedMs;
+
+    if (remainingMs > 0) {
+        return {
+            canChangeCollege: false,
+            collegeLockRemainingMs: remainingMs,
+            nextAllowedCollegeChangeAt: new Date(updatedAtMs + COLLEGE_CHANGE_COOLDOWN_MS).toISOString(),
+        };
+    }
+
+    return {
+        canChangeCollege: true,
+        collegeLockRemainingMs: 0,
+        nextAllowedCollegeChangeAt: null,
+    };
+}
+
+/**
  * GET /api/profile/me & GET /api/me
  * Retrieves current authenticated user's private profile details.
  */
@@ -127,6 +166,7 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 resume_updated_at AS "resumeUpdatedAt",
                 is_resume_public AS "isResumePublic",
                 college_id AS "collegeId",
+                college_updated_at AS "collegeUpdatedAt",
                 created_at AS "createdAt"
             FROM users
             WHERE id = $1 OR email = $2
@@ -178,11 +218,17 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
             }
         }
 
+        const cooldownInfo = computeCollegeCooldown(userRow.collegeUpdatedAt);
+
         return res.status(200).json({
             success: true,
             user: {
                 ...userRow,
                 college,
+                collegeUpdatedAt: userRow.collegeUpdatedAt,
+                canChangeCollege: cooldownInfo.canChangeCollege,
+                collegeLockRemainingMs: cooldownInfo.collegeLockRemainingMs,
+                nextAllowedCollegeChangeAt: cooldownInfo.nextAllowedCollegeChangeAt,
                 skills: Array.isArray(userRow.skills) ? userRow.skills : [],
                 links: parseLinks(userRow.links, userRow),
                 platforms: linksResult.rows || [],
@@ -308,7 +354,8 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 is_open_to_work AS "isOpenToWork",
                 is_hireable AS "isHireable",
                 is_public AS "isPublic",
-                college_id AS "collegeId"
+                college_id AS "collegeId",
+                college_updated_at AS "collegeUpdatedAt"
              FROM users
              WHERE id = $1 OR email = $2
              LIMIT 1;`,
@@ -427,6 +474,21 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
 
         const isCollegeChanged = collegeId !== undefined && sanitizedCollegeId !== (current.collegeId || null);
 
+        // Enforce 3-day (72-hour) cooldown on modifying or deleting college affiliation
+        if (isCollegeChanged && current.collegeUpdatedAt) {
+            const cooldownInfo = computeCollegeCooldown(current.collegeUpdatedAt);
+            if (!cooldownInfo.canChangeCollege) {
+                const remainingHours = Math.max(1, Math.ceil(cooldownInfo.collegeLockRemainingMs / (1000 * 60 * 60)));
+                return res.status(403).json({
+                    success: false,
+                    code: "COLLEGE_LOCKED",
+                    message: `You recently updated your college affiliation. You can change or remove it again only after 3 days (${remainingHours} hours remaining).`,
+                    collegeLockRemainingMs: cooldownInfo.collegeLockRemainingMs,
+                    nextAllowedCollegeChangeAt: cooldownInfo.nextAllowedCollegeChangeAt,
+                });
+            }
+        }
+
         const hasAnyChanges =
             isFirstNameChanged ||
             isLastNameChanged ||
@@ -506,6 +568,7 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 is_resume_public = (CASE WHEN $13 = false THEN false ELSE is_resume_public END),
                 college_id = $17,
                 college = $18,
+                college_updated_at = (CASE WHEN $21::boolean THEN CURRENT_TIMESTAMP ELSE college_updated_at END),
                 updated_at = CURRENT_TIMESTAMP
              WHERE id = $19 OR email = $20
              RETURNING
@@ -534,6 +597,7 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 is_resume_public AS "isResumePublic",
                 college,
                 college_id AS "collegeId",
+                college_updated_at AS "collegeUpdatedAt",
                 updated_at AS "updatedAt";`,
             [
                 finalFirstName || null,
@@ -556,6 +620,7 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                 resolvedCollegeName,
                 authUser.id,
                 authUser.gmail,
+                Boolean(isCollegeChanged),
             ]
         );
 
@@ -621,12 +686,18 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             gmail: updatedUser.gmail,
         });
 
+        const cooldownInfo = computeCollegeCooldown(updatedUser.collegeUpdatedAt);
+
         return res.status(200).json({
             success: true,
             message: "Profile updated successfully",
             user: {
                 ...updatedUser,
                 college,
+                collegeUpdatedAt: updatedUser.collegeUpdatedAt,
+                canChangeCollege: cooldownInfo.canChangeCollege,
+                collegeLockRemainingMs: cooldownInfo.collegeLockRemainingMs,
+                nextAllowedCollegeChangeAt: cooldownInfo.nextAllowedCollegeChangeAt,
                 skills: Array.isArray(updatedUser.skills) ? updatedUser.skills : [],
                 links: parseLinks(updatedUser.links, updatedUser),
             },
