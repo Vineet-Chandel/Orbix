@@ -150,6 +150,87 @@ export const testDatabaseConnection = async () => {
             );
             CREATE INDEX IF NOT EXISTS idx_resume_cleanup_queue_status ON resume_cleanup_queue(status);
 
+            -- =========================================================================
+            -- Resume Intelligence: Document Uploads, Real Analyses & Consent-Based Sync
+            -- =========================================================================
+            CREATE TABLE IF NOT EXISTS resume_uploads (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID,
+                username VARCHAR(100) NOT NULL,
+                storage_reference TEXT NOT NULL,
+                storage_provider VARCHAR(50) NOT NULL DEFAULT 'cloudinary',
+                original_filename VARCHAR(255) NOT NULL,
+                validated_mime_type VARCHAR(100) NOT NULL,
+                file_size INT NOT NULL,
+                checksum VARCHAR(64) NOT NULL,
+                processing_status VARCHAR(50) NOT NULL DEFAULT 'uploaded',
+                ai_consent_granted BOOLEAN DEFAULT false,
+                ai_consent_timestamp TIMESTAMPTZ NULL,
+                error_message TEXT NULL,
+                retention_status VARCHAR(50) DEFAULT 'active',
+                sync_review_status VARCHAR(50) DEFAULT 'pending',
+                uploaded_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                analysis_completed_at TIMESTAMPTZ NULL
+            );
+            ALTER TABLE resume_uploads ADD COLUMN IF NOT EXISTS storage_provider VARCHAR(50) DEFAULT 'cloudinary';
+            ALTER TABLE resume_uploads ADD COLUMN IF NOT EXISTS ai_consent_granted BOOLEAN DEFAULT false;
+            ALTER TABLE resume_uploads ADD COLUMN IF NOT EXISTS ai_consent_timestamp TIMESTAMPTZ NULL;
+            ALTER TABLE resume_uploads ADD COLUMN IF NOT EXISTS error_message TEXT NULL;
+            ALTER TABLE resume_uploads ADD COLUMN IF NOT EXISTS retention_status VARCHAR(50) DEFAULT 'active';
+            ALTER TABLE resume_uploads ADD COLUMN IF NOT EXISTS sync_review_status VARCHAR(50) DEFAULT 'pending';
+            ALTER TABLE resume_uploads ADD COLUMN IF NOT EXISTS analysis_completed_at TIMESTAMPTZ NULL;
+            CREATE INDEX IF NOT EXISTS idx_resume_uploads_username ON resume_uploads(username, uploaded_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_resume_uploads_checksum ON resume_uploads(checksum);
+            CREATE INDEX IF NOT EXISTS idx_resume_uploads_sync ON resume_uploads(username, sync_review_status);
+
+            CREATE TABLE IF NOT EXISTS resume_analyses (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                resume_upload_id UUID,
+                user_id UUID,
+                username VARCHAR(100) NOT NULL,
+                analyzer_version VARCHAR(50) NOT NULL DEFAULT 'v1.0-orbix-intelligence',
+                model_identifier VARCHAR(100) NULL,
+                extracted_fields JSONB NOT NULL DEFAULT '{}'::jsonb,
+                findings JSONB NOT NULL DEFAULT '[]'::jsonb,
+                score_breakdown JSONB NOT NULL DEFAULT '{}'::jsonb,
+                extraction_confidence_score NUMERIC(5,2) NOT NULL DEFAULT 0.00,
+                profile_comparison JSONB NOT NULL DEFAULT '{}'::jsonb,
+                analysis_status VARCHAR(50) NOT NULL DEFAULT 'completed',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS resume_upload_id UUID;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS model_identifier VARCHAR(100) NULL;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS extracted_fields JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS findings JSONB DEFAULT '[]'::jsonb;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS score_breakdown JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS extraction_confidence_score NUMERIC(5,2) DEFAULT 0.00;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS profile_comparison JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS analysis_status VARCHAR(50) DEFAULT 'completed';
+            CREATE INDEX IF NOT EXISTS idx_resume_analyses_upload ON resume_analyses(resume_upload_id);
+            CREATE INDEX IF NOT EXISTS idx_resume_analyses_user ON resume_analyses(username, created_at DESC);
+
+            CREATE TABLE IF NOT EXISTS resume_profile_sync_reviews (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                resume_upload_id UUID,
+                user_id UUID,
+                username VARCHAR(100) NOT NULL,
+                review_status VARCHAR(50) NOT NULL DEFAULT 'pending',
+                proposed_changes JSONB NOT NULL DEFAULT '[]'::jsonb,
+                selected_changes JSONB DEFAULT '[]'::jsonb,
+                result_summary JSONB DEFAULT '{}'::jsonb,
+                reviewed_at TIMESTAMPTZ NULL,
+                synchronized_at TIMESTAMPTZ NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            ALTER TABLE resume_profile_sync_reviews ADD COLUMN IF NOT EXISTS resume_upload_id UUID;
+            ALTER TABLE resume_profile_sync_reviews ADD COLUMN IF NOT EXISTS proposed_changes JSONB DEFAULT '[]'::jsonb;
+            ALTER TABLE resume_profile_sync_reviews ADD COLUMN IF NOT EXISTS selected_changes JSONB DEFAULT '[]'::jsonb;
+            ALTER TABLE resume_profile_sync_reviews ADD COLUMN IF NOT EXISTS result_summary JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE resume_profile_sync_reviews ADD COLUMN IF NOT EXISTS review_status VARCHAR(50) DEFAULT 'pending';
+            CREATE INDEX IF NOT EXISTS idx_resume_sync_reviews_upload ON resume_profile_sync_reviews(resume_upload_id);
+            CREATE INDEX IF NOT EXISTS idx_resume_sync_reviews_user ON resume_profile_sync_reviews(username, review_status);
+
             -- Ensure recruiter messages and notifications tables exist
             CREATE TABLE IF NOT EXISTS recruiter_messages (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
