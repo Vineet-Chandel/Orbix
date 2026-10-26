@@ -82,11 +82,11 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
         try {
             const data = await reAnalyzeResumeApi();
             setAnalysisReport(data.report);
-            toast.success("Resume re-analyzed with Gemini AI!", {
-                title: "Gemini Analysis Complete",
+            toast.success("Resume re-analyzed successfully!", {
+                title: "Analysis Complete",
             });
         } catch (err: any) {
-            toast.error(err?.message || "Failed to re-analyze resume with Gemini AI", {
+            toast.error(err?.message || "Failed to re-analyze resume", {
                 title: "Analysis Failed",
             });
         } finally {
@@ -134,7 +134,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
         if (newReport) {
             setAnalysisReport(newReport);
         }
-        toast.success("Resume uploaded and analyzed with Gemini AI successfully!", {
+        toast.success("Resume uploaded and analyzed successfully!", {
             title: "Attached to Profile",
         });
     };
@@ -174,13 +174,9 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                         <ShieldCheck className="w-3.5 h-3.5" />
                                         Verified System
                                     </span>
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-[#FFE566] text-black border-2 border-black shadow-[1px_1px_0px_#000]">
-                                        <Sparkles className="w-3.5 h-3.5" />
-                                        Gemini AI Powered
-                                    </span>
                                 </div>
                                 <p className="mt-1.5 text-xs sm:text-sm font-medium text-neutral-700 leading-relaxed max-w-2xl">
-                                    Upload your resume for deep Gemini AI recruiter evaluation. Your resume is automatically linked to your public developer profile.
+                                    Upload your resume for deep recruiter evaluation. Your resume is automatically linked to your public developer profile.
                                 </p>
                             </div>
                         </div>
@@ -306,7 +302,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                         className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
                                     >
                                         <RefreshCw className={`w-3.5 h-3.5 ${isReAnalyzing ? "animate-spin" : ""}`} />
-                                        <span>{isReAnalyzing ? "Re-Analyzing..." : "Re-Analyze with Gemini"}</span>
+                                        <span>{isReAnalyzing ? "Re-Analyzing..." : "Re-Analyze Resume"}</span>
                                     </button>
                                 </div>
 
@@ -329,7 +325,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                             <div className="space-y-1.5 max-w-lg mx-auto">
                                 <h3 className="text-xl font-black text-black">Upload Your Developer Resume</h3>
                                 <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                    Upload your resume (PDF or DOCX). Our Gemini AI models will analyze your technical depth, ATS compliance, and quantifiable metrics, automatically preparing an in-depth recruiter report while attaching your resume to your public Orbix profile.
+                                    Upload your resume (PDF or DOCX). Our intelligent evaluator will analyze your technical depth, ATS compliance, and quantifiable metrics, automatically preparing an in-depth recruiter report while attaching your resume to your public Orbix profile.
                                 </p>
                             </div>
                             <button
@@ -338,7 +334,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                 className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs sm:text-sm font-black uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
                             >
                                 <Sparkles className="w-4 h-4 stroke-[2.5]" />
-                                <span>Upload & Analyze with Gemini</span>
+                                <span>Upload & Analyze Resume</span>
                             </button>
                         </div>
                     )}

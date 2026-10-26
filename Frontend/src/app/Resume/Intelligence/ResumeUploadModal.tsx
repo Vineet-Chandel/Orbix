@@ -64,7 +64,7 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
             onUploadSuccess(data.resume, data.report);
             onClose();
         } catch (err: any) {
-            setErrorMsg(err?.message || "Failed to upload and analyze resume with Gemini AI.");
+            setErrorMsg(err?.message || "Failed to upload and analyze resume.");
         } finally {
             setIsUploading(false);
         }
@@ -91,7 +91,7 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
                                 Upload & Analyze Resume
                             </h3>
                             <p className="text-xs text-neutral-600 font-medium">
-                                Upload to profile and evaluate with Gemini AI
+                                Upload to profile and evaluate recruiter impact
                             </p>
                         </div>
                     </div>
@@ -189,7 +189,7 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
                         {isUploading ? (
                             <>
                                 <Sparkles className="w-4 h-4 animate-spin" />
-                                <span>Analyzing with Gemini...</span>
+                                <span>Analyzing Resume...</span>
                             </>
                         ) : (
                             <>

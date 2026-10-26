@@ -38,14 +38,10 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
                     <Sparkles className="w-8 h-8 text-black animate-spin" />
                 </div>
                 <div className="space-y-2 max-w-md mx-auto">
-                    <h3 className="text-xl font-black text-black">Gemini AI is Analyzing Your Resume</h3>
+                    <h3 className="text-xl font-black text-black">Analyzing Your Resume</h3>
                     <p className="text-xs sm:text-sm text-neutral-600 font-medium">
                         Evaluating ATS linear structure, quantifiable metrics density, technical keywords, and recruiter impact...
                     </p>
-                </div>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#FAF6EE] border border-black text-xs font-mono font-bold text-neutral-800">
-                    <Brain className="w-3.5 h-3.5 text-black animate-bounce" />
-                    <span>Gemini 2.0 Flash • Multi-turn Evaluation</span>
                 </div>
             </div>
         );
@@ -60,7 +56,7 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
                 <div className="space-y-1.5 max-w-md mx-auto">
                     <h3 className="text-lg font-black text-black">No Resume Analysis Available</h3>
                     <p className="text-xs sm:text-sm text-neutral-600">
-                        Upload your PDF or DOCX resume to trigger instant Gemini AI evaluation and attach it to your public profile.
+                        Upload your PDF or DOCX resume to trigger instant evaluation and attach it to your public profile.
                     </p>
                 </div>
                 {onUploadClick && (
@@ -90,7 +86,6 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
         checks,
         missingKeywords,
         roleSpecificTips,
-        modelUsed,
     } = report;
 
     const filteredImprovements = improvements.filter((item) => {
@@ -139,10 +134,6 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
                                 <span className={`px-2.5 py-0.5 rounded-full text-xs font-black uppercase border-2 shadow-[1px_1px_0px_#000] ${getScoreBadgeColor(overallScore)}`}>
                                     {scoreGrade}
                                 </span>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#FAF6EE] text-black border border-black font-mono">
-                                    <Sparkles className="w-3 h-3 text-amber-600" />
-                                    {modelUsed.includes("gemini") ? "Gemini 2.0 Flash" : "Orbix AI Engine"}
-                                </span>
                             </div>
                             <h2 className="text-xl sm:text-2xl font-black text-black truncate">
                                 {targetRoleDetected}
@@ -162,7 +153,7 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
                                 className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
                             >
                                 <Brain className="w-3.5 h-3.5" />
-                                <span>Re-Analyze with Gemini</span>
+                                <span>Re-Analyze Resume</span>
                             </button>
                         </div>
                     )}
@@ -417,7 +408,7 @@ export const ResumeAnalyzerView: React.FC<ResumeAnalyzerViewProps> = ({
                                             "{imp.exampleBefore}"
                                         </div>
                                         <div className="p-2 rounded bg-emerald-50 border border-emerald-200 text-emerald-950">
-                                            <span className="font-bold text-[10px] uppercase text-emerald-700 block mb-0.5">Gemini Recommended Rewrite:</span>
+                                            <span className="font-bold text-[10px] uppercase text-emerald-700 block mb-0.5">Recommended Rewrite:</span>
                                             "{imp.exampleAfter}"
                                         </div>
                                     </div>

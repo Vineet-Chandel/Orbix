@@ -81,7 +81,7 @@ intelligenceRouter.post(
             console.error("POST /upload-analyze error:", err);
             return res.status(400).json({
                 success: false,
-                message: err.message || "Failed to analyze document with Gemini AI",
+                message: err.message || "Failed to analyze document",
             });
         }
     }
@@ -129,7 +129,7 @@ intelligenceRouter.post("/analyze", authenticate, async (req: Request, res: Resp
         });
     } catch (err: any) {
         console.error("POST /analyze error:", err);
-        return res.status(500).json({ success: false, message: "Gemini AI analysis failed", error: err.message });
+        return res.status(500).json({ success: false, message: "Resume analysis failed", error: err.message });
     }
 });
 
