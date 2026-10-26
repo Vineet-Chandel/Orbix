@@ -33,7 +33,11 @@ import {
     Home,
     Clock,
     Settings,
+    ShieldAlert,
 } from "lucide-react";
+import { RelationshipActionButton } from "../../components/RelationshipActionButton";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { blockTargetUser } from "../../api/relationshipApi";
 import {
     fetchPublicProfile,
     type PublicProfileData,
@@ -42,6 +46,7 @@ import {
     invalidatePublicProfileClientCache,
 } from "../../utils/profileApi";
 import { isDemoProfileUsername, demoPublicProfile, demoConnectedPortals } from "../../data/demoProfileData";
+import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
 import { HireMeModal } from "./HireMeModal";
 import { GetTheCardModal } from "./GetTheCardModal";
@@ -555,6 +560,19 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     const [isCardModalOpen, setIsCardModalOpen] = useState(false);
     const [isResumePreviewOpen, setIsResumePreviewOpen] = useState(false);
     const [isCopied, setIsCopied] = useState(false);
+    const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+
+    const handleBlockUser = async () => {
+        if (!profile) return;
+        try {
+            await blockTargetUser(profile.id || profile.username);
+            toast.info(`Blocked @${profile.username}`);
+            setIsBlockModalOpen(false);
+            window.location.reload();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to block user");
+        }
+    };
 
     // Dynamic scale measurement for responsive LinkedInCard rendering
     const cardContainerRef = useRef<HTMLDivElement>(null);
@@ -1094,7 +1112,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     const avatarSrc =
         profile.photoUrl ||
         profile.avatarUrl ||
-        "/avatar.png";
+        DEFAULT_AVATAR_URL;
 
     return (
         <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen pb-16 bg-[#FAF6EE] relative"} text-neutral-900 font-sans antialiased selection:bg-black selection:text-white`}>
@@ -1186,7 +1204,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                         alt={profile.displayName || profile.username}
                                                         className="w-full h-full object-cover"
                                                         onError={(e) => {
-                                                            (e.currentTarget as HTMLElement).style.display = "none";
+                                                            (e.currentTarget as HTMLImageElement).src = DEFAULT_AVATAR_URL;
                                                         }}
                                                     />
                                                 ) : (
@@ -1598,6 +1616,30 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         </div>
                                     )}
 
+                                    {/* Visitor Action Row: Connect & Block (Only when viewing another developer) */}
+                                    {!profile.isOwner && (
+                                        <div className="pt-2 pb-1 border-t-2 border-black/15 flex items-center justify-between gap-2">
+                                            <div className="flex-1">
+                                                <RelationshipActionButton
+                                                    targetUserId={profile.id || profile.username}
+                                                    targetUsername={profile.username}
+                                                    targetDisplayName={profile.displayName}
+                                                    initialState={(profile as any).relationship?.state}
+                                                    initialPayload={(profile as any).relationship}
+                                                    className="w-full"
+                                                />
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsBlockModalOpen(true)}
+                                                className="p-2 rounded-xl bg-white hover:bg-rose-50 text-neutral-600 hover:text-rose-600 border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-colors"
+                                                title="Block User"
+                                            >
+                                                <ShieldAlert className="w-4 h-4 stroke-[2.5]" />
+                                            </button>
+                                        </div>
+                                    )}
+
                                     {/* Dynamic Action Buttons: Share Profile & Get the card (Card hidden for visitors if private) */}
                                     <div className={`grid ${profile.isPublic !== false || profile.isOwner ? "grid-cols-2" : "grid-cols-1"} gap-2.5 pt-1 pb-1`}>
                                         <button
@@ -1844,6 +1886,17 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                 connectedPortals={connectedPortals}
                 showcasedContests={showcasedContests}
                 publicProfileUrl={profilePageUrl}
+            />
+
+            {/* Confirmation Modal for Blocking User */}
+            <ConfirmationModal
+                isOpen={isBlockModalOpen}
+                title={`Block @${profile.username}?`}
+                message={`Blocking @${profile.username} will end any connection, cancel pending requests, and prevent them from viewing your profile or sending notifications.`}
+                confirmLabel="Block User"
+                variant="danger"
+                onConfirm={handleBlockUser}
+                onCancel={() => setIsBlockModalOpen(false)}
             />
 
             {/* Interactive PDF Resume Modal */}

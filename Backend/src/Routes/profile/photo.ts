@@ -572,17 +572,18 @@ export const handleUseDefaultAvatar = async (req: Request, res: Response) => {
 
             preservedPreviousUrl = newPreviousUrl;
 
-            // Set active photo fields to NULL
+            // Set active photo fields to default avatar
+            const defaultAvatarUrl = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
             await client.query(
                 `UPDATE users
                  SET photo_url = NULL,
                      photo_public_id = NULL,
-                     avatar_url = NULL,
+                     avatar_url = $5,
                      previous_photo_url = $1,
                      previous_photo_public_id = $2,
                      updated_at = CURRENT_TIMESTAMP
                  WHERE id = $3 OR email = $4;`,
-                [newPreviousUrl, newPreviousPublicId, authUser.id || null, authUser.gmail]
+                [newPreviousUrl, newPreviousPublicId, authUser.id || null, authUser.gmail, defaultAvatarUrl]
             );
 
             await client.query("COMMIT");

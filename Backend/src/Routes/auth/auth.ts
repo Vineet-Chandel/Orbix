@@ -47,7 +47,8 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
         // Hash Password AFTER validation
         const hashedPassword = await bcrypt.hash(validatedData.password, 10);
 
-        // 1. Insert into Database FIRST
+        // 1. Insert into Database FIRST with default avatar
+        const defaultAvatarUrl = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
         const result = await query(
             `
                 INSERT INTO users (
@@ -57,9 +58,10 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 lastName,
                 email,
                 password,
-                termsAccepted
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7)
-            RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName"`,
+                termsAccepted,
+                avatar_url
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+            RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", avatar_url AS "avatarUrl", photo_url AS "photoUrl"`,
             [
                 validatedData.username,
                 validatedData.firstName,
@@ -67,7 +69,8 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 validatedData.lastName,
                 validatedData.gmail,
                 hashedPassword,
-                validatedData.termsAccepted
+                validatedData.termsAccepted,
+                defaultAvatarUrl
             ]
         );
 

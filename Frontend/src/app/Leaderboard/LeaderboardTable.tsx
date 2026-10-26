@@ -1,6 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Flame, Award, Building2 } from "lucide-react";
+import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import type { LeaderboardEntry } from "./types";
 
 interface LeaderboardTableProps {
@@ -131,6 +132,9 @@ export const LeaderboardTable: React.FC<LeaderboardTableProps> = ({
                                                     <img
                                                         src={entry.avatarUrl}
                                                         alt={entry.displayName}
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
+                                                        }}
                                                         className="w-10 h-10 rounded-xl object-cover border-2 border-black shadow-[1px_1px_0px_#000]"
                                                     />
                                                 ) : (

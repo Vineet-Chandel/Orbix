@@ -81,7 +81,8 @@ export const testDatabaseConnection = async () => {
             -- Ensure user profile extension columns exist on users table
             ALTER TABLE users ADD COLUMN IF NOT EXISTS headline VARCHAR(255);
             ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT;
-            ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT DEFAULT 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png';
+            ALTER TABLE users ALTER COLUMN avatar_url SET DEFAULT 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png';
             ALTER TABLE users ADD COLUMN IF NOT EXISTS cover_image_url TEXT;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS website VARCHAR(255);
             ALTER TABLE users ADD COLUMN IF NOT EXISTS linkedin VARCHAR(255);

@@ -234,7 +234,7 @@ export default function SettingsPage() {
                     aria-label="Account Settings & Preferences"
                     className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
-                    <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6 max-w-5xl w-full mx-auto">
+                    <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6 w-full">
                         {/* Page Header (rendered on hub view) */}
                         {currentView === "hub" && (
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b-2 border-black/15">
@@ -255,7 +255,7 @@ export default function SettingsPage() {
                                         <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-black tracking-tight pt-1">
                                             Settings
                                         </h1>
-                                        <p className="text-xs sm:text-sm text-neutral-600 font-bold max-w-xl">
+                                        <p className="text-xs sm:text-sm text-neutral-600 font-bold">
                                             Manage your account center, privacy controls, activity history, and platform preferences.
                                         </p>
                                     </div>

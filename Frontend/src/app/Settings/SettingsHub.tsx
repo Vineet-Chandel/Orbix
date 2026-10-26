@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import {
     BadgeCheck,
     KeyRound,
@@ -6,8 +7,8 @@ import {
     Bookmark,
     Activity,
     Bell,
-    BookOpen,
     Users,
+    UserX,
     MessageSquare,
     HelpCircle,
     ShieldCheck,
@@ -65,11 +66,11 @@ export const SettingsHub: React.FC<SettingsHubProps> = ({
             iconBg: "bg-sky-200",
         },
         {
-            id: "blogged" as SettingsViewKey,
-            title: "Blogged",
-            description: "Published dev blogs, drafts, and reading lists",
-            icon: <BookOpen className="w-5 h-5 text-black stroke-[2.5]" />,
-            iconBg: "bg-purple-200",
+            id: "blocked" as SettingsViewKey,
+            title: "Blocked",
+            description: "Blocked accounts and restricted connections",
+            icon: <UserX className="w-5 h-5 text-black stroke-[2.5]" />,
+            iconBg: "bg-rose-200",
         },
         {
             id: "connections" as SettingsViewKey,
@@ -172,17 +173,14 @@ export const SettingsHub: React.FC<SettingsHubProps> = ({
                             className="p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
                         >
                             <div className="flex items-center gap-3.5 min-w-0">
-                                {user?.avatarUrl ? (
-                                    <img
-                                        src={user.avatarUrl}
-                                        alt={displayName}
-                                        className="w-12 h-12 rounded-full border-2 border-black object-cover shadow-[2px_2px_0px_#000]"
-                                    />
-                                ) : (
-                                    <div className="w-12 h-12 rounded-full bg-[#FFE566] border-2 border-black flex items-center justify-center font-black text-base shadow-[2px_2px_0px_#000] shrink-0">
-                                        {displayName.charAt(0).toUpperCase()}
-                                    </div>
-                                )}
+                                <img
+                                    src={user?.photoUrl || user?.avatarUrl || DEFAULT_AVATAR_URL}
+                                    alt={displayName}
+                                    className="w-12 h-12 rounded-full border-2 border-black object-cover shadow-[2px_2px_0px_#000] bg-[#FFE566] shrink-0"
+                                    onError={(e) => {
+                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
+                                    }}
+                                />
                                 <div className="space-y-0.5 min-w-0">
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <h3 className="text-base font-black text-black leading-tight">

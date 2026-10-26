@@ -4,7 +4,7 @@ import {
     ArrowLeft,
     BadgeCheck,
     Bookmark,
-    BookOpen,
+    UserX,
     MessageSquare,
     CheckCircle2,
     ExternalLink,
@@ -474,25 +474,23 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                     </div>
                 );
 
-            case "blogged":
+            case "blocked":
                 return (
                     <div className="p-8 sm:p-12 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
-                        <div className="w-14 h-14 rounded-2xl bg-purple-200 border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
-                            <BookOpen className="w-7 h-7 text-black stroke-[2.5]" />
+                        <div className="w-14 h-14 rounded-2xl bg-rose-200 border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
+                            <UserX className="w-7 h-7 text-black stroke-[2.5]" />
                         </div>
                         <div className="space-y-1.5 max-w-md mx-auto">
-                            <h3 className="text-xl font-black text-black">Your Authored Blogs & Articles</h3>
+                            <h3 className="text-xl font-black text-black">Blocked Accounts</h3>
                             <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                Share tutorials, system design notes, and algorithmic walkthroughs with the Orbix developer community.
+                                Blocked users cannot view your full analytics, send recruiter messages, or connect with your profile.
                             </p>
                         </div>
-                        <Link
-                            to="/blogs"
-                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer"
-                        >
-                            <span>Open Blogs Hub</span>
-                            <ExternalLink className="w-3.5 h-3.5" />
-                        </Link>
+                        <div className="pt-2">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-neutral-700 font-mono text-xs font-bold shadow-[2px_2px_0px_#000]">
+                                <span>No blocked accounts currently</span>
+                            </div>
+                        </div>
                     </div>
                 );
 
@@ -705,7 +703,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             case "saved": return "Saved";
             case "your-activity": return "Your Activity";
             case "notifications": return "Notifications";
-            case "blogged": return "Blogged";
+            case "blocked": return "Blocked Accounts";
             case "connections": return "Connections";
             case "comments": return "Comments";
             case "help": return "Help";

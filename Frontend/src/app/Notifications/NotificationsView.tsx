@@ -17,6 +17,7 @@ import {
     deleteNotification,
     type UserNotification,
 } from "../../utils/profileApi";
+import { RelationshipActionButton } from "../../components/RelationshipActionButton";
 
 function formatRelativeTime(dateString: string): string {
     try {
@@ -296,6 +297,11 @@ export const NotificationsView: React.FC = () => {
                                                             {company}
                                                         </span>
                                                     )}
+                                                    {(item.type === "connection_request" || (item as any).notification_type === "connection_request") && (
+                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                                            Connection Request
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <p className="text-xs text-neutral-700 font-medium line-clamp-2 mt-1.5 leading-relaxed">
                                                     {snippet}
@@ -369,18 +375,27 @@ export const NotificationsView: React.FC = () => {
                                         </div>
 
                                         {/* Action buttons */}
-                                        <div className="flex items-center gap-2 self-start sm:self-auto">
-                                            {commEmail && (
-                                                <a
-                                                    href={mailtoUrl}
-                                                    target="_blank"
-                                                    rel="noopener noreferrer"
-                                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] text-xs font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
-                                                >
-                                                    <Mail className="w-3.5 h-3.5" />
-                                                    <span>Reply</span>
-                                                    <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                </a>
+                                        <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                                            {(activeItem.type === "connection_request" || (activeItem as any).notification_type === "connection_request") ? (
+                                                <RelationshipActionButton
+                                                    targetUserId={meta.actorId || meta.username}
+                                                    targetUsername={meta.username}
+                                                    targetDisplayName={senderName}
+                                                    initialState="incoming_pending"
+                                                />
+                                            ) : (
+                                                commEmail && (
+                                                    <a
+                                                        href={mailtoUrl}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] text-xs font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
+                                                    >
+                                                        <Mail className="w-3.5 h-3.5" />
+                                                        <span>Reply</span>
+                                                        <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    </a>
+                                                )
                                             )}
 
                                             <button

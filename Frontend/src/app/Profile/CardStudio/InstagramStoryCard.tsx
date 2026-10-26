@@ -19,6 +19,7 @@ import type {
     ConnectedPlatformBadge,
     RankedContestPlatform,
 } from "../../../utils/cardStatsAggregator";
+import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
 
 interface InstagramStoryCardProps {
     user: any;
@@ -59,7 +60,7 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = React.memo(
 }) => {
     const displayName = `${user?.firstName || ""} ${user?.lastName || ""}`.trim() || user?.username || "Developer";
     const username = user?.username || "developer";
-    const avatarSrc = user?.photoUrl || user?.avatarUrl;
+    const avatarSrc = user?.photoUrl || user?.avatarUrl || DEFAULT_AVATAR_URL;
     const tagline = user?.headline || coderType.tagline || "Software Engineer & Builder";
 
     const connectedList: ConnectedPlatformBadge[] = (allConnectedPlatforms && allConnectedPlatforms.length > 0)
@@ -211,6 +212,9 @@ export const InstagramStoryCard: React.FC<InstagramStoryCardProps> = React.memo(
                                                     src={avatarSrc}
                                                     alt={displayName}
                                                     crossOrigin="anonymous"
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
+                                                    }}
                                                     className="w-full h-full object-cover"
                                                 />
                                             ) : (

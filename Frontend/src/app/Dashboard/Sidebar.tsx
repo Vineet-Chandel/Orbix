@@ -4,6 +4,7 @@ import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass
 import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
+import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 
 export type SidebarTab =
     | "home"
@@ -197,7 +198,7 @@ export const Sidebar = ({
         : user?.username || "Developer";
 
     const displayEmail = user?.gmail || (user as any)?.email || "";
-    const avatarSrc = user?.photoUrl || user?.avatarUrl || (user as any)?.avatar || "/avatar.png";
+    const avatarSrc = user?.photoUrl || user?.avatarUrl || (user as any)?.avatar || DEFAULT_AVATAR_URL;
 
     const handleSignOut = async () => {
         try {
@@ -839,7 +840,7 @@ export const Sidebar = ({
                                                     src={avatarSrc}
                                                     alt={displayName}
                                                     onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = "/avatar.png";
+                                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
                                                     }}
                                                     className="w-full h-full rounded-full object-cover"
                                                 />
@@ -982,7 +983,7 @@ export const Sidebar = ({
                             className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors"
                         >
                             <Settings className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Settings & Privacy</span>
+                            <span className="truncate">Settings</span>
                         </Link>
 
                         <div className="my-1.5 border-t-2 border-black/15" />

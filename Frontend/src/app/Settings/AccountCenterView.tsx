@@ -1,4 +1,5 @@
 import React from "react";
+import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import {
     ArrowLeft,
     BadgeCheck,
@@ -97,17 +98,14 @@ export const AccountCenterView: React.FC<AccountCenterViewProps> = ({
             {/* Profile Hero Overview Card */}
             <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
-                    {user?.avatarUrl ? (
-                        <img
-                            src={user.avatarUrl}
-                            alt={displayName}
-                            className="w-14 h-14 rounded-full border-2 border-black object-cover shadow-[2px_2px_0px_#000]"
-                        />
-                    ) : (
-                        <div className="w-14 h-14 rounded-full bg-[#FFE566] border-2 border-black flex items-center justify-center font-black text-lg shadow-[2px_2px_0px_#000]">
-                            {displayName.charAt(0).toUpperCase()}
-                        </div>
-                    )}
+                    <img
+                        src={user?.photoUrl || user?.avatarUrl || DEFAULT_AVATAR_URL}
+                        alt={displayName}
+                        className="w-14 h-14 rounded-full border-2 border-black object-cover shadow-[2px_2px_0px_#000] bg-[#FFE566] shrink-0"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
+                        }}
+                    />
                     <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                             <h3 className="text-lg font-black text-black leading-tight">

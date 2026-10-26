@@ -193,4 +193,11 @@ notificationsRouter.delete("/:id", authenticate, async (req: Request, res: Respo
     }
 });
 
+/**
+ * POST /api/notifications/send
+ * Sends an eligible user-triggered notification (with 3 per 24h rolling limit).
+ */
+import { handleSendNotification } from "../relationships/relationshipRoutes.js";
+notificationsRouter.post("/send", authenticate, handleSendNotification);
+
 export default notificationsRouter;

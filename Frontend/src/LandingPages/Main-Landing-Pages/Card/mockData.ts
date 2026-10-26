@@ -13,13 +13,15 @@ import {
     demoTopContests,
 } from "../../../data/demoProfileData";
 
+import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
+
 export const mockUser = {
     firstName: "Vineet",
     lastName: "Chandel",
     username: "Vineet-Chandel",
     headline: "Full Stack Developer",
-    photoUrl: "/avatar.png",
-    avatarUrl: "/avatar.png",
+    photoUrl: DEFAULT_AVATAR_URL,
+    avatarUrl: DEFAULT_AVATAR_URL,
     linkedin: "https://linkedin.com/in/Vineet-Chandel",
     github: "https://github.com/Vineet-Chandel",
     website: "https://orbix.dev/profile/u/Vineet-Chandel",
@@ -252,7 +254,7 @@ export const mockGithubStats: GitHubCardStats = {
     connected: true,
     username: "Vineet-Chandel",
     name: "Vineet Chandel",
-    avatarUrl: "/avatar.png",
+    avatarUrl: DEFAULT_AVATAR_URL,
     publicRepos: 62,
     contributionsOrCommits: 3180,
     followers: 840,

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import {
     Compass,
     Search,
@@ -23,6 +24,7 @@ import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
 import { getPlatformIcon } from "../../utils/platformLinks";
 import { NeoSelect } from "../../components/NeoSelect";
+import { RelationshipActionButton } from "../../components/RelationshipActionButton";
 
 interface ExploreViewProps {
     onOpenMobileSidebar?: () => void;
@@ -408,8 +410,16 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                 </div>
                             </div>
 
-                            {/* Candidate Navigation */}
-                            <div className="flex items-center gap-2">
+                            {/* Candidate Navigation & Relationship Action */}
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                                <RelationshipActionButton
+                                    targetUserId={currentCandidateIndex >= 0 ? (developers[currentCandidateIndex]?.id || selectedUsername) : selectedUsername}
+                                    targetUsername={selectedUsername}
+                                    initialState={currentCandidateIndex >= 0 ? developers[currentCandidateIndex]?.relationshipState : undefined}
+                                    initialPayload={currentCandidateIndex >= 0 ? developers[currentCandidateIndex]?.relationship : undefined}
+                                    size="sm"
+                                />
+
                                 <div className="inline-flex items-center rounded-xl bg-[#FAF6EE] border-2 border-black overflow-hidden shadow-[2px_2px_0px_#000]">
                                     <button
                                         type="button"
@@ -653,11 +663,11 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                 {developers.map((candidate) => {
-                                    // Default avatar: use /avatar.png if candidate does not have a photo
+                                    // Default avatar: use DEFAULT_AVATAR_URL if candidate does not have a photo
                                     const avatar =
                                         candidate.photoUrl ||
                                         candidate.avatarUrl ||
-                                        "/avatar.png";
+                                        DEFAULT_AVATAR_URL;
 
                                     const verifiedPortals = candidate.connectedPortals.filter((p) => p.verified);
 
@@ -675,7 +685,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                 src={avatar}
                                                                 alt={candidate.displayName}
                                                                 onError={(e) => {
-                                                                    (e.target as HTMLImageElement).src = "/avatar.png";
+                                                                    (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
                                                                 }}
                                                                 className="w-12 h-12 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000]"
                                                             />
@@ -786,14 +796,24 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                 )}
                                             </div>
 
-                                            {/* Action Footer: Clean Full-Width In-Place Inspection Button */}
-                                            <div className="p-3 bg-[#FAF6EE] border-t-2 border-black">
+                                            {/* Action Footer: Connect & In-Place Inspection */}
+                                            <div className="p-3 bg-[#FAF6EE] border-t-2 border-black flex items-center gap-2">
+                                                <div className="shrink-0">
+                                                    <RelationshipActionButton
+                                                        targetUserId={candidate.id || candidate.username}
+                                                        targetUsername={candidate.username}
+                                                        targetDisplayName={candidate.displayName}
+                                                        initialState={candidate.relationshipState || "none"}
+                                                        initialPayload={candidate.relationship}
+                                                        size="sm"
+                                                    />
+                                                </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => setSelectedUsername(candidate.username)}
-                                                    className="w-full py-2.5 px-3 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-1.5 transition-transform hover:translate-x-[1px]"
+                                                    className="flex-1 py-2 px-3 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-1.5 transition-transform hover:translate-x-[1px]"
                                                 >
-                                                    <span>View Profile & Analytics</span>
+                                                    <span>View Profile</span>
                                                     <ArrowRight className="w-3.5 h-3.5" />
                                                 </button>
                                             </div>

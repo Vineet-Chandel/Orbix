@@ -9,6 +9,7 @@ import {
     restorePreviousPhoto,
     useDefaultAvatar,
 } from "../../utils/profileApi";
+import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 
 interface ProfilePhotoFrameProps {
     currentPhotoUrl?: string | null;
@@ -50,10 +51,8 @@ export const ProfilePhotoFrame: React.FC<ProfilePhotoFrameProps> = ({
         lg: "w-24 h-24 sm:w-28 sm:h-28 text-base",
     }[size];
 
-    // Fallback avatar URL (initials-based DiceBear / UI-Avatars)
-    const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-        displayName || username || "U"
-    )}&background=0a0a0c&color=ffffff&size=256&bold=true`;
+    // Fallback avatar URL (Cloudinary default avatar)
+    const fallbackAvatar = DEFAULT_AVATAR_URL;
 
     const activePhotoSrc = currentPhotoUrl || fallbackAvatar;
 

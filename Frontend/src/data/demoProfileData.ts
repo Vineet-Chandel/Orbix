@@ -14,6 +14,7 @@ import type {
     RankedContestPlatform,
 } from "../utils/cardStatsAggregator";
 import { CARD_THEMES, type CardThemeConfig } from "../app/Profile/CardStudio/types";
+import { DEFAULT_AVATAR_URL } from "../utils/avatarConstants";
 
 export const DEMO_USERNAME = "Vineet-Chandel";
 
@@ -260,8 +261,8 @@ export const demoPublicProfile: PublicProfileData = {
     headline: "Full Stack Engineer & Competitive Programmer | Grandmaster Track",
     bio: "Passionate Full Stack Engineer & Systems Architect with 1,680+ algorithmic problems solved across global platforms. Specializing in high-throughput distributed systems, scalable web applications, and developer productivity tooling. Top 0.5% Guardian on LeetCode and Candidate Master on Codeforces.",
     location: "Bengaluru, India",
-    photoUrl: "/avatar.png",
-    avatarUrl: "/avatar.png",
+    photoUrl: DEFAULT_AVATAR_URL,
+    avatarUrl: DEFAULT_AVATAR_URL,
     website: "https://orbix.dev/profile/u/Vineet-Chandel",
     linkedin: "https://linkedin.com/in/Vineet-Chandel",
     github: "https://github.com/Vineet-Chandel",
@@ -2379,8 +2380,8 @@ export const demoUser = {
     lastName: "Chandel",
     username: DEMO_USERNAME,
     headline: "Full Stack Engineer & Competitive Programmer",
-    photoUrl: "/avatar.png",
-    avatarUrl: "/avatar.png",
+    photoUrl: DEFAULT_AVATAR_URL,
+    avatarUrl: DEFAULT_AVATAR_URL,
     linkedin: "https://linkedin.com/in/Vineet-Chandel",
     github: "https://github.com/Vineet-Chandel",
     website: "https://orbix.dev/profile/u/Vineet-Chandel",
@@ -2577,7 +2578,7 @@ export const demoGithubStats: GitHubCardStats = {
     connected: true,
     username: DEMO_USERNAME,
     name: "Vineet Chandel",
-    avatarUrl: "/avatar.png",
+    avatarUrl: DEFAULT_AVATAR_URL,
     publicRepos: 62,
     contributionsOrCommits: 3180,
     followers: 840,

@@ -10,6 +10,11 @@ import eventsRouter from './Routes/events/events.js';
 import notificationsRouter from './Routes/notifications/notifications.js';
 import institutionsRouter from './Routes/institutions/institutions.js';
 import clubRouter from './Routes/club/club.js';
+import {
+    relationshipRouter,
+    blockRouter,
+    settingsRelationshipRouter,
+} from './Routes/relationships/relationshipRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import redis from './redis/client.js';
 
@@ -50,6 +55,11 @@ app.use('/api/events', eventsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/institutions', institutionsRouter);
 app.use('/api/club', clubRouter);
+app.use('/api/relationships', relationshipRouter);
+app.use('/api/blocks', blockRouter);
+app.use('/api/settings', settingsRelationshipRouter);
+app.use('/relationships', relationshipRouter);
+app.use('/blocks', blockRouter);
 app.use('/profile', profileRouter);
 app.get('/', (req: Request, res: Response) => {
     res.send('Hello World!');

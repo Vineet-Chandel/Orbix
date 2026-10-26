@@ -3,13 +3,17 @@ import { AlertTriangle, Trash2, Info, X, Loader2 } from "lucide-react";
 
 export interface ConfirmationModalProps {
     isOpen: boolean;
-    onClose: () => void;
+    onClose?: () => void;
+    onCancel?: () => void;
     onConfirm: () => void | Promise<void>;
     title: string;
-    description: React.ReactNode;
+    description?: React.ReactNode;
+    message?: React.ReactNode;
     confirmText?: string;
+    confirmLabel?: string;
     cancelText?: string;
-    variant?: "danger" | "warning" | "primary";
+    cancelLabel?: string;
+    variant?: "danger" | "warning" | "primary" | "neutral";
     icon?: React.ReactNode;
     isLoading?: boolean;
 }
@@ -17,26 +21,39 @@ export interface ConfirmationModalProps {
 export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     isOpen,
     onClose,
+    onCancel,
     onConfirm,
     title,
     description,
+    message,
     confirmText = "Confirm",
+    confirmLabel,
     cancelText = "Cancel",
+    cancelLabel,
     variant = "danger",
     icon,
     isLoading = false,
 }) => {
+    const handleClose = () => {
+        if (onClose) onClose();
+        else if (onCancel) onCancel();
+    };
+
+    const finalDescription = description !== undefined ? description : message;
+    const finalConfirmText = confirmLabel || confirmText;
+    const finalCancelText = cancelLabel || cancelText;
+
     // ESC key closes modal
     useEffect(() => {
         if (!isOpen) return;
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === "Escape" && !isLoading) {
-                onClose();
+                handleClose();
             }
         };
         window.addEventListener("keydown", handleKeyDown);
         return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, isLoading, onClose]);
+    }, [isOpen, isLoading, onClose, onCancel]);
 
     if (!isOpen) return null;
 
@@ -74,7 +91,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             aria-labelledby="confirmModalTitle"
             onClick={(e) => {
                 if (e.target === e.currentTarget && !isLoading) {
-                    onClose();
+                    handleClose();
                 }
             }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn"
@@ -98,7 +115,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     {!isLoading && (
                         <button
                             type="button"
-                            onClick={onClose}
+                            onClick={handleClose}
                             className="p-1 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer shrink-0 transition-transform hover:scale-105 active:scale-95"
                             aria-label="Close dialog"
                         >
@@ -109,18 +126,18 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
 
                 {/* Description Body */}
                 <div className="text-xs sm:text-sm font-medium text-neutral-600 leading-relaxed pl-0.5">
-                    {typeof description === "string" ? <p>{description}</p> : description}
+                    {typeof finalDescription === "string" ? <p>{finalDescription}</p> : finalDescription}
                 </div>
 
                 {/* Actions Footer */}
                 <div className="flex items-center justify-end gap-2.5 pt-2 border-t-2 border-black/10">
                     <button
                         type="button"
-                        onClick={onClose}
+                        onClick={handleClose}
                         disabled={isLoading}
                         className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] cursor-pointer disabled:opacity-50 transition-all"
                     >
-                        {cancelText}
+                        {finalCancelText}
                     </button>
                     <button
                         type="button"
@@ -129,7 +146,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                         className={`inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed ${getConfirmButtonStyles()}`}
                     >
                         {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        <span>{confirmText}</span>
+                        <span>{finalConfirmText}</span>
                     </button>
                 </div>
             </div>

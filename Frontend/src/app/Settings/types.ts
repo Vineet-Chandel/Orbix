@@ -10,7 +10,7 @@ export type SettingsViewKey =
     | "saved"
     | "your-activity"
     | "notifications"
-    | "blogged"
+    | "blocked"
     | "connections"
     | "comments"
     | "help"

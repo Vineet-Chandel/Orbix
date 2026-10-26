@@ -78,7 +78,7 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
     const u = userRes.rows[0];
     const userId = u.id;
     const displayName = `${u.firstname || u.firstName || ""} ${u.lastname || u.lastName || ""}`.trim() || u.username;
-    const avatarUrl = u.photo_url || u.avatar_url || null;
+    const avatarUrl = u.photo_url || u.avatar_url || "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
     let college = u.college || null;
     let collegeId = u.college_id || null;
     const isVerified = Boolean(u.is_verified_coder);

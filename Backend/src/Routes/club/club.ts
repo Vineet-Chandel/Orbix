@@ -160,6 +160,7 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
         }
 
         // 6. Insert into public.users with account_type = 'club'
+        const defaultAvatarUrl = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
         const userInsertRes = await query(
             `INSERT INTO users (
                 id,
@@ -169,9 +170,10 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 email,
                 password,
                 termsaccepted,
-                account_type
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'club')
-            RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", account_type AS "accountType";`,
+                account_type,
+                avatar_url
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'club', $8)
+            RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", account_type AS "accountType", avatar_url AS "avatarUrl";`,
             [
                 newUserId,
                 validated.username,
@@ -180,6 +182,7 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 validated.contactEmail,
                 hashedPassword,
                 validated.termsAccepted,
+                defaultAvatarUrl,
             ]
         );
         const createdUser = userInsertRes.rows[0];

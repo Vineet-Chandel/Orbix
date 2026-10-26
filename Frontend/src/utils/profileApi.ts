@@ -494,6 +494,9 @@ export interface UserNotification {
         company?: string;
         messageId?: string;
         fullMessage?: string;
+        actorId?: string;
+        username?: string;
+        [key: string]: any;
     };
     isRead: boolean;
     readAt?: string | null;
@@ -1037,6 +1040,8 @@ export interface ExploreDeveloper {
         stats?: Array<{ label: string; value: string }>;
     }>;
     createdAt?: string;
+    relationshipState?: "none" | "outgoing_pending" | "incoming_pending" | "connected" | "blocked_by_me" | "blocked_by_them" | "cooldown_active" | "unavailable";
+    relationship?: any;
 }
 
 export interface ExploreQueryParams {

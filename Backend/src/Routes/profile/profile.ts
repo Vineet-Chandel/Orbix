@@ -13,6 +13,8 @@ import { verifyAndFetchPortal, extractPortalUsername } from "../portals/portals.
 import { syncLeaderboardForUser } from "../leaderboard/leaderboard.js";
 import photoRouter from "./photo.js";
 import resumeRouter, { generateSignedResumeUrl } from "./resume.js";
+import { getBlockState } from "../../services/relationship/blockService.js";
+import { resolveRelationshipState, resolveRelationshipStatesBatch } from "../../services/relationship/relationshipService.js";
 
 const profileRouter = express.Router();
 
@@ -145,8 +147,8 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 account_type AS "accountType",
                 headline,
                 bio,
-                avatar_url AS "avatarUrl",
-                photo_url AS "photoUrl",
+                COALESCE(avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "avatarUrl",
+                COALESCE(photo_url, avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "photoUrl",
                 previous_photo_url AS "previousPhotoUrl",
                 (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
                 cover_image_url AS "coverImageUrl",
@@ -743,8 +745,8 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 displayName: "Vineet Chandel",
                 firstName: "Vineet",
                 lastName: "Chandel",
-                avatarUrl: "/avatar.png",
-                photoUrl: "/avatar.png",
+                avatarUrl: "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png",
+                photoUrl: "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png",
                 headline: "Full Stack Engineer & Competitive Programmer | Grandmaster Track",
                 bio: "Passionate Full Stack Engineer & Systems Architect with 1,680+ algorithmic problems solved across global platforms. Specializing in high-throughput distributed systems, scalable web applications, and developer productivity tooling. Top 0.5% Guardian on LeetCode and Candidate Master on Codeforces.",
                 location: "Bengaluru, India",
@@ -956,8 +958,8 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 lastname AS "lastName",
                 headline,
                 bio,
-                avatar_url AS "avatarUrl",
-                photo_url AS "photoUrl",
+                COALESCE(avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "avatarUrl",
+                COALESCE(photo_url, avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "photoUrl",
                 cover_image_url AS "coverImageUrl",
                 website,
                 linkedin,
@@ -990,6 +992,18 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
         }
 
         const userRow = userResult.rows[0];
+
+        // Strict block check: if either user has blocked the other, suppress profile access
+        if (viewer?.id && userRow.id && viewer.id !== userRow.id) {
+            const blockCheck = await getBlockState(viewer.id, userRow.id);
+            if (blockCheck.isBlocked) {
+                return res.status(403).json({
+                    success: false,
+                    code: "PROFILE_UNAVAILABLE",
+                    message: "This profile is unavailable.",
+                });
+            }
+        }
 
         // Query all verified/connected platforms for showcase
         const linksResult = await query(
@@ -1067,11 +1081,17 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             await setCachedPublicProfile(username, publicProfilePayload);
         }
 
+        let relationship = null;
+        if (viewer?.id && userRow.id && viewer.id !== userRow.id) {
+            relationship = await resolveRelationshipState(viewer.id, userRow.id);
+        }
+
         return res.status(200).json({
             success: true,
             profile: {
                 ...publicProfilePayload,
                 isOwner: !!isOwner,
+                relationship,
             },
         });
     } catch (err: any) {
@@ -1113,11 +1133,17 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
         const whereClauses: string[] = ["u.is_public IS TRUE"];
         const queryParams: any[] = [];
 
-        // Exclude current authenticated self ID from explore discovery
+        // Exclude current authenticated self ID and any blocked users from explore discovery
         const authUser = req.user;
         if (authUser?.id) {
             queryParams.push(authUser.id);
-            whereClauses.push(`u.id != $${queryParams.length}`);
+            const selfParamIdx = queryParams.length;
+            whereClauses.push(`u.id != $${selfParamIdx}`);
+            whereClauses.push(`u.id NOT IN (
+                SELECT blocked_id FROM user_blocks WHERE blocker_id = $${selfParamIdx}
+                UNION
+                SELECT blocker_id FROM user_blocks WHERE blocked_id = $${selfParamIdx}
+            )`);
         } else if (authUser?.username) {
             queryParams.push(authUser.username.toLowerCase());
             whereClauses.push(`LOWER(u.username) != $${queryParams.length}`);
@@ -1190,8 +1216,8 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
                 u.lastname AS "lastName",
                 u.headline,
                 u.bio,
-                u.avatar_url AS "avatarUrl",
-                u.photo_url AS "photoUrl",
+                COALESCE(u.avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "avatarUrl",
+                COALESCE(u.photo_url, u.avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "photoUrl",
                 u.location,
                 u.skills,
                 u.links,
@@ -1227,10 +1253,24 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
             queryParams
         );
 
+        // Pre-resolve relationship states for all returned developers in ONE single batch query
+        // This eliminates the N+1 API call storm on the client when browsing explore
+        let relationshipMap: Record<string, any> = {};
+        if (authUser?.id && usersRes.rows.length > 0) {
+            try {
+                const targetIds = usersRes.rows.map((r: any) => r.id).filter(Boolean);
+                relationshipMap = await resolveRelationshipStatesBatch(authUser.id, targetIds);
+            } catch (relErr) {
+                console.error("Explore batch relationship resolution error:", relErr);
+            }
+        }
+
         const users = usersRes.rows.map((row: any) => {
             const fullName = `${row.firstName || ""} ${row.lastName || ""}`.trim();
             const displayName = fullName || row.username;
             const canonicalAvatar = row.photoUrl || row.avatarUrl || null;
+            const relData = relationshipMap[row.id] || null;
+
             return {
                 id: row.id,
                 username: row.username,
@@ -1257,6 +1297,8 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
                 streak: row.streak || 0,
                 connectedPortals: Array.isArray(row.connectedPortals) ? row.connectedPortals : [],
                 createdAt: row.createdAt,
+                relationshipState: relData?.state || "none",
+                relationship: relData,
             };
         });
 
