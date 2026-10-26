@@ -16,8 +16,8 @@ import {
     Layers,
     Award,
     Terminal,
-    Sliders,
     Brain,
+    Shield,
 } from "lucide-react";
 
 export const DocsHubPage: React.FC = () => {
@@ -37,6 +37,8 @@ export const DocsHubPage: React.FC = () => {
                 return <Terminal className="w-5 h-5 text-black" />;
             case "Brain":
                 return <Brain className="w-5 h-5 text-black" />;
+            case "Shield":
+                return <Shield className="w-5 h-5 text-black" />;
             default:
                 return <Folder className="w-5 h-5 text-black" />;
         }
@@ -107,7 +109,7 @@ export const DocsHubPage: React.FC = () => {
                     <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 pt-3 select-none">
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000]">
                             <Cpu className="w-3.5 h-3.5" />
-                            v2.0.0 Authoritative Engine
+                            Scoring & Ranking Engine
                         </span>
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000]">
                             <Layers className="w-3.5 h-3.5" />
@@ -217,8 +219,8 @@ export const DocsHubPage: React.FC = () => {
                             className={
                                 filteredFolders.length === 1
                                     ? "max-w-2xl mx-auto w-full space-y-8"
-                                    : filteredFolders.length === 2
-                                    ? "grid grid-cols-1 lg:grid-cols-2 gap-7 items-stretch"
+                                    : filteredFolders.length === 2 || filteredFolders.length === 4
+                                    ? "grid grid-cols-1 md:grid-cols-2 gap-7 items-stretch"
                                     : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch"
                             }
                         >
@@ -274,17 +276,6 @@ export const DocsHubPage: React.FC = () => {
                                                                 alt={file.title}
                                                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 block"
                                                             />
-                                                            <div className="absolute top-3 left-3 flex items-center gap-2">
-                                                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border border-black shadow-[1.5px_1.5px_0px_#000] ${file.badgeColor || "bg-[#a2ff86] text-black"}`}>
-                                                                    {file.badge}
-                                                                </span>
-                                                                {file.hasInteractiveSim && (
-                                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-black text-[#FFE566] border border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-1">
-                                                                        <Sliders className="w-2.5 h-2.5" />
-                                                                        Sim
-                                                                    </span>
-                                                                )}
-                                                            </div>
                                                         </Link>
 
                                                         {/* File Content Summary */}

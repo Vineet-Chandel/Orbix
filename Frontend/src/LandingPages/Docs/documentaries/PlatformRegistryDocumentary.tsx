@@ -524,27 +524,17 @@ export const PlatformRegistryDocumentary: React.FC = () => {
             {/* ========================================================================= */}
             <header className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-black/15 pb-4">
-                    <div className="flex items-center gap-2.5">
-                        <span className="px-3.5 py-1 rounded-full text-xs font-black bg-[#a2ff86] border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
-                            Verified Ecosystem
-                        </span>
-                        <span className="text-xs font-mono font-bold text-neutral-500">
-                            9 min read
-                        </span>
-                    </div>
+                    <span className="text-xs font-mono font-bold text-neutral-500">
+                        9 min read
+                    </span>
 
-                    <div className="flex items-center gap-2">
-                        <span className="px-3 py-1 rounded-full text-xs font-mono font-black bg-[#FAF6EE] text-black border-2 border-black">
-                            16 Portals Indexed
-                        </span>
-                        <Link
-                            to="/leaderboard"
-                            className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#FFE566] text-black text-xs font-black border-2 border-black hover:bg-black hover:text-[#a2ff86] transition-colors shadow-[1.5px_1.5px_0px_#000]"
-                        >
-                            <span>Live Rankings</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                        </Link>
-                    </div>
+                    <Link
+                        to="/leaderboard"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#FFE566] text-black text-xs font-black border-2 border-black hover:bg-black hover:text-[#a2ff86] transition-colors shadow-[1.5px_1.5px_0px_#000]"
+                    >
+                        <span>Live Rankings</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
                 </div>
 
                 <div className="space-y-2">

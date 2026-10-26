@@ -95,6 +95,12 @@ export default function SigninForm() {
                 dispatch(setUser(resultData.user));
             }
 
+            if (resultData?.user?.accountType === "club") {
+                toast.success("Welcome back! Redirecting to club verification status...", { title: "Signed In" });
+                navigate("/club/status");
+                return;
+            }
+
             toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });
             navigate("/dashboard");
         } catch (err: any) {

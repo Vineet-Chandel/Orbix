@@ -616,11 +616,22 @@ export const handleUseDefaultAvatar = async (req: Request, res: Response) => {
     }
 };
 
+// Restrict club accounts from personal avatar management
+photoRouter.use(authenticate, (req: Request, res: Response, next) => {
+    if ((req.user as any)?.accountType === "club" || (req.user as any)?.account_type === "club") {
+        return res.status(403).json({
+            success: false,
+            message: "Club accounts cannot access personal photo features.",
+        });
+    }
+    next();
+});
+
 // Route registrations
-photoRouter.post("/upload-signature", authenticate, handleUploadSignature);
-photoRouter.post("/confirm", authenticate, handleConfirmPhoto);
-photoRouter.post("/restore", authenticate, handleRestorePhoto);
-photoRouter.post("/default", authenticate, handleUseDefaultAvatar);
-photoRouter.delete("/", authenticate, handleUseDefaultAvatar);
+photoRouter.post("/upload-signature", handleUploadSignature);
+photoRouter.post("/confirm", handleConfirmPhoto);
+photoRouter.post("/restore", handleRestorePhoto);
+photoRouter.post("/default", handleUseDefaultAvatar);
+photoRouter.delete("/", handleUseDefaultAvatar);
 
 export default photoRouter;

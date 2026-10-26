@@ -286,6 +286,13 @@ export default function ProfileManager() {
 
     // Handle instant toggle for Open to work (smooth functional update, no race condition)
     const handleToggleOpenToWork = () => {
+        if (user?.isPublic === false) {
+            toast.info(
+                "Open to Work is automatically turned off while your profile is Private. Switch your profile to Public in Settings to activate it.",
+                { title: "Profile is Private" }
+            );
+            return;
+        }
         setIsOpenToWork((prev) => {
             const nextVal = !prev;
             pendingTogglesRef.current.isOpenToWork = nextVal;
@@ -302,6 +309,13 @@ export default function ProfileManager() {
 
     // Handle instant toggle for Hire me button (smooth functional update, no race condition)
     const handleToggleHireMe = () => {
+        if (user?.isPublic === false) {
+            toast.info(
+                "Hire Me inquiries are automatically turned off while your profile is Private. Switch your profile to Public in Settings to activate them.",
+                { title: "Profile is Private" }
+            );
+            return;
+        }
         setIsHireable((prev) => {
             const nextVal = !prev;
             pendingTogglesRef.current.isHireable = nextVal;
@@ -429,8 +443,8 @@ export default function ProfileManager() {
                 location: location.trim(),
                 skills,
                 links: sanitizedLinks,
-                isOpenToWork,
-                isHireable,
+                isOpenToWork: user?.isPublic === false ? false : isOpenToWork,
+                isHireable: user?.isPublic === false ? false : isHireable,
                 collegeId: selectedCollege?.id || null,
             };
 

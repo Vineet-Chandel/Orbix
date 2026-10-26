@@ -16,11 +16,16 @@ const ProtectedRoute = () => {
         );
     }
 
-    return user ? (
-        <Outlet context={context} />
-    ) : (
-        <Navigate to="/auth/signin" replace />
-    );
+    if (!user) {
+        return <Navigate to="/auth/signin" replace />;
+    }
+
+    // Restrict club accounts from personal-user features (dashboard, profile, resume, settings)
+    if (user.accountType === "club") {
+        return <Navigate to="/club/status" replace />;
+    }
+
+    return <Outlet context={context} />;
 };
 
 export default ProtectedRoute;

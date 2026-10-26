@@ -1,5 +1,5 @@
 import { query } from "../../database/client.js";
-import {
+import type {
     StructuredResumeFacts,
     ProfileSyncProposal,
     ProposedSyncField

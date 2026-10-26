@@ -32,6 +32,7 @@ import {
     Copy,
     Home,
     Clock,
+    Settings,
 } from "lucide-react";
 import {
     fetchPublicProfile,
@@ -879,7 +880,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                     </div>
                 </main>
 
-                <ProfileFooter />
+                {!isEmbedded && <ProfileFooter />}
             </div>
         );
     }
@@ -1086,7 +1087,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                 </main>
 
                 {/* Orbix Footer */}
-                <ProfileFooter />
+                {!isEmbedded && <ProfileFooter />}
             </div>
         );
     }
@@ -1094,9 +1095,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     const avatarSrc =
         profile.photoUrl ||
         profile.avatarUrl ||
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(
-            profile.displayName
-        )}&background=0c1017&color=fff&size=256&bold=true`;
+        "/avatar.png";
 
     return (
         <div className={`${isEmbedded ? "pb-4 embedded-showcase-container bg-[#FAF6EE]" : "min-h-screen pb-16 bg-[#FAF6EE] relative"} text-neutral-900 font-sans antialiased selection:bg-black selection:text-white`}>
@@ -1107,6 +1106,28 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
 
             {/* Minimal Orbix Header — Navigates to "/" (Hidden when embedded in hero showcase) */}
             <ProfileHeader isEmbedded={isEmbedded} isDemo={isDemo} />
+
+            {/* Private Profile Banner for Owner */}
+            {profile.isPublic === false && profile.isOwner && (
+                <div className="w-full bg-[#FFE566] border-b-2 border-black px-4 py-2.5 text-xs font-black text-black flex items-center justify-between gap-3 shadow-[0_2px_0px_#000]">
+                    <div className="flex items-center gap-2 max-w-4xl flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-black text-white text-[10px] uppercase font-mono tracking-wider">
+                            <Lock className="w-3 h-3 stroke-[2.5]" />
+                            Private Mode Active
+                        </span>
+                        <span>
+                            Your profile is currently private. Public visitors only see your name, headline, bio, location, college, links, and skills. Platform stats, hire inquiries, resume, and public card sharing are hidden.
+                        </span>
+                    </div>
+                    <Link
+                        to="/settings"
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] hover:bg-neutral-900 transition-colors shrink-0"
+                    >
+                        <Settings className="w-3.5 h-3.5" />
+                        <span>Settings</span>
+                    </Link>
+                </div>
+            )}
 
             {/* Profile Showcase Container - Full Width */}
             <main className={`w-full px-3 sm:px-6 lg:px-8 pt-4 sm:pt-6 ${isEmbedded ? "pb-4" : "pb-16"} min-w-0`}>
@@ -1121,25 +1142,45 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                             </span>
                         </div>
 
-                        <div className="flex items-center gap-2.5">
-                            <button
-                                type="button"
-                                onClick={() => setCardFace((f) => (f === "front" ? "back" : "front"))}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black hover:bg-neutral-900 text-white text-xs sm:text-sm font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                                title="Flip to view card back with QR code"
-                            >
-                                <Repeat className={`w-3.5 h-3.5 transition-transform duration-500 ${cardFace === "back" ? "rotate-180" : ""}`} />
-                                <span>{cardFace === "front" ? "Flip To Back" : "Flip To Front"}</span>
-                            </button>
-                        </div>
+                        {(profile.isPublic !== false || profile.isOwner) && (
+                            <div className="flex items-center gap-2.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setCardFace((f) => (f === "front" ? "back" : "front"))}
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black hover:bg-neutral-900 text-white text-xs sm:text-sm font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                    title="Flip to view card back with QR code"
+                                >
+                                    <Repeat className={`w-3.5 h-3.5 transition-transform duration-500 ${cardFace === "back" ? "rotate-180" : ""}`} />
+                                    <span>{cardFace === "front" ? "Flip To Back" : "Flip To Front"}</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Split Layout: 3/4 Main Card + 1/4 Details, Bio & Links Card */}
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
                         {/* LEFT (3/4 Screen Width on Large Screens): Main Developer Card with 3D Flip Animation */}
                         <div ref={cardContainerRef} className="lg:col-span-9 flex flex-col justify-start items-center min-w-0">
-                            {/* 3D Motion Card Container (Matches Card.tsx from Main Landing Page) */}
-                            <div style={{ perspective: 1800 }} className="w-full flex justify-center">
+                            {profile.isPublic === false && !profile.isOwner ? (
+                                <div className="w-full h-full min-h-[380px] rounded-3xl bg-white border-2 sm:border-[3px] border-black p-8 sm:p-12 shadow-[6px_6px_0px_#000] flex flex-col items-center justify-center text-center space-y-4">
+                                    <div className="w-16 h-16 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center">
+                                        <Lock className="w-8 h-8 text-black stroke-[2.5]" />
+                                    </div>
+                                    <div className="max-w-md space-y-2">
+                                        <h3 className="text-2xl font-black text-black">Private Developer Profile</h3>
+                                        <p className="text-xs sm:text-sm text-neutral-600 font-bold leading-relaxed">
+                                            This developer has configured their profile to private. Digital cards, platform metrics, contest ratings, and resume access are kept confidential.
+                                        </p>
+                                    </div>
+                                    <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#a2ff86] border-2 border-black text-black font-black text-xs shadow-[2px_2px_0px_#000]">
+                                        <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
+                                        <span>Verified Orbix Profile</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <>
+                                    {/* 3D Motion Card Container (Matches Card.tsx from Main Landing Page) */}
+                                    <div style={{ perspective: 1800 }} className="w-full flex justify-center">
                                 <motion.div
                                     className="relative cursor-pointer select-none"
                                     style={{
@@ -1283,6 +1324,8 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                     </div>
                                 </div>
                             )}
+                                </>
+                            )}
                         </div>
 
                         {/* RIGHT (1/4 Screen Width on Large Screens): Bio, Location & Connected Links Card */}
@@ -1375,8 +1418,8 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         </div>
                                     )}
 
-                                    {/* Status & Actions: Open to work & Hire me matching bottom button layout */}
-                                    {(profile.isOpenToWork || profile.isHireable) && (
+                                    {/* Status & Actions: Open to work & Hire me (Only rendered if profile is Public) */}
+                                    {profile.isPublic !== false && (profile.isOpenToWork || profile.isHireable) && (
                                         <div className="grid grid-cols-2 gap-2.5 pt-2 pb-0.5 border-t-2 border-black/15">
                                             {profile.isOpenToWork && (
                                                 <div
@@ -1402,8 +1445,8 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         </div>
                                     )}
 
-                                    {/* Two Dynamic Action Buttons: Share Profile & Get the card */}
-                                    <div className="grid grid-cols-2 gap-2.5 pt-1 pb-1">
+                                    {/* Dynamic Action Buttons: Share Profile & Get the card (Card hidden for visitors if private) */}
+                                    <div className={`grid ${profile.isPublic !== false || profile.isOwner ? "grid-cols-2" : "grid-cols-1"} gap-2.5 pt-1 pb-1`}>
                                         <button
                                             type="button"
                                             onClick={handleShareProfile}
@@ -1423,19 +1466,21 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                             )}
                                         </button>
 
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsCardModalOpen(true)}
-                                            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-black hover:bg-neutral-900 text-white text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                                            title="View and download LinkedIn and Instagram Story cards"
-                                        >
-                                            <CreditCard className="w-3.5 h-3.5 text-white flex-shrink-0" />
-                                            <span className="truncate">Get the card</span>
-                                        </button>
+                                        {(profile.isPublic !== false || profile.isOwner) && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsCardModalOpen(true)}
+                                                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-black hover:bg-neutral-900 text-white text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                                title="View and download LinkedIn and Instagram Story cards"
+                                            >
+                                                <CreditCard className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                                                <span className="truncate">Get the card</span>
+                                            </button>
+                                        )}
                                     </div>
 
-                                    {/* Resume Button if public */}
-                                    {profile.resumeUrl && profile.isResumePublic !== false && (
+                                    {/* Resume Button (Only visible if profile is Public) */}
+                                    {profile.isPublic !== false && profile.resumeUrl && profile.isResumePublic !== false && (
                                         <div className="p-2.5 rounded-xl bg-[#FAF6EE] text-black flex items-center justify-between gap-2.5 border-2 border-black shadow-[2px_2px_0px_#000]">
                                             <div className="flex items-center gap-2.5 min-w-0">
                                                 <div className="w-7 h-7 rounded-lg bg-white border border-black text-black flex items-center justify-center flex-shrink-0 shadow-[1px_1px_0px_#000]">
@@ -1523,77 +1568,101 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                 {/* ========================================================================= */}
                 {/* PRACTICE & DEVELOPMENT ACTIVITY & PERFORMANCE SECTION */}
                 {/* ========================================================================= */}
-                <section className="w-full max-w-[1600px] mx-auto space-y-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
-                        <div>
-                            <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
-                                <span>Activity & Performance</span>
-                            </h2>
-                            <p className="text-xs text-neutral-500 font-medium">
-                                Multi-platform coding submissions, contest performance, and developer contributions.
-                            </p>
+                {profile.isPublic === false && !profile.isOwner ? (
+                    <section className="w-full max-w-[1600px] mx-auto space-y-6">
+                        <div className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-8 sm:p-12 text-center shadow-[6px_6px_0px_#000] space-y-4">
+                            <div className="w-14 h-14 mx-auto rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_#000]">
+                                <Lock className="w-7 h-7 text-black stroke-[2.5]" />
+                            </div>
+                            <div className="max-w-md mx-auto space-y-1.5">
+                                <h3 className="text-xl sm:text-2xl font-black text-black">
+                                    Activity & Submissions are Confidential
+                                </h3>
+                                <p className="text-xs sm:text-sm text-neutral-600 font-bold leading-relaxed">
+                                    {profile.firstName || profile.displayName} has configured their profile to Private mode. Multi-platform coding submissions, contest performance, and developer activity are kept confidential.
+                                </p>
+                            </div>
+                            <div className="pt-2">
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border border-black text-[11px] font-mono font-black text-black shadow-[1px_1px_0px_#000]">
+                                    <ShieldCheck className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                                    Identity & Verified Institution Showcase Active
+                                </span>
+                            </div>
+                        </div>
+                    </section>
+                ) : (
+                    <section className="w-full max-w-[1600px] mx-auto space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
+                            <div>
+                                <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
+                                    <span>Activity & Performance</span>
+                                </h2>
+                                <p className="text-xs text-neutral-500 font-medium">
+                                    Multi-platform coding submissions, contest performance, and developer contributions.
+                                </p>
+                            </div>
+
+                            {/* Two Dashboard Fields Switcher: Practice & Development */}
+                            <div className="inline-flex items-center p-1.5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] self-start sm:self-auto gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveField("practice")}
+                                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "practice"
+                                        ? "bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000]"
+                                        : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
+                                        }`}
+                                >
+                                    <Code2 className="w-3.5 h-3.5 text-[#a2ff86] stroke-[2.5]" />
+                                    <span>Practice</span>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveField("development")}
+                                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "development"
+                                        ? "bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000]"
+                                        : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
+                                        }`}
+                                >
+                                    <GitBranch className="w-3.5 h-3.5 text-[#FFE566] stroke-[2.5]" />
+                                    <span>Development</span>
+                                </button>
+                            </div>
                         </div>
 
-                        {/* Two Dashboard Fields Switcher: Practice & Development */}
-                        <div className="inline-flex items-center p-1.5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] self-start sm:self-auto gap-1">
-                            <button
-                                type="button"
-                                onClick={() => setActiveField("practice")}
-                                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "practice"
-                                    ? "bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
-                                    }`}
-                            >
-                                <Code2 className="w-3.5 h-3.5 text-[#a2ff86] stroke-[2.5]" />
-                                <span>Practice</span>
-                            </button>
+                        {/* Practice Field: Multi-Platform Coding Submissions (Excluding GitHub), Monthly Stats, DSA & Topic Analytics, and Contest Performance */}
+                        {activeField === "practice" && (
+                            <div className="w-full animate-fadeIn space-y-6">
+                                <CodingSubmissionsTable
+                                    connectedPortals={connectedPortals}
+                                    username={profile.username}
+                                />
+                                <PracticeAnalyticsSection
+                                    connectedPortals={connectedPortals}
+                                    username={profile.username}
+                                />
+                                <ContestPerformanceSection
+                                    connectedPortals={connectedPortals}
+                                    username={profile.username}
+                                />
+                            </div>
+                        )}
 
-                            <button
-                                type="button"
-                                onClick={() => setActiveField("development")}
-                                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer ${activeField === "development"
-                                    ? "bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
-                                    }`}
-                            >
-                                <GitBranch className="w-3.5 h-3.5 text-[#FFE566] stroke-[2.5]" />
-                                <span>Development</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Practice Field: Multi-Platform Coding Submissions (Excluding GitHub), Monthly Stats, DSA & Topic Analytics, and Contest Performance */}
-                    {activeField === "practice" && (
-                        <div className="w-full animate-fadeIn space-y-6">
-                            <CodingSubmissionsTable
-                                connectedPortals={connectedPortals}
-                                username={profile.username}
-                            />
-                            <PracticeAnalyticsSection
-                                connectedPortals={connectedPortals}
-                                username={profile.username}
-                            />
-                            <ContestPerformanceSection
-                                connectedPortals={connectedPortals}
-                                username={profile.username}
-                            />
-                        </div>
-                    )}
-
-                    {/* Development Field: Development Metrics, Languages & Contributions (GitHub) */}
-                    {activeField === "development" && (
-                        <div className="w-full animate-fadeIn space-y-6">
-                            <DevelopmentContributionsTable
-                                connectedPortals={connectedPortals}
-                                username={profile.username}
-                            />
-                            <DevelopmentAnalyticsSection
-                                connectedPortals={connectedPortals}
-                                username={profile.username}
-                            />
-                        </div>
-                    )}
-                </section>
+                        {/* Development Field: Development Metrics, Languages & Contributions (GitHub) */}
+                        {activeField === "development" && (
+                            <div className="w-full animate-fadeIn space-y-6">
+                                <DevelopmentContributionsTable
+                                    connectedPortals={connectedPortals}
+                                    username={profile.username}
+                                />
+                                <DevelopmentAnalyticsSection
+                                    connectedPortals={connectedPortals}
+                                    username={profile.username}
+                                />
+                            </div>
+                        )}
+                    </section>
+                )}
             </main>
 
             {/* Hire Me Recruiter Modal (Exact Match to User Reference Screenshot) */}

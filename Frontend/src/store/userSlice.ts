@@ -8,6 +8,7 @@ export interface User {
     gmail: string;
     username: string;
     termsAccepted?: boolean | string;
+    accountType?: "personal" | "club" | "admin" | string;
     headline?: string | null;
     bio?: string | null;
     avatarUrl?: string | null;

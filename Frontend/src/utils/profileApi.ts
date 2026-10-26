@@ -1006,4 +1006,98 @@ export async function fetchPublicResume(username: string, options?: { forceRefre
     return reqPromise;
 }
 
+export interface ExploreDeveloper {
+    id: string;
+    username: string;
+    displayName: string;
+    firstName: string;
+    lastName: string;
+    headline?: string;
+    bio?: string;
+    location?: string;
+    college?: string;
+    collegeId?: string | null;
+    skills: string[];
+    links?: Array<{ label: string; url: string; platform?: string }>;
+    avatarUrl?: string | null;
+    photoUrl?: string | null;
+    isOpenToWork: boolean;
+    isHireable: boolean;
+    isPublic: boolean;
+    isVerifiedCoder: boolean;
+    hasResume: boolean;
+    orbixScore: number;
+    totalSolved: number;
+    totalContests: number;
+    streak: number;
+    connectedPortals: Array<{
+        portal: string;
+        portalUsername: string;
+        verified: boolean;
+        stats?: Array<{ label: string; value: string }>;
+    }>;
+    createdAt?: string;
+}
+
+export interface ExploreQueryParams {
+    search?: string;
+    college?: string;
+    skill?: string;
+    openToWork?: boolean;
+    verifiedOnly?: boolean;
+    sortBy?: "score" | "solved" | "contests" | "streak" | "recent" | "name";
+    page?: number;
+    limit?: number;
+}
+
+export interface ExploreResponse {
+    success: boolean;
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+    users: ExploreDeveloper[];
+}
+
+export interface PrivacyAuditResponse {
+    success: boolean;
+    username: string;
+    displayName: string;
+    isPublic: boolean;
+    privacyStatus: "PUBLIC" | "PRIVATE";
+    verifiedPortalsCount: number;
+    orbixScore: number;
+    checks: Record<string, string>;
+    exposedFields: string[];
+    shieldedFields: string[];
+    auditTimestamp: string;
+}
+
+/**
+ * Fetch discoverable public developer profiles with searching, filtering, and pagination
+ */
+export async function fetchExploreProfiles(params: ExploreQueryParams = {}): Promise<ExploreResponse> {
+    const query = new URLSearchParams();
+    if (params.search) query.set("search", params.search);
+    if (params.college) query.set("college", params.college);
+    if (params.skill) query.set("skill", params.skill);
+    if (params.openToWork) query.set("openToWork", "true");
+    if (params.verifiedOnly) query.set("verifiedOnly", "true");
+    if (params.sortBy) query.set("sortBy", params.sortBy);
+    if (params.page) query.set("page", String(params.page));
+    if (params.limit) query.set("limit", String(params.limit));
+
+    const qs = query.toString();
+    const path = `/api/profile/explore${qs ? `?${qs}` : ""}`;
+    return apiFetch<ExploreResponse>(path, { method: "GET" });
+}
+
+/**
+ * Perform a real-time privacy & anti-manipulation audit on any developer handle
+ */
+export async function fetchPrivacyAudit(username: string): Promise<PrivacyAuditResponse> {
+    const encoded = encodeURIComponent(username.toLowerCase().trim());
+    return apiFetch<PrivacyAuditResponse>(`/api/profile/${encoded}/privacy-audit`, { method: "GET" });
+}
+
 

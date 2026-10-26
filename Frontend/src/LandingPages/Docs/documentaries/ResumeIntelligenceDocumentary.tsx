@@ -203,14 +203,8 @@ export const ResumeIntelligenceDocumentary: React.FC = () => {
             {/* HEADER HERO BANNER                                                        */}
             {/* ========================================================================= */}
             <header className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-6">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-[#FFE566] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
-                        v3.0.0 Full Specification
-                    </span>
-                    <span className="px-3 py-1 rounded-full text-xs font-black uppercase bg-[#a2ff86] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
-                        Deterministic Math Model
-                    </span>
-                    <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-neutral-100 text-neutral-700 border border-neutral-300">
+                <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-bold text-neutral-500">
                         14 min read
                     </span>
                 </div>
@@ -501,12 +495,6 @@ export const ResumeIntelligenceDocumentary: React.FC = () => {
                         <h2 className="text-2xl sm:text-4xl font-black text-black">
                             Live 7-Dimension Algorithm Simulator
                         </h2>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <span className="px-3 py-1 rounded-full text-xs font-black bg-[#a2ff86] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
-                            Real-Time Engine Feedback
-                        </span>
                     </div>
                 </div>
 

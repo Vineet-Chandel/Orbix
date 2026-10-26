@@ -125,9 +125,6 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
                         <div>
                             <div className="flex items-center gap-2 flex-wrap">
                                 <h2 className="text-xl sm:text-2xl font-black tracking-tight">Orbix Score Engine</h2>
-                                <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[#a2ff86] border-2 border-black shadow-[1px_1px_0px_#000]">
-                                    v2.0.0 Authoritative
-                                </span>
                             </div>
                             <p className="text-xs sm:text-sm text-neutral-600 font-medium">
                                 Standard 0 to 10,000 Points • 6 Canonical Pillars • Diminishing Returns Architecture

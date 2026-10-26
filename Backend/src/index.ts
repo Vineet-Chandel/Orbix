@@ -9,6 +9,7 @@ import leaderboardRouter from './Routes/leaderboard/leaderboard.js';
 import eventsRouter from './Routes/events/events.js';
 import notificationsRouter from './Routes/notifications/notifications.js';
 import institutionsRouter from './Routes/institutions/institutions.js';
+import clubRouter from './Routes/club/club.js';
 import { testDatabaseConnection } from './database/client.js';
 import redis from './redis/client.js';
 
@@ -48,6 +49,7 @@ app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/institutions', institutionsRouter);
+app.use('/api/club', clubRouter);
 app.use('/profile', profileRouter);
 app.get('/', (req: Request, res: Response) => {
     res.send('Hello World!');

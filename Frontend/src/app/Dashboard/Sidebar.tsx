@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase } from "lucide-react";
+import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
@@ -8,6 +8,7 @@ import { fetchUnreadNotificationCount } from "../../utils/profileApi";
 export type SidebarTab =
     | "home"
     | "dashboard"
+    | "explore"
     | "trends"
     | "notifications"
     | "leaderboard"
@@ -23,7 +24,8 @@ export type SidebarTab =
     | "docs"
     | "codexa"
     | "evolexa"
-    | "flowexa";
+    | "flowexa"
+    | "settings";
 
 export type CollapsibleSection = "events" | "documentation" | "workspaces";
 
@@ -239,6 +241,14 @@ export const Sidebar = ({
                 </svg>
             ),
             path: "/dashboard",
+        },
+        {
+            id: "explore" as SidebarTab,
+            label: "Explore",
+            icon: (
+                <Compass className="w-5 h-5 flex-shrink-0 stroke-[2.2]" />
+            ),
+            path: "/explore",
         },
         {
             id: "trends" as SidebarTab,
@@ -829,9 +839,7 @@ export const Sidebar = ({
                                                     src={avatarSrc}
                                                     alt={displayName}
                                                     onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                                            displayName
-                                                        )}&background=000&color=a2ff86&size=128&bold=true`;
+                                                        (e.target as HTMLImageElement).src = "/avatar.png";
                                                     }}
                                                     className="w-full h-full rounded-full object-cover"
                                                 />
@@ -963,6 +971,18 @@ export const Sidebar = ({
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                             </svg>
                             <span className="truncate">Connected Platforms ({connectedPortalsCount})</span>
+                        </Link>
+
+                        <Link
+                            to="/settings"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                handleItemClick("settings");
+                            }}
+                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors"
+                        >
+                            <Settings className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                            <span className="truncate">Settings & Privacy</span>
                         </Link>
 
                         <div className="my-1.5 border-t-2 border-black/15" />

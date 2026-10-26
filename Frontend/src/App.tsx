@@ -18,6 +18,7 @@ const DocsHubPage = lazy(() => import("./LandingPages/Docs/DocsHubPage"));
 const DocsViewerPage = lazy(() => import("./LandingPages/Docs/DocsViewerPage"));
 const Dashboard = lazy(() => import("./app/Dashboard/Landing"));
 const ProfileManager = lazy(() => import("./app/Profile/ProfileManager"));
+const SettingsPage = lazy(() => import("./app/Settings/SettingsPage"));
 const PublicProfilePage = lazy(() => import("./app/Profile/PublicProfilePage"));
 const ProfilesOnboardingPage = lazy(() => import("./LandingPages/Auth-Pages/ProfilesOnboarding/ProfilesOnboardingPage"));
 const LeaderboardPage = lazy(() => import("./app/Leaderboard/LeaderboardPage"));
@@ -25,10 +26,14 @@ const EventTrackerPage = lazy(() => import("./app/Events/EventTrackerPage"));
 const Card = lazy(() => import("./LandingPages/Main-Landing-Pages/Card").then(m => ({ default: m.Card })));
 const Platform = lazy(() => import("./LandingPages/Main-Landing-Pages/Platform").then(m => ({ default: m.Platform })));
 const Events = lazy(() => import("./LandingPages/Main-Landing-Pages/Events").then(m => ({ default: m.Events })));
+const ClubStatusPage = lazy(() => import("./app/Club/ClubStatusPage"));
+const ClubReviewerQueuePage = lazy(() => import("./app/Club/ClubReviewerQueuePage"));
 
 const WorkspaceRedirect = () => {
   const { user } = useAppSelector((state) => state.user);
-  return user ? <Navigate to="/dashboard" replace /> : <Navigate to="/auth/signin" replace />;
+  if (!user) return <Navigate to="/auth/signin" replace />;
+  if (user.accountType === "club") return <Navigate to="/club/status" replace />;
+  return <Navigate to="/dashboard" replace />;
 };
 
 const LegacyProfileRedirect = () => {
@@ -104,6 +109,10 @@ const App = () => {
           <Route path="/login" element={<Navigate to="/auth/signin" replace />} />
           <Route path="/workspace" element={<WorkspaceRedirect />} />
 
+          {/* Club Verification & Staff Review Routes */}
+          <Route path="/club/status" element={<ClubStatusPage />} />
+          <Route path="/staff/club-reviews" element={<ClubReviewerQueuePage />} />
+
           {/* New User Onboarding & Profiles Links Setup */}
           <Route path="/onboarding" element={<ProfilesOnboardingPage />} />
           <Route path="/auth/profiles" element={<ProfilesOnboardingPage />} />
@@ -112,11 +121,13 @@ const App = () => {
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/explore" element={<Dashboard />} />
             <Route path="/trends" element={<Dashboard />} />
             <Route path="/reports" element={<Dashboard />} />
             <Route path="/notifications" element={<Dashboard />} />
             <Route path="/inbox" element={<Dashboard />} />
             <Route path="/profile" element={<ProfileManager />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route path="/resume" element={<Dashboard />} />
             <Route path="/projects" element={<Dashboard />} />
           </Route>

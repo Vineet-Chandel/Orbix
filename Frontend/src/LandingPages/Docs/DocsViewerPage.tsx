@@ -5,6 +5,7 @@ import { getDocBySlug, ALL_DOC_FILES } from "../../data/docsRegistry";
 import AlgorithmDocumentary from "./documentaries/AlgorithmDocumentary";
 import PlatformRegistryDocumentary from "./documentaries/PlatformRegistryDocumentary";
 import ResumeIntelligenceDocumentary from "./documentaries/ResumeIntelligenceDocumentary";
+import ProfilePrivacyDocumentary from "./documentaries/ProfilePrivacyDocumentary";
 import {
     ArrowLeft,
     FileText,
@@ -24,6 +25,8 @@ export const DocsViewerPage: React.FC = () => {
             ? "supported-platform-registry"
             : activeSlug === "resume" || activeSlug === "resume-analytics" || activeSlug === "resume-algorithm" || activeSlug === "resume-intelligence" || activeSlug === "resume-intelligence-algorithm"
             ? "resume-intelligence-algorithm"
+            : activeSlug === "privacy" || activeSlug === "public-vs-private" || activeSlug === "public-vs-private-profile" || activeSlug === "profile-privacy"
+            ? "public-vs-private-profile"
             : activeSlug;
 
     // Check if doc exists in registry
@@ -41,8 +44,8 @@ export const DocsViewerPage: React.FC = () => {
                 {/* ========================================================================= */}
                 {/* BREADCRUMB NAVIGATION & BACK BUTTON                                       */}
                 {/* ========================================================================= */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-neutral-600">
+                <div className="flex items-center justify-between gap-3 pt-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-neutral-600 flex-wrap">
                         <Link
                             to="/docs"
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] text-black hover:bg-neutral-100 transition-colors"
@@ -57,12 +60,6 @@ export const DocsViewerPage: React.FC = () => {
                             {doc?.title || "Documentary"}
                         </span>
                     </div>
-
-                    <div className="flex items-center gap-2">
-                        <span className="px-3 py-1 rounded-full text-xs font-black bg-[#FFE566] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
-                            Verified Specification
-                        </span>
-                    </div>
                 </div>
 
                 {/* ========================================================================= */}
@@ -74,13 +71,12 @@ export const DocsViewerPage: React.FC = () => {
                     <PlatformRegistryDocumentary />
                 ) : resolvedSlug === "resume-intelligence-algorithm" ? (
                     <ResumeIntelligenceDocumentary />
+                ) : resolvedSlug === "public-vs-private-profile" ? (
+                    <ProfilePrivacyDocumentary />
                 ) : doc ? (
                     <article className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-8">
                         <header className="space-y-4 pb-6 border-b-2 border-black/15">
                             <div className="flex items-center gap-2">
-                                <span className="px-3 py-1 rounded-full text-xs font-black bg-[#a2ff86] border-2 border-black">
-                                    {doc.badge}
-                                </span>
                                 <span className="text-xs font-mono font-bold text-neutral-500">
                                     {doc.readTime}
                                 </span>

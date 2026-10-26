@@ -4,8 +4,11 @@ export interface AuthUser {
     middleName?: string | undefined;
     lastName: string;
     gmail: string;
+    email?: string;
     username: string;
     termsAccepted: boolean | string;
+    accountType?: string;
+    account_type?: string;
 }
 
 declare global {

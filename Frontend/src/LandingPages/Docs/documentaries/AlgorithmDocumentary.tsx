@@ -237,9 +237,6 @@ export const AlgorithmDocumentary: React.FC = () => {
                                 <h1 className="text-2xl sm:text-4xl font-black tracking-tight text-black">
                                     Orbix Score Engine
                                 </h1>
-                                <span className="px-3 py-1 rounded-full text-xs font-black bg-[#a2ff86] border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
-                                    v2.0.0 Authoritative
-                                </span>
                             </div>
                             <p className="text-xs sm:text-sm font-bold text-neutral-600 mt-1">
                                 Standard 0 to 10,000 Points • 6 Canonical Pillars • Diminishing Returns Architecture
@@ -900,9 +897,6 @@ export const AlgorithmDocumentary: React.FC = () => {
                             16 Genuine Platforms natively indexed, verified, and mapped to scoring pillars
                         </p>
                     </div>
-                    <span className="px-3 py-1 rounded-full bg-[#FFE566] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000]">
-                        16 Portals
-                    </span>
                 </div>
 
                 <div className="rounded-3xl bg-white border-2 border-black shadow-[5px_5px_0px_#000] overflow-hidden">

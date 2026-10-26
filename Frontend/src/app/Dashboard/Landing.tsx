@@ -13,6 +13,7 @@ import { DevelopmentAnalyticsSection } from "./DevelopmentAnalytics/DevelopmentA
 import { NotificationsView } from "../Notifications/NotificationsView";
 import { TrendsView } from "../Trends/TrendsView";
 import { ResumeManager } from "../Resume/ResumeManager";
+import { ExploreView } from "../Explore/ExploreView";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 
 export default function Dashboard() {
@@ -24,6 +25,7 @@ export default function Dashboard() {
 
     // Determine initial active tab based on pathname
     const getTabFromPath = (path: string): SidebarTab => {
+        if (path.includes("/explore")) return "explore";
         if (path.includes("/trends") || path.includes("/reports")) return "trends";
         if (path.includes("/notifications") || path.includes("/inbox")) return "notifications";
         if (path.includes("/profile")) return "profile";
@@ -129,6 +131,7 @@ export default function Dashboard() {
                 onTabChange={(tab) => {
                     setActiveTab(tab);
                     if (tab === "dashboard") navigate("/dashboard");
+                    if (tab === "explore") navigate("/explore");
                     if (tab === "trends") navigate("/trends");
                     if (tab === "notifications") navigate("/notifications");
                     if (tab === "profile") navigate("/profile");
@@ -145,7 +148,11 @@ export default function Dashboard() {
 
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
-                {activeTab === "resume" ? (
+                {activeTab === "explore" ? (
+                    <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
+                        <ExploreView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                    </div>
+                ) : activeTab === "resume" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
                         <ResumeManager onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
                     </div>

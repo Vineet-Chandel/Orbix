@@ -1,5 +1,5 @@
 import type { CodingProfileEntry } from "./resumeTypes.js";
-import {
+import type {
     ComprehensiveIntelligenceReport,
     StructuredResumeFacts
 } from "./resumeTypes.js";
@@ -7,7 +7,7 @@ import { parseUploadedDocument } from "./documentParser.js";
 import { extractStructuredFacts } from "./factExtractor.js";
 import { ResumeScoringEngine } from "./scoringEngine.js";
 import { RoleIntelligenceEngine } from "./roleIntelligence.js";
-import { ProfileSyncService, UserProfileRow } from "./profileSyncService.js";
+import { ProfileSyncService, type UserProfileRow } from "./profileSyncService.js";
 
 const scoringEngine = new ResumeScoringEngine();
 const roleEngine = new RoleIntelligenceEngine();
@@ -179,4 +179,5 @@ ${rawText.slice(0, 3500)}`;
     return baseReport;
 }
 
+export type GeminiAnalysisReport = ComprehensiveIntelligenceReport;
 export { analyzeResumeWithGemini as analyzeResume };

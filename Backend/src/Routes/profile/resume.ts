@@ -1013,19 +1013,30 @@ export const handleReAnalyzeResume = async (req: Request, res: Response) => {
     }
 };
 
+// Restrict club accounts from personal resume intelligence and upload features
+const restrictClubAccounts = (req: Request, res: Response, next: express.NextFunction) => {
+    if ((req.user as any)?.accountType === "club" || (req.user as any)?.account_type === "club") {
+        return res.status(403).json({
+            success: false,
+            message: "Club accounts cannot access personal resume features.",
+        });
+    }
+    next();
+};
+
 // Mount routes
-resumeRouter.use("/intelligence", intelligenceRouter);
+resumeRouter.use("/intelligence", authenticate, restrictClubAccounts, intelligenceRouter);
 resumeRouter.use("/", intelligenceRouter);
 
-resumeRouter.get("/", authenticate, handleGetResume);
-resumeRouter.get("/view", authenticate, (req, res) => { handleStreamResume(req, res, false); });
+resumeRouter.get("/", authenticate, restrictClubAccounts, handleGetResume);
+resumeRouter.get("/view", authenticate, restrictClubAccounts, (req, res) => { handleStreamResume(req, res, false); });
 resumeRouter.get("/view/:username", optionalAuthenticate, (req, res) => { handleStreamResume(req, res, false); });
-resumeRouter.get("/download", authenticate, (req, res) => { handleStreamResume(req, res, true); });
+resumeRouter.get("/download", authenticate, restrictClubAccounts, (req, res) => { handleStreamResume(req, res, true); });
 resumeRouter.get("/download/:username", optionalAuthenticate, (req, res) => { handleStreamResume(req, res, true); });
-resumeRouter.post("/upload", authenticate, upload.single("resume"), handleDirectResumeUpload);
-resumeRouter.post("/re-analyze", authenticate, handleReAnalyzeResume);
-resumeRouter.delete("/", authenticate, handleDeleteResume);
-resumeRouter.patch("/visibility", authenticate, handleToggleResumeVisibility);
+resumeRouter.post("/upload", authenticate, restrictClubAccounts, upload.single("resume"), handleDirectResumeUpload);
+resumeRouter.post("/re-analyze", authenticate, restrictClubAccounts, handleReAnalyzeResume);
+resumeRouter.delete("/", authenticate, restrictClubAccounts, handleDeleteResume);
+resumeRouter.patch("/visibility", authenticate, restrictClubAccounts, handleToggleResumeVisibility);
 resumeRouter.get("/public/:username", optionalAuthenticate, handleGetPublicResume);
 
 export default resumeRouter;

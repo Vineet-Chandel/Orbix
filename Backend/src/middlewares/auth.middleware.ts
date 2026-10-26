@@ -1,3 +1,4 @@
+/// <reference path="../types/express.d.ts" />
 import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { getUserDetailsCache, userDetailsCache } from "../redis/cache/cache-auth.js";
@@ -59,7 +60,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
                     lastname AS "lastName",
                     email AS gmail,
                     username,
-                    termsaccepted AS "termsAccepted"
+                    termsaccepted AS "termsAccepted",
+                    account_type AS "accountType"
                 FROM users
                 WHERE id = $1 OR LOWER(email) = LOWER($2) OR LOWER(username) = LOWER($3)
                 LIMIT 1;`,
@@ -101,6 +103,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
             middleName: user.middleName || (user as any).middlename || "",
             lastName: user.lastName || (user as any).lastname || "",
             termsAccepted: user.termsAccepted ?? (user as any).termsaccepted ?? false,
+            accountType: user.accountType || (user as any).account_type || decoded?.accountType || "personal",
+            account_type: user.accountType || (user as any).account_type || decoded?.accountType || "personal",
         };
         return next();
     } catch (err) {
@@ -155,7 +159,8 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
                     lastname AS "lastName",
                     email AS gmail,
                     username,
-                    termsaccepted AS "termsAccepted"
+                    termsaccepted AS "termsAccepted",
+                    account_type AS "accountType"
                 FROM users
                 WHERE id = $1 OR LOWER(email) = LOWER($2) OR LOWER(username) = LOWER($3)
                 LIMIT 1;`,
@@ -188,6 +193,8 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
                 middleName: user.middleName || (user as any).middlename || "",
                 lastName: user.lastName || (user as any).lastname || "",
                 termsAccepted: user.termsAccepted ?? (user as any).termsaccepted ?? false,
+                accountType: user.accountType || (user as any).account_type || "personal",
+                account_type: user.accountType || (user as any).account_type || "personal",
             };
         }
 

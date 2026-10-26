@@ -13,6 +13,8 @@ export interface IUserDetails {
     middlename?: string;
     lastname?: string;
     termsaccepted?: boolean | string;
+    accountType?: string;
+    account_type?: string;
 }
 
 const CACHE_TTL = 24 * 60 * 60; // 1 day
@@ -31,6 +33,8 @@ const userDetailsCache = async (user: IUserDetails) => {
             gmail: normalizedGmail,
             username: user.username || "",
             termsAccepted: String(user.termsAccepted ?? user.termsaccepted ?? false),
+            accountType: user.accountType || user.account_type || "personal",
+            account_type: user.accountType || user.account_type || "personal",
         };
 
         // Only store password_hash if a valid non-empty hash is provided (e.g., bcrypt hash)
@@ -61,6 +65,7 @@ const getUserDetailsCache = async (gmail: string): Promise<IUserDetails | null> 
         const middleName = user.middleName || user.middlename || "";
         const lastName = user.lastName || user.lastname || "";
         const termsAccepted = user.termsAccepted === "true" || user.termsaccepted === "true";
+        const accountType = user.accountType || user.account_type || "personal";
 
         return {
             ...(user as any),
@@ -76,6 +81,8 @@ const getUserDetailsCache = async (gmail: string): Promise<IUserDetails | null> 
             password_hash: user.password_hash || "",
             termsAccepted,
             termsaccepted: termsAccepted,
+            accountType,
+            account_type: accountType,
         } as IUserDetails;
     } catch (err: any) {
         console.warn("[Redis Cache] Failed to get user details from cache:", err?.message || err);
