@@ -1,37 +1,40 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
     Settings,
-    Shield,
-    Lock,
-    Globe,
-    Check,
-    X,
-    Eye,
-    EyeOff,
-    Share2,
-    Layers,
-    ExternalLink,
-    User,
-    GraduationCap,
-    ArrowRight,
-    Loader2,
     Menu,
+    Eye,
+    ExternalLink,
+    ArrowLeft,
 } from "lucide-react";
-import { useAppDispatch, useAppSelector, updateUserProfile } from "../../store";
+import { useAppDispatch, useAppSelector, updateUserProfile, clearUser } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { updateProfile } from "../../utils/profileApi";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
-import { NeoToggle } from "../../components/NeoToggle";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
+import type { SettingsViewKey } from "./types";
+import { SettingsHub } from "./SettingsHub";
+import { AccountCenterView } from "./AccountCenterView";
+import { AccountPrivacyView } from "./AccountPrivacyView";
+import { SettingDetailView } from "./SettingDetailView";
 
 export default function SettingsPage() {
     const dispatch = useAppDispatch();
+    const navigate = useNavigate();
     const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
 
+    const [searchParams, setSearchParams] = useSearchParams();
+    const contentScrollRef = useRef<HTMLDivElement>(null);
+
+    // Active subview determined by URL ?view= query parameter (defaults to "hub")
+    const currentView = (searchParams.get("view") as SettingsViewKey) || "hub";
+
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isUpdating, setIsUpdating] = useState(false);
+    const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     // Controlled public profile state directly from user
     const [isPublic, setIsPublic] = useState<boolean>(() => {
@@ -44,6 +47,17 @@ export default function SettingsPage() {
             setIsPublic(user.isPublic !== false);
         }
     }, [user?.isPublic]);
+
+    // Handle view navigation
+    const handleSelectView = (view: SettingsViewKey) => {
+        if (view === "hub") {
+            setSearchParams({});
+        } else {
+            setSearchParams({ view });
+        }
+        // Smoothly scroll back to top of main card content
+        contentScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+    };
 
     // Handle instant zero-lag privacy toggle
     const handleTogglePrivacy = async (newIsPublic: boolean) => {
@@ -118,16 +132,91 @@ export default function SettingsPage() {
         }
     };
 
-    const displayName = user?.firstName
-        ? `${user.firstName} ${user.lastName || ""}`.trim()
-        : user?.username || "Developer";
+    // Handle logout action
+    const handleConfirmLogout = async () => {
+        setIsLoggingOut(true);
+        try {
+            const endpoints = [
+                "/api/auth/signout",
+                "http://localhost:3000/api/auth/signout",
+            ];
+            await Promise.allSettled(
+                endpoints.map((url) =>
+                    fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                    })
+                )
+            );
+        } catch {
+            // ignore network failure on logout
+        } finally {
+            try {
+                localStorage.removeItem("orbix_token");
+                localStorage.removeItem("orbix_user");
+            } catch {
+                // ignore
+            }
+            dispatch(clearUser());
+            setIsLoggingOut(false);
+            setIsLogoutModalOpen(false);
+            toast.success("You have been signed out successfully.", { title: "Logged Out" });
+            navigate("/auth/signin");
+        }
+    };
 
-    const formattedJoinDate = user?.createdAt
-        ? new Date(user.createdAt).toLocaleDateString("en-US", {
-              month: "short",
-              year: "numeric",
-          })
-        : "Recent";
+    // Render active view based on currentView
+    const renderActiveView = () => {
+        if (currentView === "hub") {
+            return (
+                <SettingsHub
+                    user={user}
+                    isPublic={isPublic}
+                    onSelectView={handleSelectView}
+                    onRequestLogout={() => setIsLogoutModalOpen(true)}
+                />
+            );
+        }
+
+        if (currentView === "account-center") {
+            return (
+                <AccountCenterView
+                    user={user}
+                    isPublic={isPublic}
+                    onSelectView={handleSelectView}
+                    onBack={() => handleSelectView("hub")}
+                />
+            );
+        }
+
+        if (currentView === "account-privacy") {
+            return (
+                <AccountPrivacyView
+                    user={user}
+                    isPublic={isPublic}
+                    isUpdating={isUpdating}
+                    onTogglePrivacy={handleTogglePrivacy}
+                    onBack={() => handleSelectView("account-center")}
+                />
+            );
+        }
+
+        return (
+            <SettingDetailView
+                viewKey={currentView}
+                user={user}
+                onBack={() => {
+                    if (["verify-account", "password-security", "manage-account"].includes(currentView)) {
+                        handleSelectView("account-center");
+                    } else {
+                        handleSelectView("hub");
+                    }
+                }}
+                onSelectView={handleSelectView}
+            />
+        );
+    };
 
     return (
         <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
@@ -141,334 +230,122 @@ export default function SettingsPage() {
             {/* Main Content Area */}
             <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
                 <section
-                    aria-label="Account Settings & Privacy Controls"
+                    ref={contentScrollRef}
+                    aria-label="Account Settings & Preferences"
                     className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
-                    <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6 max-w-6xl w-full mx-auto">
-                        {/* Header Bar */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b-2 border-black/15">
-                            <div className="flex items-start gap-3">
+                    <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6 max-w-5xl w-full mx-auto">
+                        {/* Page Header (rendered on hub view) */}
+                        {currentView === "hub" && (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b-2 border-black/15">
+                                <div className="flex items-start gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMobileSidebarOpen(true)}
+                                        className="lg:hidden mt-0.5 p-2 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer shrink-0"
+                                        aria-label="Open sidebar"
+                                    >
+                                        <Menu className="w-5 h-5 stroke-[2.5]" />
+                                    </button>
+                                    <div className="space-y-1">
+                                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-black font-black text-xs shadow-[2px_2px_0px_#000] uppercase tracking-wider">
+                                            <Settings className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <span>Settings & Preferences</span>
+                                        </div>
+                                        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-black tracking-tight pt-1">
+                                            Settings
+                                        </h1>
+                                        <p className="text-xs sm:text-sm text-neutral-600 font-bold max-w-xl">
+                                            Manage your account center, privacy controls, activity history, and platform preferences.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Top Action Pill */}
+                                {user?.username && (
+                                    <Link
+                                        to={`/profile/u/${encodeURIComponent(user.username)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-black font-black text-xs shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer self-start sm:self-auto shrink-0"
+                                    >
+                                        <Eye className="w-4 h-4 stroke-[2.5]" />
+                                        <span>Preview Public Showcase</span>
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                    </Link>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Breadcrumbs for Subviews */}
+                        {currentView !== "hub" && (
+                            <div className="flex items-center justify-between gap-3 text-xs font-bold text-neutral-600 pb-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                        type="button"
+                                        onClick={() => handleSelectView("hub")}
+                                        className="hover:text-black hover:underline cursor-pointer flex items-center gap-1 font-black text-black"
+                                    >
+                                        <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Settings</span>
+                                    </button>
+                                    <span>/</span>
+                                    {["verify-account", "account-privacy", "password-security", "manage-account"].includes(currentView) && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleSelectView("account-center")}
+                                                className="hover:text-black hover:underline cursor-pointer"
+                                            >
+                                                Account Center
+                                            </button>
+                                            <span>/</span>
+                                        </>
+                                    )}
+                                    <span className="text-black font-black capitalize">
+                                        {currentView.replace(/-/g, " ")}
+                                    </span>
+                                </div>
+
                                 <button
                                     type="button"
-                                    onClick={() => setIsMobileSidebarOpen(true)}
-                                    className="lg:hidden mt-0.5 p-2 text-black hover:bg-neutral-100 rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer shrink-0"
-                                    aria-label="Open sidebar"
+                                    onClick={() => handleSelectView("hub")}
+                                    className="px-3 py-1 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
                                 >
-                                    <Menu className="w-5 h-5 stroke-[2.5]" />
+                                    All Settings
                                 </button>
-                                <div className="space-y-1">
-                                    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-black font-black text-xs shadow-[2px_2px_0px_#000] uppercase tracking-wider">
-                                        <Settings className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>Account & Privacy Controls</span>
-                                    </div>
-                                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-black tracking-tight pt-1">
-                                        Settings & Privacy
-                                    </h1>
-                                    <p className="text-xs sm:text-sm text-neutral-600 font-bold max-w-xl">
-                                        Configure whether your developer profile is public or private, control platform analytics sharing, and manage your account preferences.
-                                    </p>
-                                </div>
                             </div>
+                        )}
 
-                            {/* Top Action Pill */}
-                            {user?.username && (
-                                <Link
-                                    to={`/profile/u/${encodeURIComponent(user.username)}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-black font-black text-xs shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer self-start sm:self-auto shrink-0"
-                                >
-                                    <Eye className="w-4 h-4 stroke-[2.5]" />
-                                    <span>Preview Public Showcase</span>
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                </Link>
-                            )}
-                        </div>
+                        {/* Active View Container */}
+                        {renderActiveView()}
+                    </div>
 
-                    {/* ========================================================================= */}
-                    {/* SECTION 1: PROFILE VISIBILITY & PRIVACY (CORE TOGGLE)                     */}
-                    {/* ========================================================================= */}
-                    <section className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-8 shadow-[6px_6px_0px_#000] space-y-6">
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 pb-6 border-b-2 border-black/10">
-                            <div className="flex items-start gap-4">
-                                <div
-                                    className={`p-3.5 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] shrink-0 transition-colors ${
-                                        isPublic ? "bg-[#a2ff86]" : "bg-[#FFE566]"
-                                    }`}
-                                >
-                                    {isPublic ? (
-                                        <Globe className="w-6 h-6 text-black stroke-[2.5]" />
-                                    ) : (
-                                        <Lock className="w-6 h-6 text-black stroke-[2.5]" />
-                                    )}
-                                </div>
-                                <div className="space-y-1.5">
-                                    <div className="flex items-center gap-2.5 flex-wrap">
-                                        <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
-                                            Public Profile Showcase
-                                        </h2>
-                                        <span
-                                            className={`px-3 py-0.5 rounded-full text-xs font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] uppercase tracking-wider ${
-                                                isPublic
-                                                    ? "bg-[#a2ff86] text-black"
-                                                    : "bg-black text-white"
-                                            }`}
-                                        >
-                                            {isPublic ? "Public Mode" : "Private Mode"}
-                                        </span>
-                                        {isUpdating && (
-                                            <span className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-neutral-500">
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                Syncing...
-                                            </span>
-                                        )}
-                                    </div>
-                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed max-w-2xl">
-                                        {isPublic
-                                            ? "Your profile is fully public. Visitors can inspect your coding platforms, submissions, contest ratings, view your resume, send hire inquiries, and share your Orbix developer card."
-                                            : "Your profile is private. Visitors can ONLY view your name, headline, bio, location, college, links (max 4), and skills. Hire button, resume access, open to work status, platform analytics, and public card sharing are automatically turned off."}
-                                    </p>
-                                </div>
-                            </div>
+                    {/* Bottom Full-Width Desk Illustration (Matching all app sections) */}
+                    <SectionBottomIllustration alt="Settings workspace illustration" />
+                </section>
+            </div>
 
-                            {/* Neo-brutalist Interactive Toggle Switch (Zero Lag) */}
-                            <NeoToggle
-                                checked={isPublic}
-                                disabled={isUpdating}
-                                onChange={handleTogglePrivacy}
-                                onIcon={<Globe className="w-3.5 h-3.5 text-black stroke-[3]" />}
-                                offIcon={<Lock className="w-3.5 h-3.5 text-neutral-700 stroke-[3]" />}
-                                onStatusText="Status: Public"
-                                offStatusText="Status: Private"
-                                ariaLabel="Toggle profile public or private visibility"
-                            />
-                        </div>
-
-                        {/* ========================================================================= */}
-                        {/* FEATURE AVAILABILITY MATRIX (EXACT USER SPECIFICATION)                    */}
-                        {/* ========================================================================= */}
-                        <div className="space-y-4 pt-2">
-                            <div className="flex items-center gap-2">
-                                <Shield className="w-4 h-4 text-black stroke-[2.5]" />
-                                <h3 className="text-sm font-black text-black uppercase tracking-wider">
-                                    Feature & Field Visibility Matrix
-                                </h3>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Always Visible (Both Public & Private) */}
-                                <div className="rounded-2xl bg-[#FAF6EE] border-2 border-black p-5 shadow-[3px_3px_0px_#000] space-y-3">
-                                    <div className="flex items-center justify-between pb-2 border-b-2 border-black/15">
-                                        <div className="flex items-center gap-2">
-                                            <Check className="w-4 h-4 text-[#008f39] stroke-[3]" />
-                                            <span className="font-black text-xs text-black uppercase tracking-wide">
-                                                Visible in Both (Public & Private)
-                                            </span>
-                                        </div>
-                                        <span className="px-2 py-0.5 rounded bg-black/5 text-[10px] font-mono font-bold">
-                                            7 Permitted Fields
-                                        </span>
-                                    </div>
-                                    <ul className="space-y-2 text-xs font-bold text-neutral-800">
-                                        <li className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
-                                            <span>First name & Last name</span>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
-                                            <span>Professional Headline</span>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
-                                            <span>Biography</span>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
-                                            <span>Location</span>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
-                                            <span>College (Verified Institution)</span>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
-                                            <span>External Links (Max 4 Links)</span>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-black shrink-0" />
-                                            <span>Skills & Technologies</span>
-                                        </li>
-                                    </ul>
-                                </div>
-
-                                {/* Hidden in Private Mode */}
-                                <div className="rounded-2xl bg-[#FAF6EE] border-2 border-black p-5 shadow-[3px_3px_0px_#000] space-y-3">
-                                    <div className="flex items-center justify-between pb-2 border-b-2 border-black/15">
-                                        <div className="flex items-center gap-2">
-                                            <EyeOff className="w-4 h-4 text-rose-600 stroke-[2.5]" />
-                                            <span className="font-black text-xs text-black uppercase tracking-wide">
-                                                Automatically Disabled When Private
-                                            </span>
-                                        </div>
-                                        <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300 text-[10px] font-mono font-bold">
-                                            Protected
-                                        </span>
-                                    </div>
-                                    <ul className="space-y-2 text-xs font-bold text-neutral-800">
-                                        <li className="flex items-center gap-2">
-                                            <X className="w-3.5 h-3.5 text-rose-600 stroke-[3] shrink-0" />
-                                            <span>Hire Button & Recruiter Inquiries</span>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <X className="w-3.5 h-3.5 text-rose-600 stroke-[3] shrink-0" />
-                                            <span>Resume View & PDF Download</span>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <X className="w-3.5 h-3.5 text-rose-600 stroke-[3] shrink-0" />
-                                            <span>Open to Work Candidate Badge</span>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <X className="w-3.5 h-3.5 text-rose-600 stroke-[3] shrink-0" />
-                                            <span>Connected Platform Analytics (LeetCode, GitHub, etc.)</span>
-                                        </li>
-                                        <li className="flex items-center gap-2">
-                                            <X className="w-3.5 h-3.5 text-rose-600 stroke-[3] shrink-0" />
-                                            <span>Public Card Sharing (Visitors cannot access your card)</span>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Card Ownership Notice */}
-                        <div className="rounded-2xl bg-amber-50 border-2 border-black p-4 shadow-[2px_2px_0px_#000] flex items-start gap-3">
-                            <Share2 className="w-4 h-4 text-amber-900 shrink-0 mt-0.5 stroke-[2.5]" />
-                            <div className="text-xs text-amber-950 font-bold leading-relaxed space-y-1">
-                                <p className="font-black text-black">
-                                    Card Sharing in Private Profiles:
-                                </p>
-                                <p>
-                                    As the profile owner, you always maintain full access to generate, preview, and download your LinkedIn Story and Instagram Story cards in Card Studio. However, external visitors on the website will not be able to view, share, or access your cards while your profile is in Private mode.
-                                </p>
-                            </div>
-                        </div>
-                    </section>
-
-                    {/* ========================================================================= */}
-                    {/* SECTION 2: ACCOUNT OVERVIEW & QUICK ACTIONS                               */}
-                    {/* ========================================================================= */}
-                    <section className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* Profile Info Card */}
-                        <div className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 shadow-[5px_5px_0px_#000] space-y-4 flex flex-col justify-between">
-                            <div className="space-y-3">
-                                <div className="p-2.5 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] w-fit">
-                                    <User className="w-5 h-5 text-black stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black text-black">Developer Identity</h3>
-                                    <p className="text-xs text-neutral-600 font-bold mt-0.5">
-                                        Your primary name, username, and bio details.
-                                    </p>
-                                </div>
-                                <div className="space-y-1.5 pt-1 text-xs font-bold text-neutral-700">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-neutral-500">Name:</span>
-                                        <span className="font-black text-black">{displayName}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-neutral-500">Username:</span>
-                                        <span className="font-mono font-bold text-black">@{user?.username}</span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-neutral-500">Joined:</span>
-                                        <span>{formattedJoinDate}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <Link
-                                to="/profile"
-                                className="inline-flex items-center justify-center gap-1.5 w-full py-2.5 px-4 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
-                            >
-                                <span>Edit Profile Details</span>
-                                <ArrowRight className="w-3.5 h-3.5" />
-                            </Link>
-                        </div>
-
-                        {/* Connected Platforms Card */}
-                        <div className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 shadow-[5px_5px_0px_#000] space-y-4 flex flex-col justify-between">
-                            <div className="space-y-3">
-                                <div className="p-2.5 rounded-xl bg-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] w-fit">
-                                    <Layers className="w-5 h-5 text-black stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black text-black">Platform Integrations</h3>
-                                    <p className="text-xs text-neutral-600 font-bold mt-0.5">
-                                        Sync coding platforms & competitive trackers.
-                                    </p>
-                                </div>
-                                <div className="space-y-1.5 pt-1 text-xs font-bold text-neutral-700">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-neutral-500">Connected:</span>
-                                        <span className="font-black text-black">
-                                            {user?.platforms?.length || 0} Platforms
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-neutral-500">Sync Status:</span>
-                                        <span className="font-bold text-[#008f39]">Active & Verified</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <Link
-                                to="/onboarding"
-                                className="inline-flex items-center justify-center gap-1.5 w-full py-2.5 px-4 rounded-xl bg-white hover:bg-[#FAF6EE] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
-                            >
-                                <span>Manage Connected Portals</span>
-                                <ExternalLink className="w-3.5 h-3.5" />
-                            </Link>
-                        </div>
-
-                        {/* Verified College Card */}
-                        <div className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 shadow-[5px_5px_0px_#000] space-y-4 flex flex-col justify-between">
-                            <div className="space-y-3">
-                                <div className="p-2.5 rounded-xl bg-sky-200 border-2 border-black shadow-[2px_2px_0px_#000] w-fit">
-                                    <GraduationCap className="w-5 h-5 text-black stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <h3 className="text-lg font-black text-black">College Affiliation</h3>
-                                    <p className="text-xs text-neutral-600 font-bold mt-0.5">
-                                        Verified campus leaderboard directory.
-                                    </p>
-                                </div>
-                                <div className="space-y-1 pt-1 text-xs font-bold text-neutral-700">
-                                    <p className="font-black text-black truncate">
-                                        {user?.college?.officialName || "No college linked"}
-                                    </p>
-                                    <p className="text-[11px] text-neutral-500 font-medium">
-                                        {user?.college?.city && user?.college?.state
-                                            ? `${user.college.city}, ${user.college.state}`
-                                            : "Link your verified college in profile manager"}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <Link
-                                to="/profile"
-                                className="inline-flex items-center justify-center gap-1.5 w-full py-2.5 px-4 rounded-xl bg-white hover:bg-[#FAF6EE] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
-                            >
-                                <span>Change College</span>
-                                <ArrowRight className="w-3.5 h-3.5" />
-                            </Link>
-                        </div>
-                    </section>
-                </div>
-
-                {/* Bottom Full-Width Desk Illustration (Matching all app sections) */}
-                <SectionBottomIllustration alt="Settings workspace illustration" />
-            </section>
+            {/* Logout Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={isLogoutModalOpen}
+                onClose={() => !isLoggingOut && setIsLogoutModalOpen(false)}
+                onConfirm={handleConfirmLogout}
+                isLoading={isLoggingOut}
+                title="Log out of Orbix?"
+                description={
+                    <span>
+                        Are you sure you want to sign out of{" "}
+                        <strong className="text-black font-black">
+                            @{user?.username || "your account"}
+                        </strong>
+                        ? You can log back in at any time with your credentials.
+                    </span>
+                }
+                confirmText={isLoggingOut ? "Signing out..." : "Log Out"}
+                cancelText="Cancel"
+                variant="danger"
+            />
         </div>
-    </div>
     );
 }
