@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock } from "lucide-react";
+import { Lock, ChevronDown } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
 
@@ -23,6 +24,8 @@ export type SidebarTab =
     | "codexa"
     | "evolexa"
     | "flowexa";
+
+export type CollapsibleSection = "events" | "documentation" | "workspaces";
 
 interface SidebarProps {
     activeTab?: SidebarTab;
@@ -49,6 +52,53 @@ export const Sidebar = ({
     // Hover-driven expansion: collapsed by default (Image 2), expands on hovering or when profile menu is open
     const [isHovered, setIsHovered] = useState(false);
     const isExpanded = isOpen || isHovered || isProfileMenuOpen;
+
+    // Collapsible accordion dropdown state: only one section can be open at a time ("events" | "documentation" | "workspaces" | null)
+    const [openSection, setOpenSection] = useState<CollapsibleSection | null>(() => {
+        if (
+            location.pathname.startsWith("/events") ||
+            location.pathname.startsWith("/clubs") ||
+            location.pathname.startsWith("/college-events") ||
+            location.pathname.startsWith("/applications")
+        ) {
+            return "events";
+        }
+        if (
+            location.pathname.startsWith("/blogs") ||
+            location.pathname.startsWith("/blog") ||
+            location.pathname.startsWith("/docs")
+        ) {
+            return "documentation";
+        }
+        return "events";
+    });
+
+    const handleToggleSection = (section: CollapsibleSection) => {
+        setOpenSection((prev) => (prev === section ? null : section));
+    };
+
+    // Auto-open section when navigating or when activeTab changes
+    useEffect(() => {
+        if (
+            activeTab === "events" ||
+            activeTab === "clubs" ||
+            activeTab === "college-events" ||
+            activeTab === "applications" ||
+            location.pathname.startsWith("/events")
+        ) {
+            setOpenSection("events");
+        } else if (
+            activeTab === "docs" ||
+            activeTab === "blogs" ||
+            location.pathname.startsWith("/docs") ||
+            location.pathname.startsWith("/blog") ||
+            location.pathname.startsWith("/blogs")
+        ) {
+            setOpenSection("documentation");
+        } else if (activeTab === "codexa" || activeTab === "evolexa" || activeTab === "flowexa") {
+            setOpenSection("workspaces");
+        }
+    }, [location.pathname, activeTab]);
 
     // Close profile menu when clicking/tapping outside or pressing Escape
     useEffect(() => {
@@ -512,110 +562,187 @@ export const Sidebar = ({
                     {mainNavItems.map(renderNavItem)}
                 </div>
 
-                {/* Subtle Hairline Divider */}
+                {/* Subtle Hairline Divider before Collapsible Groups */}
                 <div className={`my-3 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
 
-                {/* Section 2: Events (Clubs, College Events, Event Tracker, Applications) */}
-                <div className="space-y-1.5 overflow-x-hidden">
+                {/* Section 2: Events Dropdown Accordion (Clubs, College Events, Event Tracker, Applications) */}
+                <div className="space-y-1 overflow-x-hidden">
                     {isExpanded && (
-                        <div className="flex items-center justify-between px-3 py-1 text-black overflow-x-hidden animate-fadeIn">
-                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800">
+                        <button
+                            type="button"
+                            onClick={() => handleToggleSection("events")}
+                            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl hover:bg-black/5 transition-all text-neutral-800 hover:text-black group select-none cursor-pointer ${
+                                openSection === "events" ? "bg-black/[0.04]" : ""
+                            }`}
+                            aria-expanded={openSection === "events"}
+                        >
+                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
                                 Events
                             </span>
-                        </div>
+                            <ChevronDown
+                                className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
+                                    openSection === "events" ? "rotate-180" : ""
+                                }`}
+                            />
+                        </button>
                     )}
-                    {eventItems.map((item) =>
-                        item.isComingSoon || !item.path ? (
-                            <div
-                                key={item.id}
-                                className="flex items-center h-11 rounded-xl text-xs sm:text-sm font-bold text-neutral-700 select-none overflow-x-hidden relative w-full cursor-default"
-                                title={!isExpanded ? `${item.label} (Coming Soon)` : `${item.label} — Coming Soon`}
+
+                    <AnimatePresence initial={false}>
+                        {openSection === "events" && (
+                            <motion.div
+                                key="events-items"
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                                className="space-y-1.5 overflow-hidden pt-0.5"
                             >
-                                <div className="flex items-center overflow-x-hidden w-full min-w-0">
-                                    {/* SVG Icon: DEAD-CENTER in 44px container */}
-                                    <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                        <span className="w-5 h-5 flex items-center justify-center text-neutral-700">
-                                            {item.icon}
-                                        </span>
-                                    </div>
+                                {eventItems.map((item) =>
+                                    item.isComingSoon || !item.path ? (
+                                        <div
+                                            key={item.id}
+                                            className="flex items-center h-11 rounded-xl text-xs sm:text-sm font-bold text-neutral-700 select-none overflow-x-hidden relative w-full cursor-default"
+                                            title={!isExpanded ? `${item.label} (Coming Soon)` : `${item.label} — Coming Soon`}
+                                        >
+                                            <div className="flex items-center overflow-x-hidden w-full min-w-0">
+                                                {/* SVG Icon: DEAD-CENTER in 44px container */}
+                                                <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                                    <span className="w-5 h-5 flex items-center justify-center text-neutral-700">
+                                                        {item.icon}
+                                                    </span>
+                                                </div>
 
-                                    {isExpanded && (
-                                        <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 text-neutral-800 font-bold">
-                                            {item.label}
-                                        </span>
-                                    )}
-                                </div>
+                                                {isExpanded && (
+                                                    <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 text-neutral-800 font-bold">
+                                                        {item.label}
+                                                    </span>
+                                                )}
+                                            </div>
 
-                                {isExpanded && (
-                                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border-2 border-black bg-[#FFE566] text-black text-[10px] font-black tracking-tight whitespace-nowrap flex-shrink-0 mr-1 shadow-[2px_2px_0px_#000] animate-fadeIn">
-                                        <Lock className="w-2.5 h-2.5 text-black stroke-[2.5] flex-shrink-0" />
-                                        <span>Coming soon</span>
-                                    </div>
+                                            {isExpanded && (
+                                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border-2 border-black bg-[#FFE566] text-black text-[10px] font-black tracking-tight whitespace-nowrap flex-shrink-0 mr-1 shadow-[2px_2px_0px_#000] animate-fadeIn">
+                                                    <Lock className="w-2.5 h-2.5 text-black stroke-[2.5] flex-shrink-0" />
+                                                    <span>Coming soon</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        renderNavItem(item as any)
+                                    )
                                 )}
-                            </div>
-                        ) : (
-                            renderNavItem(item as any)
-                        )
-                    )}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
-                {/* Subtle Hairline Divider */}
-                <div className={`my-3 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
+                {/* Divider between Events & Documentation */}
+                <div className={`my-2 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "hidden"}`} />
 
-                {/* Section 3: Documentation (Blogs, Docs) */}
-                <div className="space-y-1.5 overflow-x-hidden">
+                {/* Section 3: Documentation Dropdown Accordion (Blogs, Docs) */}
+                <div className="space-y-1 overflow-x-hidden">
                     {isExpanded && (
-                        <div className="flex items-center justify-between px-3 py-1 text-black overflow-x-hidden animate-fadeIn">
-                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800">
+                        <button
+                            type="button"
+                            onClick={() => handleToggleSection("documentation")}
+                            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl hover:bg-black/5 transition-all text-neutral-800 hover:text-black group select-none cursor-pointer ${
+                                openSection === "documentation" ? "bg-black/[0.04]" : ""
+                            }`}
+                            aria-expanded={openSection === "documentation"}
+                        >
+                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
                                 Documentation
                             </span>
-                        </div>
+                            <ChevronDown
+                                className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
+                                    openSection === "documentation" ? "rotate-180" : ""
+                                }`}
+                            />
+                        </button>
                     )}
-                    {documentationItems.map(renderNavItem)}
+
+                    <AnimatePresence initial={false}>
+                        {openSection === "documentation" && (
+                            <motion.div
+                                key="documentation-items"
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                                className="space-y-1.5 overflow-hidden pt-0.5"
+                            >
+                                {documentationItems.map(renderNavItem)}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
-                {/* Subtle Hairline Divider */}
-                <div className={`my-3 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
+                {/* Divider between Documentation & Workspaces */}
+                <div className={`my-2 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "hidden"}`} />
 
-                {/* Section 3: Workspace Redirections (Codexa, Evolexa, Flowexa) */}
-                <div className="space-y-1.5 overflow-x-hidden">
+                {/* Section 4: Workspaces Dropdown Accordion (Codexa, Evolexa, Flowexa) */}
+                <div className="space-y-1 overflow-x-hidden">
                     {isExpanded && (
-                        <div className="flex items-center justify-between px-3 py-1 text-black overflow-x-hidden animate-fadeIn">
-                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800">
+                        <button
+                            type="button"
+                            onClick={() => handleToggleSection("workspaces")}
+                            className={`w-full flex items-center justify-between px-3 py-1.5 rounded-xl hover:bg-black/5 transition-all text-neutral-800 hover:text-black group select-none cursor-pointer ${
+                                openSection === "workspaces" ? "bg-black/[0.04]" : ""
+                            }`}
+                            aria-expanded={openSection === "workspaces"}
+                        >
+                            <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
                                 Workspaces
                             </span>
-                        </div>
+                            <ChevronDown
+                                className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
+                                    openSection === "workspaces" ? "rotate-180" : ""
+                                }`}
+                            />
+                        </button>
                     )}
 
-                    {workspaceItems.map((item) => (
-                        <div
-                            key={item.id}
-                            className="flex items-center h-11 rounded-xl text-xs sm:text-sm font-bold text-neutral-700 select-none overflow-x-hidden relative w-full cursor-default"
-                            title={!isExpanded ? `${item.name} (Coming Soon)` : `${item.name} Workspace — Coming Soon`}
-                        >
-                            <div className="flex items-center overflow-x-hidden w-full min-w-0">
-                                {/* SVG Icon: DEAD-CENTER in 44px container */}
-                                <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                    <span className="w-5 h-5 flex items-center justify-center text-neutral-700">
-                                        {item.icon}
-                                    </span>
-                                </div>
+                    <AnimatePresence initial={false}>
+                        {openSection === "workspaces" && (
+                            <motion.div
+                                key="workspaces-items"
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: "auto", opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                                className="space-y-1.5 overflow-hidden pt-0.5"
+                            >
+                                {workspaceItems.map((item) => (
+                                    <div
+                                        key={item.id}
+                                        className="flex items-center h-11 rounded-xl text-xs sm:text-sm font-bold text-neutral-700 select-none overflow-x-hidden relative w-full cursor-default"
+                                        title={!isExpanded ? `${item.name} (Coming Soon)` : `${item.name} Workspace — Coming Soon`}
+                                    >
+                                        <div className="flex items-center overflow-x-hidden w-full min-w-0">
+                                            {/* SVG Icon: DEAD-CENTER in 44px container */}
+                                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                                <span className="w-5 h-5 flex items-center justify-center text-neutral-700">
+                                                    {item.icon}
+                                                </span>
+                                            </div>
 
-                                {isExpanded && (
-                                    <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 text-neutral-800 font-bold">
-                                        {item.name}
-                                    </span>
-                                )}
-                            </div>
+                                            {isExpanded && (
+                                                <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 text-neutral-800 font-bold">
+                                                    {item.name}
+                                                </span>
+                                            )}
+                                        </div>
 
-                            {isExpanded && (
-                                <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border-2 border-black bg-[#FFE566] text-black text-[10px] font-black tracking-tight whitespace-nowrap flex-shrink-0 mr-1 shadow-[2px_2px_0px_#000] animate-fadeIn">
-                                    <Lock className="w-2.5 h-2.5 text-black stroke-[2.5] flex-shrink-0" />
-                                    <span>Coming soon</span>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                                        {isExpanded && (
+                                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border-2 border-black bg-[#FFE566] text-black text-[10px] font-black tracking-tight whitespace-nowrap flex-shrink-0 mr-1 shadow-[2px_2px_0px_#000] animate-fadeIn">
+                                                <Lock className="w-2.5 h-2.5 text-black stroke-[2.5] flex-shrink-0" />
+                                                <span>Coming soon</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             </div>
 
