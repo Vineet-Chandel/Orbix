@@ -41,6 +41,8 @@ export default function SignUpPage() {
                 switchText="Already a member?"
                 switchLinkText="Log in"
                 switchLinkHref="/auth/signin"
+                showSocialAuth={registrationMode === "personal"}
+                wide={registrationMode === "club"}
             >
                 {/* Segmented Control / Registration-Type Selector */}
                 <div className="w-full p-1 bg-white border-2 border-black rounded-full shadow-[2px_2px_0px_#000] flex items-center mb-5 select-none">

@@ -52,6 +52,7 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
         // Check Redis cache first, fallback to Postgres
         let user = userGmail ? await getUserDetailsCache(userGmail) : null;
         if (!user) {
+            const isUuid = userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
             const result = await query(
                 `SELECT
                     id,
@@ -63,9 +64,9 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
                     termsaccepted AS "termsAccepted",
                     account_type AS "accountType"
                 FROM users
-                WHERE id = $1 OR LOWER(email) = LOWER($2) OR LOWER(username) = LOWER($3)
+                WHERE ($1::uuid IS NOT NULL AND id = $1::uuid) OR LOWER(email) = LOWER($2) OR LOWER(username) = LOWER($3)
                 LIMIT 1;`,
-                [userId || null, userGmail || null, username || null]
+                [isUuid ? userId : null, userGmail || null, username || null]
             );
             user = result.rows[0];
 

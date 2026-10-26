@@ -264,9 +264,27 @@ async function run() {
     const reviewerAllowlist = getReviewerAllowlist();
     assert(reviewerAllowlist.includes(REVIEWER_EMAIL.toLowerCase()), `Test reviewer email ${REVIEWER_EMAIL} is in allowlist`);
 
+    const reviewerUserId = crypto.randomUUID();
+    await query(`
+        INSERT INTO users (id, username, email, firstname, lastname, termsaccepted, account_type)
+        VALUES ($1, 'orbixreviewer', $2, 'Staff', 'Reviewer', true, 'admin')
+        ON CONFLICT (id) DO NOTHING;
+    `, [reviewerUserId, REVIEWER_EMAIL]);
+
+    const { userDetailsCache } = await import("./src/redis/cache/cache-auth.js");
+    await userDetailsCache({
+        id: reviewerUserId,
+        firstName: "Staff",
+        lastName: "Reviewer",
+        gmail: REVIEWER_EMAIL,
+        username: "orbixreviewer",
+        termsAccepted: true,
+        accountType: "admin",
+    });
+
     const reviewerToken = jwt.sign(
         {
-            sub: "reviewer-test-uuid",
+            sub: reviewerUserId,
             gmail: REVIEWER_EMAIL,
             username: "orbixreviewer",
             accountType: "admin",
@@ -381,6 +399,7 @@ async function run() {
     console.log("\n--- CLEANUP TEST DATA ---");
     await query("DELETE FROM club_verification_requests WHERE LOWER(contact_email) = LOWER($1);", [TEST_EMAIL]);
     await query("DELETE FROM users WHERE LOWER(email) = LOWER($1);", [TEST_EMAIL]);
+    await query("DELETE FROM users WHERE LOWER(email) = LOWER($1);", [REVIEWER_EMAIL]);
     await query("DELETE FROM auth.users WHERE LOWER(email) = LOWER($1);", [TEST_EMAIL]).catch(() => {});
     console.log("  ✓ Test records cleaned up from database");
 
@@ -408,6 +427,7 @@ run().catch(async (err) => {
     try {
         await query("DELETE FROM club_verification_requests WHERE LOWER(contact_email) = LOWER($1);", [TEST_EMAIL]);
         await query("DELETE FROM users WHERE LOWER(email) = LOWER($1);", [TEST_EMAIL]);
+        await query("DELETE FROM users WHERE LOWER(email) = LOWER($1);", [REVIEWER_EMAIL]);
         await pool.end();
         await redis.quit();
     } catch {}
