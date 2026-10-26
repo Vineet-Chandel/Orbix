@@ -141,6 +141,10 @@ async function run() {
     });
 
     // Cleanup previous test state if exists
+    const rateLimitKeys = await redis.keys("auth:signup:fail:*");
+    if (rateLimitKeys.length > 0) {
+        await redis.del(...rateLimitKeys);
+    }
     await query("DELETE FROM club_verification_requests WHERE LOWER(contact_email) = LOWER($1);", [TEST_EMAIL]);
     await query("DELETE FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($2);", [TEST_EMAIL, TEST_USERNAME]);
     await query("DELETE FROM auth.users WHERE LOWER(email) = LOWER($1);", [TEST_EMAIL]).catch(() => {});

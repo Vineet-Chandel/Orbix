@@ -502,31 +502,33 @@ export default function ClubSignupForm({ onSwitchToPersonal }: ClubSignupFormPro
                     </h3>
                 </div>
 
-                <FormInput
-                    name="collegeWebsiteUrl"
-                    type="url"
-                    placeholder="College Website (e.g. https://college.edu.in)"
-                    hideLabel
-                    value={formData.collegeWebsiteUrl}
-                    onChange={(e) => {
-                        setFormData({ ...formData, collegeWebsiteUrl: e.target.value });
-                        if (errors.collegeWebsiteUrl) setErrors({ ...errors, collegeWebsiteUrl: "" });
-                    }}
-                    error={errors.collegeWebsiteUrl}
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <FormInput
+                        name="collegeWebsiteUrl"
+                        type="url"
+                        placeholder="College Website (e.g. https://college.edu.in)"
+                        hideLabel
+                        value={formData.collegeWebsiteUrl}
+                        onChange={(e) => {
+                            setFormData({ ...formData, collegeWebsiteUrl: e.target.value });
+                            if (errors.collegeWebsiteUrl) setErrors({ ...errors, collegeWebsiteUrl: "" });
+                        }}
+                        error={errors.collegeWebsiteUrl}
+                    />
 
-                <FormInput
-                    name="clubWebsiteUrl"
-                    type="url"
-                    placeholder="Club Website (e.g. https://gdsc-college.dev)"
-                    hideLabel
-                    value={formData.clubWebsiteUrl}
-                    onChange={(e) => {
-                        setFormData({ ...formData, clubWebsiteUrl: e.target.value });
-                        if (errors.clubWebsiteUrl) setErrors({ ...errors, clubWebsiteUrl: "" });
-                    }}
-                    error={errors.clubWebsiteUrl}
-                />
+                    <FormInput
+                        name="clubWebsiteUrl"
+                        type="url"
+                        placeholder="Club Website (e.g. https://gdsc-college.dev)"
+                        hideLabel
+                        value={formData.clubWebsiteUrl}
+                        onChange={(e) => {
+                            setFormData({ ...formData, clubWebsiteUrl: e.target.value });
+                            if (errors.clubWebsiteUrl) setErrors({ ...errors, clubWebsiteUrl: "" });
+                        }}
+                        error={errors.clubWebsiteUrl}
+                    />
+                </div>
 
                 <FormInput
                     name="clubSocialUrl"
