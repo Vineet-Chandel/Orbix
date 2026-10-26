@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
     Repeat,
@@ -13,6 +13,7 @@ import {
     CreditCard,
     Check,
     ArrowRight,
+    ArrowLeft,
     FileText,
     Download,
     Eye,
@@ -25,8 +26,6 @@ import {
     UserX,
     Lock,
     RefreshCw,
-    Trophy,
-    Sparkles,
     Terminal,
     ChevronDown,
     ChevronUp,
@@ -414,8 +413,18 @@ export const OrbixLogoMark = ({ className = "w-full h-full text-black" }: { clas
     </svg>
 );
 
-export const ProfileHeader = ({ isEmbedded, isDemo }: { isEmbedded?: boolean; isDemo?: boolean }) => {
+export const ProfileHeader = ({ isEmbedded }: { isEmbedded?: boolean; isDemo?: boolean }) => {
+    const navigate = useNavigate();
     if (isEmbedded) return null;
+
+    const handleBack = () => {
+        if (window.history.length > 1) {
+            navigate(-1);
+        } else {
+            navigate("/");
+        }
+    };
+
     return (
         <header className="w-full px-4 sm:px-8 pt-4 pb-2 flex items-center justify-between select-none">
             <Link
@@ -431,52 +440,19 @@ export const ProfileHeader = ({ isEmbedded, isDemo }: { isEmbedded?: boolean; is
                 </span>
             </Link>
 
-            <div className="flex items-center gap-2 sm:gap-3">
-                <Link
-                    to="/leaderboard"
-                    className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border-2 border-black/15 hover:border-black bg-white/70 hover:bg-white text-xs font-bold text-neutral-800 transition-all shadow-[2px_2px_0px_#000] active:scale-95"
-                    title="View Developer Leaderboard"
-                >
-                    <Trophy className="w-3.5 h-3.5" />
-                    <span>Leaderboard</span>
-                </Link>
-
-                <Link
-                    to="/profile/u/Vineet-Chandel"
-                    className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border-2 border-black/15 hover:border-black bg-white/70 hover:bg-white text-xs font-bold text-neutral-800 transition-all shadow-[2px_2px_0px_#000] active:scale-95"
-                    title="Explore Verified Showcase Profile"
-                >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                    <span>Demo Profile</span>
-                </Link>
-
-                {isDemo ? (
-                    <Link
-                        to="/auth/signup"
-                        className="inline-flex items-center gap-2 sm:gap-2.5 px-4 sm:px-6 py-2 sm:py-2.5 rounded-full bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] transition-all duration-200 transform active:scale-95 cursor-pointer group"
-                        title="Demo Profile — Click to create your own Orbix profile"
-                    >
-                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse flex-shrink-0" />
-                        <span className="tracking-tight">Demo Profile</span>
-                        <span className="hidden sm:inline w-px h-3.5 bg-neutral-700 mx-0.5" />
-                        <span className="hidden sm:inline font-medium text-neutral-300 group-hover:text-white transition-colors">
-                            Create your profile
-                        </span>
-                        <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-400 group-hover:text-white group-hover:translate-x-0.5 transition-transform flex-shrink-0" />
-                    </Link>
-                ) : (
-                    <Link
-                        to="/auth/signup"
-                        className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full bg-black hover:bg-neutral-800 text-white text-xs sm:text-sm font-bold border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] transition-all active:scale-95 cursor-pointer"
-                    >
-                        <span>Create your profile</span>
-                        <ArrowRight className="w-3.5 h-3.5 text-neutral-300" />
-                    </Link>
-                )}
-            </div>
+            <button
+                type="button"
+                onClick={handleBack}
+                className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 rounded-full bg-white hover:bg-[#FAF6EE] text-black text-xs sm:text-sm font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer select-none"
+                title="Go back"
+            >
+                <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+                <span>Back</span>
+            </button>
         </header>
     );
 };
+
 
 export const ProfileFooter = () => (
     <footer className="w-full py-6 text-center text-xs text-neutral-500 font-mono border-t border-black/10 mt-auto select-none">
@@ -541,6 +517,7 @@ export interface PublicProfilePageProps {
 }
 
 export default function PublicProfilePage({ overrideUsername, isEmbedded = false }: PublicProfilePageProps = {}) {
+    const navigate = useNavigate();
     const params = useParams<{ username: string }>();
     const username = overrideUsername || params.username;
     const toast = useToast();
@@ -1047,13 +1024,20 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                 </Link>
                             )}
 
-                            <Link
-                                to="/profile/u/Vineet-Chandel"
-                                className="w-full sm:w-auto px-5 py-3 rounded-full bg-[#FAF6EE] hover:bg-[#f3ede1] text-black text-sm font-bold border-2 border-black shadow-[3px_3px_0px_#000] transition-all duration-200 transform active:scale-95 active:shadow-none flex items-center justify-center gap-2 cursor-pointer select-none"
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (window.history.length > 1) {
+                                        navigate(-1);
+                                    } else {
+                                        navigate("/");
+                                    }
+                                }}
+                                className="w-full sm:w-auto px-5 py-3 rounded-full bg-white hover:bg-[#FAF6EE] text-black text-sm font-bold border-2 border-black shadow-[2px_2px_0px_#000] transition-all duration-200 transform active:scale-95 active:shadow-none flex items-center justify-center gap-1.5 cursor-pointer select-none"
                             >
-                                <Sparkles className="w-4 h-4 text-amber-500" />
-                                <span>View Demo Showcase</span>
-                            </Link>
+                                <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
+                                <span>Back</span>
+                            </button>
 
                             <Link
                                 to="/"
