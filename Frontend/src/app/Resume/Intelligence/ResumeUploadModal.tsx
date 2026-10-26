@@ -1,23 +1,21 @@
 import React, { useState, useRef } from "react";
-import { UploadCloud, FileText, CheckCircle2, AlertTriangle, X, ArrowRight } from "lucide-react";
-import { uploadAndAnalyzeResumeFile } from "../../../utils/resumeIntelligenceApi";
-import type { ResumeContent, AnalysisReport } from "../../../../../Backend/src/services/resume/resumeTypes";
+import { UploadCloud, FileText, AlertTriangle, X, Sparkles, CheckCircle2 } from "lucide-react";
+import { uploadResumeApi, type GeminiAnalysisReport, type ResumeProfileData } from "../../../utils/resumeIntelligenceApi";
 
-interface ResumeUploadModalProps {
+export interface ResumeUploadModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onImportDraft: (draft: ResumeContent, report: AnalysisReport) => void;
+    onUploadSuccess: (resume: ResumeProfileData, report: GeminiAnalysisReport | null) => void;
 }
 
 export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
     isOpen,
     onClose,
-    onImportDraft,
+    onUploadSuccess,
 }) => {
     const [file, setFile] = useState<File | null>(null);
     const [isUploading, setIsUploading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
-    const [uploadResult, setUploadResult] = useState<any>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     if (!isOpen) return null;
@@ -43,16 +41,30 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
         setFile(selected);
     };
 
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            validateAndSet(e.dataTransfer.files[0]);
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
     const handleUploadAndAnalyze = async () => {
         if (!file) return;
         setIsUploading(true);
         setErrorMsg(null);
 
         try {
-            const data = await uploadAndAnalyzeResumeFile(file);
-            setUploadResult(data);
+            const data = await uploadResumeApi(file);
+            onUploadSuccess(data.resume, data.report);
+            onClose();
         } catch (err: any) {
-            setErrorMsg(err?.message || "Failed to parse and analyze document.");
+            setErrorMsg(err?.message || "Failed to upload and analyze resume with Gemini AI.");
         } finally {
             setIsUploading(false);
         }
@@ -64,7 +76,7 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
             aria-modal="true"
             aria-labelledby="uploadModalTitle"
             onClick={(e) => {
-                if (e.target === e.currentTarget) onClose();
+                if (e.target === e.currentTarget && !isUploading) onClose();
             }}
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
         >
@@ -76,20 +88,22 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
                         </div>
                         <div>
                             <h3 id="uploadModalTitle" className="text-base font-black tracking-tight uppercase text-black">
-                                Upload Existing Resume
+                                Upload & Analyze Resume
                             </h3>
                             <p className="text-xs text-neutral-600 font-medium">
-                                Extract text, evaluate 8 recruiter checks, and convert to an editable draft
+                                Upload to profile and evaluate with Gemini AI
                             </p>
                         </div>
                     </div>
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        className="p-1.5 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                    >
-                        <X className="w-4 h-4 stroke-[2.5]" />
-                    </button>
+                    {!isUploading && (
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="p-1.5 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                        >
+                            <X className="w-4 h-4 stroke-[2.5]" />
+                        </button>
+                    )}
                 </div>
 
                 {errorMsg && (
@@ -99,107 +113,94 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
                     </div>
                 )}
 
-                {!uploadResult ? (
-                    <div className="space-y-4">
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                            accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            className="hidden"
-                        />
+                {/* Dropzone */}
+                <div
+                    onDrop={handleDrop}
+                    onDragOver={handleDragOver}
+                    onClick={() => !isUploading && fileInputRef.current?.click()}
+                    className={`p-6 border-2 border-dashed rounded-xl text-center space-y-3 cursor-pointer transition-all ${
+                        file
+                            ? "bg-[#a2ff86]/15 border-black"
+                            : "bg-[#FAF6EE] border-black/40 hover:border-black hover:bg-[#FAF6EE]/80"
+                    }`}
+                >
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        onChange={handleFileChange}
+                        disabled={isUploading}
+                        className="hidden"
+                    />
 
-                        <div
-                            onClick={() => fileInputRef.current?.click()}
-                            onDragOver={(e) => e.preventDefault()}
-                            onDrop={(e) => {
-                                e.preventDefault();
-                                if (e.dataTransfer.files?.[0]) validateAndSet(e.dataTransfer.files[0]);
-                            }}
-                            className="p-8 border-2 border-dashed border-black rounded-xl bg-[#FAF6EE] text-center space-y-3 cursor-pointer hover:bg-amber-50/50 transition-all"
-                        >
-                            <FileText className="w-10 h-10 mx-auto text-neutral-700" />
-                            {file ? (
-                                <div className="space-y-1">
-                                    <p className="text-xs font-black text-black">{file.name}</p>
-                                    <p className="text-[11px] font-mono text-neutral-600">
-                                        {(file.size / (1024 * 1024)).toFixed(2)} MB
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="space-y-1">
-                                    <p className="text-xs font-black text-black">
-                                        Click to browse or drag & drop your resume
-                                    </p>
-                                    <p className="text-[11px] text-neutral-600">
-                                        Supported formats: PDF, DOCX (Max 5.0 MB)
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-
-                        <div className="flex justify-end gap-2 pt-2">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="px-4 py-2 rounded-lg bg-white border-2 border-black text-xs font-black uppercase cursor-pointer"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="button"
-                                disabled={!file || isUploading}
-                                onClick={handleUploadAndAnalyze}
-                                className="px-5 py-2 rounded-lg bg-[#a2ff86] text-black border-2 border-black text-xs font-black uppercase shadow-[3px_3px_0px_#000] hover:bg-[#8cee6d] cursor-pointer disabled:opacity-50"
-                            >
-                                {isUploading ? "Extracting & Scanning..." : "Analyze Document"}
-                            </button>
-                        </div>
+                    <div className="w-12 h-12 rounded-xl bg-white border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
+                        {file ? (
+                            <FileText className="w-6 h-6 text-black stroke-[2.5]" />
+                        ) : (
+                            <UploadCloud className="w-6 h-6 text-black stroke-[2.5]" />
+                        )}
                     </div>
-                ) : (
-                    <div className="space-y-4">
-                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-2 text-xs">
-                            <div className="flex items-center gap-2 text-black font-black">
-                                <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-                                <span>Document Extracted Successfully!</span>
-                            </div>
-                            <p className="text-neutral-700">
-                                Detected candidate: <span className="font-bold text-black">{uploadResult.parsedDraft.contact.fullName}</span>
-                            </p>
-                            <p className="text-neutral-700">
-                                Identified sections: {uploadResult.detectedSections.join(", ") || "General Content"}
-                            </p>
-                            <p className="text-neutral-700">
-                                Overall Quality Score: <span className="font-black text-black">{uploadResult.report.overallScore}/100</span>
-                            </p>
-                        </div>
 
-                        <div className="flex justify-end gap-2 pt-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setUploadResult(null);
-                                    setFile(null);
-                                }}
-                                className="px-4 py-2 rounded-lg bg-white border-2 border-black text-xs font-black uppercase cursor-pointer"
-                            >
-                                Upload Another
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onImportDraft(uploadResult.parsedDraft, uploadResult.report);
-                                    onClose();
-                                }}
-                                className="px-5 py-2 rounded-lg bg-[#a2ff86] text-black border-2 border-black text-xs font-black uppercase shadow-[3px_3px_0px_#000] hover:bg-[#8cee6d] cursor-pointer inline-flex items-center gap-1.5"
-                            >
-                                <span>Import as Editable Draft</span>
-                                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                            </button>
-                        </div>
+                    <div className="space-y-1">
+                        {file ? (
+                            <>
+                                <p className="text-sm font-black text-black truncate max-w-xs mx-auto">
+                                    {file.name}
+                                </p>
+                                <p className="text-xs text-neutral-600 font-mono">
+                                    {(file.size / (1024 * 1024)).toFixed(2)} MB • Ready to analyze
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-sm font-black text-black">
+                                    Click or drag resume here
+                                </p>
+                                <p className="text-xs text-neutral-600">
+                                    Standard PDF or DOCX format (Max 5 MB)
+                                </p>
+                            </>
+                        )}
                     </div>
-                )}
+                </div>
+
+                <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/20 text-xs text-neutral-700 flex items-start gap-2">
+                    <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <span>
+                        This resume will automatically attach to your public Orbix developer profile, where recruiters can view and download it.
+                    </span>
+                </div>
+
+                <div className="flex items-center justify-end gap-2.5 pt-2 border-t-2 border-black/10">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        disabled={isUploading}
+                        className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleUploadAndAnalyze}
+                        disabled={!file || isUploading}
+                        className="inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        {isUploading ? (
+                            <>
+                                <Sparkles className="w-4 h-4 animate-spin" />
+                                <span>Analyzing with Gemini...</span>
+                            </>
+                        ) : (
+                            <>
+                                <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                <span>Upload & Analyze</span>
+                            </>
+                        )}
+                    </button>
+                </div>
             </div>
         </div>
     );
 };
+export default ResumeUploadModal;

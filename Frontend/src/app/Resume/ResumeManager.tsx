@@ -1,36 +1,30 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import {
     Sparkles,
     FileText,
-    Target,
     Download,
     UploadCloud,
     ShieldCheck,
+    Eye,
+    RefreshCw,
+    ExternalLink,
+    Trash2,
+    CheckCircle2,
+    Globe,
+    Lock,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
 import {
-    fetchProfileDataForResume,
-    fetchResumeDocuments,
-    createResumeDocument,
-    updateResumeDocument,
-    createResumeVersion,
-    analyzeResumeApi,
+    fetchResumeDetailsApi,
+    reAnalyzeResumeApi,
+    toggleResumeVisibilityApi,
+    deleteResumeApi,
+    type ResumeProfileData,
+    type GeminiAnalysisReport,
 } from "../../utils/resumeIntelligenceApi";
-import type {
-    ResumeContent,
-    ResumeDocument,
-    ResumeVersion,
-    AnalysisReport,
-    ProfileImportSummary,
-} from "../../../../Backend/src/services/resume/resumeTypes";
-import { ResumeEditor } from "./Studio/ResumeEditor";
-import { ResumeDocumentPreview } from "./Studio/ResumeDocumentPreview";
-import { ProfileImportModal } from "./Studio/ProfileImportModal";
 import { ResumeAnalyzerView } from "./Intelligence/ResumeAnalyzerView";
 import { ResumeUploadModal } from "./Intelligence/ResumeUploadModal";
-import { JobMatchView } from "./JobMatch/JobMatchView";
-import { ExportModal } from "./Export/ExportModal";
 
 interface ResumeManagerProps {
     onOpenMobileSidebar?: () => void;
@@ -44,281 +38,116 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
     const toast = useToast();
     const user = useAppSelector((state) => state.user.user);
 
-    // Top-level Navigation: "studio" | "intelligence" | "jobmatch"
-    const [activeTab, setActiveTab] = useState<"studio" | "intelligence" | "jobmatch">("studio");
+    // Resume Profile Data & Gemini Analysis Report
+    const [resumeData, setResumeData] = useState<ResumeProfileData | null>(null);
+    const [analysisReport, setAnalysisReport] = useState<GeminiAnalysisReport | null>(null);
 
-    // Studio View Mode on Mobile: "editor" | "preview"
-    const [studioMobileView, setStudioMobileView] = useState<"editor" | "preview">("editor");
-
-    // State for Documents, Versions & Content
-    const [documents, setDocuments] = useState<ResumeDocument[]>([]);
-    const [activeDocId, setActiveDocId] = useState<string | null>(null);
-    const [versions, setVersions] = useState<ResumeVersion[]>([]);
-    const [currentVersionNumber, setCurrentVersionNumber] = useState<number>(1);
-    const [templateId, setTemplateId] = useState<string>("ats_clean_single");
-    const [targetRole, setTargetRole] = useState<string>("Full Stack Engineer");
-
-    // Primary Editable Content Draft
-    const [resumeContent, setResumeContent] = useState<ResumeContent>(() => ({
-        contact: {
-            fullName: user?.firstName ? `${user.firstName} ${user.lastName || ""}`.trim() : "Developer",
-            headline: user?.headline || "Software Engineer",
-            email: user?.gmail || "developer@example.com",
-            phone: "",
-            location: user?.location || "",
-            githubUrl: user?.github || "",
-            linkedinUrl: user?.linkedin || "",
-            portfolioUrl: user?.website || "",
-            includeEmail: true,
-            includePhone: true,
-            includeLocation: Boolean(user?.location),
-        },
-        summary: user?.bio || "Analytical software engineer with hands-on experience building scalable applications, designing clean APIs, and solving complex algorithmic challenges.",
-        education: [
-            {
-                id: "edu_default",
-                institution: user?.college?.officialName || "Indian Institute of Technology",
-                degree: "Bachelor of Technology",
-                fieldOfStudy: "Computer Science & Engineering",
-                expectedGraduation: "2026",
-                cgpa: "8.5/10",
-                location: user?.location || "Bengaluru, India",
-                highlights: ["Relevant Coursework: Data Structures & Algorithms, Operating Systems, Database Management Systems"],
-            },
-        ],
-        skills: [
-            { category: "Languages", items: ["TypeScript", "JavaScript", "Python", "SQL"] },
-            { category: "Frameworks & Libraries", items: ["React", "Node.js", "Express", "Tailwind CSS"] },
-            { category: "Databases & Tools", items: ["PostgreSQL", "Redis", "Docker", "Git"] },
-        ],
-        projects: [
-            {
-                id: "proj_default",
-                title: "DevPulse - Real-Time Code Collaboration",
-                subtitle: "Full Stack Application",
-                technologies: ["React", "TypeScript", "Node.js", "PostgreSQL"],
-                liveUrl: "https://devpulse.dev",
-                githubUrl: "https://github.com/developer/devpulse",
-                bullets: [
-                    "Architected a scalable real-time collaborative workspace supporting concurrent editing sessions using WebSockets.",
-                    "Engineered clean RESTful endpoints and optimized database indexing, decreasing query execution latency by 35%.",
-                ],
-            },
-        ],
-        experience: [],
-        codingProfiles: [],
-        certifications: [],
-        sectionOrder: ["contact", "summary", "education", "skills", "projects", "codingProfiles", "experience", "certifications"],
-        visibleSections: {
-            contact: true,
-            summary: true,
-            education: true,
-            skills: true,
-            projects: true,
-            codingProfiles: true,
-            experience: false,
-            certifications: false,
-        },
-    }));
-
-    // Loading & Async States
+    // Loading & Async states
     const [isLoadingInitial, setIsLoadingInitial] = useState(true);
-    const [isSaving, setIsSaving] = useState(false);
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [isImportLoading, setIsImportLoading] = useState(false);
-    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [isReAnalyzing, setIsReAnalyzing] = useState(false);
+    const [isTogglingVisibility, setIsTogglingVisibility] = useState(false);
 
     // Modals
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
-    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+    const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
-    // Profile Import Summary & Analysis Report
-    const [importSummary, setImportSummary] = useState<ProfileImportSummary | null>(null);
-    const [analysisReport, setAnalysisReport] = useState<AnalysisReport | null>(null);
-
-    // Load initial documents and pre-fetch profile import summary
+    // Initial load: Fetch current profile resume and its Gemini analysis report
     useEffect(() => {
         let isMounted = true;
 
-        Promise.all([
-            fetchResumeDocuments().catch(() => []),
-            fetchProfileDataForResume().catch(() => null),
-        ]).then(([docs, profileSummary]) => {
-            if (!isMounted) return;
-
-            if (profileSummary) {
-                setImportSummary(profileSummary);
-            }
-
-            if (docs.length > 0) {
-                setDocuments(docs);
-                const primaryDoc = docs.find((d) => d.isPrimary) || docs[0];
-                if (primaryDoc) {
-                    setActiveDocId(primaryDoc.id);
-                    setResumeContent(primaryDoc.content);
-                    setTemplateId(primaryDoc.templateId || "ats_clean_single");
-                    setTargetRole(primaryDoc.targetRole || "Full Stack Engineer");
+        fetchResumeDetailsApi()
+            .then((data: ResumeProfileData) => {
+                if (!isMounted) return;
+                setResumeData(data);
+                if (data.metadata?.analysisReport) {
+                    setAnalysisReport(data.metadata.analysisReport);
                 }
-            } else if (profileSummary) {
-                // If user has no saved resume documents, initialize content directly from profile!
-                setResumeContent(profileSummary.profileData);
-            }
-
-            setIsLoadingInitial(false);
-        });
+            })
+            .catch((err: any) => {
+                console.warn("Failed to fetch initial resume details:", err?.message);
+            })
+            .finally(() => {
+                if (isMounted) setIsLoadingInitial(false);
+            });
 
         return () => {
             isMounted = false;
         };
     }, []);
 
-    // Run real analysis whenever content changes (debounced)
-    const runAnalysis = useCallback(async (contentToAnalyze: ResumeContent) => {
-        setIsAnalyzing(true);
+    // Re-analyze existing resume with Gemini AI models
+    const handleReAnalyze = async () => {
+        if (!resumeData?.hasResume) return;
+        setIsReAnalyzing(true);
         try {
-            const report = await analyzeResumeApi({
-                resumeId: activeDocId || undefined,
-                content: contentToAnalyze,
+            const data = await reAnalyzeResumeApi();
+            setAnalysisReport(data.report);
+            toast.success("Resume re-analyzed with Gemini AI!", {
+                title: "Gemini Analysis Complete",
             });
-            setAnalysisReport(report);
         } catch (err: any) {
-            console.warn("Analysis run warning:", err);
+            toast.error(err?.message || "Failed to re-analyze resume with Gemini AI", {
+                title: "Analysis Failed",
+            });
         } finally {
-            setIsAnalyzing(false);
+            setIsReAnalyzing(false);
         }
-    }, [activeDocId]);
-
-    // Initial analysis when loading finishes
-    useEffect(() => {
-        if (!isLoadingInitial && resumeContent) {
-            runAnalysis(resumeContent);
-        }
-    }, [isLoadingInitial]);
-
-    // Handle Content Edits
-    const handleContentChange = (updated: ResumeContent) => {
-        setResumeContent(updated);
-        setHasUnsavedChanges(true);
     };
 
-    // Save Draft
-    const handleSaveDraft = async () => {
-        setIsSaving(true);
+    // Toggle public visibility on profile
+    const handleToggleVisibility = async () => {
+        if (!resumeData) return;
+        setIsTogglingVisibility(true);
+        const newStatus = !resumeData.isResumePublic;
         try {
-            if (activeDocId) {
-                const updated = await updateResumeDocument(activeDocId, {
-                    content: resumeContent,
-                    templateId,
-                    targetRole,
-                    completenessScore: importSummary?.completenessMap.score || 75,
-                });
-                setDocuments((prev) => prev.map((d) => (d.id === activeDocId ? updated : d)));
-            } else {
-                const created = await createResumeDocument({
-                    title: `${(resumeContent.contact.fullName || "Developer").split(" ")[0]}'s Resume`,
-                    targetRole,
-                    templateId,
-                    content: resumeContent,
-                    completenessScore: importSummary?.completenessMap.score || 75,
-                    isPrimary: true,
-                });
-                setActiveDocId(created.id);
-                setDocuments([created]);
-            }
-
-            setHasUnsavedChanges(false);
-            toast.success("Resume draft saved successfully!", { title: "Draft Saved" });
-            runAnalysis(resumeContent);
+            await toggleResumeVisibilityApi(newStatus);
+            setResumeData((prev: ResumeProfileData | null) => (prev ? { ...prev, isResumePublic: newStatus } : prev));
+            toast.success(
+                newStatus
+                    ? "Resume is now publicly visible on your profile"
+                    : "Resume is now private and hidden from your public profile",
+                { title: "Visibility Updated" }
+            );
         } catch (err: any) {
-            toast.error(err?.message || "Failed to save draft", { title: "Save Failed" });
+            toast.error(err?.message || "Failed to update resume visibility");
         } finally {
-            setIsSaving(false);
+            setIsTogglingVisibility(false);
         }
     };
 
-    // Apply Profile Import
-    const handleApplyImport = (importedContent: ResumeContent) => {
-        setResumeContent(importedContent);
-        setHasUnsavedChanges(true);
-        toast.success("Profile details imported! Review missing fields and edit below.", {
-            title: "Profile Imported",
+    // Delete current resume
+    const handleDeleteResume = async () => {
+        if (!window.confirm("Are you sure you want to remove your resume from your profile?")) return;
+        try {
+            await deleteResumeApi();
+            setResumeData(null);
+            setAnalysisReport(null);
+            toast.success("Resume removed from profile successfully.");
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to remove resume");
+        }
+    };
+
+    // Upload Success Handler
+    const handleUploadSuccess = (newResume: ResumeProfileData, newReport: GeminiAnalysisReport | null) => {
+        setResumeData(newResume);
+        if (newReport) {
+            setAnalysisReport(newReport);
+        }
+        toast.success("Resume uploaded and analyzed with Gemini AI successfully!", {
+            title: "Attached to Profile",
         });
-        runAnalysis(importedContent);
-    };
-
-    // Create New Version
-    const handleCreateVersion = async (versionLabel: string, role: string) => {
-        if (!activeDocId) {
-            await handleSaveDraft();
-        }
-
-        if (activeDocId) {
-            try {
-                const newVer = await createResumeVersion(activeDocId, {
-                    versionLabel,
-                    targetRole: role || targetRole,
-                    content: resumeContent,
-                });
-                setVersions((prev) => [newVer, ...prev]);
-                setCurrentVersionNumber(newVer.versionNumber);
-                toast.success(`Created independent version: ${versionLabel}`, { title: "Version Created" });
-            } catch (err: any) {
-                toast.error(err?.message || "Failed to create version");
-            }
-        }
-    };
-
-    // Apply Tailored Version from Job Match
-    const handleApplyTailoredVersion = async (tailoredContent: ResumeContent, label: string, role: string) => {
-        setResumeContent(tailoredContent);
-        setTargetRole(role);
-        setActiveTab("studio");
-        setHasUnsavedChanges(true);
-        toast.success(`Tailored version created for ${role}! Review in Studio.`, {
-            title: "Tailored Version Ready",
-        });
-
-        if (activeDocId) {
-            await createResumeVersion(activeDocId, {
-                versionLabel: label,
-                targetRole: role,
-                content: tailoredContent,
-            });
-        }
-        runAnalysis(tailoredContent);
-    };
-
-    // Import Uploaded Resume Draft
-    const handleImportUploadedDraft = (draft: ResumeContent, report: AnalysisReport) => {
-        setResumeContent(draft);
-        setAnalysisReport(report);
-        setHasUnsavedChanges(true);
-        setActiveTab("studio");
-        toast.success("Uploaded resume converted into an editable draft!", {
-            title: "Document Imported",
-        });
-    };
-
-    // Navigate to a specific section from Analysis findings
-    const handleNavigateSection = (sectionId: string) => {
-        setActiveTab("studio");
-        setStudioMobileView("editor");
-        setTimeout(() => {
-            const el = document.getElementById(`section_${sectionId}`);
-            if (el) el.scrollIntoView({ behavior: "smooth" });
-        }, 150);
     };
 
     return (
         <section
-            aria-label="Orbix Resume Intelligence & Studio"
+            aria-label="Orbix Resume Intelligence & Profile Resume"
             className={`flex-1 w-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between ${className}`}
         >
             <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                 <div className="mx-auto w-full max-w-7xl my-1">
                     {/* ========================================================================= */}
-                    {/* PAGE HEADER: Product Title, Value Promise & Top-Level Action Buttons */}
+                    {/* PAGE HEADER: Product Title, Value Promise & Top Action Buttons */}
                     {/* ========================================================================= */}
                     <div className="mb-6 pb-5 border-b-2 border-black/55 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                         <div className="flex items-start gap-3">
@@ -345,19 +174,13 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                         <ShieldCheck className="w-3.5 h-3.5" />
                                         Verified System
                                     </span>
-                                    {hasUnsavedChanges && (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#FFE566] text-black border-2 border-black shadow-[1px_1px_0px_#000]">
-                                            Unsaved draft
-                                        </span>
-                                    )}
-                                    {documents.length > 1 && (
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-neutral-200 text-black border-2 border-black">
-                                            {documents.length} Drafts
-                                        </span>
-                                    )}
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase bg-[#FFE566] text-black border-2 border-black shadow-[1px_1px_0px_#000]">
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        Gemini AI Powered
+                                    </span>
                                 </div>
                                 <p className="mt-1.5 text-xs sm:text-sm font-medium text-neutral-700 leading-relaxed max-w-2xl">
-                                    Your developer profile, transformed into a verified, professional, job-ready resume in minutes.
+                                    Upload your resume for deep Gemini AI recruiter evaluation. Your resume is automatically linked to your public developer profile.
                                 </p>
                             </div>
                         </div>
@@ -366,173 +189,169 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                         <div className="flex items-center gap-2.5 flex-wrap shrink-0 self-start lg:self-center">
                             <button
                                 type="button"
-                                onClick={() => setIsImportModalOpen(true)}
-                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#FFE566] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
+                                onClick={() => setIsUploadModalOpen(true)}
+                                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
                             >
-                                <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Build from My Profile</span>
+                                <UploadCloud className="w-4 h-4 stroke-[2.5]" />
+                                <span>{resumeData?.hasResume ? "Upload New Resume" : "Upload Resume"}</span>
                             </button>
+                        </div>
+                    </div>
 
+                    {/* ========================================================================= */}
+                    {/* CURRENT PROFILE RESUME STATUS CARD */}
+                    {/* ========================================================================= */}
+                    {isLoadingInitial ? (
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] animate-pulse flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-xl bg-neutral-200" />
+                            <div className="space-y-2 flex-1">
+                                <div className="h-4 w-48 bg-neutral-200 rounded" />
+                                <div className="h-3 w-32 bg-neutral-100 rounded" />
+                            </div>
+                        </div>
+                    ) : resumeData?.hasResume ? (
+                        <div className="mb-6 p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-4">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b-2 border-black/10">
+                                <div className="flex items-center gap-3.5 min-w-0">
+                                    <div className="w-12 h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                        <FileText className="w-6 h-6 text-black stroke-[2.5]" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h3 className="text-base sm:text-lg font-black text-black truncate max-w-sm">
+                                                {resumeData.resumeFilename || "Developer Resume.pdf"}
+                                            </h3>
+                                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                                <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                                                Attached to Your Profile
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-neutral-600 font-mono mt-0.5">
+                                            {resumeData.resumeFilesize ? `${(resumeData.resumeFilesize / (1024 * 1024)).toFixed(2)} MB` : "PDF Document"} •{" "}
+                                            {resumeData.resumeUpdatedAt ? `Updated ${new Date(resumeData.resumeUpdatedAt).toLocaleDateString()}` : "Active"}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Visibility Toggle & Profile Shortcut */}
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                        type="button"
+                                        onClick={handleToggleVisibility}
+                                        disabled={isTogglingVisibility}
+                                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer ${
+                                            resumeData.isResumePublic
+                                                ? "bg-[#a2ff86] text-black hover:bg-[#8ee872]"
+                                                : "bg-neutral-200 text-neutral-800 hover:bg-neutral-300"
+                                        }`}
+                                        title={resumeData.isResumePublic ? "Resume is visible on your public profile" : "Resume is hidden from your public profile"}
+                                    >
+                                        {resumeData.isResumePublic ? (
+                                            <>
+                                                <Globe className="w-3.5 h-3.5" />
+                                                <span>Public on Profile</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Lock className="w-3.5 h-3.5" />
+                                                <span>Private (Hidden)</span>
+                                            </>
+                                        )}
+                                    </button>
+
+                                    {user?.username && (
+                                        <a
+                                            href={`/${user.username}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-[#f3ebd9] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] transition-all"
+                                            title="View your public developer profile"
+                                        >
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                            <span className="hidden sm:inline">View Profile</span>
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Resume Actions Bar */}
+                            <div className="flex items-center justify-between gap-3 flex-wrap pt-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    {resumeData.resumeUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsPreviewModalOpen(true)}
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                        >
+                                            <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <span>View Resume PDF</span>
+                                        </button>
+                                    )}
+
+                                    {resumeData.resumeUrl && (
+                                        <a
+                                            href={resumeData.resumeUrl}
+                                            download={resumeData.resumeFilename || "resume.pdf"}
+                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                        >
+                                            <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <span>Download</span>
+                                        </a>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={handleReAnalyze}
+                                        disabled={isReAnalyzing}
+                                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
+                                    >
+                                        <RefreshCw className={`w-3.5 h-3.5 ${isReAnalyzing ? "animate-spin" : ""}`} />
+                                        <span>{isReAnalyzing ? "Re-Analyzing..." : "Re-Analyze with Gemini"}</span>
+                                    </button>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={handleDeleteResume}
+                                    className="p-1.5 rounded-xl bg-white hover:bg-rose-50 text-rose-700 hover:text-rose-900 border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                    title="Remove resume from profile"
+                                >
+                                    <Trash2 className="w-4 h-4 stroke-[2]" />
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        /* Empty State: Dropzone to Upload */
+                        <div className="mb-6 p-8 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] text-center space-y-4">
+                            <div className="w-16 h-16 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center mx-auto shadow-[3px_3px_0px_#000]">
+                                <UploadCloud className="w-8 h-8 text-black stroke-[2.5]" />
+                            </div>
+                            <div className="space-y-1.5 max-w-lg mx-auto">
+                                <h3 className="text-xl font-black text-black">Upload Your Developer Resume</h3>
+                                <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                                    Upload your resume (PDF or DOCX). Our Gemini AI models will analyze your technical depth, ATS compliance, and quantifiable metrics, automatically preparing an in-depth recruiter report while attaching your resume to your public Orbix profile.
+                                </p>
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => setIsUploadModalOpen(true)}
-                                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-100 cursor-pointer"
+                                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs sm:text-sm font-black uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
                             >
-                                <UploadCloud className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">Upload Existing</span>
+                                <Sparkles className="w-4 h-4 stroke-[2.5]" />
+                                <span>Upload & Analyze with Gemini</span>
                             </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setIsExportModalOpen(true)}
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black text-white text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-800 cursor-pointer"
-                            >
-                                <Download className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Export</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* ========================================================================= */}
-                    {/* THREE CONNECTED EXPERIENCES: Segmented Navigation Pill */}
-                    {/* ========================================================================= */}
-                    <div className="mb-6 flex items-center justify-between gap-4 flex-wrap pb-1">
-                        <div className="inline-flex items-center p-1 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] gap-1">
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("studio")}
-                                className={`inline-flex items-center gap-2 px-3.5 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${activeTab === "studio"
-                                    ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
-                                    }`}
-                            >
-                                <FileText className="w-4 h-4" />
-                                <span>Resume Studio — Build</span>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("intelligence")}
-                                className={`inline-flex items-center gap-2 px-3.5 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${activeTab === "intelligence"
-                                    ? "bg-black text-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
-                                    }`}
-                            >
-                                <ShieldCheck className="w-4 h-4" />
-                                <span>Resume Intelligence — Analyze</span>
-                                {analysisReport && (
-                                    <span className="hidden sm:inline-block px-1.5 py-0.2 rounded text-[10px] bg-[#FFE566] text-black border border-black font-mono">
-                                        {analysisReport.overallScore}%
-                                    </span>
-                                )}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("jobmatch")}
-                                className={`inline-flex items-center gap-2 px-3.5 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-black transition-all cursor-pointer ${activeTab === "jobmatch"
-                                    ? "bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000]"
-                                    : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
-                                    }`}
-                            >
-                                <Target className="w-4 h-4" />
-                                <span>Job Match — Tailor</span>
-                            </button>
-                        </div>
-
-                        {/* Mobile Toggle for Studio (Editor vs Preview) */}
-                        {activeTab === "studio" && (
-                            <div className="lg:hidden inline-flex items-center p-1 bg-white border-2 border-black rounded-xl shadow-[2px_2px_0px_#000]">
-                                <button
-                                    type="button"
-                                    onClick={() => setStudioMobileView("editor")}
-                                    className={`px-3 py-1 rounded-lg text-xs font-black uppercase ${studioMobileView === "editor" ? "bg-black text-white" : "text-neutral-700"
-                                        }`}
-                                >
-                                    Editor
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setStudioMobileView("preview")}
-                                    className={`px-3 py-1 rounded-lg text-xs font-black uppercase ${studioMobileView === "preview" ? "bg-black text-white" : "text-neutral-700"
-                                        }`}
-                                >
-                                    Preview
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* ========================================================================= */}
-                    {/* TAB 1: RESUME STUDIO — BUILD (Split View: Editor + Live Document Preview) */}
-                    {/* ========================================================================= */}
-                    {activeTab === "studio" && (
-                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                            {/* Left Column: Responsive Section Editor */}
-                            <div
-                                className={`lg:col-span-6 space-y-4 ${studioMobileView === "preview" ? "hidden lg:block" : "block"
-                                    }`}
-                            >
-                                <ResumeEditor
-                                    content={resumeContent}
-                                    onChange={handleContentChange}
-                                    onSave={handleSaveDraft}
-                                    isSaving={isSaving}
-                                    versions={versions}
-                                    currentVersionNumber={currentVersionNumber}
-                                    onSelectVersion={(vNum) => {
-                                        const found = versions.find((v) => v.versionNumber === vNum);
-                                        if (found) {
-                                            setResumeContent(found.content);
-                                            setCurrentVersionNumber(vNum);
-                                            toast.info(`Switched to version ${vNum}: ${found.versionLabel}`);
-                                        }
-                                    }}
-                                    onCreateVersion={handleCreateVersion}
-                                />
-                            </div>
-
-                            {/* Right Column: Live Document Preview with Vector Typography */}
-                            <div
-                                className={`lg:col-span-6 sticky top-4 h-[calc(100vh-180px)] ${studioMobileView === "editor" ? "hidden lg:block" : "block"
-                                    }`}
-                            >
-                                <ResumeDocumentPreview
-                                    content={resumeContent}
-                                    templateId={templateId}
-                                    onTemplateChange={setTemplateId}
-                                    onTriggerExport={() => setIsExportModalOpen(true)}
-                                />
-                            </div>
                         </div>
                     )}
 
                     {/* ========================================================================= */}
-                    {/* TAB 2: RESUME INTELLIGENCE — ANALYZE (8 Real Recruiter/ATS Checks) */}
+                    {/* GEMINI AI ANALYSIS REPORT VIEW */}
                     {/* ========================================================================= */}
-                    {activeTab === "intelligence" && (
-                        <div className="animate-fadeIn">
-                            <ResumeAnalyzerView
-                                report={analysisReport}
-                                isAnalyzing={isAnalyzing}
-                                onReAnalyze={() => runAnalysis(resumeContent)}
-                                onOpenUploadModal={() => setIsUploadModalOpen(true)}
-                                onNavigateSection={handleNavigateSection}
-                            />
-                        </div>
-                    )}
-
-                    {/* ========================================================================= */}
-                    {/* TAB 3: JOB MATCH — TAILOR (Keyword & Skills Match, Role Tailoring) */}
-                    {/* ========================================================================= */}
-                    {activeTab === "jobmatch" && (
-                        <div className="animate-fadeIn">
-                            <JobMatchView
-                                content={resumeContent}
-                                onApplyTailoredVersion={handleApplyTailoredVersion}
-                            />
-                        </div>
-                    )}
+                    <ResumeAnalyzerView
+                        report={analysisReport}
+                        isAnalyzing={isReAnalyzing}
+                        onReAnalyze={handleReAnalyze}
+                        onUploadClick={() => setIsUploadModalOpen(true)}
+                    />
                 </div>
             </div>
 
@@ -547,38 +366,81 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
             </div>
 
             {/* ========================================================================= */}
-            {/* MODALS */}
+            {/* UPLOAD MODAL */}
             {/* ========================================================================= */}
-            <ProfileImportModal
-                isOpen={isImportModalOpen}
-                onClose={() => setIsImportModalOpen(false)}
-                summary={importSummary}
-                isLoading={isImportLoading}
-                onApplyImport={handleApplyImport}
-                onRefresh={async () => {
-                    setIsImportLoading(true);
-                    try {
-                        const fresh = await fetchProfileDataForResume();
-                        setImportSummary(fresh);
-                        toast.success("Profile sync updated!");
-                    } finally {
-                        setIsImportLoading(false);
-                    }
-                }}
-            />
-
             <ResumeUploadModal
                 isOpen={isUploadModalOpen}
                 onClose={() => setIsUploadModalOpen(false)}
-                onImportDraft={handleImportUploadedDraft}
+                onUploadSuccess={handleUploadSuccess}
             />
 
-            <ExportModal
-                isOpen={isExportModalOpen}
-                onClose={() => setIsExportModalOpen(false)}
-                content={resumeContent}
-                templateId={templateId}
-            />
+            {/* ========================================================================= */}
+            {/* INTERACTIVE PDF PREVIEW MODAL */}
+            {/* ========================================================================= */}
+            {isPreviewModalOpen && resumeData?.resumeUrl && (
+                <div
+                    role="dialog"
+                    aria-modal="true"
+                    className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget) setIsPreviewModalOpen(false);
+                    }}
+                >
+                    <div className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl overflow-hidden shadow-[8px_8px_0px_#000] flex flex-col">
+                        <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black bg-white">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black text-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                                    <FileText className="w-4 h-4 stroke-[2.5]" />
+                                </div>
+                                <div className="min-w-0">
+                                    <h3 className="text-sm font-black text-black truncate max-w-sm">
+                                        {resumeData.resumeFilename || "Resume.pdf"}
+                                    </h3>
+                                    <p className="text-[11px] text-neutral-600 font-mono font-bold">
+                                        Active Profile Resume
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <a
+                                    href={resumeData.resumeUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="p-2 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
+                                    title="Open PDF in new tab"
+                                >
+                                    <ExternalLink className="w-4 h-4 stroke-[2.5]" />
+                                </a>
+                                <a
+                                    href={resumeData.resumeUrl}
+                                    download={resumeData.resumeFilename || "resume.pdf"}
+                                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] border-2 border-black text-black text-xs font-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
+                                    title="Download resume"
+                                >
+                                    <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Download</span>
+                                </a>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPreviewModalOpen(false)}
+                                    className="px-3 py-1.5 rounded-xl bg-black text-white hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                >
+                                    Close
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 w-full bg-white relative overflow-hidden flex items-center justify-center">
+                            <iframe
+                                src={`${resumeData.resumeUrl}#toolbar=1&navpanes=0`}
+                                title="Resume PDF Preview"
+                                className="w-full h-full border-0"
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
         </section>
     );
 };

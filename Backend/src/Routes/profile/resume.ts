@@ -30,6 +30,8 @@ import {
     type ResumePayload,
 } from "../../redis/cache/cache-resume.js";
 import intelligenceRouter from "./resumeIntelligence.js";
+import { parseUploadedDocument } from "../../services/resume/documentParser.js";
+import { analyzeResumeWithGemini, type GeminiAnalysisReport } from "../../services/resume/geminiResumeAnalyzer.js";
 
 const resumeRouter = express.Router();
 
@@ -566,6 +568,34 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
         const updatedAt = new Date();
         const checks = evaluateResumeChecks(originalName, filesize, true);
 
+        // Analyze resume text with Gemini AI models
+        let geminiReport: GeminiAnalysisReport | null = null;
+        try {
+            const parsedDoc = await parseUploadedDocument(file.buffer, originalName, file.mimetype);
+            const platformsRes = await query(
+                `SELECT portal, portal_username AS "portalUsername", link AS url, verified, stats, last_sync_status AS "lastSyncStatus", last_sync_at AS "lastSyncAt"
+                 FROM user_links WHERE username = $1 OR username = $2;`,
+                [authUser.username, authUser.gmail]
+            );
+            const verifiedPlatforms = (platformsRes.rows || []).map((row: any) => ({
+                portal: row.portal,
+                username: row.portalUsername,
+                url: row.url,
+                verified: row.verified !== false && row.lastSyncStatus === "valid",
+                lastSyncAt: row.lastSyncAt,
+                lastSyncStatus: row.lastSyncStatus,
+            }));
+            geminiReport = await analyzeResumeWithGemini(parsedDoc.rawText, originalName, filesize, verifiedPlatforms);
+        } catch (analysisErr) {
+            console.warn("Gemini resume analysis warning:", analysisErr);
+        }
+
+        const metadataPayload = {
+            checks,
+            uploadResultVersion: uploadResult.version,
+            analysisReport: geminiReport,
+        };
+
         // 4. Update users table in PostgreSQL
         const updateSql = authUser.id
             ? `UPDATE users
@@ -593,7 +623,7 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
             originalName,
             filesize,
             updatedAt,
-            JSON.stringify({ checks, uploadResultVersion: uploadResult.version }),
+            JSON.stringify(metadataPayload),
             authUser.id || authUser.username,
         ]);
 
@@ -639,7 +669,7 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
             resumeUpdatedAt: updatedAt.toISOString(),
             isResumePublic: true,
             checks,
-            metadata: { checks, uploadResultVersion: uploadResult.version },
+            metadata: metadataPayload,
         };
 
         // Pre-warm metadata cache
@@ -650,8 +680,9 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
 
         return res.status(200).json({
             success: true,
-            message: "Resume uploaded successfully",
+            message: "Resume uploaded and analyzed with Gemini AI successfully",
             resume: newResumePayload,
+            report: geminiReport,
         });
     } catch (err: any) {
         console.error("handleDirectResumeUpload error:", err);
@@ -873,6 +904,101 @@ export const handleGetPublicResume = async (req: Request, res: Response) => {
     }
 };
 
+/**
+ * POST /api/profile/resume/re-analyze
+ * Re-runs Gemini AI analysis on the user's currently uploaded profile resume
+ */
+export const handleReAnalyzeResume = async (req: Request, res: Response) => {
+    try {
+        const authUser = req.user;
+        if (!authUser) {
+            return res.status(401).json({ success: false, message: "Authentication required" });
+        }
+
+        const querySql = authUser.id
+            ? `SELECT resume_url AS "resumeUrl", resume_public_id AS "resumePublicId", resume_filename AS "resumeFilename", resume_filesize AS "resumeFilesize", resume_metadata AS "resumeMetadata" FROM users WHERE id = $1 LIMIT 1;`
+            : `SELECT resume_url AS "resumeUrl", resume_public_id AS "resumePublicId", resume_filename AS "resumeFilename", resume_filesize AS "resumeFilesize", resume_metadata AS "resumeMetadata" FROM users WHERE username = $1 LIMIT 1;`;
+        const result = await query(querySql, [authUser.id || authUser.username]);
+
+        if (result.rowCount === 0 || !result.rows[0]?.resumeUrl) {
+            return res.status(400).json({ success: false, message: "No resume found to analyze. Please upload your resume first." });
+        }
+
+        const row = result.rows[0];
+        let fileBuffer: Buffer | null = null;
+
+        // Try getting buffer from Redis
+        if (row.resumePublicId) {
+            const cached = await getCachedPdfBuffer(row.resumePublicId);
+            if (cached?.buffer) {
+                fileBuffer = cached.buffer;
+            }
+        }
+
+        // If not in Redis, fetch from Cloudinary
+        if (!fileBuffer && row.resumeUrl) {
+            const fetchRes = await fetch(row.resumeUrl);
+            if (fetchRes.ok) {
+                const arrayBuf = await fetchRes.arrayBuffer();
+                fileBuffer = Buffer.from(arrayBuf);
+            }
+        }
+
+        if (!fileBuffer) {
+            return res.status(500).json({ success: false, message: "Could not retrieve resume document content for re-analysis." });
+        }
+
+        const parsedDoc = await parseUploadedDocument(fileBuffer, row.resumeFilename || "resume.pdf", "application/pdf");
+        const platformsRes = await query(
+            `SELECT portal, portal_username AS "portalUsername", link AS url, verified, stats, last_sync_status AS "lastSyncStatus", last_sync_at AS "lastSyncAt"
+             FROM user_links WHERE username = $1 OR username = $2;`,
+            [authUser.username, authUser.gmail]
+        );
+        const verifiedPlatforms = (platformsRes.rows || []).map((p: any) => ({
+            portal: p.portal,
+            username: p.portalUsername,
+            url: p.url,
+            verified: p.verified !== false && p.lastSyncStatus === "valid",
+            lastSyncAt: p.lastSyncAt,
+            lastSyncStatus: p.lastSyncStatus,
+        }));
+
+        const geminiReport = await analyzeResumeWithGemini(
+            parsedDoc.rawText,
+            row.resumeFilename || "resume.pdf",
+            row.resumeFilesize || fileBuffer.length,
+            verifiedPlatforms
+        );
+
+        const currentMetadata = row.resumeMetadata || {};
+        const updatedMetadata = {
+            ...currentMetadata,
+            analysisReport: geminiReport,
+        };
+
+        const updateSql = authUser.id
+            ? `UPDATE users SET resume_metadata = $1 WHERE id = $2;`
+            : `UPDATE users SET resume_metadata = $1 WHERE username = $2;`;
+        await query(updateSql, [JSON.stringify(updatedMetadata), authUser.id || authUser.username]);
+
+        // Invalidate Redis caches
+        await invalidateAllResumeCaches({
+            id: authUser.id,
+            username: authUser.username,
+            publicId: row.resumePublicId,
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "Resume re-analyzed with Gemini AI successfully",
+            report: geminiReport,
+        });
+    } catch (err: any) {
+        console.error("handleReAnalyzeResume error:", err);
+        return res.status(500).json({ success: false, message: err?.message || "Failed to re-analyze resume with Gemini AI" });
+    }
+};
+
 // Mount routes
 resumeRouter.use("/intelligence", intelligenceRouter);
 resumeRouter.use("/", intelligenceRouter);
@@ -883,6 +1009,7 @@ resumeRouter.get("/view/:username", optionalAuthenticate, (req, res) => { handle
 resumeRouter.get("/download", authenticate, (req, res) => { handleStreamResume(req, res, true); });
 resumeRouter.get("/download/:username", optionalAuthenticate, (req, res) => { handleStreamResume(req, res, true); });
 resumeRouter.post("/upload", authenticate, upload.single("resume"), handleDirectResumeUpload);
+resumeRouter.post("/re-analyze", authenticate, handleReAnalyzeResume);
 resumeRouter.delete("/", authenticate, handleDeleteResume);
 resumeRouter.patch("/visibility", authenticate, handleToggleResumeVisibility);
 resumeRouter.get("/public/:username", optionalAuthenticate, handleGetPublicResume);
