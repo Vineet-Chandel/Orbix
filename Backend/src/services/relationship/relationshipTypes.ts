@@ -58,6 +58,6 @@ export interface RelationshipActionResponse {
     outcome: string;
     state: ViewerRelationshipState;
     message: string;
-    relationshipId?: string | null;
-    retryAfter?: number;
+    relationshipId?: string | null | undefined;
+    retryAfter?: number | undefined;
 }

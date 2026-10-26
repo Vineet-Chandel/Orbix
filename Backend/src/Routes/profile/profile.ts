@@ -1133,16 +1133,37 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
         const whereClauses: string[] = ["u.is_public IS TRUE"];
         const queryParams: any[] = [];
 
-        // Exclude current authenticated self ID and any blocked users from explore discovery
+        // Exclude current authenticated self ID, blocked users, active connections, and pending requests
         const authUser = req.user;
+        if (authUser?.username && !authUser?.id) {
+            try {
+                const userLookup = await query(`SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`, [authUser.username]);
+                if (userLookup.rows[0]) {
+                    authUser.id = userLookup.rows[0].id;
+                }
+            } catch (err) {
+                // Ignore lookup errors
+            }
+        }
+
         if (authUser?.id) {
             queryParams.push(authUser.id);
             const selfParamIdx = queryParams.length;
             whereClauses.push(`u.id != $${selfParamIdx}`);
             whereClauses.push(`u.id NOT IN (
+                -- Blocked users in either direction
                 SELECT blocked_id FROM user_blocks WHERE blocker_id = $${selfParamIdx}
                 UNION
                 SELECT blocker_id FROM user_blocks WHERE blocked_id = $${selfParamIdx}
+                UNION
+                -- Active connections and pending requests (canonical pair model)
+                SELECT user_high_id FROM user_relationships 
+                WHERE user_low_id = $${selfParamIdx} 
+                  AND (status IN ('pending', 'connected') OR (status = 'declined' AND responded_at > NOW() - INTERVAL '24 hours'))
+                UNION
+                SELECT user_low_id FROM user_relationships 
+                WHERE user_high_id = $${selfParamIdx} 
+                  AND (status IN ('pending', 'connected') OR (status = 'declined' AND responded_at > NOW() - INTERVAL '24 hours'))
             )`);
         } else if (authUser?.username) {
             queryParams.push(authUser.username.toLowerCase());

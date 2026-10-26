@@ -45,6 +45,11 @@ export interface ConnectedUserItem {
     avatarUrl: string | null;
     headline: string | null;
     college: string | null;
+    location?: string | null;
+    skills?: string[];
+    orbixScore?: number;
+    totalSolved?: number;
+    isVerifiedCoder?: boolean;
     connectedAt: string;
 }
 
@@ -253,7 +258,7 @@ export async function removeActiveConnection(userId: string): Promise<Relationsh
 /**
  * Blocks a target user
  */
-export async function blockTargetUser(userId: string, reason?: string): Promise<{ success: boolean; message: string }> {
+export async function blockTargetUser(userId: string, reason?: string): Promise<{ success: boolean; message: string; outcome?: string; retryAfter?: number }> {
     const res = await fetch(`${API_BASE}/blocks/${encodeURIComponent(userId)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -262,7 +267,9 @@ export async function blockTargetUser(userId: string, reason?: string): Promise<
     });
 
     const data = await res.json();
-    broadcastRelationshipChange(userId, "blocked_by_me");
+    if (data.success) {
+        broadcastRelationshipChange(userId, "blocked_by_me");
+    }
     return data;
 }
 
@@ -277,7 +284,9 @@ export async function unblockTargetUser(userId: string): Promise<{ success: bool
     });
 
     const data = await res.json();
-    broadcastRelationshipChange(userId, "none");
+    if (data.success) {
+        broadcastRelationshipChange(userId, "none");
+    }
     return data;
 }
 
@@ -367,6 +376,85 @@ export async function sendUserDirectNotification(
         }),
         credentials: "include",
     });
+
+    return res.json();
+}
+
+export interface PendingRequestItem {
+    relationshipId: string;
+    userId: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+    headline: string | null;
+    college: string | null;
+    location?: string | null;
+    skills?: string[];
+    orbixScore: number;
+    totalSolved: number;
+    isVerifiedCoder: boolean;
+    type: "incoming" | "outgoing";
+    requestedAt: string;
+}
+
+/**
+ * Retrieves incoming or outgoing pending connection requests.
+ */
+export async function fetchPendingRequests(
+    filter: "incoming" | "outgoing" | "all" = "all",
+    limit = 20,
+    cursor?: string
+): Promise<{
+    success: boolean;
+    requests: PendingRequestItem[];
+    nextCursor: string | null;
+    totalCount: number;
+}> {
+    const params = new URLSearchParams();
+    params.set("type", filter);
+    params.set("limit", String(limit));
+    if (cursor) params.set("cursor", cursor);
+
+    const res = await fetch(`${API_BASE}/relationships/requests/pending?${params.toString()}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to fetch pending requests (${res.status})`);
+    }
+
+    return res.json();
+}
+
+export interface QuotaStatusSummary {
+    requests: {
+        daily: { used: number; limit: number; remaining: number };
+        weekly: { used: number; limit: number; remaining: number };
+    };
+    blocks: {
+        daily: { used: number; limit: number; remaining: number };
+        weekly: { used: number; limit: number; remaining: number };
+    };
+}
+
+/**
+ * Retrieves current real-time quota status for connection requests and blocks
+ */
+export async function fetchRelationshipQuota(): Promise<{
+    success: boolean;
+    quota: QuotaStatusSummary;
+}> {
+    const res = await fetch(`${API_BASE}/relationships/quota`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    });
+
+    if (!res.ok) {
+        throw new Error(`Failed to fetch quota (${res.status})`);
+    }
 
     return res.json();
 }

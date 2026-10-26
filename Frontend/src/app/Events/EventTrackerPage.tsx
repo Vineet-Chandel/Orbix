@@ -32,6 +32,7 @@ import {
 import { getPortalIcon } from "../../utils/portalIcons";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
+import { NeoToggle } from "../../components/NeoToggle";
 
 export const ALL_16_PLATFORMS = [
     { id: "leetcode", name: "LeetCode", color: "#FFA116" },
@@ -390,6 +391,9 @@ export const EventTrackerPage: React.FC = () => {
         }> = [];
 
         groupsMap.forEach((val, dateKey) => {
+            // Sort events within each date group by startTimestamp
+            val.events.sort((a, b) => a.startTimestamp - b.startTimestamp);
+
             const isToday = dateKey === todayStr;
             const weekdayShort = val.dateObj.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short" }).toUpperCase();
             const dayNum = val.dateObj.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", day: "2-digit" });
@@ -403,7 +407,7 @@ export const EventTrackerPage: React.FC = () => {
             });
 
             const hasLive = val.events.some((e) => e.status === "LIVE");
-            const allFinished = val.events.every((e) => e.status === "FINISHED");
+            const allFinished = val.events.every((e) => e.status === "FINISHED" || (e.endTimestamp && e.endTimestamp < nowMs));
 
             groups.push({
                 dateKey,
@@ -420,8 +424,11 @@ export const EventTrackerPage: React.FC = () => {
             });
         });
 
+        // Chronologically sort date groups ascending
+        groups.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
+
         return groups;
-    }, [filteredEvents]);
+    }, [filteredEvents, nowMs]);
 
 
     // Compute UP NEXT hero contest: next upcoming contest from nowMs
@@ -459,7 +466,7 @@ export const EventTrackerPage: React.FC = () => {
         return countsByPlatform || {};
     }, [countsByMonthAndPlatform, selectedMonth, countsByPlatform]);
 
-    // Calendar grid generation
+    // Calendar grid generation: includes all pointers from past, present, and next months (unaffected by list view finished toggle)
     const calendarCells = useMemo(() => {
         const firstDayOfMonth = new Date(viewYear, viewMonthIndex, 1).getDay(); // 0 is Sun
         const daysInMonth = new Date(viewYear, viewMonthIndex + 1, 0).getDate();
@@ -479,25 +486,39 @@ export const EventTrackerPage: React.FC = () => {
         const todayMonth = todayDate.getMonth();
         const todayDay = todayDate.getDate();
 
-        // 1. Fill previous month's trailing days
+        // Previous month calculation
+        const prevDate = new Date(viewYear, viewMonthIndex - 1, 1);
+        const prevYear = prevDate.getFullYear();
+        const prevMonth = prevDate.getMonth();
+
+        // 1. Fill previous month's trailing days with actual pointers from baseFilteredEvents
         for (let i = firstDayOfMonth - 1; i >= 0; i--) {
             const dNum = prevMonthLastDay - i;
+            const prevDateStr = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-${String(dNum).padStart(2, "0")}`;
+            const isToday = prevYear === todayYear && prevMonth === todayMonth && dNum === todayDay;
+
+            const dayEvents = baseFilteredEvents.filter((ev) => {
+                const evDate = new Date(ev.startTime);
+                const evDayStr = evDate.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+                return evDayStr === prevDateStr;
+            });
+
             cells.push({
                 dayNum: dNum,
-                dateStr: "",
+                dateStr: prevDateStr,
                 isCurrentMonth: false,
-                isToday: false,
-                events: [],
+                isToday,
+                events: dayEvents,
             });
         }
 
-        // 2. Fill current month's days
+        // 2. Fill current month's days with all pointers from baseFilteredEvents
         for (let d = 1; d <= daysInMonth; d++) {
             const dateStr = `${viewYear}-${String(viewMonthIndex + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
             const isToday = viewYear === todayYear && viewMonthIndex === todayMonth && d === todayDay;
 
-            // Find all events starting on this day in IST
-            const dayEvents = filteredEvents.filter((ev) => {
+            // Find all events starting on this day in IST (using baseFilteredEvents)
+            const dayEvents = baseFilteredEvents.filter((ev) => {
                 const evDate = new Date(ev.startTime);
                 const evDayStr = evDate.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // "YYYY-MM-DD"
                 return evDayStr === dateStr;
@@ -512,20 +533,34 @@ export const EventTrackerPage: React.FC = () => {
             });
         }
 
-        // 3. Fill next month's leading days to complete the 7-column grid
+        // Next month calculation
+        const nextDate = new Date(viewYear, viewMonthIndex + 1, 1);
+        const nextYear = nextDate.getFullYear();
+        const nextMonth = nextDate.getMonth();
+
+        // 3. Fill next month's leading days with actual pointers from baseFilteredEvents
         const remaining = (7 - (cells.length % 7)) % 7;
         for (let n = 1; n <= remaining; n++) {
+            const nextDateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-${String(n).padStart(2, "0")}`;
+            const isToday = nextYear === todayYear && nextMonth === todayMonth && n === todayDay;
+
+            const dayEvents = baseFilteredEvents.filter((ev) => {
+                const evDate = new Date(ev.startTime);
+                const evDayStr = evDate.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
+                return evDayStr === nextDateStr;
+            });
+
             cells.push({
                 dayNum: n,
-                dateStr: "",
+                dateStr: nextDateStr,
                 isCurrentMonth: false,
-                isToday: false,
-                events: [],
+                isToday,
+                events: dayEvents,
             });
         }
 
         return cells;
-    }, [viewYear, viewMonthIndex, filteredEvents]);
+    }, [viewYear, viewMonthIndex, baseFilteredEvents]);
 
     // Modal state for "+N more" contests on a day
     const [selectedDayEvents, setSelectedDayEvents] = useState<{ date: string; events: EventItem[] } | null>(null);
@@ -922,17 +957,51 @@ export const EventTrackerPage: React.FC = () => {
                         {viewMode === "calendar" ? (
                             <>
                                 {/* Month Navigator Header */}
-                                <div className="flex items-center justify-between gap-4">
-                                    <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-                                        {monthLabel} <span className="text-neutral-400 font-normal">{viewYear}</span>
-                                    </h3>
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+                                            {monthLabel} <span className="text-neutral-400 font-normal">{viewYear}</span>
+                                        </h3>
+                                        {selectedMonth === currentMonthStr && (
+                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFE566] text-black">
+                                                Present Month
+                                            </span>
+                                        )}
+                                    </div>
 
-                                    {/* Controls: Today button + Strict 3-Month Window Arrows (< and >) */}
-                                    <div className="flex items-center gap-2">
+                                    {/* Controls: Quick 3-Month Switcher + Today button + Arrows */}
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {/* Quick 3-Month Pills (Past, Present, Next) */}
+                                        <div className="flex items-center rounded-lg bg-neutral-900 border border-neutral-700 p-0.5">
+                                            {allowedMonths.map((mStr, idx) => {
+                                                const [y, m] = mStr.split("-").map(Number);
+                                                const isSelected = selectedMonth === mStr;
+                                                const isCurr = mStr === currentMonthStr;
+                                                const mName = MONTH_NAMES[m - 1]?.slice(0, 3) || mStr;
+                                                const tag = isCurr ? "Now" : idx === 0 ? "Past" : "Next";
+
+                                                return (
+                                                    <button
+                                                        key={mStr}
+                                                        type="button"
+                                                        onClick={() => dispatch(setSelectedMonth(mStr))}
+                                                        className={`px-2.5 py-1 rounded-md text-xs font-semibold transition cursor-pointer ${
+                                                            isSelected
+                                                                ? "bg-white text-black shadow-sm font-bold"
+                                                                : "text-neutral-400 hover:text-white hover:bg-neutral-800"
+                                                        }`}
+                                                        title={`View ${MONTH_NAMES[m - 1]} ${y}`}
+                                                    >
+                                                        {mName} <span className="text-[10px] opacity-75">({tag})</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
                                         <button
                                             type="button"
                                             onClick={handleResetToday}
-                                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition border ${selectedMonth === currentMonthStr
+                                            className={`px-3 py-1 rounded-lg text-xs font-semibold transition border cursor-pointer ${selectedMonth === currentMonthStr
                                                 ? "bg-white/10 text-white border-white/20"
                                                 : "bg-neutral-900 text-neutral-300 border-neutral-700 hover:text-white hover:bg-neutral-800"
                                                 }`}
@@ -941,7 +1010,7 @@ export const EventTrackerPage: React.FC = () => {
                                         </button>
 
                                         <div className="flex items-center rounded-lg bg-neutral-900 border border-neutral-700 p-0.5">
-                                            {/* Previous Month Arrow (disabled if outside 3-month window) */}
+                                            {/* Previous Month Arrow */}
                                             <button
                                                 type="button"
                                                 onClick={handlePrevMonth}
@@ -955,7 +1024,7 @@ export const EventTrackerPage: React.FC = () => {
                                                 <ChevronLeft className="w-4 h-4" />
                                             </button>
 
-                                            {/* Next Month Arrow (disabled if outside 3-month window) */}
+                                            {/* Next Month Arrow */}
                                             <button
                                                 type="button"
                                                 onClick={handleNextMonth}
@@ -1000,7 +1069,7 @@ export const EventTrackerPage: React.FC = () => {
                                                         ? cell.isToday
                                                             ? "bg-white text-black shadow-lg ring-1 ring-white/90"
                                                             : "bg-black hover:bg-neutral-900/50"
-                                                        : "bg-black opacity-20 pointer-events-none"
+                                                        : "bg-neutral-950/70 hover:bg-neutral-900/40 border-neutral-800/40 text-neutral-400"
                                                         }`}
                                                 >
                                                     {/* Cell Date Header */}
@@ -1010,13 +1079,13 @@ export const EventTrackerPage: React.FC = () => {
                                                                 {cell.dayNum} Today
                                                             </span>
                                                         ) : (
-                                                            <span className="text-xs font-semibold text-neutral-400 pl-0.5">
+                                                            <span className={`text-xs font-semibold pl-0.5 ${cell.isCurrentMonth ? "text-neutral-300" : "text-neutral-500"}`}>
                                                                 {cell.dayNum}
                                                             </span>
                                                         )}
 
                                                         {cell.events.length > 0 && (
-                                                            <span className={`text-[10px] font-mono ${cell.isToday ? "text-neutral-600 font-bold" : "text-neutral-500"}`}>
+                                                            <span className={`text-[10px] font-mono ${cell.isToday ? "text-neutral-600 font-bold" : cell.isCurrentMonth ? "text-neutral-400" : "text-neutral-600"}`}>
                                                                 {cell.events.length}
                                                             </span>
                                                         )}
@@ -1027,28 +1096,53 @@ export const EventTrackerPage: React.FC = () => {
                                                         {visibleEvents.map((ev) => {
                                                             const timeStr = formatTimeIST(ev.startTime);
                                                             const isReminded = reminders.includes(ev.id);
+                                                            const isFinished = ev.status === "FINISHED" || (ev.endTimestamp && ev.endTimestamp < nowMs);
+                                                            const isLive = ev.status === "LIVE" || (ev.startTimestamp <= nowMs && ev.endTimestamp > nowMs);
 
                                                             return (
                                                                 <div
                                                                     key={ev.id}
                                                                     onClick={() => setSelectedDayEvents({ date: cell.dateStr, events: cell.events })}
-                                                                    className={`group/pill flex items-center gap-1.5 p-1 sm:p-1.5 rounded-lg border transition cursor-pointer text-left shadow-sm ${cell.isToday
-                                                                        ? "bg-neutral-100 hover:bg-neutral-200/90 border-neutral-300/80 text-black"
-                                                                        : "bg-neutral-900 hover:bg-neutral-800 border-neutral-800 hover:border-neutral-700 text-white"
-                                                                        }`}
-                                                                    title={`${ev.title} on ${ev.platformName} (${timeStr} IST)`}
+                                                                    className={`group/pill flex items-center gap-1.5 p-1 sm:p-1.5 rounded-lg border transition cursor-pointer text-left shadow-sm ${
+                                                                        cell.isToday
+                                                                            ? "bg-neutral-100 hover:bg-neutral-200/90 border-neutral-300/80 text-black"
+                                                                            : isLive
+                                                                            ? "bg-rose-950/60 hover:bg-rose-900/80 border-rose-500/40 text-white"
+                                                                            : isFinished
+                                                                            ? "bg-neutral-950 hover:bg-neutral-900 border-neutral-800/60 text-neutral-400"
+                                                                            : "bg-neutral-900 hover:bg-neutral-800 border-neutral-800 hover:border-neutral-700 text-white"
+                                                                    } ${!cell.isCurrentMonth ? "opacity-75" : ""}`}
+                                                                    title={`${ev.title} on ${ev.platformName} (${timeStr} IST)${isFinished ? " · Finished" : isLive ? " · LIVE" : ""}`}
                                                                 >
                                                                     <div className="flex-shrink-0 w-3.5 h-3.5 flex items-center justify-center">
                                                                         {getPortalIcon(ev.platform, "w-3.5 h-3.5")}
                                                                     </div>
-                                                                    <span className={`text-[10px] sm:text-[11px] font-mono font-bold flex-shrink-0 ${cell.isToday ? "text-neutral-800 group-hover/pill:text-black" : "text-neutral-300 group-hover/pill:text-white"
-                                                                        }`}>
+                                                                    <span className={`text-[10px] sm:text-[11px] font-mono font-bold flex-shrink-0 ${
+                                                                        cell.isToday
+                                                                            ? "text-neutral-800 group-hover/pill:text-black"
+                                                                            : isFinished
+                                                                            ? "text-neutral-500"
+                                                                            : "text-neutral-300 group-hover/pill:text-white"
+                                                                    }`}>
                                                                         {timeStr}
                                                                     </span>
-                                                                    <span className={`text-[10px] sm:text-[11px] truncate font-semibold ${cell.isToday ? "text-neutral-900 group-hover/pill:text-black" : "text-neutral-300 group-hover/pill:text-white"
-                                                                        }`}>
+                                                                    <span className={`text-[10px] sm:text-[11px] truncate font-semibold ${
+                                                                        cell.isToday
+                                                                            ? "text-neutral-900 group-hover/pill:text-black"
+                                                                            : isFinished
+                                                                            ? "text-neutral-400 group-hover/pill:text-neutral-200"
+                                                                            : "text-neutral-300 group-hover/pill:text-white"
+                                                                    }`}>
                                                                         {ev.title}
                                                                     </span>
+                                                                    {isLive && (
+                                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 ml-auto flex-shrink-0 animate-pulse" />
+                                                                    )}
+                                                                    {isFinished && !cell.isToday && (
+                                                                        <span className="text-[9px] px-1 py-0.2 rounded bg-neutral-800 text-neutral-400 ml-auto flex-shrink-0 font-mono">
+                                                                            Done
+                                                                        </span>
+                                                                    )}
                                                                     {isReminded && (
                                                                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500 ml-auto flex-shrink-0" />
                                                                     )}
@@ -1089,38 +1183,31 @@ export const EventTrackerPage: React.FC = () => {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-3 flex-wrap">
-                                        {/* Button to see or remove finished contests from the list */}
-                                        {finishedCount > 0 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowFinished(!showFinished)}
-                                                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 border-2 cursor-pointer ${
-                                                    showFinished
-                                                        ? "bg-[#FFE566] text-black border-black shadow-[2px_2px_0px_#000]"
-                                                        : "bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white border-neutral-700 shadow-sm"
-                                                }`}
-                                                title={showFinished ? "Click to remove finished contests from this list" : "Click to view finished contests in this list"}
-                                            >
-                                                {showFinished ? (
-                                                    <>
-                                                        <EyeOff className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                        <span>Remove Finished from List</span>
-                                                        <span className="bg-black text-[#FFE566] text-[10px] px-1.5 py-0.5 rounded-md font-mono">
-                                                            {finishedCount}
-                                                        </span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                        <span>See Finished Contests</span>
-                                                        <span className="bg-white/20 text-white text-[10px] px-1.5 py-0.5 rounded-md font-mono">
-                                                            {finishedCount}
-                                                        </span>
-                                                    </>
+                                        {/* Toggle to view finished contests in list view */}
+                                        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-700">
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-xs font-bold text-neutral-200">
+                                                    Finished Contests
+                                                </span>
+                                                {finishedCount > 0 && (
+                                                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono font-bold ${
+                                                        showFinished ? "bg-[#FFE566] text-black" : "bg-neutral-800 text-neutral-400"
+                                                    }`}>
+                                                        {finishedCount}
+                                                    </span>
                                                 )}
-                                            </button>
-                                        )}
-                                        <span className="text-xs text-neutral-400">
+                                            </div>
+                                            <NeoToggle
+                                                checked={showFinished}
+                                                onChange={setShowFinished}
+                                                size="sm"
+                                                showStatusText={false}
+                                                onIcon={<Eye className="w-3.5 h-3.5 text-black stroke-[2.5]" />}
+                                                offIcon={<EyeOff className="w-3.5 h-3.5 text-neutral-600 stroke-[2.5]" />}
+                                                ariaLabel="Toggle finished contests visibility in list view"
+                                            />
+                                        </div>
+                                        <span className="text-xs text-neutral-400 hidden sm:inline">
                                             Sorted by Start Time
                                         </span>
                                     </div>
@@ -1238,13 +1325,13 @@ export const EventTrackerPage: React.FC = () => {
                                                     <div className="flex-1 min-w-0 space-y-2">
                                                         {group.events.map((ev) => {
                                                             const isReminded = reminders.includes(ev.id);
-                                                            const isLive = ev.status === "LIVE";
-                                                            const isFinished = ev.status === "FINISHED";
+                                                            const isLive = ev.status === "LIVE" || (ev.startTimestamp <= nowMs && ev.endTimestamp > nowMs);
+                                                            const isFinished = ev.status === "FINISHED" || (ev.endTimestamp && ev.endTimestamp < nowMs);
 
                                                             return (
                                                                 <div
                                                                     key={ev.id}
-                                                                    className="p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-neutral-700 transition flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm group/card"
+                                                                    className={`p-3.5 rounded-xl bg-neutral-950 border border-neutral-800 hover:border-neutral-700 transition flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm group/card ${isFinished ? "opacity-80 hover:opacity-100" : ""}`}
                                                                 >
                                                                     <div className="flex items-center gap-3.5 min-w-0">
                                                                         <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0 p-2">
@@ -1296,17 +1383,19 @@ export const EventTrackerPage: React.FC = () => {
                                                                         )}
 
                                                                         {/* Remind button */}
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={(e) => handleToggleReminder(ev.id, e)}
-                                                                            className={`p-2 rounded-lg transition border ${isReminded
-                                                                                ? "bg-amber-400 text-black border-amber-400"
-                                                                                : "bg-neutral-900 text-neutral-400 hover:text-white border-neutral-700"
-                                                                                }`}
-                                                                            title={isReminded ? "Reminder enabled" : "Set reminder"}
-                                                                        >
-                                                                            <Bell className="w-4 h-4" />
-                                                                        </button>
+                                                                        {!isFinished && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => handleToggleReminder(ev.id, e)}
+                                                                                className={`p-2 rounded-lg transition border ${isReminded
+                                                                                    ? "bg-amber-400 text-black border-amber-400"
+                                                                                    : "bg-neutral-900 text-neutral-400 hover:text-white border-neutral-700"
+                                                                                    }`}
+                                                                                title={isReminded ? "Reminder enabled" : "Set reminder"}
+                                                                            >
+                                                                                <Bell className="w-4 h-4" />
+                                                                            </button>
+                                                                        )}
 
                                                                         {/* Smart Inline Add to Calendar */}
                                                                         {openCalDropdownId === `list-${ev.id}` ? (

@@ -201,6 +201,8 @@ export const testDatabaseConnection = async () => {
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
             ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS resume_upload_id UUID;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS resume_id UUID;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS version_id UUID;
             ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS model_identifier VARCHAR(100) NULL;
             ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS extracted_fields JSONB DEFAULT '{}'::jsonb;
             ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS findings JSONB DEFAULT '[]'::jsonb;
@@ -301,6 +303,7 @@ export const testDatabaseConnection = async () => {
                 content JSONB NOT NULL DEFAULT '{}'::jsonb,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            ALTER TABLE resume_versions ADD COLUMN IF NOT EXISTS resume_id UUID;
             CREATE INDEX IF NOT EXISTS idx_resume_versions_resume ON resume_versions(resume_id, version_number DESC);
 
             CREATE TABLE IF NOT EXISTS resume_analyses (
@@ -320,6 +323,14 @@ export const testDatabaseConnection = async () => {
                 source_filesize INT,
                 created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
             );
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS resume_id UUID;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS version_id UUID;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS overall_score INT DEFAULT 0;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS checks_summary JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS job_match_report JSONB DEFAULT NULL;
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS source_type VARCHAR(50) DEFAULT 'structured';
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS source_filename VARCHAR(255);
+            ALTER TABLE resume_analyses ADD COLUMN IF NOT EXISTS source_filesize INT;
             CREATE INDEX IF NOT EXISTS idx_resume_analyses_user ON resume_analyses(username, created_at DESC);
             CREATE INDEX IF NOT EXISTS idx_resume_analyses_resume ON resume_analyses(resume_id, created_at DESC);
 
@@ -451,6 +462,32 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE leaderboard_entries ADD COLUMN IF NOT EXISTS college_id UUID;
             CREATE INDEX IF NOT EXISTS idx_leaderboard_college_id ON leaderboard_entries (college_id);
             CREATE INDEX IF NOT EXISTS idx_leaderboard_college_score ON leaderboard_entries (college_id, score DESC, total_solved DESC, username ASC) WHERE is_public = true AND college_id IS NOT NULL;
+
+            -- Relationship action logs for quota enforcement (20/day, 50/week)
+            CREATE TABLE IF NOT EXISTS user_relationship_action_logs (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                actor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                target_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                action_type VARCHAR(30) NOT NULL CHECK (action_type IN ('request', 'block')),
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_rel_action_logs_actor_type_time 
+                ON user_relationship_action_logs(actor_id, action_type, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_rel_action_logs_actor_target 
+                ON user_relationship_action_logs(actor_id, target_id, action_type, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_rel_action_logs_created_at 
+                ON user_relationship_action_logs(created_at);
+
+            -- Optimized partial indexes for pending relationship queries
+            CREATE INDEX IF NOT EXISTS idx_relationships_requested_by_pending 
+                ON user_relationships(requested_by, created_at DESC) 
+                WHERE status = 'pending';
+            CREATE INDEX IF NOT EXISTS idx_relationships_low_pending 
+                ON user_relationships(user_low_id, requested_by, created_at DESC) 
+                WHERE status = 'pending';
+            CREATE INDEX IF NOT EXISTS idx_relationships_high_pending 
+                ON user_relationships(user_high_id, requested_by, created_at DESC) 
+                WHERE status = 'pending';
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");
     } catch (error) {

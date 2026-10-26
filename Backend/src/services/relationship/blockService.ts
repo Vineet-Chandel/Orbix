@@ -1,6 +1,7 @@
 // Backend/src/services/relationship/blockService.ts
 import { pool, query } from "../../database/client.js";
 import { relationshipEvents } from "./relationshipEvents.js";
+import { checkActionQuota, recordAction } from "./relationshipQuotaService.js";
 import type { ViewerRelationshipState } from "./relationshipTypes.js";
 
 export interface BlockCheckResult {
@@ -8,6 +9,13 @@ export interface BlockCheckResult {
     blockState: 'blocked_by_me' | 'blocked_by_them' | 'none';
     blockerId?: string;
     blockedId?: string;
+}
+
+export interface BlockUserResult {
+    success: boolean;
+    message: string;
+    outcome?: string | undefined;
+    retryAfter?: number | undefined;
 }
 
 /**
@@ -61,9 +69,30 @@ export async function blockUser(
     blockerId: string,
     blockedId: string,
     reason?: string
-): Promise<{ success: boolean; message: string }> {
+): Promise<BlockUserResult> {
     if (blockerId === blockedId) {
         throw new Error("You cannot block yourself.");
+    }
+
+    // Strict block quota check: max 20/day, max 50/week (also counting repeated blocks to same target)
+    const quota = await checkActionQuota(blockerId, "block");
+    if (!quota.allowed) {
+        relationshipEvents.logEvent("relationship_action_denied", {
+            actorId: blockerId,
+            targetUserId: blockedId,
+            reason: `quota_exceeded_${quota.limitType}`,
+            metadata: {
+                limitType: quota.limitType,
+                dailyCount: quota.dailyCount,
+                weeklyCount: quota.weeklyCount,
+            },
+        });
+        return {
+            success: false,
+            outcome: "rate_limited",
+            retryAfter: quota.retryAfterSeconds,
+            message: quota.message || "User block quota exceeded.",
+        };
     }
 
     const client = await pool.connect();
@@ -103,6 +132,9 @@ export async function blockUser(
                 OR (actor_id = $2 AND recipient_id = $1);`,
             [blockerId, blockedId]
         );
+
+        // 5. Record block action in durable PostgreSQL log and Redis sliding window
+        await recordAction(blockerId, blockedId, "block", client);
 
         await client.query("COMMIT;");
 

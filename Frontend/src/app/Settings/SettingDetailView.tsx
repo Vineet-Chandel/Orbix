@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
@@ -15,10 +15,29 @@ import {
     Lock,
     Laptop,
     Mail,
+    Search,
+    Loader2,
+    UserCheck,
+    UserMinus,
+    MoreVertical,
+    ShieldCheck,
+    GraduationCap,
+    MapPin,
 } from "lucide-react";
 import type { SettingsViewKey } from "./types";
 import { useToast } from "../../context/ToastContext";
 import { NeoToggle } from "../../components/NeoToggle";
+import { useAppDispatch, useAppSelector } from "../../store";
+import {
+    fetchBlockedUsersThunk,
+    unblockUserThunk,
+    fetchConnectionsThunk,
+    removeConnectionThunk,
+    blockUserThunk,
+} from "../../store/networkSlice";
+import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
+import type { ConnectedUserItem } from "../../api/relationshipApi";
 
 interface SettingDetailViewProps {
     viewKey: SettingsViewKey;
@@ -34,6 +53,24 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
     onSelectView,
 }) => {
     const toast = useToast();
+    const dispatch = useAppDispatch();
+    const { blocked, connections } = useAppSelector((state) => state.network);
+
+    const [unblockingId, setUnblockingId] = useState<string | null>(null);
+    const [disconnectTarget, setDisconnectTarget] = useState<ConnectedUserItem | null>(null);
+    const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
+    const [connectionsQuery, setConnectionsQuery] = useState("");
+    const [connMenuId, setConnMenuId] = useState<string | null>(null);
+    const [blockTarget, setBlockTarget] = useState<ConnectedUserItem | null>(null);
+    const [isBlocking, setIsBlocking] = useState(false);
+
+    useEffect(() => {
+        if (viewKey === "blocked") {
+            dispatch(fetchBlockedUsersThunk({ isInitial: true }));
+        } else if (viewKey === "connections") {
+            dispatch(fetchConnectionsThunk({ limit: 50, isInitial: true }));
+        }
+    }, [viewKey, dispatch]);
 
     // Local toggles for notification & security settings
     const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
@@ -474,56 +511,357 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                     </div>
                 );
 
-            case "blocked":
+            case "blocked": {
+                const handleUnblock = async (blockedId: string, username: string) => {
+                    setUnblockingId(blockedId);
+                    try {
+                        const action = await dispatch(unblockUserThunk(blockedId));
+                        if (unblockUserThunk.fulfilled.match(action)) {
+                            toast.success(`User @${username} unblocked successfully.`);
+                        } else {
+                            toast.error((action.payload as string) || "Could not unblock user.");
+                        }
+                    } catch (err: any) {
+                        toast.error(err.message || "Failed to unblock user.");
+                    } finally {
+                        setUnblockingId(null);
+                    }
+                };
+
                 return (
-                    <div className="p-8 sm:p-12 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
-                        <div className="w-14 h-14 rounded-2xl bg-rose-200 border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
-                            <UserX className="w-7 h-7 text-black stroke-[2.5]" />
-                        </div>
-                        <div className="space-y-1.5 max-w-md mx-auto">
-                            <h3 className="text-xl font-black text-black">Blocked Accounts</h3>
-                            <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                Blocked users cannot view your full analytics, send recruiter messages, or connect with your profile.
-                            </p>
-                        </div>
-                        <div className="pt-2">
-                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-neutral-700 font-mono text-xs font-bold shadow-[2px_2px_0px_#000]">
-                                <span>No blocked accounts currently</span>
+                    <div className="space-y-6">
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-2">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 rounded-xl bg-rose-100 border-2 border-black shadow-[2px_2px_0px_#000]">
+                                    <UserX className="w-5 h-5 text-rose-700 stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-black">Blocked Accounts</h3>
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                                        Blocked users cannot view your full analytics, send recruiter messages, or connect with your profile.
+                                    </p>
+                                </div>
                             </div>
                         </div>
+
+                        {blocked.isLoading ? (
+                            <div className="py-16 text-center space-y-3">
+                                <Loader2 className="w-7 h-7 text-black animate-spin mx-auto" />
+                                <p className="text-xs font-bold text-neutral-500">Loading blocked accounts...</p>
+                            </div>
+                        ) : blocked.items.length === 0 ? (
+                            <div className="p-8 sm:p-12 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
+                                <div className="w-14 h-14 rounded-2xl bg-rose-100 border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
+                                    <UserX className="w-7 h-7 text-black stroke-[2.5]" />
+                                </div>
+                                <div className="space-y-1.5 max-w-md mx-auto">
+                                    <h3 className="text-xl font-black text-black">No Blocked Accounts</h3>
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                                        You have not blocked any accounts. Any users you block from Explore or messages will appear here.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {blocked.items.map((b) => (
+                                    <div
+                                        key={b.id}
+                                        className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between gap-3"
+                                    >
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <img
+                                                src={b.avatarUrl || DEFAULT_AVATAR_URL}
+                                                alt={b.displayName}
+                                                className="w-11 h-11 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000] shrink-0"
+                                            />
+                                            <div className="min-w-0">
+                                                <h4 className="font-black text-sm text-black truncate">{b.displayName}</h4>
+                                                <p className="text-xs font-mono font-bold text-neutral-500 truncate">@{b.username}</p>
+                                            </div>
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => handleUnblock(b.blockedId, b.username)}
+                                            disabled={unblockingId === b.blockedId}
+                                            className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+                                        >
+                                            {unblockingId === b.blockedId ? (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ) : (
+                                                <UserCheck className="w-3.5 h-3.5" />
+                                            )}
+                                            <span>Unblock</span>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 );
+            }
 
-            case "connections":
+            case "connections": {
+                const filteredConn = connections.items.filter((c) => {
+                    if (!connectionsQuery.trim()) return true;
+                    const q = connectionsQuery.trim().toLowerCase();
+                    return (
+                        c.username.toLowerCase().includes(q) ||
+                        c.displayName.toLowerCase().includes(q) ||
+                        (c.college && c.college.toLowerCase().includes(q))
+                    );
+                });
+
+                const handleConfirmDisconnect = async () => {
+                    if (!disconnectTarget) return;
+                    const target = disconnectTarget;
+                    setDisconnectTarget(null);
+                    setDisconnectingId(target.relationshipId);
+                    try {
+                        const action = await dispatch(
+                            removeConnectionThunk({
+                                relationshipId: target.relationshipId,
+                                targetUserId: target.connectedUserId,
+                            })
+                        );
+                        if (removeConnectionThunk.fulfilled.match(action)) {
+                            toast.info(`Disconnected from @${target.username}.`);
+                        } else {
+                            toast.error((action.payload as string) || "Failed to remove connection.");
+                        }
+                    } catch (err: any) {
+                        toast.error(err.message || "Failed to remove connection.");
+                    } finally {
+                        setDisconnectingId(null);
+                    }
+                };
+
+                const handleConfirmBlock = async () => {
+                    if (!blockTarget) return;
+                    const target = blockTarget;
+                    setIsBlocking(true);
+                    try {
+                        const action = await dispatch(
+                            blockUserThunk({
+                                targetUserId: target.connectedUserId || target.username,
+                                reason: "Blocked from settings connections card menu",
+                                userPreview: {
+                                    username: target.username,
+                                    displayName: target.displayName,
+                                    avatarUrl: target.avatarUrl,
+                                    headline: target.headline,
+                                },
+                            })
+                        );
+                        if (blockUserThunk.fulfilled.match(action)) {
+                            toast.success(`User @${target.username} has been blocked.`);
+                            setBlockTarget(null);
+                        } else {
+                            toast.error((action.payload as string) || "Could not block user.");
+                        }
+                    } catch (err: any) {
+                        toast.error(err.message || "Failed to block user.");
+                    } finally {
+                        setIsBlocking(false);
+                    }
+                };
+
                 return (
-                    <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="space-y-1">
-                                <h3 className="text-xl font-black text-black">Developer Connections</h3>
-                                <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                    Connect with coding peers, campus teammates, and mentors across institutions.
+                    <div className="space-y-6">
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xl font-black text-black">Developer Connections</h3>
+                                        <span className="px-2.5 py-0.5 rounded-full bg-[#FFE566] text-black font-mono font-bold text-xs border border-black shadow-[1px_1px_0px_#000]">
+                                            {connections.totalCount} Active
+                                        </span>
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                                        Connect with coding peers, campus teammates, and mentors across institutions.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleCopyInviteLink}
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer shrink-0"
+                                >
+                                    <Copy className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Copy Invite Link</span>
+                                </button>
+                            </div>
+
+                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-2">
+                                <p className="text-xs font-black text-black uppercase tracking-wider">Campus Directory</p>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    {user?.college?.officialName
+                                        ? `Coders from ${user.college.officialName} automatically connect in the College League.`
+                                        : "Link your verified college to automatically discover fellow student developers."}
                                 </p>
                             </div>
-                            <button
-                                type="button"
-                                onClick={handleCopyInviteLink}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black font-black text-xs uppercase border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer shrink-0"
-                            >
-                                <Copy className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Copy Invite Link</span>
-                            </button>
                         </div>
 
-                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-2">
-                            <p className="text-xs font-black text-black uppercase tracking-wider">Campus Directory</p>
-                            <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                                {user?.college?.officialName
-                                    ? `Coders from ${user.college.officialName} automatically connect in the College League.`
-                                    : "Link your verified college to automatically discover fellow student developers."}
-                            </p>
+                        {/* Connections Search & List */}
+                        <div className="space-y-4">
+                            <div className="relative">
+                                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 stroke-[2.5]" />
+                                <input
+                                    type="text"
+                                    value={connectionsQuery}
+                                    onChange={(e) => setConnectionsQuery(e.target.value)}
+                                    placeholder="Search your connections by name, @handle, or college..."
+                                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 focus:outline-none shadow-[2px_2px_0px_#000]"
+                                />
+                            </div>
+
+                            {connections.isLoading ? (
+                                <div className="py-16 text-center space-y-3">
+                                    <Loader2 className="w-7 h-7 text-black animate-spin mx-auto" />
+                                    <p className="text-xs font-bold text-neutral-500">Loading connections...</p>
+                                </div>
+                            ) : filteredConn.length === 0 ? (
+                                <div className="p-8 text-center rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                    <p className="text-sm font-black text-black">
+                                        {connectionsQuery ? "No matching connections found." : "No active connections yet."}
+                                    </p>
+                                    <p className="text-xs text-neutral-500 font-medium">
+                                        Browse the Explore section to send connection requests to verified peers.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {filteredConn.map((c) => (
+                                        <div
+                                            key={c.relationshipId}
+                                            className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between gap-3"
+                                        >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <img
+                                                    src={c.avatarUrl || DEFAULT_AVATAR_URL}
+                                                    alt={c.displayName}
+                                                    className="w-12 h-12 rounded-xl object-cover border-2 border-black shadow-[1.5px_1.5px_0px_#000] shrink-0"
+                                                />
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <h4 className="font-black text-sm text-black truncate">{c.displayName}</h4>
+                                                        {c.isVerifiedCoder && <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                                                    </div>
+                                                    <p className="text-xs font-mono font-bold text-neutral-500 truncate">@{c.username}</p>
+                                                    {c.headline && (
+                                                        <p className="text-xs font-bold text-neutral-700 truncate mt-0.5">{c.headline}</p>
+                                                    )}
+                                                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 mt-1 text-[11px] font-bold text-neutral-600">
+                                                        {c.college && (
+                                                            <span className="truncate flex items-center gap-1">
+                                                                <GraduationCap className="w-3 h-3 text-black shrink-0" />
+                                                                {c.college}
+                                                            </span>
+                                                        )}
+                                                        {c.location && (
+                                                            <span className="truncate flex items-center gap-1">
+                                                                <MapPin className="w-3 h-3 text-black shrink-0" />
+                                                                {c.location}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {c.skills && c.skills.length > 0 && (
+                                                        <div className="flex flex-wrap gap-1 mt-1.5">
+                                                            {c.skills.slice(0, 3).map((s, idx) => (
+                                                                <span key={idx} className="px-1.5 py-0.5 rounded bg-[#FAF6EE] border border-black/30 text-[9px] font-mono font-bold text-neutral-800">
+                                                                    {s}
+                                                                </span>
+                                                            ))}
+                                                            {c.skills.length > 3 && (
+                                                                <span className="px-1 py-0.5 rounded bg-neutral-100 text-[9px] font-mono font-bold text-neutral-500">
+                                                                    +{c.skills.length - 3}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 shrink-0">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setDisconnectTarget(c)}
+                                                    disabled={disconnectingId === c.relationshipId}
+                                                    className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-rose-50 text-neutral-800 hover:text-rose-700 font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 transition-colors"
+                                                    title="Disconnect"
+                                                >
+                                                    {disconnectingId === c.relationshipId ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <UserMinus className="w-3.5 h-3.5 stroke-[2]" />
+                                                    )}
+                                                    <span>Disconnect</span>
+                                                </button>
+
+                                                <div className="relative">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setConnMenuId(connMenuId === c.relationshipId ? null : c.relationshipId)}
+                                                        className="p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer transition-all flex items-center justify-center"
+                                                        title="More actions"
+                                                        aria-label="More actions"
+                                                    >
+                                                        <MoreVertical className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    </button>
+
+                                                    {connMenuId === c.relationshipId && (
+                                                        <>
+                                                            <div
+                                                                className="fixed inset-0 z-30 cursor-default"
+                                                                onClick={() => setConnMenuId(null)}
+                                                            />
+                                                            <div className="absolute right-0 top-full mt-1.5 w-44 bg-white border-2 border-black rounded-xl shadow-[3px_3px_0px_#000] p-1.5 z-40 text-left">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setConnMenuId(null);
+                                                                        setBlockTarget(c);
+                                                                    }}
+                                                                    className="w-full flex items-center gap-2 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50 rounded-lg transition-colors text-left cursor-pointer"
+                                                                >
+                                                                    <UserX className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                                    <span>Block Account</span>
+                                                                </button>
+                                                            </div>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
+
+                        {/* Modal: Confirm Disconnect */}
+                        <ConfirmationModal
+                            isOpen={!!disconnectTarget}
+                            title="Disconnect with Developer"
+                            message={`Are you sure you want to remove @${disconnectTarget?.username || "this developer"} from your connections?`}
+                            confirmLabel="Disconnect"
+                            variant="danger"
+                            onConfirm={handleConfirmDisconnect}
+                            onCancel={() => setDisconnectTarget(null)}
+                        />
+
+                        {/* Modal: Confirm Block */}
+                        <ConfirmationModal
+                            isOpen={!!blockTarget}
+                            title={`Block @${blockTarget?.username || "Developer"}`}
+                            message={`Are you sure you want to block @${blockTarget?.username || "this developer"}? They will be removed from your connections and will not be able to interact with you.`}
+                            confirmLabel="Block Account"
+                            variant="danger"
+                            isLoading={isBlocking}
+                            onConfirm={handleConfirmBlock}
+                            onCancel={() => !isBlocking && setBlockTarget(null)}
+                        />
                     </div>
                 );
+            }
 
             case "comments":
                 return (

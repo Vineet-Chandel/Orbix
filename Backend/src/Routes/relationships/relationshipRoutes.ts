@@ -11,6 +11,7 @@ import {
     cancelConnection,
     removeConnection,
     getUserConnections,
+    getPendingRequests,
 } from "../../services/relationship/relationshipService.js";
 import {
     blockUser,
@@ -21,6 +22,9 @@ import {
     dispatchNotification,
     checkNotificationQuota,
 } from "../../services/notification/quotaService.js";
+import {
+    getActionQuotaStatus,
+} from "../../services/relationship/relationshipQuotaService.js";
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -83,6 +87,54 @@ relationshipRouter.post("/batch", authenticate, async (req: Request, res: Respon
 });
 
 /**
+ * GET /api/relationships/requests/pending
+ * High-performance paginated retrieval of incoming and outgoing pending requests.
+ */
+relationshipRouter.get("/requests/pending", authenticate, async (req: Request, res: Response) => {
+    try {
+        const viewerId = req.user!.id;
+        const filter = (req.query.type as "incoming" | "outgoing" | "all") || "all";
+        const limit = Math.min(50, Math.max(1, parseInt(String(req.query.limit || 20), 10)));
+        const cursor = req.query.cursor ? String(req.query.cursor) : undefined;
+
+        const data = await getPendingRequests(viewerId, filter, limit, cursor);
+        return res.status(200).json({
+            success: true,
+            ...data,
+        });
+    } catch (err: any) {
+        console.error("GET /api/relationships/requests/pending error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to fetch pending requests.",
+            error: err.message,
+        });
+    }
+});
+
+/**
+ * GET /api/relationships/quota
+ * Returns current real-time quota status for connection requests and blocks.
+ */
+relationshipRouter.get("/quota", authenticate, async (req: Request, res: Response) => {
+    try {
+        const viewerId = req.user!.id;
+        const quota = await getActionQuotaStatus(viewerId);
+        return res.status(200).json({
+            success: true,
+            quota,
+        });
+    } catch (err: any) {
+        console.error("GET /api/relationships/quota error:", err);
+        return res.status(500).json({
+            success: false,
+            message: "Failed to retrieve relationship quota status.",
+            error: err.message,
+        });
+    }
+});
+
+/**
  * GET /api/relationships/:userId
  * Obtains viewer-specific relationship state with target user.
  */
@@ -134,6 +186,13 @@ relationshipRouter.post("/:userId/request", authenticate, async (req: Request, r
             firstName: req.user!.firstName,
             lastName: req.user!.lastName,
         });
+
+        if (!result.success && result.outcome === "rate_limited") {
+            if (result.retryAfter) {
+                res.setHeader("Retry-After", String(result.retryAfter));
+            }
+            return res.status(429).json(result);
+        }
 
         const statusCode = result.success ? 200 : (result.outcome === "blocked" ? 403 : 400);
         return res.status(statusCode).json(result);
@@ -297,6 +356,14 @@ blockRouter.post("/:userId", authenticate, async (req: Request, res: Response) =
         }
 
         const result = await blockUser(viewerId, targetUserId, reason);
+
+        if (!result.success && result.outcome === "rate_limited") {
+            if (result.retryAfter) {
+                res.setHeader("Retry-After", String(result.retryAfter));
+            }
+            return res.status(429).json(result);
+        }
+
         return res.status(200).json(result);
     } catch (err: any) {
         console.error("POST /api/blocks/:userId error:", err);

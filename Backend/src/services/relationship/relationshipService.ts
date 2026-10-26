@@ -3,6 +3,7 @@ import { pool, query } from "../../database/client.js";
 import { getBlockState } from "./blockService.js";
 import { dispatchNotification } from "../notification/quotaService.js";
 import { relationshipEvents } from "./relationshipEvents.js";
+import { checkActionQuota, recordAction } from "./relationshipQuotaService.js";
 import type {
     CanonicalPair,
     RelationshipStateResult,
@@ -456,6 +457,28 @@ export async function requestConnection(
         };
     }
 
+    // Strict connection request quota check: max 20/day, max 50/week (also counting repeated requests to same target)
+    const quotaCheck = await checkActionQuota(actorId, "request");
+    if (!quotaCheck.allowed) {
+        relationshipEvents.logEvent("relationship_action_denied", {
+            actorId,
+            targetUserId,
+            reason: `quota_exceeded_${quotaCheck.limitType}`,
+            metadata: {
+                limitType: quotaCheck.limitType,
+                dailyCount: quotaCheck.dailyCount,
+                weeklyCount: quotaCheck.weeklyCount,
+            },
+        });
+        return {
+            success: false,
+            outcome: "rate_limited",
+            state: "none",
+            retryAfter: quotaCheck.retryAfterSeconds,
+            message: quotaCheck.message || "Connection request quota reached.",
+        };
+    }
+
     const client = await pool.connect();
     try {
         await client.query("BEGIN;");
@@ -589,6 +612,9 @@ export async function requestConnection(
             );
             relationshipId = insertRes.rows[0].id;
         }
+
+        // Record request action in durable PostgreSQL log and Redis sliding window (counts repeated actions)
+        await recordAction(actorId, targetUserId, "request", client);
 
         await client.query("COMMIT;");
 
@@ -1018,6 +1044,20 @@ export async function removeConnection(
 /**
  * Retrieves paginated connections for user's Settings view.
  */
+function parseSkills(skills: any): string[] {
+    if (!skills) return [];
+    if (Array.isArray(skills)) return skills.filter(Boolean);
+    if (typeof skills === "string") {
+        try {
+            const parsed = JSON.parse(skills);
+            if (Array.isArray(parsed)) return parsed.filter(Boolean);
+        } catch {
+            return skills.split(",").map((s: string) => s.trim()).filter(Boolean);
+        }
+    }
+    return [];
+}
+
 export async function getUserConnections(
     userId: string,
     limit = 20,
@@ -1032,6 +1072,11 @@ export async function getUserConnections(
         avatarUrl: string | null;
         headline: string | null;
         college: string | null;
+        location: string | null;
+        skills: string[];
+        orbixScore: number;
+        totalSolved: number;
+        isVerifiedCoder: boolean;
         connectedAt: string;
     }>;
     nextCursor: string | null;
@@ -1057,7 +1102,12 @@ export async function getUserConnections(
             COALESCE(u.firstname || ' ' || u.lastname, u.username) AS display_name,
             u.avatar_url,
             u.headline,
-            u.college
+            u.college,
+            u.location,
+            u.skills,
+            COALESCE(u.orbix_score, 0) AS orbix_score,
+            COALESCE(u.total_solved, 0) AS total_solved,
+            COALESCE(u.is_verified_coder, false) AS is_verified_coder
         FROM user_relationships r
         JOIN users u ON u.id = (CASE WHEN r.user_low_id = $1 THEN r.user_high_id ELSE r.user_low_id END)
         WHERE (r.user_low_id = $1 OR r.user_high_id = $1)
@@ -1092,11 +1142,131 @@ export async function getUserConnections(
         avatarUrl: r.avatar_url,
         headline: r.headline,
         college: r.college,
+        location: r.location || null,
+        skills: parseSkills(r.skills),
+        orbixScore: r.orbix_score,
+        totalSolved: r.total_solved,
+        isVerifiedCoder: r.is_verified_coder,
         connectedAt: r.connected_at.toISOString ? r.connected_at.toISOString() : r.connected_at,
     }));
 
     return {
         connections,
+        nextCursor,
+        totalCount,
+    };
+}
+
+export interface PendingRequestItem {
+    relationshipId: string;
+    userId: string;
+    username: string;
+    displayName: string;
+    avatarUrl: string | null;
+    headline: string | null;
+    college: string | null;
+    location: string | null;
+    skills: string[];
+    orbixScore: number;
+    totalSolved: number;
+    isVerifiedCoder: boolean;
+    type: "incoming" | "outgoing";
+    requestedAt: string;
+}
+
+/**
+ * Optimized management query for pending connection requests.
+ * Uses partial indexes for sub-millisecond retrieval with cursor pagination.
+ */
+export async function getPendingRequests(
+    userId: string,
+    filter: "incoming" | "outgoing" | "all" = "all",
+    limit = 20,
+    cursor?: string
+): Promise<{
+    requests: PendingRequestItem[];
+    nextCursor: string | null;
+    totalCount: number;
+}> {
+    // 1. Total count query
+    let countSql = `
+        SELECT COUNT(*)::int AS count
+        FROM user_relationships r
+        WHERE (r.user_low_id = $1 OR r.user_high_id = $1)
+          AND r.status = 'pending'
+    `;
+    if (filter === "incoming") {
+        countSql += ` AND r.requested_by != $1`;
+    } else if (filter === "outgoing") {
+        countSql += ` AND r.requested_by = $1`;
+    }
+    const countRes = await query(countSql, [userId]);
+    const totalCount = countRes.rows[0]?.count ?? 0;
+
+    // 2. Fetch requests with user details and cursor pagination
+    let dataSql = `
+        SELECT
+            r.id AS relationship_id,
+            r.created_at AS requested_at,
+            CASE WHEN r.requested_by = $1 THEN 'outgoing' ELSE 'incoming' END AS request_type,
+            u.id AS peer_id,
+            u.username,
+            COALESCE(NULLIF(TRIM(u.firstname || ' ' || COALESCE(u.lastname, '')), ''), u.username) AS display_name,
+            u.avatar_url,
+            u.headline,
+            u.college,
+            u.location,
+            u.skills,
+            COALESCE(u.orbix_score, 0) AS orbix_score,
+            COALESCE(u.total_solved, 0) AS total_solved,
+            COALESCE(u.is_verified_coder, false) AS is_verified_coder
+        FROM user_relationships r
+        JOIN users u ON u.id = (CASE WHEN r.user_low_id = $1 THEN r.user_high_id ELSE r.user_low_id END)
+        WHERE (r.user_low_id = $1 OR r.user_high_id = $1)
+          AND r.status = 'pending'
+    `;
+    const params: any[] = [userId];
+
+    if (filter === "incoming") {
+        dataSql += ` AND r.requested_by != $1`;
+    } else if (filter === "outgoing") {
+        dataSql += ` AND r.requested_by = $1`;
+    }
+
+    if (cursor) {
+        params.push(cursor);
+        dataSql += ` AND r.created_at < $${params.length}::timestamptz`;
+    }
+
+    params.push(limit + 1);
+    dataSql += ` ORDER BY r.created_at DESC LIMIT $${params.length};`;
+
+    const res = await query(dataSql, params);
+    const hasMore = res.rows.length > limit;
+    const items = hasMore ? res.rows.slice(0, limit) : res.rows;
+    const nextCursor = hasMore && items.length > 0
+        ? (items[items.length - 1].requested_at.toISOString ? items[items.length - 1].requested_at.toISOString() : items[items.length - 1].requested_at)
+        : null;
+
+    const requests: PendingRequestItem[] = items.map((r) => ({
+        relationshipId: r.relationship_id,
+        userId: r.peer_id,
+        username: r.username,
+        displayName: r.display_name,
+        avatarUrl: r.avatar_url,
+        headline: r.headline,
+        college: r.college,
+        location: r.location || null,
+        skills: parseSkills(r.skills),
+        orbixScore: r.orbix_score,
+        totalSolved: r.total_solved,
+        isVerifiedCoder: r.is_verified_coder,
+        type: r.request_type,
+        requestedAt: r.requested_at.toISOString ? r.requested_at.toISOString() : r.requested_at,
+    }));
+
+    return {
+        requests,
         nextCursor,
         totalCount,
     };
