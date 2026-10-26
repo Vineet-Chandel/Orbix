@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import {
     Settings,
     Shield,
@@ -24,6 +23,7 @@ import { useToast } from "../../context/ToastContext";
 import { updateProfile } from "../../utils/profileApi";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
+import { NeoToggle } from "../../components/NeoToggle";
 
 export default function SettingsPage() {
     const dispatch = useAppDispatch();
@@ -232,33 +232,16 @@ export default function SettingsPage() {
                             </div>
 
                             {/* Neo-brutalist Interactive Toggle Switch (Zero Lag) */}
-                            <div className="flex flex-col items-start sm:items-end gap-2 shrink-0">
-                                <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={isPublic}
-                                    disabled={isUpdating}
-                                    onClick={() => handleTogglePrivacy(!isPublic)}
-                                    className={`relative w-20 h-11 rounded-full border-[3px] border-black shadow-[3px_3px_0px_#000] transition-colors p-1 cursor-pointer focus:outline-none ${
-                                        isPublic ? "bg-[#a2ff86]" : "bg-neutral-200"
-                                    }`}
-                                >
-                                    <motion.div
-                                        animate={{ x: isPublic ? 36 : 0 }}
-                                        transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                                        className="w-7 h-7 rounded-full bg-white border-2 border-black shadow-[1px_1px_0px_#000] flex items-center justify-center"
-                                    >
-                                        {isPublic ? (
-                                            <Globe className="w-3.5 h-3.5 text-black stroke-[3]" />
-                                        ) : (
-                                            <Lock className="w-3.5 h-3.5 text-neutral-700 stroke-[3]" />
-                                        )}
-                                    </motion.div>
-                                </button>
-                                <span className="text-[11px] font-mono font-bold text-neutral-600">
-                                    {isPublic ? "Status: Public" : "Status: Private"}
-                                </span>
-                            </div>
+                            <NeoToggle
+                                checked={isPublic}
+                                disabled={isUpdating}
+                                onChange={handleTogglePrivacy}
+                                onIcon={<Globe className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                                offIcon={<Lock className="w-3.5 h-3.5 text-neutral-700 stroke-[3]" />}
+                                onStatusText="Status: Public"
+                                offStatusText="Status: Private"
+                                ariaLabel="Toggle profile public or private visibility"
+                            />
                         </div>
 
                         {/* ========================================================================= */}

@@ -1161,19 +1161,131 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                         {/* LEFT (3/4 Screen Width on Large Screens): Main Developer Card with 3D Flip Animation */}
                         <div ref={cardContainerRef} className="lg:col-span-9 flex flex-col justify-start items-center min-w-0">
                             {profile.isPublic === false && !profile.isOwner ? (
-                                <div className="w-full h-full min-h-[380px] rounded-3xl bg-white border-2 sm:border-[3px] border-black p-8 sm:p-12 shadow-[6px_6px_0px_#000] flex flex-col items-center justify-center text-center space-y-4">
-                                    <div className="w-16 h-16 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center">
-                                        <Lock className="w-8 h-8 text-black stroke-[2.5]" />
+                                <div className="w-full h-full min-h-[420px] rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] flex flex-col justify-between space-y-6">
+                                    {/* Top Status Header */}
+                                    <div className="flex items-center justify-between flex-wrap gap-2.5 pb-4 border-b-2 border-black/15">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-[#FFE566] border border-black animate-pulse" />
+                                            <span className="text-xs font-black uppercase tracking-wider text-black">
+                                                Developer Profile (Private Mode)
+                                            </span>
+                                        </div>
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-black font-black text-xs shadow-[1.5px_1.5px_0px_#000]">
+                                            <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <span>Verified Orbix Profile</span>
+                                        </div>
                                     </div>
-                                    <div className="max-w-md space-y-2">
-                                        <h3 className="text-2xl font-black text-black">Private Developer Profile</h3>
-                                        <p className="text-xs sm:text-sm text-neutral-600 font-bold leading-relaxed">
-                                            This developer has configured their profile to private. Digital cards, platform metrics, contest ratings, and resume access are kept confidential.
+
+                                    {/* Main Identity: Photo, Name, Headline, Location, College */}
+                                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6 text-center sm:text-left">
+                                        <div className="relative shrink-0">
+                                            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-[#FAF6EE] border-[3px] border-black shadow-[4px_4px_0px_#000] overflow-hidden flex items-center justify-center">
+                                                {avatarSrc ? (
+                                                    <img
+                                                        src={avatarSrc}
+                                                        alt={profile.displayName || profile.username}
+                                                        className="w-full h-full object-cover"
+                                                        onError={(e) => {
+                                                            (e.currentTarget as HTMLElement).style.display = "none";
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <span className="text-3xl font-black text-black">
+                                                        {(profile.firstName?.[0] || profile.username?.[0] || "U").toUpperCase()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="absolute -bottom-2 -right-2 p-1.5 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]" title="Private Profile">
+                                                <Lock className="w-3.5 h-3.5 text-black stroke-[3]" />
+                                            </div>
+                                        </div>
+
+                                        <div className="min-w-0 flex-1 space-y-2">
+                                            <div className="flex items-center justify-center sm:justify-start gap-2.5 flex-wrap">
+                                                <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                    {profile.displayName || `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || profile.username}
+                                                </h2>
+                                                <span className="text-xs font-mono font-bold text-neutral-700 bg-[#FAF6EE] px-2.5 py-0.5 rounded-lg border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                                                    @{profile.username}
+                                                </span>
+                                            </div>
+
+                                            {profile.headline ? (
+                                                <p className="text-sm sm:text-base font-bold text-neutral-800 leading-snug">
+                                                    {profile.headline}
+                                                </p>
+                                            ) : (
+                                                <p className="text-xs font-mono font-bold text-neutral-500">
+                                                    Developer on Orbix
+                                                </p>
+                                            )}
+
+                                            {/* Location & College Quick Chips */}
+                                            <div className="flex items-center justify-center sm:justify-start gap-2.5 flex-wrap pt-1 text-xs font-bold text-neutral-800">
+                                                {profile.location && (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                                                        <MapPin className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                                                        <span>{profile.location}</span>
+                                                    </span>
+                                                )}
+                                                {profile.college && (
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                                                        <GraduationCap className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                                                        <span className="truncate max-w-xs">{profile.college.officialName}</span>
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Biography and Skills Blocks */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                                        <div className="p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-1.5">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-black block">
+                                                Biography
+                                            </span>
+                                            {profile.bio ? (
+                                                <p className="text-xs font-bold text-neutral-800 leading-relaxed whitespace-pre-line line-clamp-4">
+                                                    {profile.bio}
+                                                </p>
+                                            ) : (
+                                                <p className="text-xs text-neutral-400 italic font-medium">
+                                                    No biography provided.
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        <div className="p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-1.5">
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-black block">
+                                                Skills & Technologies
+                                            </span>
+                                            {profile.skills && profile.skills.length > 0 ? (
+                                                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                                                    {profile.skills.map((skill) => (
+                                                        <span
+                                                            key={skill}
+                                                            className="px-2.5 py-1 rounded-lg bg-white border-2 border-black text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]"
+                                                        >
+                                                            {skill}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <p className="text-xs text-neutral-400 italic font-medium">
+                                                    No skills listed yet.
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Bottom Notice */}
+                                    <div className="p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                                        <div className="w-8 h-8 rounded-xl bg-[#FFE566] border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0">
+                                            <Lock className="w-4 h-4 text-black stroke-[2.5]" />
+                                        </div>
+                                        <p className="text-xs text-neutral-700 font-bold leading-relaxed">
+                                            Platform metrics, multi-platform coding activity, contest ratings, and resume downloads are kept confidential by this developer.
                                         </p>
-                                    </div>
-                                    <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#a2ff86] border-2 border-black text-black font-black text-xs shadow-[2px_2px_0px_#000]">
-                                        <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Verified Orbix Profile</span>
                                     </div>
                                 </div>
                             ) : (
@@ -1344,6 +1456,52 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         </span>
                                     </div>
 
+                                    {/* Developer Identity Block: Photo, Full Name, Headline */}
+                                    <div className="flex items-center gap-3 pb-3 border-b-2 border-black/10">
+                                        <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center">
+                                            {avatarSrc ? (
+                                                <img
+                                                    src={avatarSrc}
+                                                    alt={profile.displayName || profile.username}
+                                                    className="w-full h-full object-cover"
+                                                    onError={(e) => {
+                                                        (e.currentTarget as HTMLElement).style.display = "none";
+                                                    }}
+                                                />
+                                            ) : (
+                                                <span className="text-base font-black text-black">
+                                                    {(profile.firstName?.[0] || profile.username?.[0] || "U").toUpperCase()}
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <h4 className="text-sm font-black text-black truncate leading-tight">
+                                                {profile.displayName || `${profile.firstName || ""} ${profile.lastName || ""}`.trim() || profile.username}
+                                            </h4>
+                                            {profile.headline ? (
+                                                <p className="text-[11px] font-bold text-neutral-600 truncate mt-0.5">
+                                                    {profile.headline}
+                                                </p>
+                                            ) : (
+                                                <p className="text-[10px] font-mono font-bold text-neutral-400 mt-0.5">
+                                                    Developer on Orbix
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Headline (Dedicated Section if present) */}
+                                    {profile.headline && (
+                                        <div>
+                                            <span className="text-[10px] font-black uppercase tracking-wider text-black block mb-1">
+                                                Headline
+                                            </span>
+                                            <p className="text-xs font-bold text-neutral-800 leading-snug">
+                                                {profile.headline}
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {/* Bio */}
                                     <div>
                                         <span className="text-[10px] font-black uppercase tracking-wider text-black block mb-1">
@@ -1352,10 +1510,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         {profile.bio ? (
                                             <p className="text-xs font-bold text-neutral-800 leading-relaxed whitespace-pre-line">
                                                 {profile.bio}
-                                            </p>
-                                        ) : profile.headline ? (
-                                            <p className="text-xs font-bold text-neutral-700 leading-relaxed">
-                                                {profile.headline}
                                             </p>
                                         ) : (
                                             <p className="text-xs text-neutral-400 italic font-medium">
@@ -1402,7 +1556,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                     {profile.skills && profile.skills.length > 0 && (
                                         <div className="pt-1">
                                             <span className="text-[10px] font-black uppercase tracking-wider text-black block mb-1.5">
-                                                Skills & Stack
+                                                Skills & Technologies
                                             </span>
                                             <div className="flex flex-wrap gap-1.5">
                                                 {profile.skills.map((skill) => (

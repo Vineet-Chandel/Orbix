@@ -11,6 +11,7 @@ import { ProfilePhotoFrame } from "./ProfilePhotoFrame";
 import { ConnectedPlatformsSection } from "../Dashboard/ConnectedPlatformsSection";
 import { ProfileCardStudio } from "./CardStudio/ProfileCardStudio";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
+import { NeoToggle } from "../../components/NeoToggle";
 import {
     detectPlatform,
     getPlatformIcon,
@@ -837,22 +838,15 @@ export default function ProfileManager() {
                                                         Show an Open to work tag on your profile
                                                     </span>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    role="switch"
-                                                    aria-checked={isOpenToWork}
-                                                    onClick={handleToggleOpenToWork}
-                                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-black shadow-[1px_1px_0px_#000] transition-colors duration-200 ease-in-out focus:outline-none ${
-                                                        isOpenToWork ? "bg-[#a2ff86]" : "bg-neutral-200"
-                                                    }`}
-                                                >
-                                                    <span
-                                                        aria-hidden="true"
-                                                        className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white border border-black shadow-xs ring-0 transition duration-200 ease-in-out mt-0.25 ${
-                                                            isOpenToWork ? "translate-x-5" : "translate-x-0.5"
-                                                        }`}
-                                                    />
-                                                </button>
+                                                <NeoToggle
+                                                    checked={isOpenToWork}
+                                                    onChange={handleToggleOpenToWork}
+                                                    onIcon={<Briefcase className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                                                    offIcon={<Briefcase className="w-3.5 h-3.5 text-neutral-600 stroke-[2.5]" />}
+                                                    onStatusText="Status: Active"
+                                                    offStatusText="Status: Hidden"
+                                                    ariaLabel="Toggle Open to work status"
+                                                />
                                             </div>
 
                                             {/* Toggle 2: Hire me */}
@@ -863,22 +857,15 @@ export default function ProfileManager() {
                                                         Show a Hire me button so recruiters can message you
                                                     </span>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    role="switch"
-                                                    aria-checked={isHireable}
-                                                    onClick={handleToggleHireMe}
-                                                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-black shadow-[1px_1px_0px_#000] transition-colors duration-200 ease-in-out focus:outline-none ${
-                                                        isHireable ? "bg-[#a2ff86]" : "bg-neutral-200"
-                                                    }`}
-                                                >
-                                                    <span
-                                                        aria-hidden="true"
-                                                        className={`pointer-events-none inline-block h-4.5 w-4.5 transform rounded-full bg-white border border-black shadow-xs ring-0 transition duration-200 ease-in-out mt-0.25 ${
-                                                            isHireable ? "translate-x-5" : "translate-x-0.5"
-                                                        }`}
-                                                    />
-                                                </button>
+                                                <NeoToggle
+                                                    checked={isHireable}
+                                                    onChange={handleToggleHireMe}
+                                                    onIcon={<Mail className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                                                    offIcon={<Mail className="w-3.5 h-3.5 text-neutral-600 stroke-[2.5]" />}
+                                                    onStatusText="Status: Active"
+                                                    offStatusText="Status: Off"
+                                                    ariaLabel="Toggle Hire me recruiter button"
+                                                />
                                             </div>
                                         </div>
                                     </div>
