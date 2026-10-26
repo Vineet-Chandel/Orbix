@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import PublicProfilePage from '../../../app/Profile/PublicProfilePage';
+
+const PublicProfilePage = lazy(() => import('../../../app/Profile/PublicProfilePage'));
 
 export interface PlatformItem {
     id: string;
@@ -442,7 +443,7 @@ const WHITE_STICKER_FILTER = [
     "drop-shadow(0 1.5px 2px rgba(0,0,0,0.12))",
 ].join(" ");
 
-const Landing = () => {
+const HeroHeadlines = React.memo(function HeroHeadlines() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isPaused, setIsPaused] = useState(false);
 
@@ -476,6 +477,206 @@ const Landing = () => {
     const current = CONNECTABLE_PLATFORMS[currentIndex];
     const currentOpp = OPPORTUNITIES[oppIndex];
 
+    return (
+        <div className="w-full flex flex-col items-center justify-center gap-2 sm:gap-3.5 md:gap-5 lg:gap-6 text-[clamp(1.1rem,3.4vw,4.25rem)] text-black font-MyCustomFont3 pt-[100px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.2] sm:leading-[1.18] md:leading-[1.15] select-none">
+            {/* Line 1: Strictly single line, never wraps */}
+            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-2 sm:gap-x-3 text-center max-w-full'>
+                <span>A developer tool to connect</span>
+
+                <motion.div
+                    layout
+                    initial={{
+                        y: 85,
+                        opacity: 0,
+                        scale: 0.35,
+                        rotate: -12,
+                        filter: "brightness(2.4)",
+                    }}
+                    animate={{
+                        y: 0,
+                        opacity: 1,
+                        scale: 1,
+                        rotate: 0,
+                        filter: "brightness(1)",
+                    }}
+                    transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 13,
+                        mass: 0.85,
+                        delay: 0.2,
+                    }}
+                    onClick={handleNext}
+                    onMouseEnter={() => setIsPaused(true)}
+                    onMouseLeave={() => setIsPaused(false)}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.94 }}
+                    className="relative bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-2.5 sm:px-3.5 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1.5 sm:gap-2.5 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
+                    title="Click to switch platform"
+                >
+                    {/* Flashing light sweep effect as it bounces out of the underground */}
+                    <motion.div
+                        initial={{ x: "-120%", opacity: 1 }}
+                        animate={{ x: "250%", opacity: 0 }}
+                        transition={{ duration: 0.65, delay: 0.32, ease: "easeOut" }}
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent skew-x-12 pointer-events-none z-20"
+                    />
+
+                    <div
+                        className="relative w-[0.85em] h-[0.85em] flex items-center justify-center shrink-0 overflow-visible"
+                        style={{ filter: WHITE_STICKER_FILTER }}
+                    >
+                        <AnimatePresence mode="popLayout" initial={false}>
+                            <motion.div
+                                key={current.id}
+                                initial={{
+                                    scale: 0.05,
+                                    rotate: 0,
+                                    opacity: 0
+                                }}
+                                animate={{
+                                    scale: 1.25,
+                                    rotate: -8.5,
+                                    opacity: 1
+                                }}
+                                exit={{
+                                    scale: 0.1,
+                                    rotate: 0,
+                                    opacity: 0,
+                                    transition: { duration: 0.12, ease: "easeIn" }
+                                }}
+                                transition={{
+                                    type: "spring",
+                                    stiffness: 380,
+                                    damping: 18,
+                                    mass: 0.75
+                                }}
+                                className="w-full h-full flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
+                            >
+                                {current.renderIcon("w-full h-full")}
+                            </motion.div>
+                        </AnimatePresence>
+                    </div>
+
+                    <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                            key={current.id}
+                            initial={{ scale: 0.92, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 1.05, opacity: 0 }}
+                            transition={{ duration: 0.12, ease: "easeOut" }}
+                            className="text-inherit font-MyCustomFont3 whitespace-nowrap inline-block"
+                        >
+                            {current.name}
+                        </motion.span>
+                    </AnimatePresence>
+                </motion.div>
+                <span>,</span>
+            </div>
+
+            {/* Line 2: Strictly single line, never wraps regardless of text changes */}
+            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-2 sm:gap-x-3 text-center max-w-full'>
+                <span>and redirecting</span>
+                <motion.div
+                    layout
+                    initial={{
+                        y: 85,
+                        opacity: 0,
+                        scale: 0.35,
+                        rotate: 12,
+                        filter: "brightness(2.4)",
+                    }}
+                    animate={{
+                        y: 0,
+                        opacity: 1,
+                        scale: 1,
+                        rotate: 0,
+                        filter: "brightness(1)",
+                    }}
+                    transition={{
+                        type: "spring",
+                        stiffness: 420,
+                        damping: 13,
+                        mass: 0.85,
+                        delay: 0.42,
+                    }}
+                    onClick={handleNextOpp}
+                    onMouseEnter={() => setIsOppPaused(true)}
+                    onMouseLeave={() => setIsOppPaused(false)}
+                    whileHover={{ scale: 1.05, y: -2 }}
+                    whileTap={{ scale: 0.94 }}
+                    className="relative bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-2.5 sm:px-3.5 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1.5 sm:gap-2.5 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
+                    title="Click to switch opportunity"
+                >
+                    {/* Flashing light sweep effect as it bounces out of the underground */}
+                    <motion.div
+                        initial={{ x: "-120%", opacity: 1 }}
+                        animate={{ x: "250%", opacity: 0 }}
+                        transition={{ duration: 0.65, delay: 0.54, ease: "easeOut" }}
+                        className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent skew-x-12 pointer-events-none z-20"
+                    />
+
+                    <div
+                        className="relative w-[0.85em] h-[0.85em] flex items-center justify-center shrink-0 overflow-visible"
+                        style={{ filter: WHITE_STICKER_FILTER }}
+                    >
+                        <AnimatePresence mode="popLayout" initial={false}>
+                            <motion.div
+                                key={currentOpp.id || currentOpp.name}
+                                initial={{
+                                    scale: 0.05,
+                                    rotate: 0,
+                                    opacity: 0
+                                }}
+                                animate={{
+                                    scale: 1.25,
+                                    rotate: -8.5,
+                                    opacity: 1
+                                }}
+                                exit={{
+                                    scale: 0.1,
+                                    rotate: 0,
+                                    opacity: 0,
+                                    transition: { duration: 0.12, ease: "easeIn" }
+                                }}
+                                transition={{
+                                    type: "spring",
+                                    stiffness: 380,
+                                    damping: 18,
+                                    mass: 0.75
+                                }}
+                                className="w-full h-full flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
+                            >
+                                {currentOpp.renderIcon("w-full h-full")}
+                            </motion.div>
+                        </AnimatePresence>
+                    </div>
+
+                    <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                            key={currentOpp.id || currentOpp.name}
+                            initial={{ scale: 0.92, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 1.05, opacity: 0 }}
+                            transition={{ duration: 0.12, ease: "easeOut" }}
+                            className="text-inherit font-MyCustomFont3 whitespace-nowrap inline-block"
+                        >
+                            {currentOpp.name}
+                        </motion.span>
+                    </AnimatePresence>
+                </motion.div>
+                <span>economics for</span>
+            </div>
+
+            {/* Line 3: Strictly single line */}
+            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center text-center max-w-full'>
+                <span>our developers.</span>
+            </div>
+        </div>
+    );
+});
+
+const Landing = () => {
     const trackRef = useRef<HTMLDivElement>(null);
     const viewportRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -488,7 +689,8 @@ const Landing = () => {
                 const ch = contentRef.current.scrollHeight;
                 const vh = viewportRef.current.clientHeight;
                 if (ch > 0 && vh > 0) {
-                    setMaxScroll(Math.max(0, ch - vh + 60));
+                    const calculated = Math.max(0, ch - vh + 60);
+                    setMaxScroll((prev) => (Math.abs(prev - calculated) > 5 ? calculated : prev));
                 }
             }
         };
@@ -505,7 +707,7 @@ const Landing = () => {
         if (contentRef.current) ro.observe(contentRef.current);
         if (viewportRef.current) ro.observe(viewportRef.current);
 
-        window.addEventListener('resize', updateHeight);
+        window.addEventListener('resize', updateHeight, { passive: true });
         return () => {
             clearTimeout(t1);
             clearTimeout(t2);
@@ -526,205 +728,8 @@ const Landing = () => {
 
     return (
         <div className="relative w-full flex flex-col items-center bg-[#FAF6EE] text-neutral-900 select-none">
-            {/* Warm, eye-friendly dot grid matching Orbix platform canvas */}
-            <div className="absolute inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
-
-            {/* Hero Headline (Scoped to MyCustomFont3) */}
-            <div className="w-full flex flex-col items-center justify-center gap-2 sm:gap-3.5 md:gap-5 lg:gap-6 text-[clamp(1.1rem,3.4vw,4.25rem)] text-black font-MyCustomFont3 pt-[100px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.2] sm:leading-[1.18] md:leading-[1.15] select-none">
-                {/* Line 1: Strictly single line, never wraps */}
-                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-2 sm:gap-x-3 text-center max-w-full'>
-                    <span>A developer tool to connect</span>
-
-                    <motion.div
-                        layout
-                        initial={{
-                            y: 85,
-                            opacity: 0,
-                            scale: 0.35,
-                            rotate: -12,
-                            filter: "brightness(2.4)",
-                        }}
-                        animate={{
-                            y: 0,
-                            opacity: 1,
-                            scale: 1,
-                            rotate: 0,
-                            filter: "brightness(1)",
-                        }}
-                        transition={{
-                            type: "spring",
-                            stiffness: 420,
-                            damping: 13,
-                            mass: 0.85,
-                            delay: 0.2,
-                        }}
-                        onClick={handleNext}
-                        onMouseEnter={() => setIsPaused(true)}
-                        onMouseLeave={() => setIsPaused(false)}
-                        whileHover={{ scale: 1.05, y: -2 }}
-                        whileTap={{ scale: 0.94 }}
-                        className="relative bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-2.5 sm:px-3.5 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1.5 sm:gap-2.5 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
-                        title="Click to switch platform"
-                    >
-                        {/* Flashing light sweep effect as it bounces out of the underground */}
-                        <motion.div
-                            initial={{ x: "-120%", opacity: 1 }}
-                            animate={{ x: "250%", opacity: 0 }}
-                            transition={{ duration: 0.65, delay: 0.32, ease: "easeOut" }}
-                            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent skew-x-12 pointer-events-none z-20"
-                        />
-
-                        <div
-                            className="relative w-[0.85em] h-[0.85em] flex items-center justify-center shrink-0 overflow-visible"
-                            style={{ filter: WHITE_STICKER_FILTER }}
-                        >
-                            <AnimatePresence mode="popLayout" initial={false}>
-                                <motion.div
-                                    key={current.id}
-                                    initial={{
-                                        scale: 0.05,
-                                        rotate: 0,
-                                        opacity: 0
-                                    }}
-                                    animate={{
-                                        scale: 1.25,
-                                        rotate: -8.5,
-                                        opacity: 1
-                                    }}
-                                    exit={{
-                                        scale: 0.1,
-                                        rotate: 0,
-                                        opacity: 0,
-                                        transition: { duration: 0.12, ease: "easeIn" }
-                                    }}
-                                    transition={{
-                                        type: "spring",
-                                        stiffness: 380,
-                                        damping: 18,
-                                        mass: 0.75
-                                    }}
-                                    className="w-full h-full flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
-                                >
-                                    {current.renderIcon("w-full h-full")}
-                                </motion.div>
-                            </AnimatePresence>
-                        </div>
-
-                        <AnimatePresence mode="popLayout" initial={false}>
-                            <motion.span
-                                key={current.id}
-                                initial={{ scale: 0.92, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 1.05, opacity: 0 }}
-                                transition={{ duration: 0.12, ease: "easeOut" }}
-                                className="text-inherit font-MyCustomFont3 whitespace-nowrap inline-block"
-                            >
-                                {current.name}
-                            </motion.span>
-                        </AnimatePresence>
-                    </motion.div>
-                    <span>,</span>
-                </div>
-
-                {/* Line 2: Strictly single line, never wraps regardless of text changes */}
-                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-2 sm:gap-x-3 text-center max-w-full'>
-                    <span>and redirecting</span>
-                    <motion.div
-                        layout
-                        initial={{
-                            y: 85,
-                            opacity: 0,
-                            scale: 0.35,
-                            rotate: 12,
-                            filter: "brightness(2.4)",
-                        }}
-                        animate={{
-                            y: 0,
-                            opacity: 1,
-                            scale: 1,
-                            rotate: 0,
-                            filter: "brightness(1)",
-                        }}
-                        transition={{
-                            type: "spring",
-                            stiffness: 420,
-                            damping: 13,
-                            mass: 0.85,
-                            delay: 0.42,
-                        }}
-                        onClick={handleNextOpp}
-                        onMouseEnter={() => setIsOppPaused(true)}
-                        onMouseLeave={() => setIsOppPaused(false)}
-                        whileHover={{ scale: 1.05, y: -2 }}
-                        whileTap={{ scale: 0.94 }}
-                        className="relative bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-2.5 sm:px-3.5 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1.5 sm:gap-2.5 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
-                        title="Click to switch opportunity"
-                    >
-                        {/* Flashing light sweep effect as it bounces out of the underground */}
-                        <motion.div
-                            initial={{ x: "-120%", opacity: 1 }}
-                            animate={{ x: "250%", opacity: 0 }}
-                            transition={{ duration: 0.65, delay: 0.54, ease: "easeOut" }}
-                            className="absolute inset-0 bg-gradient-to-r from-transparent via-white/80 to-transparent skew-x-12 pointer-events-none z-20"
-                        />
-
-                        <div
-                            className="relative w-[0.85em] h-[0.85em] flex items-center justify-center shrink-0 overflow-visible"
-                            style={{ filter: WHITE_STICKER_FILTER }}
-                        >
-                            <AnimatePresence mode="popLayout" initial={false}>
-                                <motion.div
-                                    key={currentOpp.id || currentOpp.name}
-                                    initial={{
-                                        scale: 0.05,
-                                        rotate: 0,
-                                        opacity: 0
-                                    }}
-                                    animate={{
-                                        scale: 1.25,
-                                        rotate: -8.5,
-                                        opacity: 1
-                                    }}
-                                    exit={{
-                                        scale: 0.1,
-                                        rotate: 0,
-                                        opacity: 0,
-                                        transition: { duration: 0.12, ease: "easeIn" }
-                                    }}
-                                    transition={{
-                                        type: "spring",
-                                        stiffness: 380,
-                                        damping: 18,
-                                        mass: 0.75
-                                    }}
-                                    className="w-full h-full flex items-center justify-center overflow-visible [&_svg]:w-full [&_svg]:h-full [&_svg]:max-w-full [&_svg]:max-h-full [&_svg]:block"
-                                >
-                                    {currentOpp.renderIcon("w-full h-full")}
-                                </motion.div>
-                            </AnimatePresence>
-                        </div>
-
-                        <AnimatePresence mode="popLayout" initial={false}>
-                            <motion.span
-                                key={currentOpp.id || currentOpp.name}
-                                initial={{ scale: 0.92, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 1.05, opacity: 0 }}
-                                transition={{ duration: 0.12, ease: "easeOut" }}
-                                className="text-inherit font-MyCustomFont3 whitespace-nowrap inline-block"
-                            >
-                                {currentOpp.name}
-                            </motion.span>
-                        </AnimatePresence>
-                    </motion.div>
-                    <span>economics for</span>
-                </div>
-
-                {/* Line 3: Strictly single line */}
-                <div className='flex flex-nowrap whitespace-nowrap items-center justify-center text-center max-w-full'>
-                    <span>our developers.</span>
-                </div>
-            </div>
+            {/* Hero Headline (Isolated ticker state so pinned showcase never re-renders) */}
+            <HeroHeadlines />
 
             {/* Pinned Scroll Showcase Section: Holds the box fixed in screen center while inner page scrolls */}
             <div
@@ -761,20 +766,26 @@ const Landing = () => {
                                 <motion.div
                                     ref={contentRef}
                                     style={{ y: contentY }}
-                                    className="embedded-showcase-container w-full will-change-transform"
+                                    className="embedded-showcase-container w-full will-change-transform transform-gpu"
                                 >
-                                    <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
+                                    <Suspense fallback={
+                                        <div className="w-full min-h-[460px] flex flex-col items-center justify-center gap-3 p-8">
+                                            <div className="w-8 h-8 rounded-full border-2 border-black/20 border-t-black animate-spin" />
+                                            <span className="text-xs font-mono font-bold text-neutral-500">Loading showcase preview...</span>
+                                        </div>
+                                    }>
+                                        <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
+                                    </Suspense>
                                 </motion.div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
-
-
         </div>
     );
 };
+
 
 export default Landing;
 export { Landing as Hero };

@@ -396,6 +396,8 @@ export const LeaderboardShowcase: React.FC = () => {
                                                 <img
                                                     src={topThree[1].avatarUrl}
                                                     alt={topThree[1].displayName}
+                                                    loading="lazy"
+                                                    decoding="async"
                                                     className="w-full h-full object-cover"
                                                 />
                                             </div>
@@ -451,6 +453,8 @@ export const LeaderboardShowcase: React.FC = () => {
                                                 <img
                                                     src={topThree[0].avatarUrl}
                                                     alt={topThree[0].displayName}
+                                                    loading="lazy"
+                                                    decoding="async"
                                                     className="w-full h-full object-cover"
                                                 />
                                             </div>
@@ -501,6 +505,8 @@ export const LeaderboardShowcase: React.FC = () => {
                                                 <img
                                                     src={topThree[2].avatarUrl}
                                                     alt={topThree[2].displayName}
+                                                    loading="lazy"
+                                                    decoding="async"
                                                     className="w-full h-full object-cover"
                                                 />
                                             </div>
@@ -580,6 +586,8 @@ export const LeaderboardShowcase: React.FC = () => {
                                                         <img
                                                             src={entry.avatarUrl}
                                                             alt={entry.displayName}
+                                                            loading="lazy"
+                                                            decoding="async"
                                                             className="w-full h-full object-cover"
                                                         />
                                                     </div>

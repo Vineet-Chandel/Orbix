@@ -26,7 +26,6 @@ import {
     Lock,
     RefreshCw,
     Trophy,
-    Sparkles,
     Terminal,
     ChevronDown,
     ChevronUp,
@@ -1037,14 +1036,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                     <ArrowRight className="w-4 h-4" />
                                 </Link>
                             )}
-
-                            <Link
-                                to="/profile/u/Vineet-Chandel"
-                                className="w-full sm:w-auto px-5 py-3 rounded-full bg-[#FAF6EE] hover:bg-[#f3ede1] text-black text-sm font-bold border-2 border-black shadow-[3px_3px_0px_#000] transition-all duration-200 transform active:scale-95 active:shadow-none flex items-center justify-center gap-2 cursor-pointer select-none"
-                            >
-                                <Sparkles className="w-4 h-4 text-amber-500" />
-                                <span>View Demo Showcase</span>
-                            </Link>
 
                             <Link
                                 to="/"

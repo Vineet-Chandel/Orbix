@@ -298,6 +298,9 @@ export const Footer: React.FC = () => {
                 <img
                     src="/image.png"
                     alt="Orbix Developer Desk"
+                    loading="lazy"
+                    decoding="async"
+                    fetchPriority="low"
                     className="w-full h-auto min-h-[140px] sm:min-h-[220px] md:min-h-[280px] lg:min-h-[340px] xl:min-h-[400px] object-cover object-bottom block"
                 />
             </div>
