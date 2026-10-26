@@ -1986,7 +1986,10 @@ export async function calculateUnifiedSubmissions(
     let prevDayNum: number | null = null;
     const epochDays = Array.from(activeDateStrings)
         .map((ds) => {
-            const [y, m, d] = ds.split("-").map(Number);
+            const parts = ds.split("-").map(Number);
+            const y = parts[0] ?? 0;
+            const m = parts[1] ?? 1;
+            const d = parts[2] ?? 1;
             return Math.round(Date.UTC(y, m - 1, d) / 86400000);
         })
         .sort((a, b) => a - b);

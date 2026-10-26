@@ -29,6 +29,7 @@ import {
     setCachedPdfBuffer,
     type ResumePayload,
 } from "../../redis/cache/cache-resume.js";
+import intelligenceRouter from "./resumeIntelligence.js";
 
 const resumeRouter = express.Router();
 
@@ -873,6 +874,9 @@ export const handleGetPublicResume = async (req: Request, res: Response) => {
 };
 
 // Mount routes
+resumeRouter.use("/intelligence", intelligenceRouter);
+resumeRouter.use("/", intelligenceRouter);
+
 resumeRouter.get("/", authenticate, handleGetResume);
 resumeRouter.get("/view", authenticate, (req, res) => { handleStreamResume(req, res, false); });
 resumeRouter.get("/view/:username", optionalAuthenticate, (req, res) => { handleStreamResume(req, res, false); });
