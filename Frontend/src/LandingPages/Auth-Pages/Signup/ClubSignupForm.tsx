@@ -313,31 +313,33 @@ export default function ClubSignupForm({ onSwitchToPersonal }: ClubSignupFormPro
                     </h3>
                 </div>
 
-                <FormInput
-                    name="clubName"
-                    type="text"
-                    placeholder="Club Name (e.g. Google Developer Student Club)"
-                    hideLabel
-                    value={formData.clubName}
-                    onChange={(e) => {
-                        setFormData({ ...formData, clubName: e.target.value });
-                        if (errors.clubName) setErrors({ ...errors, clubName: "" });
-                    }}
-                    error={errors.clubName}
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <FormInput
+                        name="clubName"
+                        type="text"
+                        placeholder="Club Name (e.g. Google Developer Student Club)"
+                        hideLabel
+                        value={formData.clubName}
+                        onChange={(e) => {
+                            setFormData({ ...formData, clubName: e.target.value });
+                            if (errors.clubName) setErrors({ ...errors, clubName: "" });
+                        }}
+                        error={errors.clubName}
+                    />
 
-                <FormInput
-                    name="collegeName"
-                    type="text"
-                    placeholder="College / University Name (Full Official Name)"
-                    hideLabel
-                    value={formData.collegeName}
-                    onChange={(e) => {
-                        setFormData({ ...formData, collegeName: e.target.value });
-                        if (errors.collegeName) setErrors({ ...errors, collegeName: "" });
-                    }}
-                    error={errors.collegeName}
-                />
+                    <FormInput
+                        name="collegeName"
+                        type="text"
+                        placeholder="College / University Name (Full Official Name)"
+                        hideLabel
+                        value={formData.collegeName}
+                        onChange={(e) => {
+                            setFormData({ ...formData, collegeName: e.target.value });
+                            if (errors.collegeName) setErrors({ ...errors, collegeName: "" });
+                        }}
+                        error={errors.collegeName}
+                    />
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <FormInput
