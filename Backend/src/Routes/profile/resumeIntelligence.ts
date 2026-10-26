@@ -5,6 +5,13 @@ import { authenticate } from "../../middlewares/auth.middleware.js";
 import { parseUploadedDocument } from "../../services/resume/documentParser.js";
 import { analyzeResumeWithGemini } from "../../services/resume/geminiResumeAnalyzer.js";
 import { ProfileSyncService } from "../../services/resume/profileSyncService.js";
+import {
+    invalidatePublicProfileCache,
+    invalidatePrivateProfileCache,
+    invalidateAllUserCaches,
+} from "../../redis/cache/cache-profile.js";
+import { deleteUserDetailsCache } from "../../redis/cache/cache-auth.js";
+import { invalidateAllResumeCaches } from "../../redis/cache/cache-resume.js";
 
 const intelligenceRouter = express.Router();
 const profileSyncService = new ProfileSyncService();
@@ -158,10 +165,16 @@ intelligenceRouter.get("/sync-proposal", authenticate, async (req: Request, res:
         const authUser = req.user;
         if (!authUser) return res.status(401).json({ success: false, message: "Authentication required" });
 
+        const userId = authUser.id;
+        const username = authUser.username;
+        const isUuid = userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
+
         const userRes = await query(
-            `SELECT id, username, headline, bio, location, website, github, linkedin, skills, college, resume_metadata AS "resumeMetadata"
-             FROM users WHERE id = $1 OR username = $2 LIMIT 1;`,
-            [authUser.id || "", authUser.username || ""]
+            `SELECT id, username, email AS gmail, headline, bio, location, website, github, linkedin, skills, college, college_id AS "collegeId", links, resume_metadata AS "resumeMetadata"
+             FROM users 
+             WHERE ($1::uuid IS NOT NULL AND id = $1::uuid) OR LOWER(username) = LOWER($2)
+             LIMIT 1;`,
+            [isUuid ? userId : null, username || ""]
         );
 
         if (!userRes.rows[0]) {
@@ -207,10 +220,16 @@ intelligenceRouter.post("/apply-sync", authenticate, async (req: Request, res: R
             return res.status(400).json({ success: false, message: "approvedFields array is required" });
         }
 
+        const userId = authUser.id;
+        const username = authUser.username;
+        const isUuid = userId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId);
+
         const userRes = await query(
-            `SELECT id, username, headline, bio, location, website, github, linkedin, skills, college, resume_metadata AS "resumeMetadata"
-             FROM users WHERE id = $1 OR username = $2 LIMIT 1;`,
-            [authUser.id || "", authUser.username || ""]
+            `SELECT id, username, email AS gmail, headline, bio, location, website, github, linkedin, skills, college, college_id AS "collegeId", links, resume_metadata AS "resumeMetadata"
+             FROM users 
+             WHERE ($1::uuid IS NOT NULL AND id = $1::uuid) OR LOWER(username) = LOWER($2)
+             LIMIT 1;`,
+            [isUuid ? userId : null, username || ""]
         );
 
         if (!userRes.rows[0]) {
@@ -228,16 +247,54 @@ intelligenceRouter.post("/apply-sync", authenticate, async (req: Request, res: R
         }
 
         const proposal = profileSyncService.buildSyncProposal(user, structuredFacts);
-        const result = await profileSyncService.applyProfileSync(authUser.id || authUser.username, approvedFields, proposal);
+        const result = await profileSyncService.applyProfileSync(user.id, approvedFields, proposal);
+
+        // Fetch fresh profile row after sync to build fresh updated proposal
+        const freshUserRes = await query(
+            `SELECT id, username, email AS gmail, headline, bio, location, website, github, linkedin, skills, college, college_id AS "collegeId", links, resume_metadata AS "resumeMetadata"
+             FROM users WHERE id = $1 LIMIT 1;`,
+            [user.id]
+        );
+        const freshUser = freshUserRes.rows[0] || user;
+        const updatedProposal = profileSyncService.buildSyncProposal(freshUser, structuredFacts);
+
+        // Update resume_metadata in DB with the newly updated proposal
+        if (freshUser.resumeMetadata?.analysisReport) {
+            const updatedMetadata = {
+                ...freshUser.resumeMetadata,
+                analysisReport: {
+                    ...freshUser.resumeMetadata.analysisReport,
+                    profileSyncProposal: updatedProposal
+                }
+            };
+            await query(
+                `UPDATE users SET resume_metadata = $1 WHERE id = $2;`,
+                [JSON.stringify(updatedMetadata), user.id]
+            ).catch(err => console.warn("Failed to update resume_metadata after sync:", err?.message));
+        }
+
+        // Invalidate all Redis caches across user, profile and resume
+        await Promise.allSettled([
+            invalidatePublicProfileCache(freshUser.username),
+            invalidatePrivateProfileCache(freshUser.id),
+            invalidatePrivateProfileCache(freshUser.username),
+            invalidateAllUserCaches({ id: freshUser.id, username: freshUser.username, gmail: freshUser.gmail }),
+            deleteUserDetailsCache(freshUser.id),
+            deleteUserDetailsCache(freshUser.username),
+            deleteUserDetailsCache(freshUser.gmail),
+            invalidateAllResumeCaches({ id: freshUser.id, username: freshUser.username }),
+        ]);
 
         return res.status(200).json({
             success: true,
             message: `Successfully synced ${result.updatedFields.length} field(s) to your Orbix profile.`,
-            updatedFields: result.updatedFields
+            updatedFields: result.updatedFields,
+            user: result.user || freshUser,
+            proposal: updatedProposal
         });
     } catch (err: any) {
         console.error("POST /apply-sync error:", err);
-        return res.status(500).json({ success: false, message: "Failed to apply profile sync", error: err.message });
+        return res.status(500).json({ success: false, message: err?.message || "Failed to apply profile sync", error: err?.message });
     }
 });
 

@@ -194,6 +194,32 @@ export default function ProfileManager() {
         }
     }, [user]);
 
+    // Live sync when resume-to-profile sync occurs
+    useEffect(() => {
+        const handleProfileSync = (event: Event) => {
+            const detail = (event as CustomEvent)?.detail;
+            if (detail) {
+                if (Array.isArray(detail.skills) && detail.skills.length > 0) {
+                    setSkills(detail.skills);
+                }
+                if (detail.headline) setHeadline(detail.headline);
+                if (detail.bio) setBio(detail.bio);
+                if (detail.location) setLocation(detail.location);
+                if (detail.links) setLinks(parseInitialLinks(detail));
+                if (detail.college) {
+                    setSelectedCollege(detail.college);
+                } else if (detail.collegeId) {
+                    getInstitutionById(detail.collegeId).then((inst) => {
+                        if (inst) setSelectedCollege(inst);
+                    });
+                }
+            }
+        };
+
+        window.addEventListener("orbix_profile_updated", handleProfileSync);
+        return () => window.removeEventListener("orbix_profile_updated", handleProfileSync);
+    }, []);
+
     // Pending toggle queue to batch & sequence concurrent or rapid toggle clicks
     const pendingTogglesRef = useRef<{ isOpenToWork?: boolean; isHireable?: boolean }>({});
     const isFlushingTogglesRef = useRef(false);

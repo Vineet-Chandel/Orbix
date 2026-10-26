@@ -13,6 +13,7 @@ import {
     type ProfileSyncProposal,
     type ProposedSyncField
 } from "../../../utils/resumeIntelligenceApi";
+import { useAppDispatch, updateUserProfile } from "../../../store";
 
 interface ProfileSyncModalProps {
     isOpen: boolean;
@@ -27,6 +28,7 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
     proposal,
     onSyncSuccess
 }) => {
+    const dispatch = useAppDispatch();
     const [selectedFields, setSelectedFields] = useState<string[]>(() => {
         return proposal?.proposedFields?.map(f => f.fieldKey) || [];
     });
@@ -63,6 +65,14 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
             setError(null);
             const res = await applyProfileSyncApi(selectedFields);
             setSuccessMessage(res.message);
+
+            if (res.user) {
+                dispatch(updateUserProfile(res.user));
+            }
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("orbix_profile_updated", { detail: res.user }));
+            }
+
             if (onSyncSuccess) {
                 onSyncSuccess(res.updatedFields);
             }

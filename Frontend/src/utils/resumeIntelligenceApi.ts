@@ -182,6 +182,8 @@ export async function applyProfileSyncApi(approvedFields: string[]): Promise<{
     success: boolean;
     message: string;
     updatedFields: string[];
+    user?: any;
+    proposal?: ProfileSyncProposal;
 }> {
     const res = await fetch(`${API_BASE}/intelligence/apply-sync`, {
         method: "POST",
@@ -192,7 +194,7 @@ export async function applyProfileSyncApi(approvedFields: string[]): Promise<{
 
     if (!res.ok) {
         const err = await res.json().catch(() => null);
-        throw new Error(err?.message || `Failed to apply profile sync (${res.status})`);
+        throw new Error(err?.error || err?.message || `Failed to apply profile sync (${res.status})`);
     }
 
     return res.json();
