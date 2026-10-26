@@ -270,8 +270,14 @@ async function run() {
 
     const reviewerUserId = crypto.randomUUID();
     await query(`
-        INSERT INTO users (id, username, email, firstname, lastname, termsaccepted, account_type)
-        VALUES ($1, 'orbixreviewer', $2, 'Staff', 'Reviewer', true, 'admin')
+        INSERT INTO auth.users (id, email, encrypted_password, role, aud, created_at, updated_at)
+        VALUES ($1, $2, '$2b$10$abcdefghijklmnopqrstuv', 'authenticated', 'authenticated', NOW(), NOW())
+        ON CONFLICT (id) DO NOTHING;
+    `, [reviewerUserId, REVIEWER_EMAIL]).catch(() => {});
+
+    await query(`
+        INSERT INTO users (id, username, email, password, firstname, lastname, termsaccepted, account_type)
+        VALUES ($1, 'orbixreviewer', $2, '$2b$10$abcdefghijklmnopqrstuv', 'Staff', 'Reviewer', true, 'admin')
         ON CONFLICT (id) DO NOTHING;
     `, [reviewerUserId, REVIEWER_EMAIL]);
 
@@ -405,6 +411,7 @@ async function run() {
     await query("DELETE FROM users WHERE LOWER(email) = LOWER($1);", [TEST_EMAIL]);
     await query("DELETE FROM users WHERE LOWER(email) = LOWER($1);", [REVIEWER_EMAIL]);
     await query("DELETE FROM auth.users WHERE LOWER(email) = LOWER($1);", [TEST_EMAIL]).catch(() => {});
+    await query("DELETE FROM auth.users WHERE LOWER(email) = LOWER($1);", [REVIEWER_EMAIL]).catch(() => {});
     console.log("  ✓ Test records cleaned up from database");
 
     if (server) {
@@ -432,6 +439,8 @@ run().catch(async (err) => {
         await query("DELETE FROM club_verification_requests WHERE LOWER(contact_email) = LOWER($1);", [TEST_EMAIL]);
         await query("DELETE FROM users WHERE LOWER(email) = LOWER($1);", [TEST_EMAIL]);
         await query("DELETE FROM users WHERE LOWER(email) = LOWER($1);", [REVIEWER_EMAIL]);
+        await query("DELETE FROM auth.users WHERE LOWER(email) = LOWER($1);", [TEST_EMAIL]).catch(() => {});
+        await query("DELETE FROM auth.users WHERE LOWER(email) = LOWER($1);", [REVIEWER_EMAIL]).catch(() => {});
         await pool.end();
         await redis.quit();
     } catch {}

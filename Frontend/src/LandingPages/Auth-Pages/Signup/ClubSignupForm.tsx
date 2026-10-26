@@ -578,87 +578,93 @@ export default function ClubSignupForm({ onSwitchToPersonal }: ClubSignupFormPro
                     />
                 </div>
 
-                {/* Password Input */}
-                <div>
-                    <FormInput
-                        name="password"
-                        isPassword
-                        placeholder="Password"
-                        hideLabel
-                        value={formData.password}
-                        onChange={(e) => {
-                            setFormData({ ...formData, password: e.target.value });
-                            if (errors.password) setErrors({ ...errors, password: "" });
-                        }}
-                        error={errors.password}
-                        autoComplete="new-password"
-                    />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
+                    {/* Password Input */}
+                    <div>
+                        <FormInput
+                            name="password"
+                            isPassword
+                            placeholder="Password"
+                            hideLabel
+                            value={formData.password}
+                            onChange={(e) => {
+                                setFormData({ ...formData, password: e.target.value });
+                                if (errors.password) setErrors({ ...errors, password: "" });
+                            }}
+                            error={errors.password}
+                            autoComplete="new-password"
+                        />
 
-                    {/* Interactive Password Strength Indicator */}
-                    <PasswordStrengthIndicator
-                        result={passwordStrength}
-                        hasInput={formData.password.length > 0}
-                    />
+                        {/* Interactive Password Strength Indicator */}
+                        <PasswordStrengthIndicator
+                            result={passwordStrength}
+                            hasInput={formData.password.length > 0}
+                        />
+                    </div>
+
+                    {/* Password Confirmation */}
+                    <div>
+                        <FormInput
+                            name="passwordConfirm"
+                            isPassword
+                            placeholder="Confirm Password"
+                            hideLabel
+                            value={formData.passwordConfirm}
+                            onChange={(e) => {
+                                setFormData({ ...formData, passwordConfirm: e.target.value });
+                                if (errors.passwordConfirm) setErrors({ ...errors, passwordConfirm: "" });
+                            }}
+                            error={errors.passwordConfirm}
+                            autoComplete="new-password"
+                        />
+                    </div>
                 </div>
-
-                {/* Password Confirmation */}
-                <FormInput
-                    name="passwordConfirm"
-                    isPassword
-                    placeholder="Confirm Password"
-                    hideLabel
-                    value={formData.passwordConfirm}
-                    onChange={(e) => {
-                        setFormData({ ...formData, passwordConfirm: e.target.value });
-                        if (errors.passwordConfirm) setErrors({ ...errors, passwordConfirm: "" });
-                    }}
-                    error={errors.passwordConfirm}
-                    autoComplete="new-password"
-                />
             </div>
 
             {/* SECTION E: LEGAL ACCEPTANCE */}
             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2.5">
-                <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
-                    <input
-                        type="checkbox"
-                        checked={formData.termsAccepted}
-                        onChange={(e) => {
-                            setFormData({ ...formData, termsAccepted: e.target.checked });
-                            if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
-                        }}
-                        className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
-                    />
-                    <span className="leading-snug font-medium">
-                        I accept the{" "}
-                        <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                            Terms of Service
-                        </a>
-                        .
-                    </span>
-                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
+                        <input
+                            type="checkbox"
+                            checked={formData.termsAccepted}
+                            onChange={(e) => {
+                                setFormData({ ...formData, termsAccepted: e.target.checked });
+                                if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
+                            }}
+                            className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
+                        />
+                        <span className="leading-snug font-medium">
+                            I accept the{" "}
+                            <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                Terms of Service
+                            </a>
+                            .
+                        </span>
+                    </label>
+
+                    <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
+                        <input
+                            type="checkbox"
+                            checked={formData.privacyPolicyAccepted}
+                            onChange={(e) => {
+                                setFormData({ ...formData, privacyPolicyAccepted: e.target.checked });
+                                if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
+                            }}
+                            className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
+                        />
+                        <span className="leading-snug font-medium">
+                            I accept the{" "}
+                            <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                Privacy Policy
+                            </a>
+                            .
+                        </span>
+                    </label>
+                </div>
                 {errors.termsAccepted && (
                     <p className="text-xs font-bold text-rose-600 px-1">{errors.termsAccepted}</p>
                 )}
-
-                <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
-                    <input
-                        type="checkbox"
-                        checked={formData.privacyPolicyAccepted}
-                        onChange={(e) => {
-                            setFormData({ ...formData, privacyPolicyAccepted: e.target.checked });
-                            if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
-                        }}
-                        className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
-                    />
-                    <span className="leading-snug font-medium">
-                        I accept the{" "}
-                        <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                            Privacy Policy
-                        </a>
-                        .
-                    </span>
-                </label>
                 {errors.privacyPolicyAccepted && (
                     <p className="text-xs font-bold text-rose-600 px-1">{errors.privacyPolicyAccepted}</p>
                 )}
