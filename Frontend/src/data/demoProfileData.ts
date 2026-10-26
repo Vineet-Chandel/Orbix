@@ -23,7 +23,15 @@ export const DEMO_USERNAME = "Vineet-Chandel";
 export function isDemoProfileUsername(username?: string | null): boolean {
     if (!username) return false;
     const clean = username.trim().toLowerCase();
-    return clean === "vineet-chandel" || clean === "vineetchandel" || clean === "demo";
+    const stripped = clean.replace(/[-_.\s]/g, "");
+    return (
+        clean === "vineet-chandel" ||
+        clean === "vineet_chandel" ||
+        clean === "vineetchandel" ||
+        stripped === "vineetchandel" ||
+        clean === "demo" ||
+        clean === "demo-profile"
+    );
 }
 
 /**

@@ -644,7 +644,9 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 viewer.gmail?.toLowerCase() === username);
 
         // Immediate mock handler for the public demo profile
-        if (username === "vineet-chandel" || username === "demo") {
+        const cleanUser = username.trim().toLowerCase();
+        const strippedUser = cleanUser.replace(/[-_.\s]/g, "");
+        if (cleanUser === "vineet-chandel" || cleanUser === "vineet_chandel" || strippedUser === "vineetchandel" || cleanUser === "demo") {
             const demoProfile: PublicProfilePayload = {
                 id: "demo-vineet-chandel",
                 username: "Vineet-Chandel",

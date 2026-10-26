@@ -153,11 +153,47 @@ async function apiFetch<T = any>(
     throw new Error(lastError);
 }
 
+export type ProfileErrorKind =
+    | "NETWORK_ERROR"    // Offline, Failed to fetch, connection refused, DNS error, timeout
+    | "NOT_FOUND"        // 404: The username is not registered in Orbix
+    | "PRIVATE"          // 403: Profile exists but owner marked it private
+    | "SERVER_ERROR"     // 500, 502, 503, 504: Backend crashed, gateway down, DB error
+    | "RATE_LIMITED"     // 429: Too many requests
+    | "INVALID_USERNAME" // Bad handle format (invalid characters, empty)
+    | "UNKNOWN";
+
+export class ProfileApiError extends Error {
+    kind: ProfileErrorKind;
+    status?: number;
+    details?: string;
+    endpoint?: string;
+
+    constructor(
+        kind: ProfileErrorKind,
+        message: string,
+        status?: number,
+        details?: string,
+        endpoint?: string
+    ) {
+        super(message);
+        this.name = "ProfileApiError";
+        this.kind = kind;
+        this.status = status;
+        this.details = details;
+        this.endpoint = endpoint;
+    }
+}
+
 /**
  * Fetch public profile by username with client-side caching & request deduplication
  */
 export async function fetchPublicProfile(username: string, force = false): Promise<PublicProfileData> {
-    const key = username.toLowerCase().trim();
+    const raw = (username || "").trim();
+    const key = raw.toLowerCase();
+
+    if (!key) {
+        throw new ProfileApiError("INVALID_USERNAME", "No username specified.", 400);
+    }
 
     // Instant return for verified demo showcase profile
     if (isDemoProfileUsername(key)) {
@@ -172,6 +208,16 @@ export async function fetchPublicProfile(username: string, force = false): Promi
         }
     }
 
+    // Check if browser is strictly offline
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new ProfileApiError(
+            "NETWORK_ERROR",
+            "You appear to be offline. Please verify your internet connection.",
+            0,
+            "Browser reports navigator.onLine = false"
+        );
+    }
+
     // Deduplicate in-flight requests
     if (inFlightRequests.has(key)) {
         return inFlightRequests.get(key)!;
@@ -184,9 +230,14 @@ export async function fetchPublicProfile(username: string, force = false): Promi
             `http://localhost:3000/api/profile/public/${encodedKey}`,
         ];
 
-        let lastError = "Unable to fetch profile";
+        let networkErrorCount = 0;
+        let lastStatus: number | undefined;
+        let lastErrorMessage = "Unable to fetch profile";
+        let lastErrorDetails = "";
+        let finalEndpoint = endpoints[0];
 
         for (const url of endpoints) {
+            finalEndpoint = url;
             try {
                 const response = await fetch(url, {
                     method: "GET",
@@ -201,22 +252,91 @@ export async function fetchPublicProfile(username: string, force = false): Promi
                         publicProfileCache.set(key, { data: profile, timestamp: Date.now() });
                         return profile;
                     }
-                } else if (response.status === 404) {
-                    const errJson = await response.json().catch(() => null);
-                    throw new Error(errJson?.message || "Profile not found or is private.");
-                } else {
-                    const errJson = await response.json().catch(() => null);
-                    throw new Error(errJson?.message || `Error (${response.status})`);
                 }
+
+                lastStatus = response.status;
+                const errJson = await response.json().catch(() => null);
+                const serverMsg = errJson?.message || errJson?.error;
+
+                if (response.status === 404) {
+                    throw new ProfileApiError(
+                        "NOT_FOUND",
+                        serverMsg || `Developer profile '@${raw}' does not exist on Orbix.`,
+                        404,
+                        "The username was not found in the Orbix database.",
+                        url
+                    );
+                }
+
+                if (response.status === 403) {
+                    throw new ProfileApiError(
+                        "PRIVATE",
+                        serverMsg || `The profile '@${raw}' is private.`,
+                        403,
+                        "This profile has been configured as private by its owner.",
+                        url
+                    );
+                }
+
+                if (response.status === 429) {
+                    throw new ProfileApiError(
+                        "RATE_LIMITED",
+                        serverMsg || "Too many profile lookup requests. Please wait a moment and try again.",
+                        429,
+                        "Client exceeded rate limit.",
+                        url
+                    );
+                }
+
+                if (response.status >= 500) {
+                    // Gateway errors on proxy (502/503/504) -> try direct port fallback if not already on localhost:3000
+                    if ((response.status === 502 || response.status === 503 || response.status === 504) && !url.includes("localhost:3000")) {
+                        lastErrorMessage = `Server gateway error (${response.status})`;
+                        lastErrorDetails = serverMsg || response.statusText;
+                        continue;
+                    }
+
+                    throw new ProfileApiError(
+                        "SERVER_ERROR",
+                        serverMsg || `Server error (${response.status}): Failed to retrieve public profile.`,
+                        response.status,
+                        serverMsg || `HTTP ${response.status} from ${url}`,
+                        url
+                    );
+                }
+
+                throw new ProfileApiError(
+                    response.status === 400 ? "INVALID_USERNAME" : "UNKNOWN",
+                    serverMsg || `Request failed (${response.status})`,
+                    response.status,
+                    serverMsg || response.statusText,
+                    url
+                );
             } catch (err: any) {
-                if (err.message.includes("not found") || err.message.includes("private")) {
+                if (err instanceof ProfileApiError) {
                     throw err;
                 }
-                lastError = err?.message || lastError;
+                if (err?.name === "AbortError" || String(err?.message || "").includes("aborted")) {
+                    throw err;
+                }
+                networkErrorCount++;
+                lastErrorMessage = err?.message || "Network request failed";
+                lastErrorDetails = String(err);
             }
         }
 
-        throw new Error(lastError);
+        // If all attempts failed with network errors, classify explicitly as NETWORK_ERROR
+        if (networkErrorCount > 0 && !lastStatus) {
+            throw new ProfileApiError(
+                "NETWORK_ERROR",
+                "Unable to establish a connection to the Orbix server. Please verify your internet connection or check if the backend service is running.",
+                0,
+                lastErrorDetails || lastErrorMessage,
+                finalEndpoint
+            );
+        }
+
+        throw new ProfileApiError("UNKNOWN", lastErrorMessage, lastStatus, lastErrorDetails, finalEndpoint);
     })();
 
     inFlightRequests.set(key, requestPromise);

@@ -188,6 +188,58 @@ export const testDatabaseConnection = async () => {
             CREATE INDEX IF NOT EXISTS idx_user_notifications_username ON user_notifications(username, is_read);
             CREATE INDEX IF NOT EXISTS idx_user_notifications_unread ON user_notifications(username, is_read, created_at DESC);
 
+            -- Resume Intelligence: Dedicated structured resumes, versions & real analyses
+            CREATE TABLE IF NOT EXISTS user_resumes (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID,
+                username VARCHAR(100) NOT NULL,
+                title VARCHAR(255) NOT NULL DEFAULT 'My Developer Resume',
+                target_role VARCHAR(255) DEFAULT 'Full Stack Engineer',
+                template_id VARCHAR(50) DEFAULT 'ats_clean_single',
+                content JSONB NOT NULL DEFAULT '{}'::jsonb,
+                completeness_score INT DEFAULT 0,
+                is_primary BOOLEAN DEFAULT true,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_user_resumes_user ON user_resumes(username, is_primary);
+            CREATE INDEX IF NOT EXISTS idx_user_resumes_updated ON user_resumes(updated_at DESC);
+
+            CREATE TABLE IF NOT EXISTS resume_versions (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                resume_id UUID NOT NULL REFERENCES user_resumes(id) ON DELETE CASCADE,
+                user_id UUID,
+                username VARCHAR(100) NOT NULL,
+                version_number INT NOT NULL DEFAULT 1,
+                version_label VARCHAR(100) NOT NULL DEFAULT 'Initial Draft',
+                target_role VARCHAR(255),
+                company_name VARCHAR(255),
+                job_description TEXT,
+                content JSONB NOT NULL DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_resume_versions_resume ON resume_versions(resume_id, version_number DESC);
+
+            CREATE TABLE IF NOT EXISTS resume_analyses (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                resume_id UUID,
+                version_id UUID,
+                user_id UUID,
+                username VARCHAR(100) NOT NULL,
+                analyzer_version VARCHAR(50) NOT NULL DEFAULT 'v2.0-ats-strict',
+                overall_score INT NOT NULL DEFAULT 0,
+                score_breakdown JSONB NOT NULL DEFAULT '{}'::jsonb,
+                findings JSONB NOT NULL DEFAULT '[]'::jsonb,
+                checks_summary JSONB NOT NULL DEFAULT '{}'::jsonb,
+                job_match_report JSONB DEFAULT NULL,
+                source_type VARCHAR(50) DEFAULT 'structured',
+                source_filename VARCHAR(255),
+                source_filesize INT,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_resume_analyses_user ON resume_analyses(username, created_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_resume_analyses_resume ON resume_analyses(resume_id, created_at DESC);
+
             -- Ensure leaderboard_entries precomputed projection table exists
             CREATE TABLE IF NOT EXISTS leaderboard_entries (
                 user_id UUID PRIMARY KEY,
