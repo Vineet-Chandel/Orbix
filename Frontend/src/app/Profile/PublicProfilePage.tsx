@@ -85,10 +85,9 @@ export interface ProfileDiagnosis {
 export function diagnoseProfileError(err: any, rawUsername?: string): ProfileDiagnosis {
     const isOffline = typeof navigator !== "undefined" && !navigator.onLine;
     const cleanUser = (rawUsername || "").trim();
-    const stripped = cleanUser.toLowerCase().replace(/[-_.\s]/g, "");
 
     let suggestedHandle: string | undefined;
-    if (stripped === "vineetchandel" && cleanUser.toLowerCase() !== "vineet-chandel") {
+    if (cleanUser.toLowerCase() === "vineetchandel" || cleanUser.toLowerCase() === "demo") {
         suggestedHandle = "Vineet-Chandel";
     }
 

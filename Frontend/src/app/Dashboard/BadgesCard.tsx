@@ -69,7 +69,7 @@ export const BadgesCard: React.FC<BadgesCardProps> = ({
         }
     }, [effectiveUser, remoteData, isLoading, dispatch]);
 
-    const isDemo = isDemoProfileUsername(effectiveUser) || effectiveUser.toLowerCase() === "vineet_chandel";
+    const isDemo = isDemoProfileUsername(effectiveUser);
 
     const badges = useMemo(() => {
         if (remoteData?.badges && remoteData.badges.length > 0) {

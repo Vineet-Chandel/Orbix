@@ -292,8 +292,7 @@ export const handleStreamResume = async (
 
         if (usernameParam) {
             const cleanUser = usernameParam.trim().toLowerCase();
-            const strippedUser = cleanUser.replace(/[-_.\s]/g, "");
-            if (cleanUser === "vineet-chandel" || cleanUser === "vineet_chandel" || strippedUser === "vineetchandel" || cleanUser === "demo") {
+            if (cleanUser === "vineet-chandel" || cleanUser === "demo" || cleanUser === "demo-profile") {
                 const demoUrl =
                     "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf";
                 return streamPdfWithCache(
@@ -824,8 +823,7 @@ export const handleGetPublicResume = async (req: Request, res: Response) => {
 
         // Demo profile support
         const cleanUser = username.trim().toLowerCase();
-        const strippedUser = cleanUser.replace(/[-_.\s]/g, "");
-        if (cleanUser === "vineet-chandel" || cleanUser === "vineet_chandel" || strippedUser === "vineetchandel" || cleanUser === "demo") {
+        if (cleanUser === "vineet-chandel" || cleanUser === "demo" || cleanUser === "demo-profile") {
             const demoPayload = {
                 success: true,
                 hasResume: true,

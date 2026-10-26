@@ -51,8 +51,6 @@ const saveStoredBadges = (data: Record<string, UnifiedBadgesData>) => {
 const initialData: Record<string, UnifiedBadgesData> = {
     [DEMO_USERNAME]: demoBadgesData,
     "vineet-chandel": demoBadgesData,
-    "vineetchandel": demoBadgesData,
-    "vineet_chandel": demoBadgesData,
     "demo": demoBadgesData,
     ...getStoredBadges(),
 };
@@ -64,8 +62,6 @@ const initialState: BadgesState = {
     lastFetchedAtByUser: {
         [DEMO_USERNAME]: Date.now(),
         "vineet-chandel": Date.now(),
-        "vineetchandel": Date.now(),
-        "vineet_chandel": Date.now(),
         "demo": Date.now(),
     },
 };
@@ -82,12 +78,12 @@ export const fetchUnifiedBadges = createAsyncThunk<
             return rejectWithValue("Username is required to fetch badges");
         }
 
-        // Instantly return enhanced data for demo profile, attempting live server sync for vineet_chandel first
-        if (isDemoProfileUsername(effectiveUser) || effectiveUser.toLowerCase() === "vineet_chandel") {
+        // Instantly return enhanced data for demo profile
+        if (isDemoProfileUsername(effectiveUser)) {
             try {
                 const endpoints = [
-                    `/api/portals/badges/unified?username=vineet_chandel`,
-                    `http://localhost:3000/api/portals/badges/unified?username=vineet_chandel`,
+                    `/api/portals/badges/unified?username=${encodeURIComponent(effectiveUser)}`,
+                    `http://localhost:3000/api/portals/badges/unified?username=${encodeURIComponent(effectiveUser)}`,
                 ];
                 for (const url of endpoints) {
                     try {

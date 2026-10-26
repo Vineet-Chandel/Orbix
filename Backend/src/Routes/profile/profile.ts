@@ -665,8 +665,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
 
         // Immediate mock handler for the public demo profile
         const cleanUser = username.trim().toLowerCase();
-        const strippedUser = cleanUser.replace(/[-_.\s]/g, "");
-        if (cleanUser === "vineet-chandel" || cleanUser === "vineet_chandel" || strippedUser === "vineetchandel" || cleanUser === "demo") {
+        if (cleanUser === "vineet-chandel" || cleanUser === "demo" || cleanUser === "demo-profile") {
             const demoProfile: PublicProfilePayload = {
                 id: "demo-vineet-chandel",
                 username: "Vineet-Chandel",
