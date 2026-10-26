@@ -1,6 +1,32 @@
-import type { GeminiAnalysisReport } from "../../../Backend/src/services/resume/resumeTypes";
+import type {
+    ComprehensiveIntelligenceReport,
+    ComprehensiveScoringResult,
+    DimensionScoreResult,
+    SubcriterionResult,
+    RoleSeniorityIntelligence,
+    ProfileSyncProposal,
+    ProposedSyncField,
+    PersonalizedImprovement,
+    RecruiterCheck,
+    StructuredResumeFacts,
+    ExtractedFact,
+    GeminiAnalysisReport
+} from "../../../Backend/src/services/resume/resumeTypes";
 
-export type { GeminiAnalysisReport };
+export type {
+    ComprehensiveIntelligenceReport,
+    ComprehensiveScoringResult,
+    DimensionScoreResult,
+    SubcriterionResult,
+    RoleSeniorityIntelligence,
+    ProfileSyncProposal,
+    ProposedSyncField,
+    PersonalizedImprovement,
+    RecruiterCheck,
+    StructuredResumeFacts,
+    ExtractedFact,
+    GeminiAnalysisReport
+};
 
 export interface ResumeProfileData {
     hasResume: boolean;
@@ -15,7 +41,7 @@ export interface ResumeProfileData {
     isResumePublic: boolean;
     checks?: any[];
     metadata?: {
-        analysisReport?: GeminiAnalysisReport;
+        analysisReport?: ComprehensiveIntelligenceReport;
         uploadResultVersion?: number;
         [key: string]: any;
     };
@@ -24,7 +50,7 @@ export interface ResumeProfileData {
 const API_BASE = "/api/profile/resume";
 
 /**
- * Fetch the authenticated user's uploaded profile resume details and Gemini report
+ * Fetch the authenticated user's uploaded profile resume details and report
  */
 export async function fetchResumeDetailsApi(): Promise<ResumeProfileData> {
     const res = await fetch(`${API_BASE}`, {
@@ -41,13 +67,13 @@ export async function fetchResumeDetailsApi(): Promise<ResumeProfileData> {
 
 /**
  * Upload resume PDF/DOCX directly to Cloudinary & user profile,
- * automatically executing Gemini AI analysis and storing the report.
+ * automatically executing intelligence analysis and storing the report.
  */
 export async function uploadResumeApi(file: File): Promise<{
     success: boolean;
     message: string;
     resume: ResumeProfileData;
-    report: GeminiAnalysisReport | null;
+    report: ComprehensiveIntelligenceReport | null;
 }> {
     const formData = new FormData();
     formData.append("resume", file);
@@ -67,12 +93,12 @@ export async function uploadResumeApi(file: File): Promise<{
 }
 
 /**
- * Re-runs Gemini AI analysis on the user's currently uploaded profile resume
+ * Re-runs intelligence analysis on the user's currently uploaded profile resume
  */
 export async function reAnalyzeResumeApi(): Promise<{
     success: boolean;
     message: string;
-    report: GeminiAnalysisReport;
+    report: ComprehensiveIntelligenceReport;
 }> {
     const res = await fetch(`${API_BASE}/re-analyze`, {
         method: "POST",
@@ -123,6 +149,50 @@ export async function deleteResumeApi(): Promise<{ success: boolean; message: st
     if (!res.ok) {
         const err = await res.json().catch(() => null);
         throw new Error(err?.message || `Failed to delete resume (${res.status})`);
+    }
+
+    return res.json();
+}
+
+/**
+ * Fetch Orbix Profile Sync proposal (missing profile fields only)
+ */
+export async function fetchProfileSyncProposalApi(): Promise<{
+    success: boolean;
+    proposal: ProfileSyncProposal;
+}> {
+    const res = await fetch(`${API_BASE}/intelligence/sync-proposal`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || `Failed to fetch profile sync proposal (${res.status})`);
+    }
+
+    return res.json();
+}
+
+/**
+ * Apply user-approved sync fields into the authenticated user's Orbix profile
+ */
+export async function applyProfileSyncApi(approvedFields: string[]): Promise<{
+    success: boolean;
+    message: string;
+    updatedFields: string[];
+}> {
+    const res = await fetch(`${API_BASE}/intelligence/apply-sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ approvedFields }),
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.message || `Failed to apply profile sync (${res.status})`);
     }
 
     return res.json();

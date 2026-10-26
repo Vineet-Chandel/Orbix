@@ -4,6 +4,7 @@ import NavBar from "../NavBar/Landing";
 import { getDocBySlug, ALL_DOC_FILES } from "../../data/docsRegistry";
 import AlgorithmDocumentary from "./documentaries/AlgorithmDocumentary";
 import PlatformRegistryDocumentary from "./documentaries/PlatformRegistryDocumentary";
+import ResumeIntelligenceDocumentary from "./documentaries/ResumeIntelligenceDocumentary";
 import {
     ArrowLeft,
     FileText,
@@ -21,6 +22,8 @@ export const DocsViewerPage: React.FC = () => {
             ? "orbix-score-algorithm"
             : activeSlug === "platforms" || activeSlug === "platform-registry" || activeSlug === "connected-platforms"
             ? "supported-platform-registry"
+            : activeSlug === "resume" || activeSlug === "resume-analytics" || activeSlug === "resume-algorithm" || activeSlug === "resume-intelligence" || activeSlug === "resume-intelligence-algorithm"
+            ? "resume-intelligence-algorithm"
             : activeSlug;
 
     // Check if doc exists in registry
@@ -69,6 +72,8 @@ export const DocsViewerPage: React.FC = () => {
                     <AlgorithmDocumentary />
                 ) : resolvedSlug === "supported-platform-registry" ? (
                     <PlatformRegistryDocumentary />
+                ) : resolvedSlug === "resume-intelligence-algorithm" ? (
+                    <ResumeIntelligenceDocumentary />
                 ) : doc ? (
                     <article className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-8">
                         <header className="space-y-4 pb-6 border-b-2 border-black/15">

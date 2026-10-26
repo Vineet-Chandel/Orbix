@@ -84,6 +84,34 @@ export const DOCS_FOLDERS: DocFolder[] = [
             },
         ],
     },
+    {
+        id: "resume-intelligence",
+        name: "Resume Intelligence & Parsing Engine",
+        badge: "v3.0.0 Architecture",
+        icon: "Brain",
+        color: "bg-[#a2ff86]",
+        description: "Multi-stage document parsing, AST text extraction, 7-dimension deterministic scoring, fact provenance, and consent-driven profile sync.",
+        files: [
+            {
+                id: "resume-intelligence-algorithm",
+                slug: "resume-intelligence-algorithm",
+                title: "Orbix Resume Intelligence: Fact Extraction & 7-Dimension Scoring Engine",
+                subtitle: "Deterministic 7-Dimension Mathematical Model • Structured Provenance • ATS Linear Audit • Profile Sync",
+                folderId: "resume-intelligence",
+                folderName: "Resume Intelligence & Parsing Engine",
+                badge: "v3.0.0 Authoritative",
+                badgeColor: "bg-[#a2ff86]",
+                image: "https://res.cloudinary.com/dj0ivep44/image/upload/v1793003144/Neon_Resume_PDF_Thumbnail_lucuju.png",
+                summary: "Full-fledged architectural documentation of the Orbix Resume Intelligence Engine. Explores multi-stage ingestion, selectable text parsing, structured fact provenance (explicitly stated vs inferred vs verified), 7 weighted evaluation dimensions, explainability formulas, and profile synchronization.",
+                tags: ["Resume Analytics", "Algorithm", "ATS Linear Audit", "Provenance", "Profile Sync", "Deterministic Math"],
+                readTime: "14 min read",
+                updatedAt: "October 2026",
+                author: "Orbix Research & Intelligence Engineering",
+                featured: true,
+                hasInteractiveSim: true,
+            },
+        ],
+    },
 ];
 
 export const ALL_DOC_FILES: DocFile[] = DOCS_FOLDERS.flatMap((folder) => folder.files);

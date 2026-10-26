@@ -4,8 +4,10 @@ import { query } from "../../database/client.js";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { parseUploadedDocument } from "../../services/resume/documentParser.js";
 import { analyzeResumeWithGemini } from "../../services/resume/geminiResumeAnalyzer.js";
+import { ProfileSyncService } from "../../services/resume/profileSyncService.js";
 
 const intelligenceRouter = express.Router();
+const profileSyncService = new ProfileSyncService();
 
 // Memory storage for analyzing uploaded resumes (PDF / DOCX up to 5 MB)
 const uploadDoc = multer({
@@ -23,7 +25,7 @@ const uploadDoc = multer({
 });
 
 // =========================================================================
-// 1. UPLOAD RESUME (PDF / DOCX) FOR TEXT EXTRACTION & GEMINI AI ANALYSIS
+// 1. UPLOAD RESUME (PDF / DOCX) FOR TEXT EXTRACTION & INTELLIGENCE ANALYSIS
 // =========================================================================
 intelligenceRouter.post(
     "/upload-analyze",
@@ -60,12 +62,20 @@ intelligenceRouter.post(
                 lastSyncStatus: row.lastSyncStatus,
             }));
 
-            // Run Gemini AI models (with intelligent rule engine fallback)
+            // Fetch current user profile to determine missing fields for sync proposal
+            const userProfileRes = await query(
+                `SELECT id, username, headline, bio, location, website, github, linkedin, skills, college FROM users WHERE id = $1 OR username = $2 LIMIT 1;`,
+                [authUser.id || "", authUser.username || ""]
+            );
+            const currentUserProfile = userProfileRes.rows[0] || {};
+
+            // Run Intelligence Pipeline
             const report = await analyzeResumeWithGemini(
                 parseResult.rawText,
                 parseResult.filename,
                 parseResult.filesizeBytes,
-                verifiedPlatforms
+                verifiedPlatforms,
+                currentUserProfile
             );
 
             return res.status(200).json({
@@ -88,7 +98,7 @@ intelligenceRouter.post(
 );
 
 // =========================================================================
-// 2. RUN GEMINI AI ANALYSIS ON TEXT CONTENT
+// 2. RUN INTELLIGENCE ANALYSIS ON TEXT CONTENT
 // =========================================================================
 intelligenceRouter.post("/analyze", authenticate, async (req: Request, res: Response) => {
     try {
@@ -116,11 +126,18 @@ intelligenceRouter.post("/analyze", authenticate, async (req: Request, res: Resp
             lastSyncStatus: row.lastSyncStatus,
         }));
 
+        const userProfileRes = await query(
+            `SELECT id, username, headline, bio, location, website, github, linkedin, skills, college FROM users WHERE id = $1 OR username = $2 LIMIT 1;`,
+            [authUser.id || "", authUser.username || ""]
+        );
+        const currentUserProfile = userProfileRes.rows[0] || {};
+
         const report = await analyzeResumeWithGemini(
             rawText,
             filename || "resume.pdf",
             filesizeBytes || 150000,
-            verifiedPlatforms
+            verifiedPlatforms,
+            currentUserProfile
         );
 
         return res.status(200).json({
@@ -130,6 +147,97 @@ intelligenceRouter.post("/analyze", authenticate, async (req: Request, res: Resp
     } catch (err: any) {
         console.error("POST /analyze error:", err);
         return res.status(500).json({ success: false, message: "Resume analysis failed", error: err.message });
+    }
+});
+
+// =========================================================================
+// 3. GET PROFILE SYNC PROPOSAL (Eligible missing fields only)
+// =========================================================================
+intelligenceRouter.get("/sync-proposal", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = req.user;
+        if (!authUser) return res.status(401).json({ success: false, message: "Authentication required" });
+
+        const userRes = await query(
+            `SELECT id, username, headline, bio, location, website, github, linkedin, skills, college, resume_metadata AS "resumeMetadata"
+             FROM users WHERE id = $1 OR username = $2 LIMIT 1;`,
+            [authUser.id || "", authUser.username || ""]
+        );
+
+        if (!userRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        const user = userRes.rows[0];
+        const structuredFacts = user.resumeMetadata?.analysisReport?.structuredFacts;
+
+        if (!structuredFacts) {
+            return res.status(200).json({
+                success: true,
+                proposal: {
+                    proposedFields: [],
+                    totalEligibleFields: 0,
+                    hasMissingFields: false
+                }
+            });
+        }
+
+        const proposal = profileSyncService.buildSyncProposal(user, structuredFacts);
+
+        return res.status(200).json({
+            success: true,
+            proposal
+        });
+    } catch (err: any) {
+        console.error("GET /sync-proposal error:", err);
+        return res.status(500).json({ success: false, message: "Failed to build sync proposal", error: err.message });
+    }
+});
+
+// =========================================================================
+// 4. APPLY PROFILE SYNC (User reviewed & approved fields)
+// =========================================================================
+intelligenceRouter.post("/apply-sync", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = req.user;
+        if (!authUser) return res.status(401).json({ success: false, message: "Authentication required" });
+
+        const { approvedFields } = req.body;
+        if (!Array.isArray(approvedFields) || approvedFields.length === 0) {
+            return res.status(400).json({ success: false, message: "approvedFields array is required" });
+        }
+
+        const userRes = await query(
+            `SELECT id, username, headline, bio, location, website, github, linkedin, skills, college, resume_metadata AS "resumeMetadata"
+             FROM users WHERE id = $1 OR username = $2 LIMIT 1;`,
+            [authUser.id || "", authUser.username || ""]
+        );
+
+        if (!userRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "User not found" });
+        }
+
+        const user = userRes.rows[0];
+        const structuredFacts = user.resumeMetadata?.analysisReport?.structuredFacts;
+
+        if (!structuredFacts) {
+            return res.status(400).json({
+                success: false,
+                message: "No structured resume facts found. Please analyze your resume first."
+            });
+        }
+
+        const proposal = profileSyncService.buildSyncProposal(user, structuredFacts);
+        const result = await profileSyncService.applyProfileSync(authUser.id || authUser.username, approvedFields, proposal);
+
+        return res.status(200).json({
+            success: true,
+            message: `Successfully synced ${result.updatedFields.length} field(s) to your Orbix profile.`,
+            updatedFields: result.updatedFields
+        });
+    } catch (err: any) {
+        console.error("POST /apply-sync error:", err);
+        return res.status(500).json({ success: false, message: "Failed to apply profile sync", error: err.message });
     }
 });
 

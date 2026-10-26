@@ -60,6 +60,18 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
+    const loadResumeDetails = React.useCallback(async () => {
+        try {
+            const data = await fetchResumeDetailsApi();
+            setResumeData(data);
+            if (data.metadata?.analysisReport) {
+                setAnalysisReport(data.metadata.analysisReport);
+            }
+        } catch (err: any) {
+            console.warn("Failed to fetch resume details:", err?.message);
+        }
+    }, []);
+
     // Initial load: Fetch current profile resume and its Gemini analysis report
     useEffect(() => {
         let isMounted = true;
@@ -556,6 +568,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                         isAnalyzing={isReAnalyzing}
                         onReAnalyze={handleReAnalyze}
                         onUploadClick={() => setIsUploadModalOpen(true)}
+                        onProfileSyncSuccess={loadResumeDetails}
                     />
 
                     {/* ========================================================================= */}

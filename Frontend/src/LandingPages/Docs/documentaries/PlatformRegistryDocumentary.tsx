@@ -15,6 +15,8 @@ import {
     GitPullRequest,
     Award,
     BookOpen,
+    Sparkles,
+    Activity,
 } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
 
@@ -835,11 +837,46 @@ export const PlatformRegistryDocumentary: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Schema Sample */}
+                            {/* Real Section Snapshot: Live Platform UI Card */}
+                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[10px] font-mono font-black uppercase text-neutral-500 flex items-center gap-1.5">
+                                        <Sparkles className="w-3.5 h-3.5 text-black" />
+                                        <span>Live Card Snapshot</span>
+                                    </span>
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-[#a2ff86] border border-black">
+                                        Verified
+                                    </span>
+                                </div>
+
+                                <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            {getPortalIcon(activePlatform.id, "w-5 h-5")}
+                                            <span className="font-black text-sm text-black">{activePlatform.name}</span>
+                                        </div>
+                                        <span className="font-mono text-xs font-bold text-neutral-600">@candidate</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-black/10">
+                                        {Object.entries(activePlatform.schemaSample).slice(0, 4).map(([key, val], idx) => (
+                                            <div key={idx} className="p-1.5 rounded-lg bg-white border border-neutral-300">
+                                                <div className="text-[9px] font-bold uppercase text-neutral-500 truncate">{key}</div>
+                                                <div className="text-xs font-mono font-black text-black truncate">
+                                                    {typeof val === "object" ? JSON.stringify(val) : String(val)}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Schema Sample & Live Ingestion Trace */}
                             <div className="p-4 rounded-2xl bg-black text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-mono font-black uppercase text-neutral-400">
-                                        Normalized Data Payload
+                                    <span className="text-[10px] font-mono font-black uppercase text-neutral-400 flex items-center gap-1">
+                                        <Activity className="w-3 h-3 text-[#a2ff86]" />
+                                        <span>Normalized Ingestion Payload</span>
                                     </span>
                                     <span className="text-[10px] font-mono font-bold text-[#FFE566]">JSON Schema</span>
                                 </div>

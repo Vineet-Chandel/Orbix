@@ -585,7 +585,14 @@ export const handleDirectResumeUpload = async (req: Request, res: Response) => {
                 lastSyncAt: row.lastSyncAt,
                 lastSyncStatus: row.lastSyncStatus,
             }));
-            geminiReport = await analyzeResumeWithGemini(parsedDoc.rawText, originalName, filesize, verifiedPlatforms);
+
+            const userProfileRes = await query(
+                `SELECT id, username, headline, bio, location, website, github, linkedin, skills, college FROM users WHERE id = $1 OR username = $2 LIMIT 1;`,
+                [authUser.id || "", authUser.username || ""]
+            );
+            const currentUserProfile = userProfileRes.rows[0] || {};
+
+            geminiReport = await analyzeResumeWithGemini(parsedDoc.rawText, originalName, filesize, verifiedPlatforms, currentUserProfile);
         } catch (analysisErr) {
             console.warn("Gemini resume analysis warning:", analysisErr);
         }
@@ -963,11 +970,18 @@ export const handleReAnalyzeResume = async (req: Request, res: Response) => {
             lastSyncStatus: p.lastSyncStatus,
         }));
 
+        const userProfileRes = await query(
+            `SELECT id, username, headline, bio, location, website, github, linkedin, skills, college FROM users WHERE id = $1 OR username = $2 LIMIT 1;`,
+            [authUser.id || "", authUser.username || ""]
+        );
+        const currentUserProfile = userProfileRes.rows[0] || {};
+
         const geminiReport = await analyzeResumeWithGemini(
             parsedDoc.rawText,
             row.resumeFilename || "resume.pdf",
             row.resumeFilesize || fileBuffer.length,
-            verifiedPlatforms
+            verifiedPlatforms,
+            currentUserProfile
         );
 
         const currentMetadata = row.resumeMetadata || {};

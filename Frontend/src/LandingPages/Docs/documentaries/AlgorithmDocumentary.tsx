@@ -15,6 +15,8 @@ import {
     GraduationCap,
     Globe2,
     AlertCircle,
+    Sparkles,
+    TrendingUp
 } from "lucide-react";
 
 export const AlgorithmDocumentary: React.FC = () => {
@@ -36,7 +38,7 @@ export const AlgorithmDocumentary: React.FC = () => {
     const [readersCount, setReadersCount] = useState<number>(1200);
 
     // -------------------------------------------------------------------------
-    // Live Deterministic Mathematical Model (Mirrors orbixScore.ts v2.0.0)
+    // Live Deterministic Mathematical Model (Mirrors Orbix Authoritative Score Specification v2.0.0)
     // -------------------------------------------------------------------------
     const simResults = useMemo(() => {
         // P1: Problem Solving (35% / 3,500 pts)
@@ -751,6 +753,136 @@ export const AlgorithmDocumentary: React.FC = () => {
                         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#ffdfbf] border border-black inline-block" /> P4: {simResults.p4.pts} pts</span>
                         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#c0aede] border border-black inline-block" /> P5: {simResults.p5.pts} pts</span>
                         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-[#fef08a] border border-black inline-block" /> P6: {simResults.p6.pts} pts</span>
+                    </div>
+                </div>
+
+                {/* ========================================================================= */}
+                {/* REAL SECTION SNAPSHOT: LIVE LEADERBOARD CANDIDATE CARD                   */}
+                {/* ========================================================================= */}
+                <div className="space-y-4 pt-4 border-t-2 border-black/15">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                            <Sparkles className="w-5 h-5 text-black" />
+                            <h3 className="text-base sm:text-lg font-black text-black">
+                                Live Component Snapshot: Candidate Leaderboard Card
+                            </h3>
+                        </div>
+                        <span className="px-2.5 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase bg-black text-[#a2ff86] border border-black">
+                            Real-Time Simulator Render
+                        </span>
+                    </div>
+
+                    <div className="p-6 rounded-3xl bg-[#FAF6EE] border-2 sm:border-[3px] border-black shadow-[6px_6px_0px_#000] space-y-5">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b-2 border-black/10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-black border-2 border-black flex items-center justify-center font-black text-2xl text-[#a2ff86] shadow-[3px_3px_0px_#000] shrink-0">
+                                    #14
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h4 className="text-lg sm:text-xl font-black text-black">Aarav Sharma</h4>
+                                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase border border-black shadow-[1px_1px_0px_#000] ${
+                                            simResults.total >= 7500 ? "bg-[#a2ff86] text-black" : simResults.total >= 5000 ? "bg-[#FFE566] text-black" : "bg-white text-black"
+                                        }`}>
+                                            {simResults.total >= 7500 ? "Grandmaster Tier" : simResults.total >= 5000 ? "Master Tier" : "Diamond Tier"}
+                                        </span>
+                                    </div>
+                                    <p className="text-xs font-bold text-neutral-600 flex items-center gap-1.5 flex-wrap">
+                                        <GraduationCap className="w-3.5 h-3.5 text-neutral-800" />
+                                        <span>Indian Institute of Information Technology • CSE &apos;26</span>
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 self-start md:self-center">
+                                <div className="p-3 rounded-2xl bg-white border-2 border-black text-right shadow-[3px_3px_0px_#000]">
+                                    <div className="text-[10px] font-bold uppercase text-neutral-500">Orbix Score</div>
+                                    <div className="text-2xl font-black text-black font-mono">
+                                        {simResults.total.toLocaleString()}
+                                        <span className="text-xs text-neutral-500 font-normal"> / 10k</span>
+                                    </div>
+                                    <div className="text-[10px] font-bold text-emerald-700">Top 1.4% Globally</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Verified Platform Chips on Card */}
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-[11px] font-bold text-neutral-600 uppercase tracking-wider mr-1">Verified:</span>
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-black border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-[#FFA116]" /> LeetCode ({contestRating})
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-black border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-[#1F8ACB]" /> Codeforces ({Math.max(1200, contestRating - 80)})
+                            </span>
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-white text-black border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-black" /> GitHub ({publicRepos} Repos • {repoStars}★)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* ========================================================================= */}
+                {/* INTERACTIVE DIMINISHING RETURNS MATH GRAPH (SVG)                          */}
+                {/* ========================================================================= */}
+                <div className="space-y-4 pt-4 border-t-2 border-black/15">
+                    <div className="flex items-center gap-2">
+                        <TrendingUp className="w-5 h-5 text-black" />
+                        <h3 className="text-base sm:text-lg font-black text-black">
+                            Mathematical Saturation Curve Visualizer (P1 Concave Decay)
+                        </h3>
+                    </div>
+
+                    <div className="p-6 rounded-3xl bg-neutral-950 text-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                            <span className="font-mono text-[#a2ff86]">Formula: S(x) = 100 × (1 - e^(-raw / 1400))</span>
+                            <span className="font-mono text-neutral-400">Current Raw Problem Points: {simResults.p1.raw}</span>
+                        </div>
+
+                        {/* Interactive SVG Curve */}
+                        <div className="w-full bg-black/60 rounded-2xl p-4 border border-neutral-800 overflow-x-auto">
+                            <svg viewBox="0 0 500 160" className="w-full h-40 max-w-full block">
+                                {/* Grid lines */}
+                                <line x1="50" y1="130" x2="480" y2="130" stroke="#333" strokeWidth="1" />
+                                <line x1="50" y1="80" x2="480" y2="80" stroke="#222" strokeDasharray="3 3" />
+                                <line x1="50" y1="30" x2="480" y2="30" stroke="#222" strokeDasharray="3 3" />
+                                <line x1="50" y1="20" x2="50" y2="130" stroke="#333" strokeWidth="1" />
+
+                                {/* Axis Labels */}
+                                <text x="20" y="35" fill="#666" fontSize="9" fontFamily="monospace">100%</text>
+                                <text x="25" y="85" fill="#666" fontSize="9" fontFamily="monospace">50%</text>
+                                <text x="35" y="133" fill="#666" fontSize="9" fontFamily="monospace">0</text>
+                                <text x="50" y="145" fill="#666" fontSize="9" fontFamily="monospace">0</text>
+                                <text x="250" y="145" fill="#666" fontSize="9" fontFamily="monospace">1,500 Raw</text>
+                                <text x="440" y="145" fill="#666" fontSize="9" fontFamily="monospace">3,500 Raw</text>
+
+                                {/* Saturation curve path */}
+                                <path
+                                    d="M 50 130 Q 150 50, 480 32"
+                                    fill="none"
+                                    stroke="#a2ff86"
+                                    strokeWidth="3"
+                                />
+
+                                {/* Current Simulated Point Marker */}
+                                {(() => {
+                                    const progressX = Math.min(480, 50 + (simResults.p1.raw / 3500) * 430);
+                                    const progressY = 130 - (simResults.p1.sub / 100) * 100;
+                                    return (
+                                        <g>
+                                            <circle cx={progressX} cy={progressY} r="6" fill="#FFE566" stroke="#000" strokeWidth="2" />
+                                            <circle cx={progressX} cy={progressY} r="10" fill="none" stroke="#FFE566" strokeWidth="1" opacity="0.6" className="animate-ping" />
+                                            <text x={Math.min(420, progressX + 10)} y={progressY - 8} fill="#FFE566" fontSize="10" fontWeight="bold" fontFamily="monospace">
+                                                {simResults.p1.sub}% Subscore ({simResults.p1.pts} pts)
+                                            </text>
+                                        </g>
+                                    );
+                                })()}
+                            </svg>
+                        </div>
+                        <p className="text-xs text-neutral-400 leading-relaxed font-medium">
+                            Anti-Gaming Guarantee: As a student’s raw count increases, the curve asymptotically flattens. Solving 500 trivial easy problems grants diminishing returns, encouraging candidates to tackle Hard contest problems, contribute to genuine open-source repositories, and maintain real consistency.
+                        </p>
                     </div>
                 </div>
             </section>

@@ -17,6 +17,7 @@ import {
     Award,
     Terminal,
     Sliders,
+    Brain,
 } from "lucide-react";
 
 export const DocsHubPage: React.FC = () => {
@@ -34,6 +35,8 @@ export const DocsHubPage: React.FC = () => {
                 return <Award className="w-5 h-5 text-black" />;
             case "Terminal":
                 return <Terminal className="w-5 h-5 text-black" />;
+            case "Brain":
+                return <Brain className="w-5 h-5 text-black" />;
             default:
                 return <Folder className="w-5 h-5 text-black" />;
         }
@@ -76,13 +79,6 @@ export const DocsHubPage: React.FC = () => {
     const totalMatchingFiles = useMemo(() => {
         return filteredFolders.reduce((acc, f) => acc + f.files.length, 0);
     }, [filteredFolders]);
-
-    // Smart UI Detection Flags:
-    // 1. If only 1 file is left across the docs explorer, limit the block width to the doc block with padding
-    const isSingleFileLeft = totalMatchingFiles === 1;
-
-    // 2. If multiple folders exist and each has 1 file (e.g. 1:1 files), pair them side by side
-    const areFoldersSingleFilePaired = filteredFolders.length > 1 && filteredFolders.every((f) => f.files.length === 1);
 
     return (
         <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] text-black font-sans selection:bg-black selection:text-[#a2ff86] relative overflow-x-hidden">
@@ -186,31 +182,14 @@ export const DocsHubPage: React.FC = () => {
                 {/* FOLDERS & INSERTED FILE STRUCTURE (SMART ADAPTIVE ARRANGEMENT)           */}
                 {/* ========================================================================= */}
                 <div className="space-y-6">
-                    {/* Smart Layout State Indicator */}
+                    {/* Status & Topic Counter */}
                     {filteredFolders.length > 0 && (
-                        <div className="flex items-center justify-between gap-3 text-xs font-bold text-neutral-600 px-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-black font-black uppercase text-[11px]">
-                                    {filteredFolders.length} {filteredFolders.length === 1 ? "Folder" : "Folders"} • {totalMatchingFiles} {totalMatchingFiles === 1 ? "Document" : "Documents"}
-                                </span>
-                                {isSingleFileLeft ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFE566] text-black font-black text-[10px] border border-black shadow-[1px_1px_0px_#000]">
-                                        <Sparkles className="w-3 h-3 stroke-[2.5]" />
-                                        Focused 1-File Layout (Constrained Width)
-                                    </span>
-                                ) : areFoldersSingleFilePaired ? (
-                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black font-black text-[10px] border border-black shadow-[1px_1px_0px_#000]">
-                                        <Layers className="w-3 h-3 stroke-[2.5]" />
-                                        Smart 1:1 Side-by-Side Arrangement
-                                    </span>
-                                ) : null}
-                            </div>
+                        <div className="flex items-center justify-between text-xs font-bold text-neutral-600 px-1">
+                            <span className="font-mono text-neutral-700 font-bold uppercase text-[11px] tracking-wider">
+                                Showing {filteredFolders.length} {filteredFolders.length === 1 ? "Architecture Topic" : "Architecture Topics"} ({totalMatchingFiles} {totalMatchingFiles === 1 ? "Documentary" : "Documentaries"})
+                            </span>
                             <span className="text-[11px] font-mono text-neutral-500 hidden sm:inline-block">
-                                {isSingleFileLeft
-                                    ? "Whitespace limited to doc block with padding"
-                                    : areFoldersSingleFilePaired
-                                    ? "1:1 folders paired side by side"
-                                    : "Modular grid layout"}
+                                Orbix Technical Specifications
                             </span>
                         </div>
                     )}
@@ -236,11 +215,11 @@ export const DocsHubPage: React.FC = () => {
                     ) : (
                         <div
                             className={
-                                isSingleFileLeft
+                                filteredFolders.length === 1
                                     ? "max-w-2xl mx-auto w-full space-y-8"
-                                    : areFoldersSingleFilePaired
-                                    ? "grid grid-cols-1 lg:grid-cols-2 gap-8 items-stretch"
-                                    : "space-y-10"
+                                    : filteredFolders.length === 2
+                                    ? "grid grid-cols-1 lg:grid-cols-2 gap-7 items-stretch"
+                                    : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch"
                             }
                         >
                             {filteredFolders.map((folder) => {
@@ -249,35 +228,25 @@ export const DocsHubPage: React.FC = () => {
                                 return (
                                     <section
                                         key={folder.id}
-                                        className={`rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-8 shadow-[6px_6px_0px_#000] flex flex-col justify-between space-y-6 ${
-                                            areFoldersSingleFilePaired ? "h-full" : ""
-                                        }`}
+                                        className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-5 sm:p-6 shadow-[5px_5px_0px_#000] flex flex-col justify-between space-y-5 h-full"
                                     >
                                         {/* Folder Block Header */}
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b-2 border-black/15">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`p-2.5 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] ${folder.color}`}>
-                                                    {getFolderIcon(folder.icon)}
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
-                                                            {folder.name}
-                                                        </h2>
-                                                        <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-black text-white border border-black">
-                                                            {folder.badge}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-xs sm:text-sm text-neutral-600 font-bold mt-0.5">
-                                                        {folder.description}
-                                                    </p>
-                                                </div>
+                                        <div className="flex items-start gap-3.5 pb-4 border-b-2 border-black/10">
+                                            <div className={`p-2.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] shrink-0 mt-0.5 ${folder.color}`}>
+                                                {getFolderIcon(folder.icon)}
                                             </div>
-
-                                            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-                                                <span className="px-3 py-1 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-mono font-black text-black shadow-[1.5px_1.5px_0px_#000]">
-                                                    {folder.files.length} {folder.files.length === 1 ? "File" : "Files"}
-                                                </span>
+                                            <div className="flex-1 min-w-0 space-y-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h2 className="text-lg sm:text-xl font-black text-black tracking-tight leading-snug">
+                                                        {folder.name}
+                                                    </h2>
+                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-white border border-black shadow-[1px_1px_0px_#000] shrink-0">
+                                                        {folder.badge}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-neutral-600 font-medium leading-relaxed line-clamp-2">
+                                                    {folder.description}
+                                                </p>
                                             </div>
                                         </div>
 
@@ -298,9 +267,7 @@ export const DocsHubPage: React.FC = () => {
                                                         {/* Image-like View Header (Thumbnail Banner) */}
                                                         <Link
                                                             to={`/docs/${file.slug}`}
-                                                            className={`block w-full relative overflow-hidden bg-black border-b-2 border-black shrink-0 ${
-                                                                isSingleFileLeft ? "h-56 sm:h-72" : "h-52 sm:h-60"
-                                                            }`}
+                                                            className="block w-full relative overflow-hidden bg-black border-b-2 border-black shrink-0 h-48 sm:h-52"
                                                         >
                                                             <img
                                                                 src={file.image}
@@ -308,63 +275,65 @@ export const DocsHubPage: React.FC = () => {
                                                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 block"
                                                             />
                                                             <div className="absolute top-3 left-3 flex items-center gap-2">
-                                                                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-black border border-black shadow-[1.5px_1.5px_0px_#000] ${file.badgeColor || "bg-[#a2ff86] text-black"}`}>
+                                                                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border border-black shadow-[1.5px_1.5px_0px_#000] ${file.badgeColor || "bg-[#a2ff86] text-black"}`}>
                                                                     {file.badge}
                                                                 </span>
                                                                 {file.hasInteractiveSim && (
-                                                                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-black text-[#FFE566] border border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-1">
+                                                                    <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-black text-[#FFE566] border border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-1">
                                                                         <Sliders className="w-2.5 h-2.5" />
-                                                                        Interactive Sim
+                                                                        Sim
                                                                     </span>
                                                                 )}
                                                             </div>
                                                         </Link>
 
                                                         {/* File Content Summary */}
-                                                        <div className="p-5 sm:p-6 space-y-3">
-                                                            <div className="flex items-center gap-2 text-xs font-mono font-bold text-neutral-600">
-                                                                <FileText className="w-3.5 h-3.5 text-black" />
-                                                                <span>{file.folderName}</span>
+                                                        <div className="p-4 sm:p-5 space-y-2.5">
+                                                            <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold text-neutral-600">
+                                                                <Clock className="w-3 h-3 text-black" />
+                                                                <span>{file.readTime}</span>
                                                                 <span>•</span>
-                                                                <span className="flex items-center gap-1">
-                                                                    <Clock className="w-3 h-3" />
-                                                                    {file.readTime}
-                                                                </span>
+                                                                <span className="truncate">{file.author}</span>
                                                             </div>
 
-                                                            <h3 className="text-lg sm:text-xl font-black text-black tracking-tight leading-snug group-hover:text-neutral-800 transition-colors">
+                                                            <h3 className="text-base sm:text-lg font-black text-black tracking-tight leading-snug group-hover:text-[#008f39] transition-colors line-clamp-2">
                                                                 <Link to={`/docs/${file.slug}`}>
                                                                     {file.title}
                                                                 </Link>
                                                             </h3>
 
-                                                            <p className="text-xs sm:text-sm font-medium text-neutral-700 leading-relaxed line-clamp-3">
+                                                            <p className="text-xs font-medium text-neutral-600 leading-relaxed line-clamp-2">
                                                                 {file.summary}
                                                             </p>
 
                                                             {/* Tags */}
                                                             <div className="flex flex-wrap gap-1.5 pt-1">
-                                                                {file.tags.map((tag, tIdx) => (
+                                                                {file.tags.slice(0, 3).map((tag, tIdx) => (
                                                                     <span
                                                                         key={tIdx}
-                                                                        className="px-2 py-0.5 rounded-md bg-white border border-neutral-300 text-[10px] font-bold text-neutral-800"
+                                                                        className="px-2 py-0.5 rounded-md bg-white border border-neutral-300 text-[10px] font-bold text-neutral-800 shadow-[1px_1px_0px_#eee]"
                                                                     >
                                                                         #{tag}
                                                                     </span>
                                                                 ))}
+                                                                {file.tags.length > 3 && (
+                                                                    <span className="px-1.5 py-0.5 rounded-md bg-black/5 text-[10px] font-mono font-bold text-neutral-600">
+                                                                        +{file.tags.length - 3}
+                                                                    </span>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
 
                                                     {/* File Card Footer */}
-                                                    <div className="p-4 sm:p-5 bg-white border-t-2 border-black flex items-center justify-between gap-3 mt-4">
+                                                    <div className="p-3.5 sm:p-4 bg-white border-t-2 border-black flex items-center justify-between gap-3 mt-3">
                                                         <span className="text-[11px] font-mono font-bold text-neutral-500">
-                                                            Updated {file.updatedAt}
+                                                            {file.updatedAt}
                                                         </span>
 
                                                         <Link
                                                             to={`/docs/${file.slug}`}
-                                                            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-[#FFE566] hover:text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-[#FFE566] hover:text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
                                                         >
                                                             <span>Open File</span>
                                                             <ArrowRight className="w-3.5 h-3.5" />
