@@ -6,7 +6,6 @@ import {
     Globe,
     Lock,
     ShieldCheck,
-    ArrowLeft,
 } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
@@ -17,7 +16,7 @@ import { useAppDispatch, setUser } from "../../../store";
 import { NeoSelect } from "../../../components/NeoSelect";
 
 interface ClubSignupFormProps {
-    onSwitchToPersonal: () => void;
+    onSwitchToPersonal?: () => void;
 }
 
 const CATEGORY_OPTIONS = [
@@ -41,7 +40,7 @@ const ROLE_OPTIONS = [
     "Other",
 ];
 
-export default function ClubSignupForm({ onSwitchToPersonal }: ClubSignupFormProps) {
+export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal }: ClubSignupFormProps = {}) {
     const navigate = useNavigate();
     const toast = useToast();
     const dispatch = useAppDispatch();
@@ -286,25 +285,6 @@ export default function ClubSignupForm({ onSwitchToPersonal }: ClubSignupFormPro
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-            {/* Top Switch Header Back to Personal */}
-            <div className="flex items-center justify-between p-3 rounded-2xl bg-white border-2 border-black shadow-[2px_2px_0px_#000]">
-                <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#FFE566] border border-black animate-pulse" />
-                    <span className="text-xs font-black uppercase tracking-wider text-black">
-                        Club Registration Mode
-                    </span>
-                </div>
-
-                <button
-                    type="button"
-                    onClick={onSwitchToPersonal}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] hover:bg-[#ede5d6] text-black text-xs font-bold border-2 border-black shadow-[1.5px_1.5px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                >
-                    <ArrowLeft className="w-3 h-3 stroke-[2.5]" />
-                    <span>Back to Personal</span>
-                </button>
-            </div>
-
             {/* SECTION A: CLUB INFORMATION */}
             <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
                 <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
@@ -679,15 +659,6 @@ export default function ClubSignupForm({ onSwitchToPersonal }: ClubSignupFormPro
                             <span>Submit Club for Verification</span>
                         </span>
                     )}
-                </button>
-
-                <button
-                    type="button"
-                    onClick={onSwitchToPersonal}
-                    disabled={loading}
-                    className="w-full flex h-10 items-center justify-center rounded-full bg-[#FAF6EE] text-xs font-bold text-neutral-800 border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#ede5d6] active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                >
-                    Cancel and Back to Personal Signup
                 </button>
             </div>
         </form>
