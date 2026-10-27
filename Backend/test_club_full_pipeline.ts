@@ -15,8 +15,15 @@ async function runPipelineTest() {
     let createdEventId: string | null = null;
 
     try {
-        // Step 1: Create a test user in users table
+        // Step 1: Create a test user in auth.users and public.users
         console.log("👉 Step 1: Creating test user account...");
+        await query(
+            `INSERT INTO auth.users (id, email, encrypted_password, role, aud, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+             VALUES ($1, $2, 'hashed_test_pwd', 'authenticated', 'authenticated', '{"provider":"email","providers":["email"]}'::jsonb, '{"account_type":"club"}'::jsonb, NOW(), NOW())
+             ON CONFLICT (id) DO NOTHING;`,
+            [testUserId, `club-${testRunId}@orbix-test.edu`]
+        );
+
         const userRes = await query(
             `INSERT INTO users (id, username, firstname, lastname, email, password, termsaccepted, avatar_url, account_type, created_at, updated_at)
              VALUES ($1, $2, $3, $4, $5, 'hashed_test_pwd', true, 'https://example.com/avatar.png', 'club', NOW(), NOW())
@@ -272,6 +279,7 @@ async function runPipelineTest() {
             await query(`DELETE FROM club_verification_requests WHERE id = $1;`, [createdAppId]).catch(() => {});
         }
         await query(`DELETE FROM users WHERE id = $1;`, [testUserId]).catch(() => {});
+        await query(`DELETE FROM auth.users WHERE id = $1;`, [testUserId]).catch(() => {});
         console.log("   Test records cleaned up cleanly.");
         process.exit(0);
     }
