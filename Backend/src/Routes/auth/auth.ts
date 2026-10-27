@@ -142,7 +142,10 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 firstName: validatedData.firstName,
                 middleName: validatedData.middleName,
                 lastName: validatedData.lastName,
-                gmail: validatedData.gmail
+                gmail: validatedData.gmail,
+                isEmailVerified: false,
+                isVerifiedCoder: false,
+                isVerified: false,
             }
         });
 
@@ -218,6 +221,10 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
                 is_open_to_work AS "isOpenToWork",
                 is_hireable AS "isHireable",
                 is_public AS "isPublic",
+                COALESCE(is_email_verified, false) AS "isEmailVerified",
+                email_verified_at AS "emailVerifiedAt",
+                (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
+                (COALESCE(is_email_verified, false) = true) AS "isVerified",
                 created_at AS "createdAt"
             FROM users
             WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
@@ -425,6 +432,10 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
                 is_open_to_work AS "isOpenToWork",
                 is_hireable AS "isHireable",
                 is_public AS "isPublic",
+                COALESCE(is_email_verified, false) AS "isEmailVerified",
+                email_verified_at AS "emailVerifiedAt",
+                (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
+                (COALESCE(is_email_verified, false) = true) AS "isVerified",
                 created_at AS "createdAt"
             FROM users
             WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)

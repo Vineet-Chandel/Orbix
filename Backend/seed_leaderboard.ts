@@ -370,12 +370,12 @@ async function seed() {
                 username, firstName, lastName, email, password, termsAccepted,
                 college, orbix_score, orbix_score_breakdown, orbix_score_version,
                 orbix_score_updated_at, streak, total_solved, total_contests,
-                platform_ratings, is_verified_coder, is_public
+                platform_ratings, is_verified_coder, is_email_verified, is_public
              ) VALUES (
                 $1, $2, $3, $4, $5, true,
                 $6, $7, $8, $9,
                 CURRENT_TIMESTAMP, $10, $11, $12,
-                $13, $14, true
+                $13, $14, $14, true
              )
              ON CONFLICT (username) DO UPDATE SET
                 firstName = EXCLUDED.firstName,
@@ -389,7 +389,8 @@ async function seed() {
                 total_solved = EXCLUDED.total_solved,
                 total_contests = EXCLUDED.total_contests,
                 platform_ratings = EXCLUDED.platform_ratings,
-                is_verified_coder = EXCLUDED.is_verified_coder
+                is_verified_coder = EXCLUDED.is_verified_coder,
+                is_email_verified = EXCLUDED.is_email_verified
              RETURNING id, username;`,
             [
                 coder.username,

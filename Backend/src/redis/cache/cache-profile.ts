@@ -19,6 +19,9 @@ export interface PublicProfilePayload {
     location?: string;
     skills?: string[];
     isPublic: boolean;
+    isEmailVerified?: boolean;
+    isVerifiedCoder?: boolean;
+    isVerified?: boolean;
     isOpenToWork?: boolean;
     isHireable?: boolean;
     resumeUrl?: string | null;

@@ -35,6 +35,9 @@ export interface PublicProfileData {
     isOpenToWork?: boolean;
     isHireable?: boolean;
     isPublic: boolean;
+    isEmailVerified?: boolean;
+    isVerifiedCoder?: boolean;
+    isVerified?: boolean;
     resumeUrl?: string | null;
     resumeFilename?: string | null;
     resumeFilesize?: number | null;

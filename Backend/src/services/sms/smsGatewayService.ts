@@ -14,6 +14,7 @@ export interface SendSmsResult {
     messageId?: string;
     simulated?: boolean;
     devOtp?: string;
+    providerError?: string;
     error?: string;
 }
 
@@ -95,6 +96,8 @@ export async function sendVerificationSms(options: SendSmsOptions): Promise<Send
         ? `Your Orbix verification code for ${clubName} is: ${otp}. Valid for 10 minutes. Do not share.`
         : `Your Orbix verification code is: ${otp}. Valid for 10 minutes. Do not share.`;
 
+    let lastProviderError: string | undefined;
+
     // 1. Check Fast2SMS Gateway (popular for India)
     const fast2smsApiKey = process.env.FAST2SMS_API_KEY;
     if (fast2smsApiKey && fast2smsApiKey.trim() && !fast2smsApiKey.includes("your_fast2sms_api_key")) {
@@ -121,9 +124,11 @@ export async function sendVerificationSms(options: SendSmsOptions): Promise<Send
                 };
             } else {
                 console.warn("[Fast2SMS] Provider message:", data?.message);
+                lastProviderError = data?.message || "Fast2SMS dispatch failed";
             }
         } catch (fastErr: any) {
             console.error("[Fast2SMS] Dispatch error:", fastErr.message);
+            lastProviderError = fastErr.message;
         }
     }
 
@@ -162,9 +167,11 @@ export async function sendVerificationSms(options: SendSmsOptions): Promise<Send
                 };
             } else {
                 console.warn("[Twilio SMS] Error:", twilioData?.message);
+                lastProviderError = twilioData?.message || "Twilio dispatch failed";
             }
         } catch (twErr: any) {
             console.error("[Twilio SMS] Dispatch error:", twErr.message);
+            lastProviderError = twErr.message;
         }
     }
 
@@ -172,6 +179,9 @@ export async function sendVerificationSms(options: SendSmsOptions): Promise<Send
     console.log(`\n======================================================`);
     console.log(`[ORBIX SMS SERVICE] 💬 Verification Code for ${phone.formatted}:`);
     console.log(`>>> SMS OTP: ${otp} <<<`);
+    if (lastProviderError) {
+        console.log(`⚠️ SMS Provider Notice: ${lastProviderError}`);
+    }
     console.log(`======================================================\n`);
 
     const isDev = process.env.NODE_ENV !== "production";
@@ -180,6 +190,7 @@ export async function sendVerificationSms(options: SendSmsOptions): Promise<Send
         success: true,
         simulated: true,
         devOtp: isDev ? otp : undefined,
+        providerError: lastProviderError,
         messageId: `sim_sms_${Date.now()}`,
     };
 }

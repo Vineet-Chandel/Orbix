@@ -55,6 +55,8 @@ export interface User {
     collegeId?: string | null;
     isEmailVerified?: boolean;
     emailVerifiedAt?: string | null;
+    isVerified?: boolean;
+    isVerifiedCoder?: boolean;
     college?: {
         id: string;
         officialName: string;
@@ -237,6 +239,13 @@ export const userSlice = createSlice({
     initialState,
     reducers: {
         setUser: (state, action: PayloadAction<User | null>) => {
+            if (action.payload) {
+                // In personal user case, only those persons verified via email OTP are verified
+                const isVerified = Boolean(action.payload.isEmailVerified);
+                action.payload.isEmailVerified = isVerified;
+                action.payload.isVerifiedCoder = isVerified;
+                action.payload.isVerified = isVerified;
+            }
             state.user = action.payload;
             state.isAuthenticated = !!action.payload;
             state.loading = false;
@@ -314,6 +323,8 @@ export const userSlice = createSlice({
         ) => {
             if (state.user) {
                 state.user.isEmailVerified = action.payload.isEmailVerified;
+                state.user.isVerifiedCoder = action.payload.isEmailVerified;
+                state.user.isVerified = action.payload.isEmailVerified;
                 if (action.payload.emailVerifiedAt) {
                     state.user.emailVerifiedAt = action.payload.emailVerifiedAt;
                 }

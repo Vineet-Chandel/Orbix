@@ -87,6 +87,8 @@ export class EmailVerificationService {
         return {
             email: user?.email || email,
             isEmailVerified: isVerified,
+            isVerifiedCoder: isVerified,
+            isVerified,
             emailVerifiedAt,
             hasPendingOtp,
             cooldownRemainingSeconds,
@@ -314,16 +316,25 @@ export class EmailVerificationService {
         // 5. Successful Verification!
         const verifiedAt = new Date();
 
-        // Update PostgreSQL users table
+        // Update PostgreSQL users table - strictly grant verified status on successful email OTP
         const updateRes = await query(
             `UPDATE users
              SET is_email_verified = true,
                  email_verified_at = $1,
+                 is_verified_coder = true,
                  email = COALESCE(NULLIF($2, ''), email)
              WHERE id = $3
-             RETURNING id, username, email, is_email_verified AS "isEmailVerified", email_verified_at AS "emailVerifiedAt";`,
+             RETURNING id, username, email, is_email_verified AS "isEmailVerified", email_verified_at AS "emailVerifiedAt", is_verified_coder AS "isVerifiedCoder";`,
             [verifiedAt, cachedData.email, userId]
         );
+
+        // Update leaderboard projection so verified status reflects across podium and ranks
+        await query(
+            `UPDATE leaderboard_entries
+             SET is_verified = true
+             WHERE user_id = $1;`,
+            [userId]
+        ).catch(() => {});
 
         // Mark OTP audit record as verified
         await query(
@@ -355,6 +366,8 @@ export class EmailVerificationService {
             success: true,
             message: "Email successfully verified!",
             isEmailVerified: true,
+            isVerifiedCoder: true,
+            isVerified: true,
             emailVerifiedAt: verifiedAt.toISOString(),
             email: updatedUser?.email || cachedData.email,
         };

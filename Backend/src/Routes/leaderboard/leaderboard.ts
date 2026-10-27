@@ -63,7 +63,7 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
 
     // 1. Fetch user record including college_id
     const userRes = await query(
-        `SELECT id, username, firstname, lastname, avatar_url, photo_url, college, college_id, is_verified_coder, is_public,
+        `SELECT id, username, firstname, lastname, avatar_url, photo_url, college, college_id, is_email_verified, is_verified_coder, is_public,
                 orbix_score, orbix_score_breakdown, total_solved, total_contests, streak, platform_ratings
          FROM users
          WHERE username = $1
@@ -81,7 +81,8 @@ export async function syncLeaderboardForUser(username: string): Promise<Leaderbo
     const avatarUrl = u.photo_url || u.avatar_url || "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
     let college = u.college || null;
     let collegeId = u.college_id || null;
-    const isVerified = Boolean(u.is_verified_coder);
+    // In personal user case, only persons verified via email OTP are verified
+    const isVerified = Boolean(u.is_email_verified);
     const isPublic = u.is_public !== false;
 
     // Harmonize college and college_id with verified institutions directory

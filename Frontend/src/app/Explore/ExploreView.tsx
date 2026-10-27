@@ -1099,7 +1099,6 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                     ? candidate.photoUrl
                                                     : (candidate.avatarUrl || candidate.photoUrl || DEFAULT_AVATAR_URL);
 
-                                            const verifiedPortals = candidate.connectedPortals.filter((p) => p.verified);
                                             const isConnecting = actionInProgressId === (candidate.id || candidate.username);
 
                                             return (
@@ -1133,8 +1132,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                         <h3 className="font-black text-base text-black tracking-tight truncate group-hover:text-emerald-700 transition-colors">
                                                                             {candidate.displayName}
                                                                         </h3>
-                                                                        {(candidate.isVerifiedCoder || verifiedPortals.length > 0) && (
-                                                                            <span title="Verified Developer Credentials">
+                                                                        {Boolean(candidate.isVerifiedCoder) && (
+                                                                            <span title="Verified Developer (Email OTP Verified)">
                                                                                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                                                                             </span>
                                                                         )}
@@ -1397,7 +1396,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                             {item.displayName}
                                                                         </h3>
                                                                         {item.isVerifiedCoder && (
-                                                                            <span title="Verified Developer">
+                                                                            <span title="Verified Developer (Email OTP Verified)">
                                                                                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                                                                             </span>
                                                                         )}
@@ -1607,7 +1606,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                                     {item.displayName}
                                                                                 </h3>
                                                                                 {item.isVerifiedCoder && (
-                                                                                    <span title="Verified Developer">
+                                                                                    <span title="Verified Developer (Email OTP Verified)">
                                                                                         <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                                                                                     </span>
                                                                                 )}
@@ -1638,7 +1637,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                     </p>
                                                                 ) : (
                                                                     <p className="text-xs font-medium text-neutral-500 italic">
-                                                                        Verified Developer
+                                                                        {item.isVerifiedCoder ? "Verified Developer" : "Developer on Orbix"}
                                                                     </p>
                                                                 )}
 
@@ -1755,7 +1754,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                                     {item.displayName}
                                                                                 </h3>
                                                                                 {item.isVerifiedCoder && (
-                                                                                    <span title="Verified Developer">
+                                                                                    <span title="Verified Developer (Email OTP Verified)">
                                                                                         <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                                                                                     </span>
                                                                                 )}

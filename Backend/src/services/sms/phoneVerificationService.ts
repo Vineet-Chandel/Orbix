@@ -164,13 +164,28 @@ export class PhoneVerificationService {
             throw new Error(sendResult.error || "Failed to dispatch SMS verification code");
         }
 
+        // Cache devOtp in Redis if simulation was used
+        if (redis && redis.status === "ready" && sendResult.simulated) {
+            const redisPayload = JSON.stringify({
+                otp,
+                otpHash,
+                canonical,
+                attempts: 0,
+                expiresAt: expiresAt.toISOString(),
+            });
+            await redis.set(`otp:phone_verification:${canonical}`, redisPayload, "EX", OTP_TTL_SECONDS);
+        }
+
         return {
             success: true,
-            message: `Verification code sent to ${norm.formatted}`,
+            message: sendResult.simulated && sendResult.providerError
+                ? `SMS Provider Notice: ${sendResult.providerError}`
+                : `Verification code sent to ${norm.formatted}`,
             phone: norm.formatted,
             canonical: norm.canonical,
             simulated: Boolean(sendResult.simulated),
             devOtp: sendResult.devOtp,
+            providerError: sendResult.providerError,
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresInSeconds: OTP_TTL_SECONDS,
         };

@@ -630,17 +630,21 @@ export async function requestConnection(
             location: null as string | null,
             orbixScore: 0,
             totalSolved: 0,
+            isVerifiedCoder: false,
+            isEmailVerified: false,
         };
 
         try {
             const userLookup = await query(
                 `SELECT username, firstname, lastname, headline, college, location, orbix_score, total_solved,
+                        COALESCE(is_email_verified, false) AS is_email_verified,
                         COALESCE(photo_url, avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS avatar_url
                  FROM users WHERE id = $1 LIMIT 1;`,
                 [actorId]
             );
             if (userLookup.rows[0]) {
                 const u = userLookup.rows[0];
+                const isVerified = Boolean(u.is_email_verified);
                 actorInfo = {
                     username: u.username || actorInfo.username,
                     displayName: `${u.firstname || ""} ${u.lastname || ""}`.trim() || u.username || actorInfo.displayName,
@@ -650,6 +654,8 @@ export async function requestConnection(
                     location: u.location || null,
                     orbixScore: u.orbix_score ?? 0,
                     totalSolved: u.total_solved ?? 0,
+                    isVerifiedCoder: isVerified,
+                    isEmailVerified: isVerified,
                 };
             }
         } catch (lookupErr: any) {
@@ -675,6 +681,8 @@ export async function requestConnection(
                 location: actorInfo.location,
                 orbixScore: actorInfo.orbixScore,
                 totalSolved: actorInfo.totalSolved,
+                isVerifiedCoder: actorInfo.isVerifiedCoder,
+                isEmailVerified: actorInfo.isEmailVerified,
             },
             idempotencyKey: `req-${actorId}-${targetUserId}-${relationshipId}`,
             isUserInitiated: false,
@@ -1149,7 +1157,7 @@ export async function getUserConnections(
             u.skills,
             COALESCE(u.orbix_score, 0) AS orbix_score,
             COALESCE(u.total_solved, 0) AS total_solved,
-            COALESCE(u.is_verified_coder, false) AS is_verified_coder
+            COALESCE(u.is_email_verified, false) AS is_verified_coder
         FROM user_relationships r
         JOIN users u ON u.id = (CASE WHEN r.user_low_id = $1 THEN r.user_high_id ELSE r.user_low_id END)
         WHERE (r.user_low_id = $1 OR r.user_high_id = $1)
@@ -1264,7 +1272,7 @@ export async function getPendingRequests(
             u.skills,
             COALESCE(u.orbix_score, 0) AS orbix_score,
             COALESCE(u.total_solved, 0) AS total_solved,
-            COALESCE(u.is_verified_coder, false) AS is_verified_coder
+            COALESCE(u.is_email_verified, false) AS is_verified_coder
         FROM user_relationships r
         JOIN users u ON u.id = (CASE WHEN r.user_low_id = $1 THEN r.user_high_id ELSE r.user_low_id END)
         WHERE (r.user_low_id = $1 OR r.user_high_id = $1)

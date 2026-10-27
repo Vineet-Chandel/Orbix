@@ -123,6 +123,16 @@ export const testDatabaseConnection = async () => {
             CREATE INDEX IF NOT EXISTS idx_users_orbix_score ON users(orbix_score DESC, username ASC);
             CREATE INDEX IF NOT EXISTS idx_users_is_public ON users(is_public);
 
+            -- Enforce strict personal user verification rule: verified strictly when email is verified via OTP
+            UPDATE users
+            SET is_verified_coder = COALESCE(is_email_verified, false)
+            WHERE account_type IS NULL OR account_type = 'personal';
+
+            UPDATE leaderboard_entries le
+            SET is_verified = COALESCE(u.is_email_verified, false)
+            FROM users u
+            WHERE le.user_id = u.id;
+
             -- Ensure email verification OTP audit table exists
             CREATE TABLE IF NOT EXISTS email_verification_otps (
                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

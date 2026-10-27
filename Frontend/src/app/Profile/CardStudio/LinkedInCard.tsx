@@ -327,12 +327,14 @@ export const LinkedInCard: React.FC<LinkedInCardProps> = React.memo(({
                                         <h1 className="text-5xl font-black text-white tracking-tight leading-none">
                                             {displayName}
                                         </h1>
-                                        {/* Verified Badge Icon (Matching Image 1) */}
-                                        <div className="w-8 h-8 flex items-center justify-center text-[#1D9BF0] flex-shrink-0" title="Verified Developer">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" viewBox="0 0 16 16">
-                                                <path fill="#00c4ff" d="m11.335 2.065l.076.153l.577 1.533c.045.12.14.216.261.261l1.48.555c.65.244.999.938.826 1.595l-.042.13l-.688 1.523a.45.45 0 0 0 0 .37l.653 1.439a1.34 1.34 0 0 1-.543 1.711l-.153.076l-1.533.577a.45.45 0 0 0-.261.261l-.555 1.48a1.34 1.34 0 0 1-1.595.826l-.13-.042l-1.523-.688a.45.45 0 0 0-.37 0l-1.439.654a1.34 1.34 0 0 1-1.711-.544l-.076-.153l-.577-1.533a.45.45 0 0 0-.261-.261l-1.48-.555a1.34 1.34 0 0 1-.826-1.595l.042-.13l.689-1.523a.45.45 0 0 0 0-.37l-.654-1.439a1.34 1.34 0 0 1 .543-1.711l.153-.076l1.533-.577a.45.45 0 0 0 .261-.261l.555-1.48a1.34 1.34 0 0 1 1.595-.826l.13.042l1.523.689a.45.45 0 0 0 .37 0l1.439-.654a1.34 1.34 0 0 1 1.711.543m-1.171 3.64L6.978 9.348L5.816 8.184a.447.447 0 1 0-.632.632l1.5 1.5a.447.447 0 0 0 .652-.022l3.5-4a.447.447 0 0 0-.672-.588"></path>
-                                            </svg>
-                                        </div>
+                                        {/* Verified Badge Icon - only for personal users verified via email OTP */}
+                                        {Boolean(user?.isEmailVerified || user?.is_email_verified || user?.isVerifiedCoder || user?.isVerified) && (
+                                            <div className="w-8 h-8 flex items-center justify-center text-[#1D9BF0] flex-shrink-0" title="Verified Developer (Email OTP Verified)">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="h-full w-full" viewBox="0 0 16 16">
+                                                    <path fill="#00c4ff" d="m11.335 2.065l.076.153l.577 1.533c.045.12.14.216.261.261l1.48.555c.65.244.999.938.826 1.595l-.042.13l-.688 1.523a.45.45 0 0 0 0 .37l.653 1.439a1.34 1.34 0 0 1-.543 1.711l-.153.076l-1.533.577a.45.45 0 0 0-.261.261l-.555 1.48a1.34 1.34 0 0 1-1.595.826l-.13-.042l-1.523-.688a.45.45 0 0 0-.37 0l-1.439.654a1.34 1.34 0 0 1-1.711-.544l-.076-.153l-.577-1.533a.45.45 0 0 0-.261-.261l-1.48-.555a1.34 1.34 0 0 1-.826-1.595l.042-.13l.689-1.523a.45.45 0 0 0 0-.37l-.654-1.439a1.34 1.34 0 0 1 .543-1.711l.153-.076l1.533-.577a.45.45 0 0 0 .261-.261l.555-1.48a1.34 1.34 0 0 1 1.595-.826l.13.042l1.523.689a.45.45 0 0 0 .37 0l1.439-.654a1.34 1.34 0 0 1 1.711.543m-1.171 3.64L6.978 9.348L5.816 8.184a.447.447 0 1 0-.632.632l1.5 1.5a.447.447 0 0 0 .652-.022l3.5-4a.447.447 0 0 0-.672-.588"></path>
+                                                </svg>
+                                            </div>
+                                        )}
 
 
                                     </div>

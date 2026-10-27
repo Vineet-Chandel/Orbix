@@ -187,6 +187,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
     const [devEmailOtp, setDevEmailOtp] = useState<string | null>(null);
     const [devPhoneOtp, setDevPhoneOtp] = useState<string | null>(null);
+    const [phoneProviderNotice, setPhoneProviderNotice] = useState<string | null>(null);
 
     const passwordStrength = evaluatePassword(formData.password);
 
@@ -396,7 +397,12 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
             setPhoneCooldown(data?.cooldownSeconds || 60);
             if (data?.devOtp) setDevPhoneOtp(data.devOtp);
-            toast.success(`SMS verification code sent to ${data?.phone || phone}`, { title: "SMS Code Sent" });
+            if (data?.providerError) {
+                setPhoneProviderNotice(data.providerError);
+            } else {
+                setPhoneProviderNotice(null);
+            }
+            toast.success(`SMS verification code dispatched to ${data?.phone || phone}`, { title: "SMS Code Sent" });
         } catch (err: any) {
             toast.error(err.message || "Failed to send SMS verification code");
         } finally {
@@ -1171,10 +1177,27 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 />
 
                                 {devPhoneOtp && (
-                                    <div className="text-center">
-                                        <span className="inline-block text-[10px] font-mono font-bold bg-neutral-100 border border-black/30 px-2 py-0.5 rounded text-neutral-600">
-                                            Dev Mode OTP: <strong className="text-black">{devPhoneOtp}</strong>
-                                        </span>
+                                    <div className="p-3 rounded-2xl bg-[#FFF9E6] border-2 border-amber-500 text-left space-y-1.5 shadow-[2px_2px_0px_#b45309]">
+                                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                                            <span className="text-[11px] font-black text-amber-950 uppercase tracking-wide">
+                                                Simulation Mode OTP
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setPhoneOtp(devPhoneOtp);
+                                                    handleVerifyPhone(devPhoneOtp);
+                                                }}
+                                                className="px-2.5 py-1 rounded-lg bg-black text-[#a2ff86] font-black text-xs hover:bg-neutral-800 transition cursor-pointer shadow-[1px_1px_0px_#000]"
+                                            >
+                                                Auto-fill ({devPhoneOtp})
+                                            </button>
+                                        </div>
+                                        {phoneProviderNotice && (
+                                            <p className="text-[10px] text-amber-900 font-medium">
+                                                <strong>Fast2SMS notice:</strong> {phoneProviderNotice}.
+                                            </p>
+                                        )}
                                     </div>
                                 )}
 

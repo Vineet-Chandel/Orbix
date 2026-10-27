@@ -1188,10 +1188,16 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                 Developer Profile (Private Mode)
                                             </span>
                                         </div>
-                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-black font-black text-xs shadow-[1.5px_1.5px_0px_#000]">
-                                            <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
-                                            <span>Verified Orbix Profile</span>
-                                        </div>
+                                        {Boolean(profile.isEmailVerified || profile.isVerified || profile.isVerifiedCoder) ? (
+                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-black font-black text-xs shadow-[1.5px_1.5px_0px_#000]">
+                                                <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Verified Orbix Profile</span>
+                                            </div>
+                                        ) : (
+                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 border-2 border-black text-black font-black text-xs shadow-[1.5px_1.5px_0px_#000]">
+                                                <span>Standard Profile</span>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Main Identity: Photo, Name, Headline, Location, College */}

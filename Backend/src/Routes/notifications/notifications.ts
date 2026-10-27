@@ -54,7 +54,8 @@ notificationsRouter.get("/", authenticate, async (req: Request, res: Response) =
                 u.location AS "senderLocation",
                 u.orbix_score AS "senderOrbixScore",
                 u.total_solved AS "senderTotalSolved",
-                u.is_verified_coder AS "senderIsVerifiedCoder"
+                COALESCE(u.is_email_verified, false) AS "senderIsEmailVerified",
+                (COALESCE(u.is_email_verified, false) = true) AS "senderIsVerifiedCoder"
              FROM user_notifications n
              LEFT JOIN users u ON (n.actor_id IS NOT NULL AND u.id = n.actor_id)
                                OR (n.actor_id IS NULL AND n.metadata->>'username' IS NOT NULL AND LOWER(u.username) = LOWER(n.metadata->>'username'))
@@ -88,6 +89,7 @@ notificationsRouter.get("/", authenticate, async (req: Request, res: Response) =
                     orbixScore: row.senderOrbixScore ?? meta.orbixScore ?? 0,
                     totalSolved: row.senderTotalSolved ?? meta.totalSolved ?? 0,
                     isVerifiedCoder: Boolean(row.senderIsVerifiedCoder ?? meta.isVerifiedCoder),
+                    isEmailVerified: Boolean(row.senderIsEmailVerified ?? meta.isEmailVerified),
                 };
 
                 // Normalize top-level meta so legacy callers get correct sender name & avatar

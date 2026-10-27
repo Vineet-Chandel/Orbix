@@ -430,7 +430,9 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                 <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center space-y-1">
                                     <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Account Age</p>
                                     <p className="text-base font-black text-black">Active</p>
-                                    <p className="text-[10px] font-bold text-neutral-600">Verified</p>
+                                    <p className={`text-[10px] font-bold ${user?.isEmailVerified ? "text-emerald-700 font-black" : "text-amber-800"}`}>
+                                        {user?.isEmailVerified ? "Email Verified" : "Pending OTP"}
+                                    </p>
                                 </div>
                                 <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center space-y-1">
                                     <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Sync Pipeline</p>

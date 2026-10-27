@@ -200,6 +200,8 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 is_resume_public AS "isResumePublic",
                 COALESCE(is_email_verified, false) AS "isEmailVerified",
                 email_verified_at AS "emailVerifiedAt",
+                (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
+                (COALESCE(is_email_verified, false) = true) AS "isVerified",
                 college_id AS "collegeId",
                 college_updated_at AS "collegeUpdatedAt",
                 created_at AS "createdAt"
@@ -821,6 +823,9 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 isOpenToWork: true,
                 isHireable: true,
                 isPublic: true,
+                isEmailVerified: true,
+                isVerifiedCoder: true,
+                isVerified: true,
                 resumeUrl: "/sample-resume.pdf",
                 resumeFilename: "Vineet_Chandel_FullStack_Resume.pdf",
                 resumeFilesize: 1420000,
@@ -1041,6 +1046,8 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 resume_filesize AS "resumeFilesize",
                 resume_updated_at AS "resumeUpdatedAt",
                 is_resume_public AS "isResumePublic",
+                COALESCE(is_email_verified, false) AS "isEmailVerified",
+                email_verified_at AS "emailVerifiedAt",
                 created_at AS "createdAt"
             FROM users
             WHERE LOWER(username) = $1
@@ -1131,6 +1138,9 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             isOpenToWork: isProfilePrivate ? false : userRow.isOpenToWork === true,
             isHireable: isProfilePrivate ? false : userRow.isHireable === true,
             isPublic: !isProfilePrivate,
+            isEmailVerified: Boolean(userRow.isEmailVerified),
+            isVerifiedCoder: Boolean(userRow.isEmailVerified),
+            isVerified: Boolean(userRow.isEmailVerified),
             resumeUrl: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeUrl || null) : null),
             resumeFilename: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeFilename || null) : null),
             resumeFilesize: isProfilePrivate ? null : (userRow.isResumePublic !== false ? (userRow.resumeFilesize || null) : null),
@@ -1262,7 +1272,7 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
         }
 
         if (verifiedOnly === "true" || (verifiedOnly as any) === true) {
-            whereClauses.push(`u.is_verified_coder IS TRUE`);
+            whereClauses.push(`u.is_email_verified IS TRUE`);
         }
 
         let orderByClause = "u.orbix_score DESC NULLS LAST, u.total_solved DESC NULLS LAST";
@@ -1315,7 +1325,9 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
                 u.total_solved AS "totalSolved",
                 u.total_contests AS "totalContests",
                 u.streak,
-                u.is_verified_coder AS "isVerifiedCoder",
+                COALESCE(u.is_email_verified, false) AS "isEmailVerified",
+                (COALESCE(u.is_email_verified, false) = true) AS "isVerifiedCoder",
+                (COALESCE(u.is_email_verified, false) = true) AS "isVerified",
                 (u.resume_url IS NOT NULL AND u.is_resume_public IS NOT FALSE) AS "hasResume",
                 u.created_at AS "createdAt",
                 COALESCE(
@@ -1422,7 +1434,7 @@ export const handlePrivacyAudit = async (req: Request, res: Response) => {
         const userRes = await query(
             `SELECT id, username, firstname, lastname, headline, bio, location, college, skills, links,
                     is_public, is_open_to_work, is_hireable, resume_url, is_resume_public,
-                    orbix_score, total_solved, total_contests, is_verified_coder, created_at
+                    orbix_score, total_solved, total_contests, is_email_verified, is_verified_coder, created_at
              FROM users
              WHERE LOWER(username) = $1
              LIMIT 1;`,
@@ -1463,9 +1475,9 @@ export const handlePrivacyAudit = async (req: Request, res: Response) => {
                 ? "PASS (Card preview and sharing accessible)"
                 : "PASS (Card web-sharing strictly restricted; owner retains studio access only)",
             antiManipulationIntegrity: "PASS (Cryptographic database integrity verified, no spoofed ratings)",
-            realUserVerification: verifiedPortalsCount > 0 || u.is_verified_coder
-                ? `PASS (Verified developer with ${verifiedPortalsCount} authenticated platform connections)`
-                : "PASS (Genuine registered account; standard verification tier)",
+            realUserVerification: u.is_email_verified
+                ? `PASS (Verified developer identity authenticated via secure email OTP)`
+                : "PASS (Standard registered account; email OTP verification pending)",
         };
 
         const exposedFields = isPublic
