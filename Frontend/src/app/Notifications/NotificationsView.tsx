@@ -1,5 +1,6 @@
+// Frontend/src/app/Notifications/NotificationsView.tsx
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import {
     Mail,
     Search,
@@ -10,6 +11,13 @@ import {
     Inbox,
     Loader2,
     ArrowUpRight,
+    User,
+    UserPlus,
+    GraduationCap,
+    MapPin,
+    Trophy,
+    Code2,
+    ExternalLink,
 } from "lucide-react";
 import { useAppSelector } from "../../store";
 import {
@@ -18,6 +26,7 @@ import {
     type UserNotification,
 } from "../../utils/profileApi";
 import { RelationshipActionButton } from "../../components/RelationshipActionButton";
+import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 
 function formatRelativeTime(dateString: string): string {
     try {
@@ -60,7 +69,7 @@ export const NotificationsView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [filter, setFilter] = useState<"all" | "inquiries" | "unread">("all");
+    const [filter, setFilter] = useState<"all" | "requests" | "inquiries" | "unread">("all");
     const [searchQuery, setSearchQuery] = useState("");
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -74,7 +83,7 @@ export const NotificationsView: React.FC = () => {
             try {
                 // Fetch with autoMarkRead=true so unread count clears automatically on arrival
                 const res = await fetchNotifications(true);
-                setNotifications(res.notifications);
+                setNotifications(res.notifications || []);
 
                 // Broadcast update so navbar and sidebar unread counts update
                 if (typeof window !== "undefined") {
@@ -82,9 +91,9 @@ export const NotificationsView: React.FC = () => {
                 }
 
                 // If queryId is provided, select it; otherwise select first item if none selected
-                if (queryId && res.notifications.some((n) => n.id === queryId)) {
+                if (queryId && res.notifications?.some((n) => n.id === queryId)) {
                     setSelectedId(queryId);
-                } else if (!selectedId && res.notifications.length > 0) {
+                } else if (!selectedId && res.notifications && res.notifications.length > 0) {
                     setSelectedId(res.notifications[0].id);
                 }
             } catch (err) {
@@ -147,22 +156,45 @@ export const NotificationsView: React.FC = () => {
     // Filter and search logic
     const filteredNotifications = useMemo(() => {
         return notifications.filter((item) => {
-            if (filter === "inquiries" && item.type !== "hire_inquiry") return false;
+            const isConnReq =
+                item.type === "connection_request" ||
+                (item as any).notification_type === "connection_request";
+            const isHire =
+                item.type === "hire_inquiry" ||
+                (item as any).notification_type === "hire_inquiry";
+
+            if (filter === "requests" && !isConnReq) return false;
+            if (filter === "inquiries" && !isHire) return false;
             if (filter === "unread" && item.isRead) return false;
 
             if (!searchQuery.trim()) return true;
 
             const q = searchQuery.toLowerCase();
-            const senderName = (item.metadata?.senderName || "").toLowerCase();
-            const company = (item.metadata?.company || "").toLowerCase();
-            const body = (item.metadata?.fullMessage || item.body || "").toLowerCase();
-            const commEmail = (item.metadata?.communicationEmail || "").toLowerCase();
+            const meta = item.metadata || {};
+            const senderProfile = meta.senderProfile || {};
+            const senderName = (
+                senderProfile.displayName ||
+                meta.displayName ||
+                meta.senderName ||
+                ""
+            ).toLowerCase();
+            const username = (
+                senderProfile.username ||
+                meta.username ||
+                ""
+            ).toLowerCase();
+            const company = (meta.company || "").toLowerCase();
+            const body = (meta.fullMessage || item.body || "").toLowerCase();
+            const commEmail = (meta.communicationEmail || "").toLowerCase();
+            const college = (senderProfile.college || meta.college || "").toLowerCase();
 
             return (
                 senderName.includes(q) ||
+                username.includes(q) ||
                 company.includes(q) ||
                 body.includes(q) ||
-                commEmail.includes(q)
+                commEmail.includes(q) ||
+                college.includes(q)
             );
         });
     }, [notifications, filter, searchQuery]);
@@ -172,7 +204,12 @@ export const NotificationsView: React.FC = () => {
     }, [notifications, selectedId, filteredNotifications]);
 
     const totalCount = notifications.length;
-    const inquiryCount = notifications.filter((n) => n.type === "hire_inquiry").length;
+    const requestsCount = notifications.filter(
+        (n) => n.type === "connection_request" || (n as any).notification_type === "connection_request"
+    ).length;
+    const inquiryCount = notifications.filter(
+        (n) => n.type === "hire_inquiry" || (n as any).notification_type === "hire_inquiry"
+    ).length;
 
     return (
         <div className="flex-1 flex flex-col min-w-0 space-y-5 select-none">
@@ -186,7 +223,7 @@ export const NotificationsView: React.FC = () => {
                         </span>
                     </h2>
                     <p className="text-xs sm:text-sm text-neutral-600 font-medium mt-1">
-                        Direct inquiries from recruiters and platform updates
+                        Connection requests, developer interactions, and direct opportunities
                     </p>
                 </div>
 
@@ -199,7 +236,7 @@ export const NotificationsView: React.FC = () => {
                         className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FAF6EE] hover:bg-[#FFE566] active:translate-x-0.5 active:translate-y-0.5 text-xs font-black text-black border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer disabled:opacity-50"
                         title="Refresh inbox"
                     >
-                        <RefreshCw className={`w-3.5 h-3.5 stroke-[2.5] ${refreshing ? "animate-spin" : ""}`} />
+                        <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
                         <span>Refresh</span>
                     </button>
                 </div>
@@ -218,13 +255,13 @@ export const NotificationsView: React.FC = () => {
                                 type="text"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder="Search sender, company, message..."
+                                placeholder="Search by name, handle, college, or text..."
                                 className="w-full pl-8 pr-3 py-2 rounded-xl bg-white text-xs border-2 border-black focus:outline-none placeholder-neutral-400 font-bold text-black shadow-[2px_2px_0px_#000]"
                             />
                         </div>
 
                         {/* Filter Tabs */}
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                             <button
                                 type="button"
                                 onClick={() => setFilter("all")}
@@ -238,15 +275,28 @@ export const NotificationsView: React.FC = () => {
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setFilter("inquiries")}
+                                onClick={() => setFilter("requests")}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                                    filter === "inquiries"
+                                    filter === "requests"
                                         ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
                                         : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
                                 }`}
                             >
-                                Recruiter ({inquiryCount})
+                                Requests ({requestsCount})
                             </button>
+                            {inquiryCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFilter("inquiries")}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                        filter === "inquiries"
+                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                    }`}
+                                >
+                                    Recruiter ({inquiryCount})
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -264,15 +314,38 @@ export const NotificationsView: React.FC = () => {
                                 </div>
                                 <h4 className="text-sm font-black text-black">No messages</h4>
                                 <p className="text-xs font-bold text-neutral-600 mt-1 max-w-[220px]">
-                                    {searchQuery ? "No matching inquiries found." : "Inquiries from recruiters will appear here."}
+                                    {searchQuery ? "No matching notifications found." : "Connection requests and updates will appear here."}
                                 </p>
                             </div>
                         ) : (
                             filteredNotifications.map((item) => {
                                 const isSelected = activeItem?.id === item.id;
+                                const isConnReq =
+                                    item.type === "connection_request" ||
+                                    (item as any).notification_type === "connection_request";
+                                const isHire =
+                                    item.type === "hire_inquiry" ||
+                                    (item as any).notification_type === "hire_inquiry";
+
                                 const meta = item.metadata || {};
-                                const senderName = meta.senderName || item.title || "Inquiry";
-                                const company = meta.company || "";
+                                const senderProfile = meta.senderProfile || {};
+
+                                const senderDisplayName =
+                                    senderProfile.displayName ||
+                                    meta.displayName ||
+                                    meta.senderName ||
+                                    (isConnReq ? "Developer" : item.title || "Inquiry");
+
+                                const senderAvatar =
+                                    senderProfile.avatarUrl ||
+                                    meta.avatarUrl ||
+                                    DEFAULT_AVATAR_URL;
+
+                                const senderUsername =
+                                    senderProfile.username ||
+                                    meta.username ||
+                                    "";
+
                                 const snippet = meta.fullMessage || item.body || "";
 
                                 return (
@@ -285,25 +358,53 @@ export const NotificationsView: React.FC = () => {
                                                 : "hover:bg-[#FAF6EE]/50 border-l-transparent"
                                         }`}
                                     >
-                                        <div className="flex items-start justify-between gap-2.5">
-                                            {/* Sender & Company */}
+                                        <div className="flex items-start gap-3">
+                                            {/* Sender Avatar Thumbnail */}
+                                            <div className="relative w-10 h-10 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] overflow-hidden shrink-0 mt-0.5">
+                                                <img
+                                                    src={senderAvatar}
+                                                    alt={senderDisplayName}
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
+                                                    }}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                {isConnReq && (
+                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#a2ff86] border border-black flex items-center justify-center">
+                                                        <UserPlus className="w-2.5 h-2.5 text-black stroke-[3]" />
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Sender & Preview */}
                                             <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
                                                     <span className="text-xs font-black text-black truncate">
-                                                        {senderName}
+                                                        {senderDisplayName}
                                                     </span>
-                                                    {company && (
-                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] truncate max-w-[140px]">
-                                                            {company}
-                                                        </span>
-                                                    )}
-                                                    {(item.type === "connection_request" || (item as any).notification_type === "connection_request") && (
+
+                                                    {/* Badges without misleading 'Company' tags */}
+                                                    {isConnReq && (
                                                         <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
                                                             Connection Request
                                                         </span>
                                                     )}
+
+                                                    {isHire && meta.company && (
+                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] truncate max-w-[130px]">
+                                                            {meta.company}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                <p className="text-xs text-neutral-700 font-medium line-clamp-2 mt-1.5 leading-relaxed">
+
+                                                {/* Handle and snippet */}
+                                                {senderUsername && (
+                                                    <span className="text-[11px] font-mono font-bold text-neutral-500 block truncate">
+                                                        @{senderUsername}
+                                                    </span>
+                                                )}
+
+                                                <p className="text-xs text-neutral-700 font-medium line-clamp-2 mt-1 leading-relaxed">
                                                     {snippet}
                                                 </p>
                                             </div>
@@ -334,18 +435,290 @@ export const NotificationsView: React.FC = () => {
                 <div className="lg:col-span-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden flex flex-col min-h-[580px]">
                     {activeItem ? (
                         (() => {
+                            const isConnectionRequest =
+                                activeItem.type === "connection_request" ||
+                                (activeItem as any).notification_type === "connection_request";
+
+                            const isHireInquiry =
+                                activeItem.type === "hire_inquiry" ||
+                                (activeItem as any).notification_type === "hire_inquiry";
+
                             const meta = activeItem.metadata || {};
-                            const senderName = meta.senderName || "Recruiter";
-                            const company = meta.company || "Company";
+                            const senderProfile = meta.senderProfile || {};
+
+                            const senderUsername =
+                                senderProfile.username ||
+                                meta.username ||
+                                "";
+
+                            const senderDisplayName =
+                                senderProfile.displayName ||
+                                meta.displayName ||
+                                meta.senderName ||
+                                (isConnectionRequest ? "Developer" : isHireInquiry ? "Recruiter" : activeItem.title || "Inquiry");
+
+                            const senderAvatar =
+                                senderProfile.avatarUrl ||
+                                meta.avatarUrl ||
+                                DEFAULT_AVATAR_URL;
+
+                            const senderHeadline =
+                                senderProfile.headline ||
+                                meta.headline ||
+                                null;
+
+                            const senderCollege =
+                                senderProfile.college ||
+                                meta.college ||
+                                null;
+
+                            const senderLocation =
+                                senderProfile.location ||
+                                meta.location ||
+                                null;
+
+                            const senderBio =
+                                senderProfile.bio ||
+                                meta.bio ||
+                                null;
+
+                            const senderScore =
+                                senderProfile.orbixScore ??
+                                meta.orbixScore ??
+                                null;
+
+                            const senderSolved =
+                                senderProfile.totalSolved ??
+                                meta.totalSolved ??
+                                null;
+
+                            const actorId =
+                                senderProfile.id ||
+                                meta.actorId ||
+                                senderUsername;
+
+                            // -------------------------------------------------------------
+                            // CASE A: CONNECTION REQUEST (OPTIMIZED FOR JUDGING SENDER)
+                            // -------------------------------------------------------------
+                            if (isConnectionRequest) {
+                                return (
+                                    <div className="flex-1 flex flex-col p-5 sm:p-6 space-y-5">
+                                        {/* Detail Top Header */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b-2 border-black/10">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                {/* Sender Profile Picture */}
+                                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden shrink-0">
+                                                    <img
+                                                        src={senderAvatar}
+                                                        alt={senderDisplayName}
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
+                                                        }}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+
+                                                <div className="min-w-0 space-y-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h3 className="text-lg sm:text-xl font-black text-black tracking-tight truncate">
+                                                            {senderDisplayName}
+                                                        </h3>
+                                                        <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1 shrink-0">
+                                                            <UserPlus className="w-3 h-3 stroke-[2.5]" />
+                                                            <span>Connection Request</span>
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                                                        {senderUsername && (
+                                                            <Link
+                                                                to={`/profile/u/${encodeURIComponent(senderUsername)}`}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="font-mono font-bold text-neutral-600 hover:text-black flex items-center gap-1 hover:underline"
+                                                                title="View public profile"
+                                                            >
+                                                                <span>@{senderUsername}</span>
+                                                                <ExternalLink className="w-3 h-3 stroke-[2.5]" />
+                                                            </Link>
+                                                        )}
+                                                        <span className="text-neutral-400">•</span>
+                                                        <span className="text-neutral-500 font-mono font-bold text-[11px]">
+                                                            Received {formatFullDateTime(activeItem.createdAt)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Quick Actions Top Right */}
+                                            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                                                <RelationshipActionButton
+                                                    targetUserId={actorId}
+                                                    targetUsername={senderUsername}
+                                                    targetDisplayName={senderDisplayName}
+                                                    initialState="incoming_pending"
+                                                />
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDelete(e, activeItem.id)}
+                                                    disabled={deletingId === activeItem.id}
+                                                    className="p-2 rounded-xl border-2 border-black bg-white text-black hover:text-rose-600 hover:bg-rose-50 shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
+                                                    title="Delete notification"
+                                                >
+                                                    {deletingId === activeItem.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                    ) : (
+                                                        <Trash2 className="w-4 h-4 stroke-[2]" />
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Judging The Sender: Comprehensive Developer Profile Summary */}
+                                        <div className="p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b-2 border-black/10">
+                                                <span className="text-[11px] font-black uppercase font-mono tracking-wider text-neutral-500 flex items-center gap-1.5">
+                                                    <User className="w-3.5 h-3.5 text-black" />
+                                                    <span>Developer Profile Details</span>
+                                                </span>
+                                                {senderUsername && (
+                                                    <Link
+                                                        to={`/profile/u/${encodeURIComponent(senderUsername)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 text-xs font-black text-black hover:text-neutral-700 underline underline-offset-4"
+                                                    >
+                                                        <span>Inspect Full Showcase Profile</span>
+                                                        <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    </Link>
+                                                )}
+                                            </div>
+
+                                            {/* Headline / Tagline */}
+                                            <div className="space-y-1">
+                                                <p className="text-sm font-black text-black leading-snug">
+                                                    {senderHeadline || "Developer on Orbix"}
+                                                </p>
+                                                {senderBio && (
+                                                    <p className="text-xs text-neutral-600 font-medium leading-relaxed italic border-l-2 border-black/30 pl-2.5 mt-1">
+                                                        "{senderBio}"
+                                                    </p>
+                                                )}
+                                            </div>
+
+                                            {/* 4 Metric Assessment Chips */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                                                {/* College / Institution */}
+                                                <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-sky-100 border border-black flex items-center justify-center shrink-0">
+                                                        <GraduationCap className="w-4 h-4 text-black stroke-[2]" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                                                            Institution / College
+                                                        </span>
+                                                        <span className="text-xs font-black text-black truncate block">
+                                                            {senderCollege || "No College Listed"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Location */}
+                                                <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-emerald-100 border border-black flex items-center justify-center shrink-0">
+                                                        <MapPin className="w-4 h-4 text-black stroke-[2]" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                                                            Location
+                                                        </span>
+                                                        <span className="text-xs font-black text-black truncate block">
+                                                            {senderLocation || "Location Not Set"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Orbix Score */}
+                                                <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0">
+                                                        <Trophy className="w-4 h-4 text-black stroke-[2]" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                                                            Orbix Score
+                                                        </span>
+                                                        <span className="text-xs font-black text-black truncate block">
+                                                            {senderScore ? `${senderScore} Pts` : "Unrated / New"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Problems Solved */}
+                                                <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-purple-100 border border-black flex items-center justify-center shrink-0">
+                                                        <Code2 className="w-4 h-4 text-black stroke-[2]" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                                                            Problems Solved
+                                                        </span>
+                                                        <span className="text-xs font-black text-black truncate block">
+                                                            {senderSolved ? `${senderSolved} Solved` : "0 Tracked"}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Network Context Note */}
+                                        <div className="p-4 rounded-xl bg-[#FAF6EE]/60 border-2 border-black/20 text-xs font-medium text-neutral-700 leading-relaxed space-y-1">
+                                            <p className="font-bold text-black">
+                                                Why connect on Orbix?
+                                            </p>
+                                            <p>
+                                                Accepting this connection request adds{" "}
+                                                <span className="font-black text-black">{senderDisplayName}</span> to
+                                                your network, enabling shared progress tracking, mutual platform
+                                                insights, and direct updates.
+                                            </p>
+                                        </div>
+
+                                        {/* Bottom Decision Callout */}
+                                        <div className="mt-auto p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                            <div className="space-y-0.5">
+                                                <span className="text-xs font-black text-black uppercase tracking-wider block">
+                                                    Connection Decision
+                                                </span>
+                                                <span className="text-xs text-neutral-600 font-medium block">
+                                                    Choose whether to accept or decline {senderDisplayName}'s request.
+                                                </span>
+                                            </div>
+                                            <RelationshipActionButton
+                                                targetUserId={actorId}
+                                                targetUsername={senderUsername}
+                                                targetDisplayName={senderDisplayName}
+                                                initialState="incoming_pending"
+                                                size="md"
+                                            />
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            // -------------------------------------------------------------
+                            // CASE B: RECRUITER / HIRE INQUIRY OR OTHER NOTIFICATIONS
+                            // -------------------------------------------------------------
+                            const company = meta.company || "";
                             const commEmail = meta.communicationEmail || meta.senderEmail || "";
                             const workEmail = meta.senderEmail || "";
                             const fullMsg = meta.fullMessage || activeItem.body || "";
 
                             const mailSubject = encodeURIComponent(
-                                `Re: Opportunity at ${company} for ${user?.firstName || user?.username || "Developer"}`
+                                `Re: Opportunity${company ? ` at ${company}` : ""} for ${user?.firstName || user?.username || "Developer"}`
                             );
                             const mailBody = encodeURIComponent(
-                                `Hi ${senderName},\n\nThank you for reaching out regarding the opportunity at ${company}.\n\n`
+                                `Hi ${senderDisplayName},\n\nThank you for reaching out${company ? ` regarding ${company}` : ""}.\n\n`
                             );
                             const mailtoUrl = commEmail
                                 ? `mailto:${commEmail}?subject=${mailSubject}&body=${mailBody}`
@@ -356,17 +729,31 @@ export const NotificationsView: React.FC = () => {
                                     {/* Detail Top Header */}
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b-2 border-black/10">
                                         <div className="flex items-center gap-3.5">
-                                            <div className="w-11 h-11 rounded-xl bg-[#FFE566] text-black font-black flex items-center justify-center text-base border-2 border-black shadow-[2px_2px_0px_#000] flex-shrink-0">
-                                                {senderName.charAt(0).toUpperCase()}
+                                            <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] overflow-hidden flex-shrink-0">
+                                                <img
+                                                    src={senderAvatar}
+                                                    alt={senderDisplayName}
+                                                    onError={(e) => {
+                                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
+                                                    }}
+                                                    className="w-full h-full object-cover"
+                                                />
                                             </div>
                                             <div>
                                                 <div className="flex items-center gap-2 flex-wrap">
                                                     <h3 className="text-base sm:text-lg font-black text-black tracking-tight">
-                                                        {senderName}
+                                                        {senderDisplayName}
                                                     </h3>
-                                                    <span className="text-xs font-black px-2.5 py-0.5 rounded-md bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]">
-                                                        {company}
-                                                    </span>
+                                                    {company && (
+                                                        <span className="text-xs font-black px-2.5 py-0.5 rounded-md bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]">
+                                                            {company}
+                                                        </span>
+                                                    )}
+                                                    {isHireInquiry && !company && (
+                                                        <span className="text-xs font-black px-2.5 py-0.5 rounded-md bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                                            Recruiter Opportunity
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <p className="text-[11px] text-neutral-500 font-mono font-bold mt-1">
                                                     Received {formatFullDateTime(activeItem.createdAt)}
@@ -376,26 +763,17 @@ export const NotificationsView: React.FC = () => {
 
                                         {/* Action buttons */}
                                         <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-                                            {(activeItem.type === "connection_request" || (activeItem as any).notification_type === "connection_request") ? (
-                                                <RelationshipActionButton
-                                                    targetUserId={meta.actorId || meta.username}
-                                                    targetUsername={meta.username}
-                                                    targetDisplayName={senderName}
-                                                    initialState="incoming_pending"
-                                                />
-                                            ) : (
-                                                commEmail && (
-                                                    <a
-                                                        href={mailtoUrl}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] text-xs font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
-                                                    >
-                                                        <Mail className="w-3.5 h-3.5" />
-                                                        <span>Reply</span>
-                                                        <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                    </a>
-                                                )
+                                            {commEmail && (
+                                                <a
+                                                    href={mailtoUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] text-xs font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
+                                                >
+                                                    <Mail className="w-3.5 h-3.5" />
+                                                    <span>Reply</span>
+                                                    <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                </a>
                                             )}
 
                                             <button
@@ -414,9 +792,9 @@ export const NotificationsView: React.FC = () => {
                                         </div>
                                     </div>
 
-                                    {/* Contact Information Chips */}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        {commEmail && (
+                                    {/* Contact Information Chips (Only if communication email exists) */}
+                                    {commEmail && (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div className="flex items-center justify-between p-3 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
                                                 <div className="min-w-0 pr-2">
                                                     <span className="block text-[10px] font-black text-neutral-600 uppercase tracking-wider">
@@ -439,33 +817,33 @@ export const NotificationsView: React.FC = () => {
                                                     )}
                                                 </button>
                                             </div>
-                                        )}
 
-                                        {workEmail && workEmail !== commEmail && (
-                                            <div className="flex items-center justify-between p-3 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
-                                                <div className="min-w-0 pr-2">
-                                                    <span className="block text-[10px] font-black text-neutral-600 uppercase tracking-wider">
-                                                        Work Email
-                                                    </span>
-                                                    <span className="text-xs font-mono font-bold text-black truncate block mt-0.5">
-                                                        {workEmail}
-                                                    </span>
+                                            {workEmail && workEmail !== commEmail && (
+                                                <div className="flex items-center justify-between p-3 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                                                    <div className="min-w-0 pr-2">
+                                                        <span className="block text-[10px] font-black text-neutral-600 uppercase tracking-wider">
+                                                            Work Email
+                                                        </span>
+                                                        <span className="text-xs font-mono font-bold text-black truncate block mt-0.5">
+                                                            {workEmail}
+                                                        </span>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleCopy(workEmail, "work")}
+                                                        className="p-1.5 rounded-lg text-black bg-white hover:bg-[#FFE566] border border-black shadow-[1px_1px_0px_#000] transition-colors cursor-pointer flex-shrink-0"
+                                                        title="Copy work email"
+                                                    >
+                                                        {copiedField === "work" ? (
+                                                            <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
+                                                        ) : (
+                                                            <Copy className="w-3.5 h-3.5 stroke-[2]" />
+                                                        )}
+                                                    </button>
                                                 </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleCopy(workEmail, "work")}
-                                                    className="p-1.5 rounded-lg text-black bg-white hover:bg-[#FFE566] border border-black shadow-[1px_1px_0px_#000] transition-colors cursor-pointer flex-shrink-0"
-                                                    title="Copy work email"
-                                                >
-                                                    {copiedField === "work" ? (
-                                                        <Check className="w-3.5 h-3.5 text-black stroke-[3]" />
-                                                    ) : (
-                                                        <Copy className="w-3.5 h-3.5 stroke-[2]" />
-                                                    )}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Message Body Content */}
                                     <div className="flex-1 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] p-5 text-black leading-relaxed space-y-3">
@@ -478,7 +856,10 @@ export const NotificationsView: React.FC = () => {
                                     {commEmail && (
                                         <div className="pt-2 flex items-center gap-2 text-xs font-bold text-neutral-600">
                                             <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black" />
-                                            <span>Direct reply enabled to <span className="font-mono text-black font-black">{commEmail}</span></span>
+                                            <span>
+                                                Direct reply enabled to{" "}
+                                                <span className="font-mono text-black font-black">{commEmail}</span>
+                                            </span>
                                         </div>
                                     )}
                                 </div>
@@ -489,9 +870,9 @@ export const NotificationsView: React.FC = () => {
                             <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center text-black mb-3">
                                 <Inbox className="w-7 h-7 stroke-[2.5]" />
                             </div>
-                            <h3 className="text-sm font-black text-black">Select a message</h3>
+                            <h3 className="text-sm font-black text-black">Select a notification</h3>
                             <p className="text-xs font-bold text-neutral-600 mt-1 max-w-[240px]">
-                                Choose an inquiry from the left panel to review recruiter details and reply.
+                                Choose a connection request or update from the left panel to review details.
                             </p>
                         </div>
                     )}

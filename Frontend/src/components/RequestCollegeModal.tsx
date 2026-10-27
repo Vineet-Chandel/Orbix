@@ -119,28 +119,34 @@ export function RequestCollegeModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="request-modal-title"
+            onClick={(e) => {
+                if (e.target === e.currentTarget && !submitting) {
+                    onClose();
+                }
+            }}
         >
-            <div className="relative w-full max-w-lg rounded-2xl bg-white border border-neutral-200/90 shadow-2xl p-6 sm:p-7 overflow-hidden text-neutral-900">
-                {/* Close Button */}
+            <div className="relative w-full max-w-lg rounded-2xl bg-white border-2 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 overflow-hidden text-black animate-scaleUp">
+                {/* Neo-Brutalist Close Button */}
                 <button
                     type="button"
                     onClick={onClose}
-                    className="absolute top-5 right-5 p-2 rounded-xl text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors cursor-pointer"
+                    disabled={submitting}
+                    className="absolute top-5 right-5 p-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform hover:scale-105 active:scale-95 disabled:opacity-50"
                     aria-label="Close modal"
                 >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4 stroke-[2.5]" />
                 </button>
 
                 {/* Header */}
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0 text-indigo-600">
-                        <Building2 className="w-5 h-5" />
+                <div className="flex items-start gap-3.5 mb-5 pr-8">
+                    <div className="w-11 h-11 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center flex-shrink-0 text-black shadow-[2px_2px_0px_#000]">
+                        <Building2 className="w-6 h-6 stroke-[2.5]" />
                     </div>
                     <div>
-                        <h2 id="request-modal-title" className="text-base sm:text-lg font-black text-neutral-900 tracking-tight">
+                        <h2 id="request-modal-title" className="text-lg sm:text-xl font-black text-black tracking-tight">
                             Request College Verification
                         </h2>
-                        <p className="text-xs text-neutral-500 mt-0.5">
+                        <p className="text-xs text-neutral-600 font-bold mt-0.5">
                             Submit your institution for verification against official AISHE & UGC registries.
                         </p>
                     </div>
@@ -148,23 +154,25 @@ export function RequestCollegeModal({
 
                 {successMessage ? (
                     <div className="space-y-4 py-2">
-                        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200/90 flex items-start gap-3 text-emerald-900">
-                            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                        <div className="p-4 rounded-xl bg-[#a2ff86]/25 border-2 border-black shadow-[2px_2px_0px_#000] flex items-start gap-3 text-black">
+                            <CheckCircle2 className="w-5 h-5 text-black flex-shrink-0 mt-0.5 stroke-[2.5]" />
                             <div className="space-y-1">
-                                <h4 className="text-xs font-bold text-emerald-800">Request Received</h4>
-                                <p className="text-xs leading-relaxed text-emerald-700">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                    Request Received & Queued
+                                </h4>
+                                <p className="text-xs font-medium leading-relaxed text-neutral-800">
                                     {successMessage}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="p-4 rounded-xl bg-neutral-50 border border-neutral-200 text-xs text-neutral-600 space-y-2">
-                            <div className="flex items-center gap-2 font-semibold text-neutral-800">
-                                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-xs text-neutral-800 space-y-2">
+                            <div className="flex items-center gap-2 font-black text-black uppercase tracking-wider text-[11px]">
+                                <ShieldCheck className="w-4 h-4 text-black stroke-[2.5]" />
                                 <span>Verification Policy</span>
                             </div>
-                            <p className="leading-relaxed">
-                                To prevent unverified claims and maintain database integrity, institutions must match a recognized AISHE code or UGC gazette entry before displaying the verified badge.
+                            <p className="leading-relaxed font-medium">
+                                To prevent unverified claims and maintain leaderboard authenticity, institutions must match a recognized AISHE code or UGC gazette entry before displaying the verified badge.
                             </p>
                         </div>
 
@@ -172,7 +180,7 @@ export function RequestCollegeModal({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-white text-xs font-bold transition-colors cursor-pointer"
+                                className="px-5 py-2.5 rounded-xl border-2 border-black bg-black text-[#a2ff86] hover:bg-neutral-900 text-xs font-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
                             >
                                 Done
                             </button>
@@ -181,15 +189,15 @@ export function RequestCollegeModal({
                 ) : (
                     <form onSubmit={handleSubmit} noValidate className="space-y-4 pt-1">
                         {errorMessage && (
-                            <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2.5 text-amber-900 text-xs leading-relaxed animate-in fade-in duration-150">
-                                <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <div className="p-3.5 rounded-xl bg-rose-50 border-2 border-black shadow-[2px_2px_0px_#000] flex items-start gap-2.5 text-rose-950 text-xs font-bold leading-relaxed animate-in fade-in duration-150">
+                                <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5 stroke-[2.5]" />
                                 <span>{errorMessage}</span>
                             </div>
                         )}
 
                         <div>
-                            <label className="block text-xs font-bold text-neutral-700 mb-1">
-                                College / University Official Name <span className="text-rose-500">*</span>
+                            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-800 mb-1.5">
+                                College / University Official Name <span className="text-rose-600">*</span>
                             </label>
                             <input
                                 ref={nameInputRef}
@@ -199,35 +207,35 @@ export function RequestCollegeModal({
                                     setName(e.target.value);
                                     if (errorMessage) setErrorMessage(null);
                                 }}
-                                placeholder="e.g. National Institute of Technology Calicut"
-                                className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-medium text-neutral-900 focus:outline-hidden transition-all ${
+                                placeholder="e.g. Delhi Technological University"
+                                className={`w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none transition-all ${
                                     errorMessage && name.trim().length < 3
-                                        ? "bg-rose-50/50 border border-rose-300 focus:border-rose-500 ring-2 ring-rose-100"
-                                        : "bg-neutral-50 border border-neutral-200 focus:bg-white focus:border-neutral-900"
+                                        ? "bg-rose-50 border-rose-600 ring-2 ring-rose-200"
+                                        : ""
                                 }`}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-neutral-700 mb-1">
-                                Official Website <span className="text-neutral-400 font-normal">(optional)</span>
+                            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-800 mb-1.5">
+                                Official Website <span className="text-neutral-500 font-bold capitalize text-[10px]">(optional)</span>
                             </label>
                             <div className="relative">
-                                <Globe className="w-3.5 h-3.5 text-neutral-400 absolute left-3.5 top-3" />
+                                <Globe className="w-4 h-4 text-neutral-600 absolute left-3.5 top-3 stroke-[2.5]" />
                                 <input
                                     type="text"
                                     inputMode="url"
                                     value={website}
                                     onChange={(e) => setWebsite(e.target.value)}
-                                    placeholder="https://www.nitc.ac.in"
-                                    className="w-full pl-9 pr-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                    placeholder="https://www.dtu.ac.in"
+                                    className="w-full pl-10 pr-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none transition-all"
                                 />
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                             <div>
-                                <label className="block text-xs font-bold text-neutral-700 mb-1">
+                                <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-800 mb-1.5">
                                     State / UT
                                 </label>
                                 <NeoSelect
@@ -235,6 +243,7 @@ export function RequestCollegeModal({
                                     onChange={(val) => setState(val)}
                                     placeholder="Select State"
                                     size="sm"
+                                    triggerClassName="bg-[#FAF6EE] border-2 border-black font-bold text-xs shadow-[2px_2px_0px_#000] focus:bg-white"
                                     options={[
                                         { value: "", label: "Select State" },
                                         ...INDIAN_STATES.map((s) => ({ value: s, label: s })),
@@ -242,29 +251,29 @@ export function RequestCollegeModal({
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-bold text-neutral-700 mb-1">
-                                    City / District <span className="text-neutral-400 font-normal">(optional)</span>
+                                <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-800 mb-1.5">
+                                    City / District <span className="text-neutral-500 font-bold capitalize text-[10px]">(optional)</span>
                                 </label>
                                 <input
                                     type="text"
                                     value={district}
                                     onChange={(e) => setDistrict(e.target.value)}
-                                    placeholder="e.g. Kozhikode"
-                                    className="w-full px-3.5 py-2.5 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all"
+                                    placeholder="e.g. New Delhi"
+                                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none transition-all"
                                 />
                             </div>
                         </div>
 
                         <div>
-                            <label className="block text-xs font-bold text-neutral-700 mb-1">
-                                Supporting Link / AISHE Code <span className="text-neutral-400 font-normal">(optional)</span>
+                            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-800 mb-1.5">
+                                Supporting Link / AISHE Code <span className="text-neutral-500 font-bold capitalize text-[10px]">(optional)</span>
                             </label>
                             <textarea
                                 rows={2}
                                 value={reference}
                                 onChange={(e) => setReference(e.target.value)}
                                 placeholder="AISHE code (e.g. C-12345), UGC listing link, or official document..."
-                                className="w-full px-3.5 py-2 rounded-xl bg-neutral-50 border border-neutral-200 text-xs font-medium text-neutral-900 focus:bg-white focus:border-neutral-900 focus:outline-hidden transition-all resize-none"
+                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none transition-all resize-none"
                             />
                         </div>
 
@@ -273,7 +282,7 @@ export function RequestCollegeModal({
                                 type="button"
                                 onClick={onClose}
                                 disabled={submitting}
-                                className="px-4 py-2.5 rounded-xl text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 text-xs font-bold transition-colors cursor-pointer"
+                                className="px-4 py-2.5 rounded-xl border-2 border-black bg-white text-black font-black text-xs shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 Cancel
                             </button>
@@ -287,13 +296,7 @@ export function RequestCollegeModal({
                                         nameInputRef.current?.focus();
                                     }
                                 }}
-                                className={`px-5 py-2.5 rounded-xl text-white text-xs font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
-                                    submitting
-                                        ? "bg-neutral-400 cursor-wait"
-                                        : name.trim().length >= 3
-                                        ? "bg-neutral-900 hover:bg-black hover:scale-[1.02] shadow-sm active:scale-[0.98]"
-                                        : "bg-neutral-800 hover:bg-neutral-900"
-                                }`}
+                                className="px-5 py-2.5 rounded-xl border-2 border-black bg-black text-[#a2ff86] hover:bg-neutral-900 font-black text-xs shadow-[3px_3px_0px_#000] cursor-pointer flex items-center gap-2 transition-all active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
                             >
                                 {submitting ? (
                                     <>
@@ -311,3 +314,4 @@ export function RequestCollegeModal({
         </div>
     );
 }
+export default RequestCollegeModal;

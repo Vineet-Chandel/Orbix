@@ -32,20 +32,85 @@ notificationsRouter.get("/", authenticate, async (req: Request, res: Response) =
 
         const notificationsRes = await query(
             `SELECT
-                id,
-                title,
-                body,
-                type,
-                metadata,
-                is_read AS "isRead",
-                read_at AS "readAt",
-                created_at AS "createdAt"
-             FROM user_notifications
-             WHERE (user_id = $1 OR LOWER(username) = $2 OR LOWER(username) = $3)
-             ORDER BY created_at DESC
+                n.id,
+                n.title,
+                n.body,
+                COALESCE(n.notification_type, n.type) AS type,
+                n.metadata,
+                n.is_read AS "isRead",
+                n.read_at AS "readAt",
+                n.created_at AS "createdAt",
+                n.actor_id AS "actorId",
+                n.relationship_id AS "relationshipId",
+                u.id AS "senderId",
+                u.username AS "senderUsername",
+                u.firstname AS "senderFirstName",
+                u.lastname AS "senderLastName",
+                NULLIF(TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), '') AS "senderDisplayName",
+                COALESCE(u.photo_url, u.avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "senderAvatarUrl",
+                u.headline AS "senderHeadline",
+                u.bio AS "senderBio",
+                u.college AS "senderCollege",
+                u.location AS "senderLocation",
+                u.orbix_score AS "senderOrbixScore",
+                u.total_solved AS "senderTotalSolved",
+                u.is_verified_coder AS "senderIsVerifiedCoder"
+             FROM user_notifications n
+             LEFT JOIN users u ON (n.actor_id IS NOT NULL AND u.id = n.actor_id)
+                               OR (n.actor_id IS NULL AND n.metadata->>'username' IS NOT NULL AND LOWER(u.username) = LOWER(n.metadata->>'username'))
+             WHERE (n.user_id = $1 OR LOWER(n.username) = $2 OR LOWER(n.username) = $3)
+             ORDER BY n.created_at DESC
              LIMIT 50;`,
             [userId, userIdentifier, userGmail]
         );
+
+        const enrichedNotifications = notificationsRes.rows.map((row) => {
+            const meta = { ...(row.metadata || {}) };
+
+            // If notification is associated with an actor or sender
+            if (row.senderUsername || row.senderDisplayName || row.actorId) {
+                const displayName =
+                    row.senderDisplayName ||
+                    meta.displayName ||
+                    meta.senderName ||
+                    row.senderUsername ||
+                    "A developer";
+
+                meta.senderProfile = {
+                    id: row.senderId || row.actorId || meta.actorId,
+                    username: row.senderUsername || meta.username,
+                    displayName,
+                    avatarUrl: row.senderAvatarUrl || meta.avatarUrl,
+                    headline: row.senderHeadline || meta.headline || null,
+                    bio: row.senderBio || meta.bio || null,
+                    college: row.senderCollege || meta.college || null,
+                    location: row.senderLocation || meta.location || null,
+                    orbixScore: row.senderOrbixScore ?? meta.orbixScore ?? 0,
+                    totalSolved: row.senderTotalSolved ?? meta.totalSolved ?? 0,
+                    isVerifiedCoder: Boolean(row.senderIsVerifiedCoder ?? meta.isVerifiedCoder),
+                };
+
+                // Normalize top-level meta so legacy callers get correct sender name & avatar
+                meta.senderName = displayName;
+                meta.username = row.senderUsername || meta.username;
+                meta.actorId = row.senderId || row.actorId || meta.actorId;
+                meta.avatarUrl = row.senderAvatarUrl || meta.avatarUrl;
+                meta.headline = row.senderHeadline || meta.headline;
+                meta.college = row.senderCollege || meta.college;
+                meta.location = row.senderLocation || meta.location;
+            }
+
+            return {
+                id: row.id,
+                title: row.title,
+                body: row.body,
+                type: row.type,
+                metadata: meta,
+                isRead: row.isRead,
+                readAt: row.readAt,
+                createdAt: row.createdAt,
+            };
+        });
 
         // If autoMarkRead requested, update unread records automatically
         if (autoMarkRead && unreadCount > 0) {
@@ -59,7 +124,7 @@ notificationsRouter.get("/", authenticate, async (req: Request, res: Response) =
 
         return res.status(200).json({
             success: true,
-            notifications: notificationsRes.rows,
+            notifications: enrichedNotifications,
             unreadCount: autoMarkRead ? 0 : unreadCount,
         });
     } catch (err: any) {

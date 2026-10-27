@@ -752,7 +752,7 @@ export default function ProfileManager() {
                                         </div>
 
                                         {/* Verified College / University Selector */}
-                                        <div>
+                                        <div className="pb-1">
                                             <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
                                                 College / University (Verified Directory)
                                             </label>
@@ -768,7 +768,7 @@ export default function ProfileManager() {
                                         </div>
 
                                         {/* Dynamic Links Section */}
-                                        <div className="space-y-3 pt-1">
+                                        <div className="space-y-3 pt-4 border-t-2 border-black/10">
                                             <div className="flex items-center justify-between">
                                                 <div>
                                                     <div className="flex items-center gap-2">
@@ -855,7 +855,7 @@ export default function ProfileManager() {
                                     </div>
 
                                     {/* Skills Tags */}
-                                    <div>
+                                    <div className="pt-4 border-t-2 border-black/10">
                                         <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">Skills & Technologies</label>
                                         <div className="flex gap-2 mb-2.5">
                                             <input

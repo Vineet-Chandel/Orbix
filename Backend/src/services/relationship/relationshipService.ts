@@ -618,23 +618,63 @@ export async function requestConnection(
 
         await client.query("COMMIT;");
 
-        // Dispatch idempotent notification to target user
-        const actorDisplayName = actorProfile?.firstName
-            ? `${actorProfile.firstName} ${actorProfile.lastName || ""}`.trim()
-            : actorProfile?.username || "A developer";
+        // Retrieve fresh actor details from users to enrich notification metadata
+        let actorInfo = {
+            username: actorProfile?.username || "",
+            displayName: actorProfile?.firstName
+                ? `${actorProfile.firstName} ${actorProfile.lastName || ""}`.trim()
+                : actorProfile?.username || "A developer",
+            avatarUrl: actorProfile?.avatarUrl || null,
+            headline: null as string | null,
+            college: null as string | null,
+            location: null as string | null,
+            orbixScore: 0,
+            totalSolved: 0,
+        };
 
+        try {
+            const userLookup = await query(
+                `SELECT username, firstname, lastname, headline, college, location, orbix_score, total_solved,
+                        COALESCE(photo_url, avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS avatar_url
+                 FROM users WHERE id = $1 LIMIT 1;`,
+                [actorId]
+            );
+            if (userLookup.rows[0]) {
+                const u = userLookup.rows[0];
+                actorInfo = {
+                    username: u.username || actorInfo.username,
+                    displayName: `${u.firstname || ""} ${u.lastname || ""}`.trim() || u.username || actorInfo.displayName,
+                    avatarUrl: u.avatar_url || actorInfo.avatarUrl,
+                    headline: u.headline || null,
+                    college: u.college || null,
+                    location: u.location || null,
+                    orbixScore: u.orbix_score ?? 0,
+                    totalSolved: u.total_solved ?? 0,
+                };
+            }
+        } catch (lookupErr: any) {
+            console.warn("[Relationship] Actor profile lookup non-blocking warning:", lookupErr?.message);
+        }
+
+        // Dispatch idempotent notification to target user
         await dispatchNotification({
             recipientId: targetUserId,
             actorId,
             title: "New Connection Request",
-            body: `${actorDisplayName} sent you a connection request.`,
+            body: `${actorInfo.displayName} sent you a connection request.`,
             notificationType: "connection_request",
             relationshipId,
             metadata: {
                 actorId,
-                username: actorProfile?.username || "",
-                displayName: actorDisplayName,
-                avatarUrl: actorProfile?.avatarUrl || null,
+                username: actorInfo.username,
+                displayName: actorInfo.displayName,
+                senderName: actorInfo.displayName,
+                avatarUrl: actorInfo.avatarUrl,
+                headline: actorInfo.headline,
+                college: actorInfo.college,
+                location: actorInfo.location,
+                orbixScore: actorInfo.orbixScore,
+                totalSolved: actorInfo.totalSolved,
             },
             idempotencyKey: `req-${actorId}-${targetUserId}-${relationshipId}`,
             isUserInitiated: false,

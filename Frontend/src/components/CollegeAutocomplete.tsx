@@ -55,16 +55,31 @@ export function CollegeAutocomplete({
     const listboxRef = useRef<HTMLUListElement>(null);
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    // Close dropdown when clicking outside
+    // Close dropdown when clicking outside (mouse and touch)
     useEffect(() => {
-        const handleClickOutside = (e: MouseEvent) => {
+        const handleClickOutside = (e: MouseEvent | TouchEvent) => {
             if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
                 setIsOpen(false);
             }
         };
         document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+        document.addEventListener("touchstart", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+            document.removeEventListener("touchstart", handleClickOutside);
+        };
     }, []);
+
+    // Global Escape key listener when dropdown is open
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape" && isOpen) {
+                setIsOpen(false);
+            }
+        };
+        window.addEventListener("keydown", handleGlobalKeyDown);
+        return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+    }, [isOpen]);
 
     // Debounced search with AbortController
     useEffect(() => {
@@ -153,6 +168,8 @@ export function CollegeAutocomplete({
                 e.preventDefault();
                 if (highlightedIndex >= 0 && highlightedIndex < results.length) {
                     handleSelect(results[highlightedIndex]);
+                } else if (results.length > 0) {
+                    handleSelect(results[0]);
                 }
                 break;
             case "Escape":
@@ -275,57 +292,223 @@ export function CollegeAutocomplete({
     }
 
     return (
-        <div ref={containerRef} className="relative w-full">
-            {/* Input Container */}
-            <div className="relative flex items-center">
-                <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 pointer-events-none stroke-[2.5]" />
-
-                <input
-                    ref={inputRef}
-                    type="text"
-                    role="combobox"
-                    aria-expanded={isOpen}
-                    aria-autocomplete="list"
-                    aria-controls="institution-search-listbox"
-                    aria-activedescendant={
-                        highlightedIndex >= 0 ? `inst-option-${highlightedIndex}` : undefined
-                    }
-                    disabled={disabled}
-                    value={queryText}
-                    onChange={(e) => {
-                        setQueryText(e.target.value);
-                        setIsOpen(true);
-                    }}
-                    onFocus={() => {
-                        if (queryText.trim().length >= 2) setIsOpen(true);
-                    }}
-                    onKeyDown={handleKeyDown}
-                    placeholder={placeholder}
-                    className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+        <div
+            ref={containerRef}
+            className="relative w-full"
+            onBlur={(e) => {
+                if (containerRef.current && !containerRef.current.contains(e.relatedTarget as Node)) {
+                    setIsOpen(false);
+                }
+            }}
+        >
+            {/* Backdrop overlay for clean click-outside and visual separation */}
+            {isOpen && queryText.trim().length >= 2 && (
+                <div
+                    className="fixed inset-0 z-40 bg-black/15 backdrop-blur-[0.5px] transition-opacity cursor-default"
+                    onClick={() => setIsOpen(false)}
+                    aria-hidden="true"
                 />
+            )}
 
-                <div className="absolute right-3 flex items-center gap-1.5">
-                    {isLoading && <Loader2 className="w-4 h-4 text-black animate-spin" />}
-                    {queryText && !isLoading && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setQueryText("");
-                                setResults([]);
-                                setIsOpen(false);
-                                inputRef.current?.focus();
-                            }}
-                            className="p-1 rounded-md text-neutral-500 hover:text-black hover:bg-neutral-200/50 transition-colors cursor-pointer"
-                            aria-label="Clear search input"
-                        >
-                            <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                        </button>
-                    )}
+            {/* Input Container */}
+            <div className="relative">
+                <div className="relative flex items-center">
+                    <Search className="w-4 h-4 text-neutral-500 absolute left-3.5 pointer-events-none stroke-[2.5]" />
+
+                    <input
+                        ref={inputRef}
+                        type="text"
+                        role="combobox"
+                        aria-expanded={isOpen}
+                        aria-autocomplete="list"
+                        aria-controls="institution-search-listbox"
+                        aria-activedescendant={
+                            highlightedIndex >= 0 ? `inst-option-${highlightedIndex}` : undefined
+                        }
+                        disabled={disabled}
+                        value={queryText}
+                        onChange={(e) => {
+                            setQueryText(e.target.value);
+                            setIsOpen(true);
+                        }}
+                        onFocus={() => {
+                            if (queryText.trim().length >= 2) setIsOpen(true);
+                        }}
+                        onKeyDown={handleKeyDown}
+                        placeholder={placeholder}
+                        className="w-full pl-10 pr-10 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black placeholder:text-neutral-500 focus:bg-white focus:outline-hidden shadow-[2px_2px_0px_#000] transition-all"
+                    />
+
+                    <div className="absolute right-3 flex items-center gap-1.5">
+                        {isLoading && <Loader2 className="w-4 h-4 text-black animate-spin" />}
+                        {queryText && !isLoading && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setQueryText("");
+                                    setResults([]);
+                                    setIsOpen(false);
+                                    inputRef.current?.focus();
+                                }}
+                                className="p-1 rounded-md text-neutral-500 hover:text-black hover:bg-neutral-200/50 transition-colors cursor-pointer"
+                                aria-label="Clear search input"
+                            >
+                                <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                            </button>
+                        )}
+                    </div>
                 </div>
+
+                {/* Dropdown Menu - Directly attached under input with elevated z-index */}
+                {isOpen && queryText.trim().length >= 2 && (
+                    <div className="absolute z-50 left-0 right-0 top-full mt-2 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                        {/* Dropdown Header */}
+                        <div className="px-3.5 py-2.5 bg-[#FAF6EE] border-b-2 border-black flex items-center justify-between text-xs font-black text-black">
+                            <div className="flex items-center gap-1.5">
+                                <Building className="w-4 h-4 text-black stroke-[2.5]" />
+                                <span>Institutions matching "{queryText}" {results.length > 0 && `(${results.length})`}</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsOpen(false)}
+                                className="text-neutral-500 hover:text-black font-black text-xs px-2 py-0.5 rounded-md hover:bg-black/10 transition-colors cursor-pointer flex items-center gap-1"
+                                aria-label="Close search dropdown"
+                            >
+                                <span>Close</span>
+                                <span className="font-mono text-[10px] bg-neutral-200 px-1 py-0.5 rounded">Esc</span>
+                            </button>
+                        </div>
+
+                        {/* Error Banner */}
+                        {searchError && (
+                            <div className="p-3 bg-rose-50 border-b-2 border-black flex items-center gap-2 text-rose-800 text-xs font-bold">
+                                <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
+                                <span>{searchError}</span>
+                            </div>
+                        )}
+
+                        {/* Results List */}
+                        {results.length > 0 && (
+                            <ul
+                                ref={listboxRef}
+                                id="institution-search-listbox"
+                                role="listbox"
+                                className="max-h-64 overflow-y-auto divide-y-2 divide-neutral-100 py-1"
+                            >
+                                {results.map((item, idx) => {
+                                    const isHighlighted = idx === highlightedIndex;
+                                    return (
+                                        <li
+                                            key={item.id}
+                                            id={`inst-option-${idx}`}
+                                            role="option"
+                                            aria-selected={isHighlighted}
+                                            onMouseEnter={() => setHighlightedIndex(idx)}
+                                            onClick={() => handleSelect(item)}
+                                            className={`group px-4 py-3 flex items-center justify-between gap-3 cursor-pointer transition-all ${
+                                                isHighlighted
+                                                    ? "bg-[#FFE566]/25 border-l-4 border-l-black pl-3"
+                                                    : "hover:bg-neutral-50 border-l-4 border-l-transparent pl-3"
+                                            }`}
+                                        >
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-xs font-black text-black tracking-tight leading-snug">
+                                                        {item.officialName}
+                                                    </span>
+                                                    {item.verificationStatus === "verified" && (
+                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[9px] font-black text-black shadow-[1px_1px_0px_#000]">
+                                                            <CheckCircle2 className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                            <span>Verified</span>
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-2.5 text-[11px] text-neutral-600 font-semibold mt-1 flex-wrap">
+                                                    {(item.city || item.state) && (
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <MapPin className="w-3 h-3 text-neutral-500" />
+                                                            <span>{[item.city, item.state].filter(Boolean).join(", ")}</span>
+                                                        </span>
+                                                    )}
+                                                    {item.institutionType && (
+                                                        <span className="text-neutral-500">• {item.institutionType}</span>
+                                                    )}
+                                                    {item.aisheCode && (
+                                                        <span className="font-mono text-[9px] bg-neutral-100 border border-black/30 px-1 rounded font-bold text-neutral-800">
+                                                            {item.aisheCode}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleSelect(item);
+                                                }}
+                                                className="px-3 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] text-xs font-black uppercase tracking-wider flex items-center gap-1 transition-all flex-shrink-0 cursor-pointer"
+                                            >
+                                                <span>Select</span>
+                                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+
+                        {/* Empty State */}
+                        {!isLoading && hasSearched && results.length === 0 && !searchError && (
+                            <div className="p-6 text-center space-y-3">
+                                <div className="w-11 h-11 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center mx-auto text-black shadow-[2px_2px_0px_#000]">
+                                    <Building className="w-5 h-5 stroke-[2.5]" />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-xs font-black text-black">
+                                        No verified institutions found for "{queryText}"
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 max-w-sm mx-auto leading-relaxed font-medium">
+                                        Only institutions verified against official Ministry of Education / AISHE registers can be selected.
+                                    </p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setIsOpen(false);
+                                        setIsRequestModalOpen(true);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] transition-transform hover:scale-[1.02] cursor-pointer"
+                                >
+                                    <PlusCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Request College Addition</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Dropdown Footer */}
+                        <div className="p-2.5 bg-[#FAF6EE] border-t-2 border-black flex items-center justify-between text-[11px] font-bold text-neutral-700">
+                            <span className="inline-flex items-center gap-1">
+                                <ShieldCheck className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                                <span>Official Indian Higher Education Directory</span>
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsOpen(false);
+                                    setIsRequestModalOpen(true);
+                                }}
+                                className="text-black hover:underline font-black cursor-pointer underline-offset-2"
+                            >
+                                Request Addition
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Helper label below input */}
-            <div className="flex items-center justify-between text-[11px] text-neutral-600 font-semibold mt-1 px-1">
+            <div className="flex items-center justify-between text-[11px] text-neutral-600 font-semibold mt-1.5 px-1">
                 <span>Type at least 2 characters to search by official name, short form (e.g. IIT, NIT, BITS), or city.</span>
                 <button
                     type="button"
@@ -340,129 +523,6 @@ export function CollegeAutocomplete({
                 <ShieldCheck className="w-3.5 h-3.5 text-black flex-shrink-0 stroke-[2.5]" />
                 <span>Selected college identity will be locked for 3 days once saved to your profile.</span>
             </div>
-
-            {/* Dropdown Menu */}
-            {isOpen && queryText.trim().length >= 2 && (
-                <div className="absolute z-50 left-0 right-0 mt-1.5 rounded-xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
-                    {/* Error Banner */}
-                    {searchError && (
-                        <div className="p-3 bg-rose-50 border-b border-rose-100 flex items-center gap-2 text-rose-800 text-xs">
-                            <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0" />
-                            <span>{searchError}</span>
-                        </div>
-                    )}
-
-                    {/* Results List */}
-                    {results.length > 0 && (
-                        <ul
-                            ref={listboxRef}
-                            id="institution-search-listbox"
-                            role="listbox"
-                            className="max-h-72 overflow-y-auto divide-y divide-neutral-100 py-1"
-                        >
-                            {results.map((item, idx) => {
-                                const isHighlighted = idx === highlightedIndex;
-                                return (
-                                    <li
-                                        key={item.id}
-                                        id={`inst-option-${idx}`}
-                                        role="option"
-                                        aria-selected={isHighlighted}
-                                        onMouseEnter={() => setHighlightedIndex(idx)}
-                                        onClick={() => handleSelect(item)}
-                                        className={`px-4 py-3 flex items-start justify-between gap-3 cursor-pointer transition-colors ${
-                                            isHighlighted ? "bg-neutral-100/80 text-neutral-900" : "hover:bg-neutral-50 text-neutral-800"
-                                        }`}
-                                    >
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="text-xs font-bold text-neutral-900 tracking-tight leading-snug">
-                                                    {item.officialName}
-                                                </span>
-                                                {item.verificationStatus === "verified" && (
-                                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-emerald-50 border border-emerald-200 text-[9px] font-bold text-emerald-700">
-                                                        <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
-                                                        Verified
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2.5 text-[11px] text-neutral-500 mt-1 flex-wrap">
-                                                {(item.city || item.state) && (
-                                                    <span className="inline-flex items-center gap-1">
-                                                        <MapPin className="w-3 h-3 text-neutral-400" />
-                                                        <span>{[item.city, item.state].filter(Boolean).join(", ")}</span>
-                                                    </span>
-                                                )}
-                                                {item.institutionType && (
-                                                    <span className="text-neutral-400">• {item.institutionType}</span>
-                                                )}
-                                                {item.aisheCode && (
-                                                    <span className="font-mono text-[9px] bg-neutral-200/60 px-1 rounded text-neutral-600">
-                                                        {item.aisheCode}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <button
-                                            type="button"
-                                            className="px-2.5 py-1 rounded-lg bg-neutral-900 text-white text-[11px] font-bold opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                        >
-                                            Select
-                                        </button>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-                    )}
-
-                    {/* Empty State */}
-                    {!isLoading && hasSearched && results.length === 0 && !searchError && (
-                        <div className="p-6 text-center space-y-3">
-                            <div className="w-10 h-10 rounded-xl bg-neutral-100 flex items-center justify-center mx-auto text-neutral-400">
-                                <Building className="w-5 h-5" />
-                            </div>
-                            <div className="space-y-1">
-                                <p className="text-xs font-bold text-neutral-800">
-                                    No verified institutions found for "{queryText}"
-                                </p>
-                                <p className="text-[11px] text-neutral-500 max-w-sm mx-auto leading-relaxed">
-                                    Only institutions verified against official Ministry of Education / AISHE registers can be selected.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsOpen(false);
-                                    setIsRequestModalOpen(true);
-                                }}
-                                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-bold transition-colors cursor-pointer"
-                            >
-                                <PlusCircle className="w-3.5 h-3.5" />
-                                <span>Request College Addition</span>
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Dropdown Footer */}
-                    <div className="p-2.5 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between text-[11px] text-neutral-500">
-                        <span className="inline-flex items-center gap-1">
-                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                            <span>Official Indian Higher Education Directory</span>
-                        </span>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsOpen(false);
-                                setIsRequestModalOpen(true);
-                            }}
-                            className="text-neutral-700 hover:text-black font-semibold cursor-pointer underline-offset-2 hover:underline"
-                        >
-                            Request Addition
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {/* Request College Modal */}
             <RequestCollegeModal
