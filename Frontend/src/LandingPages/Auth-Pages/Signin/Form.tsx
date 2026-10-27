@@ -96,6 +96,11 @@ export default function SigninForm() {
             }
 
             if (resultData?.user?.accountType === "club") {
+                if (resultData?.user?.clubStatus === "approved" || resultData?.user?.verifiedClub) {
+                    toast.success("Welcome back! Redirecting to dedicated club dashboard...", { title: "Signed In" });
+                    navigate("/club/dashboard");
+                    return;
+                }
                 toast.success("Welcome back! Redirecting to club verification status...", { title: "Signed In" });
                 navigate("/club/status");
                 return;

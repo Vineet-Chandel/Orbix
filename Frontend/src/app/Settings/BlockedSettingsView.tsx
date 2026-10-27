@@ -156,7 +156,10 @@ export const BlockedSettingsView: React.FC = () => {
             ) : (
                 <div className="divide-y-2 divide-black/10 border-2 border-black rounded-2xl overflow-hidden shadow-[2px_2px_0px_#000]">
                     {filteredUsers.map((item) => {
-                        const avatar = item.avatarUrl || DEFAULT_AVATAR_URL;
+                        const avatar =
+                            (item.photoUrl && item.photoUrl !== DEFAULT_AVATAR_URL)
+                                ? item.photoUrl
+                                : (item.avatarUrl || DEFAULT_AVATAR_URL);
                         return (
                             <div
                                 key={item.id}

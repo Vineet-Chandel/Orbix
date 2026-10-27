@@ -116,10 +116,29 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_updated_at TIMESTAMPTZ NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_resume_public BOOLEAN DEFAULT true;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_metadata JSONB DEFAULT '{}'::jsonb;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS is_email_verified BOOLEAN DEFAULT false;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ NULL;
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
             CREATE INDEX IF NOT EXISTS idx_users_lower_username ON users(LOWER(username));
             CREATE INDEX IF NOT EXISTS idx_users_orbix_score ON users(orbix_score DESC, username ASC);
             CREATE INDEX IF NOT EXISTS idx_users_is_public ON users(is_public);
+
+            -- Ensure email verification OTP audit table exists
+            CREATE TABLE IF NOT EXISTS email_verification_otps (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL,
+                email VARCHAR(255) NOT NULL,
+                otp_hash VARCHAR(64) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                attempts INT DEFAULT 0,
+                ip_address VARCHAR(45),
+                user_agent TEXT,
+                expires_at TIMESTAMPTZ NOT NULL,
+                verified_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_otps(user_id, status);
+            CREATE INDEX IF NOT EXISTS idx_email_verification_email ON email_verification_otps(email);
 
             -- Ensure resume upload intent tracking & cleanup queues exist
             CREATE TABLE IF NOT EXISTS resume_upload_intents (

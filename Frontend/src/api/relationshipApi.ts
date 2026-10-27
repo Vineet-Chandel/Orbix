@@ -43,6 +43,7 @@ export interface ConnectedUserItem {
     username: string;
     displayName: string;
     avatarUrl: string | null;
+    photoUrl?: string | null;
     headline: string | null;
     college: string | null;
     location?: string | null;
@@ -59,6 +60,7 @@ export interface BlockedUserItem {
     username: string;
     displayName: string;
     avatarUrl: string | null;
+    photoUrl?: string | null;
     headline: string | null;
     blockedAt: string;
 }
@@ -386,6 +388,7 @@ export interface PendingRequestItem {
     username: string;
     displayName: string;
     avatarUrl: string | null;
+    photoUrl?: string | null;
     headline: string | null;
     college: string | null;
     location?: string | null;

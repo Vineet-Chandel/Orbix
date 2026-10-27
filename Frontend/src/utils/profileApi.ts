@@ -1082,6 +1082,9 @@ export interface PrivacyAuditResponse {
  * Fetch discoverable public developer profiles with searching, filtering, and pagination
  */
 export async function fetchExploreProfiles(params: ExploreQueryParams = {}): Promise<ExploreResponse> {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+        throw new Error("You appear to be offline. Please verify your internet connection.");
+    }
     const query = new URLSearchParams();
     if (params.search) query.set("search", params.search);
     if (params.college) query.set("college", params.college);

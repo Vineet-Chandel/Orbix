@@ -22,6 +22,9 @@ const ProtectedRoute = () => {
 
     // Restrict club accounts from personal-user features (dashboard, profile, resume, settings)
     if (user.accountType === "club") {
+        if (user.clubStatus === "approved" || user.verifiedClub) {
+            return <Navigate to="/club/dashboard" replace />;
+        }
         return <Navigate to="/club/status" replace />;
     }
 

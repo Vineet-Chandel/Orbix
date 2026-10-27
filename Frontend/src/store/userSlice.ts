@@ -9,6 +9,20 @@ export interface User {
     username: string;
     termsAccepted?: boolean | string;
     accountType?: "personal" | "club" | "admin" | string;
+    clubStatus?: "pending" | "under_review" | "needs_information" | "rejected" | "ready_for_promotion" | "approved" | "none" | string;
+    verifiedClub?: {
+        id: string;
+        name: string;
+        slug: string;
+        category?: string;
+        collegeName?: string;
+        logoUrl?: string | null;
+    } | null;
+    application?: {
+        id: string;
+        status: string;
+        clubName: string;
+    } | null;
     headline?: string | null;
     bio?: string | null;
     avatarUrl?: string | null;
@@ -39,6 +53,8 @@ export interface User {
     resumeMetadata?: Record<string, any> | null;
     // Verified College / Institution
     collegeId?: string | null;
+    isEmailVerified?: boolean;
+    emailVerifiedAt?: string | null;
     college?: {
         id: string;
         officialName: string;
@@ -292,6 +308,25 @@ export const userSlice = createSlice({
                 // ignore
             }
         },
+        setEmailVerified: (
+            state,
+            action: PayloadAction<{ isEmailVerified: boolean; emailVerifiedAt?: string | null; email?: string }>
+        ) => {
+            if (state.user) {
+                state.user.isEmailVerified = action.payload.isEmailVerified;
+                if (action.payload.emailVerifiedAt) {
+                    state.user.emailVerifiedAt = action.payload.emailVerifiedAt;
+                }
+                if (action.payload.email) {
+                    state.user.gmail = action.payload.email;
+                }
+                try {
+                    localStorage.setItem("orbix_user", JSON.stringify(state.user));
+                } catch {
+                    // ignore
+                }
+            }
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -335,5 +370,5 @@ export const userSlice = createSlice({
     },
 });
 
-export const { setUser, updateUserProfile, clearUser, setLoading, setPortalProfiles } = userSlice.actions;
+export const { setUser, updateUserProfile, clearUser, setLoading, setPortalProfiles, setEmailVerified } = userSlice.actions;
 export default userSlice.reducer;

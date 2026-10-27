@@ -1070,6 +1070,7 @@ export async function getUserConnections(
         username: string;
         displayName: string;
         avatarUrl: string | null;
+        photoUrl?: string | null;
         headline: string | null;
         college: string | null;
         location: string | null;
@@ -1100,7 +1101,8 @@ export async function getUserConnections(
             CASE WHEN r.user_low_id = $1 THEN r.user_high_id ELSE r.user_low_id END AS connected_user_id,
             u.username,
             COALESCE(u.firstname || ' ' || u.lastname, u.username) AS display_name,
-            u.avatar_url,
+            COALESCE(u.photo_url, u.avatar_url) AS avatar_url,
+            u.photo_url,
             u.headline,
             u.college,
             u.location,
@@ -1139,7 +1141,8 @@ export async function getUserConnections(
         connectedUserId: r.connected_user_id,
         username: r.username,
         displayName: r.display_name,
-        avatarUrl: r.avatar_url,
+        avatarUrl: r.photo_url || r.avatar_url || null,
+        photoUrl: r.photo_url || r.avatar_url || null,
         headline: r.headline,
         college: r.college,
         location: r.location || null,
@@ -1163,6 +1166,7 @@ export interface PendingRequestItem {
     username: string;
     displayName: string;
     avatarUrl: string | null;
+    photoUrl?: string | null;
     headline: string | null;
     college: string | null;
     location: string | null;
@@ -1212,7 +1216,8 @@ export async function getPendingRequests(
             u.id AS peer_id,
             u.username,
             COALESCE(NULLIF(TRIM(u.firstname || ' ' || COALESCE(u.lastname, '')), ''), u.username) AS display_name,
-            u.avatar_url,
+            COALESCE(u.photo_url, u.avatar_url) AS avatar_url,
+            u.photo_url,
             u.headline,
             u.college,
             u.location,
@@ -1253,7 +1258,8 @@ export async function getPendingRequests(
         userId: r.peer_id,
         username: r.username,
         displayName: r.display_name,
-        avatarUrl: r.avatar_url,
+        avatarUrl: r.photo_url || r.avatar_url || null,
+        photoUrl: r.photo_url || r.avatar_url || null,
         headline: r.headline,
         college: r.college,
         location: r.location || null,

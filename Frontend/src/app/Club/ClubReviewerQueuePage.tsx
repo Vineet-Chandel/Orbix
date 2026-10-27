@@ -7,6 +7,8 @@ import {
     RefreshCw,
     ExternalLink,
     Lock,
+    Loader2,
+    CheckCircle2,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { NeoSelect } from "../../components/NeoSelect";
@@ -29,7 +31,7 @@ interface ReviewerApplication {
     college_website_url: string | null;
     club_website_url: string | null;
     club_social_url: string | null;
-    status: "pending" | "under_review" | "needs_information" | "rejected" | "ready_for_promotion";
+    status: "pending" | "under_review" | "needs_information" | "rejected" | "ready_for_promotion" | "approved";
     college_contact_status: "not_started" | "contacted" | "confirmed" | "not_found" | "no_response";
     club_existence_confirmed: boolean;
     college_authorization_confirmed: boolean;
@@ -52,6 +54,8 @@ export default function ClubReviewerQueuePage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedRequest, setSelectedRequest] = useState<ReviewerApplication | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isPromoting, setIsPromoting] = useState(false);
+    const [promotedInfo, setPromotedInfo] = useState<{ name: string; slug: string } | null>(null);
     const [accessDenied, setAccessDenied] = useState(false);
 
     // Inspector Edit Form State
@@ -181,6 +185,43 @@ export default function ClubReviewerQueuePage() {
         }
     };
 
+    const handlePromoteClub = async () => {
+        if (!selectedRequest) return;
+        if (!isAllChecklistConfirmed) {
+            toast.error(
+                "All 4 verification checklist items must be confirmed before activating the club.",
+                { title: "Verification Incomplete" }
+            );
+            return;
+        }
+
+        setIsPromoting(true);
+        try {
+            const res = await fetch(`/api/club/reviewer/promote/${selectedRequest.id}`, {
+                method: "POST",
+                credentials: "include",
+                headers: { "Content-Type": "application/json" },
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(data?.message || "Failed to promote club.");
+            }
+
+            toast.success("Club successfully promoted and activated! Public page and dashboard are now live.", {
+                title: "Club Activated",
+            });
+            setPromotedInfo({ name: data.verifiedClub.name, slug: data.verifiedClub.slug });
+            fetchQueue();
+            setSelectedRequest((prev) => (prev ? { ...prev, status: "approved" as any } : null));
+        } catch (err: any) {
+            console.error("Promote club error:", err);
+            toast.error(err.message || "Failed to promote club.", { title: "Promotion Failed" });
+        } finally {
+            setIsPromoting(false);
+        }
+    };
+
     const filteredRequests = requests.filter((r) => {
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
@@ -284,6 +325,7 @@ export default function ClubReviewerQueuePage() {
                                     { id: "under_review", label: "Under Review" },
                                     { id: "needs_information", label: "Needs Info" },
                                     { id: "ready_for_promotion", label: "Ready" },
+                                    { id: "approved", label: "Approved" },
                                     { id: "rejected", label: "Rejected" },
                                 ].map((tab) => (
                                     <button
@@ -313,6 +355,24 @@ export default function ClubReviewerQueuePage() {
                                 />
                             </div>
                         </div>
+
+                        {promotedInfo && (
+                            <div className="p-4 rounded-2xl bg-emerald-100 border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between gap-4">
+                                <div className="flex items-center gap-2 text-xs font-bold text-emerald-900">
+                                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                                    <span>Club <strong>{promotedInfo.name}</strong> activated successfully!</span>
+                                </div>
+                                <a
+                                    href={`/clubs/${promotedInfo.slug}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3 py-1.5 rounded-xl bg-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-50 flex items-center gap-1.5"
+                                >
+                                    <span>View Public Page</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </a>
+                            </div>
+                        )}
 
                         {/* Queue Grid / Table */}
                         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
@@ -370,10 +430,12 @@ export default function ClubReviewerQueuePage() {
                                                                 ? "bg-orange-200 text-black"
                                                                 : req.status === "ready_for_promotion"
                                                                 ? "bg-emerald-300 text-black"
+                                                                : req.status === "approved"
+                                                                ? "bg-emerald-400 text-black shadow-[2px_2px_0px_#000]"
                                                                 : "bg-rose-200 text-black"
                                                         }`}
                                                     >
-                                                        {req.status}
+                                                        {req.status === "approved" ? "Verified Club" : req.status}
                                                     </span>
                                                 </div>
 
@@ -613,33 +675,83 @@ export default function ClubReviewerQueuePage() {
                                                     Reject Request
                                                 </button>
 
-                                                <button
-                                                    type="button"
-                                                    disabled={isSaving || !isAllChecklistConfirmed}
-                                                    onClick={() => handleSaveReview("ready_for_promotion")}
-                                                    className={`px-3 py-2 rounded-xl border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] transition-all ${
-                                                        isAllChecklistConfirmed
-                                                            ? "bg-emerald-300 hover:bg-emerald-400 text-black cursor-pointer"
-                                                            : "bg-neutral-100 text-neutral-400 border-neutral-300 cursor-not-allowed shadow-none"
-                                                    }`}
-                                                    title={
-                                                        isAllChecklistConfirmed
-                                                            ? "Approve application as Ready for Promotion"
-                                                            : "Must confirm all checklist items first"
-                                                    }
-                                                >
-                                                    Ready for Promotion
-                                                </button>
+                                                {selectedRequest.status === "approved" ? (
+                                                    <div className="p-4 rounded-2xl bg-emerald-100 border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                                        <div className="flex items-center gap-2 text-emerald-900 font-black text-sm">
+                                                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                                                            <span>Club Approved & Live</span>
+                                                        </div>
+                                                        <p className="text-xs text-emerald-800 font-medium leading-relaxed">
+                                                            This club has been promoted to a live verified club. Dedicated dashboard and public presence are active.
+                                                        </p>
+                                                        <a
+                                                            href={`/clubs/${selectedRequest.club_name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-50"
+                                                        >
+                                                            <span>View Public Club Page</span>
+                                                            <ExternalLink className="w-3.5 h-3.5" />
+                                                        </a>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            disabled={isSaving || !isAllChecklistConfirmed}
+                                                            onClick={() => handleSaveReview("ready_for_promotion")}
+                                                            className={`px-3 py-2 rounded-xl border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] transition-all ${
+                                                                isAllChecklistConfirmed
+                                                                    ? "bg-emerald-200 hover:bg-emerald-300 text-black cursor-pointer"
+                                                                    : "bg-neutral-100 text-neutral-400 border-neutral-300 cursor-not-allowed shadow-none"
+                                                            }`}
+                                                            title={
+                                                                isAllChecklistConfirmed
+                                                                    ? "Mark as Ready for Promotion"
+                                                                    : "Must confirm all checklist items first"
+                                                            }
+                                                        >
+                                                            Ready for Promotion
+                                                        </button>
+                                                    </>
+                                                )}
                                             </div>
 
-                                            <button
-                                                type="button"
-                                                disabled={isSaving}
-                                                onClick={() => handleSaveReview()}
-                                                className="w-full mt-2 py-2 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 cursor-pointer disabled:opacity-50"
-                                            >
-                                                {isSaving ? "Saving Updates..." : "Save Checklist & Notes Only"}
-                                            </button>
+                                            {selectedRequest.status !== "approved" && (
+                                                <div className="pt-2 border-t-2 border-black/10 space-y-2">
+                                                    <button
+                                                        type="button"
+                                                        disabled={isSaving || isPromoting || !isAllChecklistConfirmed}
+                                                        onClick={handlePromoteClub}
+                                                        className={`w-full py-2.5 rounded-xl border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 transition-all ${
+                                                            isAllChecklistConfirmed
+                                                                ? "bg-emerald-400 hover:bg-emerald-500 text-black cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                                                                : "bg-neutral-100 text-neutral-400 border-neutral-300 cursor-not-allowed shadow-none"
+                                                        }`}
+                                                    >
+                                                        {isPromoting ? (
+                                                            <>
+                                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                                <span>Activating Club in Database...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <ShieldCheck className="w-4 h-4" />
+                                                                <span>Approve & Activate Club (Promote to Live)</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+
+                                                    <button
+                                                        type="button"
+                                                        disabled={isSaving || isPromoting}
+                                                        onClick={() => handleSaveReview()}
+                                                        className="w-full py-2 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        {isSaving ? "Saving Updates..." : "Save Checklist & Notes Only"}
+                                                    </button>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )}

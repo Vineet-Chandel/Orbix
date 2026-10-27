@@ -28,11 +28,18 @@ const Platform = lazy(() => import("./LandingPages/Main-Landing-Pages/Platform")
 const Events = lazy(() => import("./LandingPages/Main-Landing-Pages/Events").then(m => ({ default: m.Events })));
 const ClubStatusPage = lazy(() => import("./app/Club/ClubStatusPage"));
 const ClubReviewerQueuePage = lazy(() => import("./app/Club/ClubReviewerQueuePage"));
+const ClubDashboardPage = lazy(() => import("./app/Club/ClubDashboardPage"));
+const PublicClubProfilePage = lazy(() => import("./app/Club/PublicClubProfilePage"));
 
 const WorkspaceRedirect = () => {
   const { user } = useAppSelector((state) => state.user);
   if (!user) return <Navigate to="/auth/signin" replace />;
-  if (user.accountType === "club") return <Navigate to="/club/status" replace />;
+  if (user.accountType === "club") {
+    if (user.clubStatus === "approved" || user.verifiedClub) {
+      return <Navigate to="/club/dashboard" replace />;
+    }
+    return <Navigate to="/club/status" replace />;
+  }
   return <Navigate to="/dashboard" replace />;
 };
 
@@ -109,8 +116,10 @@ const App = () => {
           <Route path="/login" element={<Navigate to="/auth/signin" replace />} />
           <Route path="/workspace" element={<WorkspaceRedirect />} />
 
-          {/* Club Verification & Staff Review Routes */}
+          {/* Club Verification, Dedicated Dashboard & Public Presence */}
           <Route path="/club/status" element={<ClubStatusPage />} />
+          <Route path="/club/dashboard" element={<ClubDashboardPage />} />
+          <Route path="/clubs/:slug" element={<PublicClubProfilePage />} />
           <Route path="/staff/club-reviews" element={<ClubReviewerQueuePage />} />
 
           {/* New User Onboarding & Profiles Links Setup */}

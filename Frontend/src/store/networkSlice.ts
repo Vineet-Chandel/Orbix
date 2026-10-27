@@ -4,6 +4,7 @@ import {
     fetchExploreProfiles,
     type ExploreDeveloper,
 } from "../utils/profileApi";
+import { DEFAULT_AVATAR_URL } from "../utils/avatarConstants";
 import {
     sendConnectionRequest,
     acceptConnectionRequest,
@@ -62,7 +63,7 @@ const initialState: NetworkState = {
         items: [],
         total: 0,
         page: 1,
-        hasMore: true,
+        hasMore: false,
         isLoading: false,
         isLoadingMore: false,
         error: null,
@@ -111,6 +112,9 @@ export const fetchExploreDevelopersThunk = createAsyncThunk(
         },
         { rejectWithValue }
     ) => {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+            return rejectWithValue("You appear to be offline. Please verify your internet connection.");
+        }
         try {
             const res = await fetchExploreProfiles(params);
             if (!res.success) {
@@ -135,6 +139,9 @@ export const fetchConnectionsThunk = createAsyncThunk(
         params: { limit?: number; cursor?: string; search?: string; isInitial?: boolean },
         { rejectWithValue }
     ) => {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+            return rejectWithValue("You appear to be offline. Please verify your internet connection.");
+        }
         try {
             const res = await fetchUserConnectionsList(params.limit, params.cursor, params.search);
             if (!res.success) {
@@ -158,6 +165,9 @@ export const fetchPendingRequestsThunk = createAsyncThunk(
         params: { filter?: "incoming" | "outgoing" | "all"; limit?: number; cursor?: string } = {},
         { rejectWithValue }
     ) => {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+            return rejectWithValue("You appear to be offline. Please verify your internet connection.");
+        }
         try {
             const filter = params.filter || "all";
             const res = await fetchPendingRequests(filter, params.limit, params.cursor);
@@ -383,7 +393,11 @@ export const networkSlice = createSlice({
             state.explore.items = [];
             state.explore.total = 0;
             state.explore.page = 1;
-            state.explore.hasMore = true;
+            state.explore.hasMore = false;
+            state.explore.error = null;
+        },
+        clearExploreError: (state) => {
+            state.explore.error = null;
         },
     },
     extraReducers: (builder) => {
@@ -418,6 +432,10 @@ export const networkSlice = createSlice({
                 state.explore.isLoading = false;
                 state.explore.isLoadingMore = false;
                 state.explore.error = (action.payload as string) || "Failed to load explore developers";
+                // On failure, disable hasMore if no items or if initial to prevent scroll retry flood
+                if (action.meta.arg.isInitial || state.explore.items.length === 0) {
+                    state.explore.hasMore = false;
+                }
             });
 
         // --- Send Connection Request from Explore ---
@@ -436,12 +454,17 @@ export const networkSlice = createSlice({
                 }
 
                 // 2. Add to outgoing requests in Redux
+                const resolvedAvatar = (candidate.photoUrl && candidate.photoUrl !== DEFAULT_AVATAR_URL)
+                    ? candidate.photoUrl
+                    : (candidate.avatarUrl || candidate.photoUrl || null);
+
                 const newOutgoing: PendingRequestItem = {
                     relationshipId: action.payload.response.relationshipId || `rel-${Date.now()}`,
                     userId: candidate.id,
                     username: candidate.username,
                     displayName: candidate.displayName,
-                    avatarUrl: candidate.avatarUrl || candidate.photoUrl || null,
+                    avatarUrl: resolvedAvatar,
+                    photoUrl: resolvedAvatar,
                     headline: candidate.headline || null,
                     college: candidate.college || null,
                     orbixScore: candidate.orbixScore || 0,
@@ -678,6 +701,7 @@ export const {
     setRequestsSubTab,
     removeExploreDeveloper,
     clearExploreList,
+    clearExploreError,
 } = networkSlice.actions;
 
 export default networkSlice.reducer;

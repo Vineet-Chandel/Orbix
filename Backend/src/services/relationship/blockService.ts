@@ -216,7 +216,8 @@ export async function getBlockedUsers(
             b.created_at AS blocked_at,
             u.username,
             COALESCE(u.firstname || ' ' || u.lastname, u.username) AS display_name,
-            u.avatar_url,
+            COALESCE(u.photo_url, u.avatar_url) AS avatar_url,
+            u.photo_url,
             u.headline
         FROM user_blocks b
         JOIN users u ON b.blocked_id = u.id
@@ -243,7 +244,8 @@ export async function getBlockedUsers(
         blockedId: r.blocked_id,
         username: r.username,
         displayName: r.display_name,
-        avatarUrl: r.avatar_url,
+        avatarUrl: r.photo_url || r.avatar_url || null,
+        photoUrl: r.photo_url || r.avatar_url || null,
         headline: r.headline,
         blockedAt: r.blocked_at.toISOString ? r.blocked_at.toISOString() : r.blocked_at,
     }));

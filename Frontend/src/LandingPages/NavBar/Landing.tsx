@@ -367,73 +367,73 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
                                 exit={{ opacity: 0, y: 8, scale: 0.98 }}
                                 transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                                className="w-[840px] max-w-[94vw] bg-white/95 backdrop-blur-2xl text-slate-900 rounded-[24px] p-6 sm:p-7 shadow-[0_25px_70px_-15px_rgba(0,0,0,0.18),0_0_0_1px_rgba(0,0,0,0.06)] border border-slate-200 overflow-hidden"
+                                className="w-[860px] max-w-[95vw] bg-white text-black rounded-[24px] sm:rounded-[28px] p-5 sm:p-6 shadow-[8px_8px_0px_#000] border-2 border-black overflow-hidden select-none"
                             >
                                 {/* Header Row */}
-                                <div className="flex items-center justify-between pb-3.5 mb-4 border-b border-slate-200">
+                                <div className="flex items-center justify-between pb-3 mb-4 border-b-2 border-black/15">
                                     <div className="flex items-center gap-2">
-                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                        <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-slate-500">
+                                        <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black animate-pulse" />
+                                        <span className="text-xs font-mono font-black tracking-wider uppercase text-black">
                                             Featured Workshop & Blog
                                         </span>
                                     </div>
                                     <Link
                                         to="/blogs"
                                         onClick={() => { setOpenDropdown(null); setIsClickOpen(false); }}
-                                        className="text-xs font-semibold text-slate-600 hover:text-black flex items-center gap-1 transition-colors group"
+                                        className="group inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#FAF6EE] hover:bg-[#FFE566] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer"
                                     >
                                         <span>View All Blogs</span>
-                                        <span className="transition-transform group-hover:translate-x-0.5">→</span>
+                                        <span className="transition-transform group-hover:translate-x-1 font-bold">→</span>
                                     </Link>
                                 </div>
 
-                                <div className="grid grid-cols-12 gap-6">
+                                <div className="grid grid-cols-12 gap-5 sm:gap-6">
                                     {/* Left: Featured AWS Launchpad Blog Card with Cloudinary Banner */}
                                     <div className="col-span-12 lg:col-span-7 flex flex-col">
                                         <Link
                                             to="/blog/aws-sbg-psit/aws-launchpad-2026"
                                             onClick={() => { setOpenDropdown(null); setIsClickOpen(false); }}
-                                            className="group flex flex-col h-full rounded-2xl bg-slate-50 hover:bg-slate-100/80 border border-slate-200/90 hover:border-slate-300 p-3.5 transition-all duration-200 cursor-pointer text-left shadow-xs hover:shadow-sm"
+                                            className="group flex flex-col h-full rounded-2xl bg-[#FAF6EE] hover:bg-[#FAF6EE]/90 border-2 border-black p-3.5 sm:p-4 shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:-translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 transition-all duration-200 cursor-pointer text-left"
                                         >
                                             {/* Cloudinary Banner Image */}
-                                            <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden border border-slate-200 bg-slate-100 mb-3.5">
+                                            <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden border-2 border-black bg-black mb-3 shadow-[2px_2px_0px_#000]">
                                                 <img
                                                     src="https://res.cloudinary.com/dj0ivep44/image/upload/v1792919453/AWS_EC2_Deployment_Banner_samf2y.png"
                                                     alt="AWS EC2 Deployment Guide Banner"
-                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                                                 />
-                                                <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-white/95 backdrop-blur-xs text-[10px] font-mono font-bold text-slate-900 border border-slate-200 shadow-xs">
+                                                <div className="absolute top-2.5 left-2.5 px-2.5 py-0.5 rounded-full bg-black text-[#a2ff86] border border-black text-[10px] font-mono font-black shadow-[1.5px_1.5px_0px_#000]">
                                                     AWS LAUNCHPAD 2026
                                                 </div>
                                             </div>
 
                                             {/* Tags & Time */}
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-200/70 px-2 py-0.5 rounded border border-slate-300/50">
+                                            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2.5">
+                                                <span className="text-[10px] font-mono font-black text-black bg-[#FFE566] px-2 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000]">
                                                     AWS SBG PSIT
                                                 </span>
-                                                <span className="text-[10px] font-mono text-slate-500">
+                                                <span className="text-[10px] font-mono font-bold text-black bg-white px-2 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000]">
                                                     ~120 min read
                                                 </span>
-                                                <span className="text-[10px] font-mono font-bold text-emerald-600 ml-auto">
+                                                <span className="text-[10px] font-mono font-black text-black bg-[#a2ff86] px-2 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000] ml-auto">
                                                     Beginner Friendly
                                                 </span>
                                             </div>
 
                                             {/* Title & Description */}
-                                            <h3 className="text-base sm:text-lg font-bold text-slate-950 group-hover:text-emerald-600 transition-colors leading-snug mb-1.5">
+                                            <h3 className="text-base sm:text-lg font-black text-black group-hover:underline transition-colors leading-snug mb-1.5">
                                                 Deploy your first website to AWS
                                             </h3>
-                                            <p className="text-xs text-slate-600 line-clamp-2 leading-relaxed mb-4">
+                                            <p className="text-xs text-neutral-700 font-medium line-clamp-2 leading-relaxed mb-3.5">
                                                 A visual, step-by-step workbook for launching EC2 instances, configuring security groups, setting up Nginx, and deploying production applications.
                                             </p>
 
                                             {/* Action Button */}
-                                            <div className="mt-auto pt-2.5 flex items-center justify-between border-t border-slate-200">
-                                                <span className="text-xs font-semibold text-slate-700 group-hover:text-slate-950">
+                                            <div className="mt-auto pt-2.5 flex items-center justify-between border-t-2 border-black/15">
+                                                <span className="text-xs font-black text-black">
                                                     Start reading guide
                                                 </span>
-                                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-slate-900 text-white text-xs font-bold transition-transform duration-200 group-hover:translate-x-1">
+                                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-black text-[#a2ff86] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] group-hover:translate-x-0.5 transition-transform">
                                                     ↗
                                                 </span>
                                             </div>
@@ -441,12 +441,17 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                     </div>
 
                                     {/* Right: Quick Chapter Links */}
-                                    <div className="col-span-12 lg:col-span-5 flex flex-col justify-between gap-2.5">
-                                        <div className="text-[11px] font-mono font-bold uppercase text-slate-500 tracking-wider mb-0.5">
-                                            Workbook Chapters
+                                    <div className="col-span-12 lg:col-span-5 flex flex-col justify-between gap-2">
+                                        <div className="flex items-center justify-between pb-0.5">
+                                            <span className="text-xs font-mono font-black uppercase text-black tracking-wider">
+                                                Workbook Chapters
+                                            </span>
+                                            <span className="text-[10px] font-mono font-bold text-neutral-700 bg-[#FAF6EE] px-2 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000]">
+                                                5 Modules
+                                            </span>
                                         </div>
 
-                                        <div className="flex flex-col gap-1.5 flex-1">
+                                        <div className="flex flex-col gap-2 flex-1">
                                             {[
                                                 {
                                                     chapter: '01',
@@ -483,17 +488,22 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                                     key={ch.chapter}
                                                     to={ch.path}
                                                     onClick={() => { setOpenDropdown(null); setIsClickOpen(false); }}
-                                                    className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200/70 hover:border-slate-300 transition-all text-left group"
+                                                    className="p-2.5 rounded-xl bg-[#FAF6EE] hover:bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-0.5 active:translate-y-0.5 transition-all text-left group"
                                                 >
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
-                                                            CH {ch.chapter}
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-2 min-w-0">
+                                                            <span className="text-[10px] font-mono font-black text-[#a2ff86] bg-black border border-black px-1.5 py-0.5 rounded shrink-0">
+                                                                CH {ch.chapter}
+                                                            </span>
+                                                            <h4 className="text-xs font-black text-black group-hover:text-black transition-colors truncate">
+                                                                {ch.title}
+                                                            </h4>
+                                                        </div>
+                                                        <span className="text-black font-bold text-xs opacity-0 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all shrink-0">
+                                                            →
                                                         </span>
-                                                        <h4 className="text-xs font-bold text-slate-900 group-hover:text-emerald-600 transition-colors truncate">
-                                                            {ch.title}
-                                                        </h4>
                                                     </div>
-                                                    <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">
+                                                    <p className="text-[11px] text-neutral-700 font-medium mt-0.5 line-clamp-1">
                                                         {ch.desc}
                                                     </p>
                                                 </Link>

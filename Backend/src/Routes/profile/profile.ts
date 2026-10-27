@@ -126,11 +126,42 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
             });
         }
 
-        // Restrict club accounts from modifying personal profile features
+        // Club accounts have a dedicated profile & dashboard. Return club session details cleanly
         if (authUser.accountType === "club" || (authUser as any).account_type === "club") {
-            return res.status(403).json({
-                success: false,
-                message: "Club accounts cannot modify personal user profile features. Please check your club status.",
+            const verifiedClubRes = await query(
+                `SELECT id, name, slug, category, college_name, logo_url, is_active FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                [authUser.id]
+            );
+            const verifiedClub = verifiedClubRes.rows[0];
+
+            const reqRes = await query(
+                `SELECT id, status, club_name, submitted_at FROM club_verification_requests WHERE auth_user_id = $1 ORDER BY submitted_at DESC LIMIT 1;`,
+                [authUser.id]
+            );
+            const application = reqRes.rows[0];
+
+            return res.json({
+                success: true,
+                user: {
+                    id: authUser.id,
+                    username: authUser.username,
+                    gmail: authUser.gmail,
+                    accountType: "club",
+                    clubStatus: verifiedClub ? "approved" : (application?.status || "pending"),
+                    verifiedClub: verifiedClub ? {
+                        id: verifiedClub.id,
+                        name: verifiedClub.name,
+                        slug: verifiedClub.slug,
+                        category: verifiedClub.category,
+                        collegeName: verifiedClub.college_name,
+                        logoUrl: verifiedClub.logo_url,
+                    } : null,
+                    application: application ? {
+                        id: application.id,
+                        status: application.status,
+                        clubName: application.club_name,
+                    } : null,
+                },
             });
         }
 
@@ -147,7 +178,7 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 account_type AS "accountType",
                 headline,
                 bio,
-                COALESCE(avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "avatarUrl",
+                COALESCE(photo_url, avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "avatarUrl",
                 COALESCE(photo_url, avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "photoUrl",
                 previous_photo_url AS "previousPhotoUrl",
                 (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
@@ -167,6 +198,8 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 resume_filesize AS "resumeFilesize",
                 resume_updated_at AS "resumeUpdatedAt",
                 is_resume_public AS "isResumePublic",
+                COALESCE(is_email_verified, false) AS "isEmailVerified",
+                email_verified_at AS "emailVerifiedAt",
                 college_id AS "collegeId",
                 college_updated_at AS "collegeUpdatedAt",
                 created_at AS "createdAt"
@@ -263,11 +296,42 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             });
         }
 
-        // Restrict club accounts from modifying personal profile features
+        // Club accounts have a dedicated profile & dashboard. Return club session details cleanly
         if (authUser.accountType === "club" || (authUser as any).account_type === "club") {
-            return res.status(403).json({
-                success: false,
-                message: "Club accounts cannot modify personal user profile features. Please check your club status.",
+            const verifiedClubRes = await query(
+                `SELECT id, name, slug, category, college_name, logo_url, is_active FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                [authUser.id]
+            );
+            const verifiedClub = verifiedClubRes.rows[0];
+
+            const reqRes = await query(
+                `SELECT id, status, club_name, submitted_at FROM club_verification_requests WHERE auth_user_id = $1 ORDER BY submitted_at DESC LIMIT 1;`,
+                [authUser.id]
+            );
+            const application = reqRes.rows[0];
+
+            return res.json({
+                success: true,
+                user: {
+                    id: authUser.id,
+                    username: authUser.username,
+                    gmail: authUser.gmail,
+                    accountType: "club",
+                    clubStatus: verifiedClub ? "approved" : (application?.status || "pending"),
+                    verifiedClub: verifiedClub ? {
+                        id: verifiedClub.id,
+                        name: verifiedClub.name,
+                        slug: verifiedClub.slug,
+                        category: verifiedClub.category,
+                        collegeName: verifiedClub.college_name,
+                        logoUrl: verifiedClub.logo_url,
+                    } : null,
+                    application: application ? {
+                        id: application.id,
+                        status: application.status,
+                        clubName: application.club_name,
+                    } : null,
+                },
             });
         }
 
@@ -958,7 +1022,7 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
                 lastname AS "lastName",
                 headline,
                 bio,
-                COALESCE(avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "avatarUrl",
+                COALESCE(photo_url, avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "avatarUrl",
                 COALESCE(photo_url, avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "photoUrl",
                 cover_image_url AS "coverImageUrl",
                 website,
@@ -1237,7 +1301,7 @@ export const handleExploreProfiles = async (req: Request, res: Response) => {
                 u.lastname AS "lastName",
                 u.headline,
                 u.bio,
-                COALESCE(u.avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "avatarUrl",
+                COALESCE(u.photo_url, u.avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "avatarUrl",
                 COALESCE(u.photo_url, u.avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "photoUrl",
                 u.location,
                 u.skills,

@@ -93,7 +93,7 @@ export const SettingsHub: React.FC<SettingsHubProps> = ({
         {
             id: "help" as SettingsViewKey,
             title: "Help",
-            description: "Help center, FAQ, and developer guides",
+            description: "Help Center, ticket resolution & bug reporting",
             icon: <HelpCircle className="w-5 h-5 text-black stroke-[2.5]" />,
             iconBg: "bg-sky-200",
         },

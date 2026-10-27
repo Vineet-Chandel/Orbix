@@ -15,6 +15,8 @@ import {
     blockRouter,
     settingsRelationshipRouter,
 } from './Routes/relationships/relationshipRoutes.js';
+import { helpRouter } from './Routes/help/helpRoutes.js';
+import verificationRouter from './Routes/verification/verificationRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import redis from './redis/client.js';
 
@@ -55,9 +57,15 @@ app.use('/api/events', eventsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/institutions', institutionsRouter);
 app.use('/api/club', clubRouter);
+app.use('/api/clubs', clubRouter);
+app.use('/clubs', clubRouter);
 app.use('/api/relationships', relationshipRouter);
 app.use('/api/blocks', blockRouter);
 app.use('/api/settings', settingsRelationshipRouter);
+app.use('/api/help', helpRouter);
+app.use('/help', helpRouter);
+app.use('/api/verification', verificationRouter);
+app.use('/api/settings/verification', verificationRouter);
 app.use('/relationships', relationshipRouter);
 app.use('/blocks', blockRouter);
 app.use('/profile', profileRouter);

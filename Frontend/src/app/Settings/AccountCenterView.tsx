@@ -33,11 +33,11 @@ export const AccountCenterView: React.FC<AccountCenterViewProps> = ({
         {
             id: "verify-account" as SettingsViewKey,
             title: "Verify Account",
-            description: "Submit collegiate ID, verify university enrollment & unlock the verified student coder badge.",
+            description: "Verify your email via Resend OTP, confirm collegiate enrollment & unlock the verified student coder badge.",
             icon: <BadgeCheck className="w-5 h-5 text-black stroke-[2.5]" />,
             iconBg: "bg-[#FFE566]",
-            badge: user?.isVerified ? "Verified" : "Pending Verification",
-            badgeStyle: user?.isVerified ? "bg-[#a2ff86] text-black" : "bg-amber-100 text-amber-900 border border-amber-300",
+            badge: (user?.isEmailVerified || user?.isVerified) ? "Verified" : "Pending Verification",
+            badgeStyle: (user?.isEmailVerified || user?.isVerified) ? "bg-[#a2ff86] text-black" : "bg-amber-100 text-amber-900 border border-amber-300",
         },
         {
             id: "account-privacy" as SettingsViewKey,

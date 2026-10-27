@@ -14,7 +14,6 @@ import {
     AlertTriangle,
     Lock,
     Laptop,
-    Mail,
     Search,
     Loader2,
     UserCheck,
@@ -38,6 +37,8 @@ import {
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import type { ConnectedUserItem } from "../../api/relationshipApi";
+import { HelpCenterView } from "./HelpCenterView";
+import { EmailVerificationSection } from "./EmailVerificationSection";
 
 interface SettingDetailViewProps {
     viewKey: SettingsViewKey;
@@ -145,6 +146,10 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             case "verify-account":
                 return (
                     <div className="space-y-6">
+                        {/* Primary Email Verification (Resend OTP Pipeline) */}
+                        <EmailVerificationSection user={user} />
+
+                        {/* Collegiate Enrollment & Identity */}
                         <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="space-y-1">
@@ -882,42 +887,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                 );
 
             case "help":
-                return (
-                    <div className="space-y-5">
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="space-y-1">
-                                <h3 className="text-xl font-black text-black">Help & Documentation</h3>
-                                <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                    Find guides on platform syncs, verification, contest tracking, and Orbix Score calculation.
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-                                <Link
-                                    to="/docs"
-                                    className="p-4 rounded-xl bg-[#FAF6EE] hover:bg-[#ede5d6] border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer flex items-center justify-between"
-                                >
-                                    <div className="space-y-0.5">
-                                        <p className="text-xs font-black text-black">Documentation Hub</p>
-                                        <p className="text-[11px] text-neutral-600 font-medium">Platform architecture, scoring engine & APIs.</p>
-                                    </div>
-                                    <ExternalLink className="w-4 h-4 text-black shrink-0" />
-                                </Link>
-
-                                <a
-                                    href="mailto:support@orbix.dev"
-                                    className="p-4 rounded-xl bg-[#FAF6EE] hover:bg-[#ede5d6] border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer flex items-center justify-between"
-                                >
-                                    <div className="space-y-0.5">
-                                        <p className="text-xs font-black text-black">Contact Support</p>
-                                        <p className="text-[11px] text-neutral-600 font-medium">Email our team at support@orbix.dev</p>
-                                    </div>
-                                    <Mail className="w-4 h-4 text-black shrink-0" />
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                );
+                return <HelpCenterView user={user} onBack={onBack} />;
 
             case "privacy-center":
                 return (
@@ -1044,7 +1014,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             case "blocked": return "Blocked Accounts";
             case "connections": return "Connections";
             case "comments": return "Comments";
-            case "help": return "Help";
+            case "help": return "Help Center";
             case "privacy-center": return "Privacy Center";
             case "account-status": return "Account Status";
             case "about": return "About";

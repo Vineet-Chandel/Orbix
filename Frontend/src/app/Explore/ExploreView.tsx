@@ -24,6 +24,7 @@ import {
     Inbox,
     MoreVertical,
     Copy,
+    WifiOff,
 } from "lucide-react";
 import { type ExploreDeveloper } from "../../utils/profileApi";
 import PublicProfilePage from "../Profile/PublicProfilePage";
@@ -41,6 +42,7 @@ import {
     declinePendingRequestThunk,
     removeConnectionThunk,
     blockUserThunk,
+    clearExploreError,
 } from "../../store/networkSlice";
 import { getPlatformIcon } from "../../utils/platformLinks";
 import { NeoSelect } from "../../components/NeoSelect";
@@ -53,12 +55,20 @@ interface ExploreViewProps {
 }
 
 const PAGE_SIZE = 24;
+const ERROR_COOLDOWN_MS = 4000; // 4-second minimum backoff cooldown after fetch failure
 
 export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar }) => {
     const toast = useToast();
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.user);
     const { explore, connections, requests, activeTab } = useAppSelector((state) => state.network);
+
+    // -------------------------------------------------------------------------
+    // Offline status & Connectivity awareness
+    // -------------------------------------------------------------------------
+    const [isOnline, setIsOnline] = useState<boolean>(() =>
+        typeof navigator !== "undefined" ? navigator.onLine : true
+    );
 
     // -------------------------------------------------------------------------
     // Navigation & Selection State
@@ -106,6 +116,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
     const containerRef = useRef<HTMLElement | null>(null);
     const sentinelRef = useRef<HTMLDivElement | null>(null);
     const isFetchingRef = useRef<boolean>(false);
+    const lastErrorTimeRef = useRef<number>(0);
+    const scrollThrottleRef = useRef<number | null>(null);
 
     // Debounce search query input (300ms) to avoid over-fetching
     useEffect(() => {
@@ -119,9 +131,34 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
     // Initial Load & Tab Counts Hydration
     // -------------------------------------------------------------------------
     useEffect(() => {
-        // Hydrate badge counts across all sections on boot
-        dispatch(fetchPendingRequestsThunk({ filter: "all" }));
-        dispatch(fetchConnectionsThunk({ limit: 50, isInitial: true }));
+        // Hydrate badge counts across all sections on boot if online
+        if (typeof navigator === "undefined" || navigator.onLine) {
+            dispatch(fetchPendingRequestsThunk({ filter: "all" }));
+            dispatch(fetchConnectionsThunk({ limit: 50, isInitial: true }));
+        }
+    }, [dispatch]);
+
+    // -------------------------------------------------------------------------
+    // Online / Offline Status Event Listeners
+    // -------------------------------------------------------------------------
+    useEffect(() => {
+        const handleOnline = () => {
+            setIsOnline(true);
+            lastErrorTimeRef.current = 0;
+            dispatch(clearExploreError());
+        };
+
+        const handleOffline = () => {
+            setIsOnline(false);
+            isFetchingRef.current = false;
+        };
+
+        window.addEventListener("online", handleOnline);
+        window.addEventListener("offline", handleOffline);
+        return () => {
+            window.removeEventListener("online", handleOnline);
+            window.removeEventListener("offline", handleOffline);
+        };
     }, [dispatch]);
 
     // -------------------------------------------------------------------------
@@ -158,6 +195,17 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
     // -------------------------------------------------------------------------
     const fetchPage = useCallback(
         async (pageToFetch: number, isInitial = false) => {
+            // Strict offline guard: do NOT fire network calls when offline
+            if (typeof navigator !== "undefined" && !navigator.onLine) {
+                setIsRefreshing(false);
+                return;
+            }
+
+            // Cooldown guard: prevent continuous loop if an error occurred recently
+            if (!isInitial && Date.now() - lastErrorTimeRef.current < ERROR_COOLDOWN_MS) {
+                return;
+            }
+
             if (isFetchingRef.current) return;
             isFetchingRef.current = true;
 
@@ -174,8 +222,10 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                         isInitial,
                     })
                 ).unwrap();
+                lastErrorTimeRef.current = 0;
             } catch (err: any) {
                 console.error("Explore fetch error:", err);
+                lastErrorTimeRef.current = Date.now();
             } finally {
                 setIsRefreshing(false);
                 isFetchingRef.current = false;
@@ -194,6 +244,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
     // Trigger initial fetch or re-fetch whenever filters or query change
     useEffect(() => {
         if (activeTab === "explore") {
+            lastErrorTimeRef.current = 0;
             fetchPage(1, true);
 
             if (containerRef.current) {
@@ -212,6 +263,14 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
         fetchPage,
     ]);
 
+    // Automatically recover when coming back online
+    useEffect(() => {
+        if (isOnline && activeTab === "explore" && (explore.error || explore.items.length === 0)) {
+            lastErrorTimeRef.current = 0;
+            fetchPage(1, true);
+        }
+    }, [isOnline, activeTab, explore.error, explore.items.length, fetchPage]);
+
     // -------------------------------------------------------------------------
     // Load More Action for Scroll Pagination in Explore
     // -------------------------------------------------------------------------
@@ -219,6 +278,11 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
         if (
             activeTab !== "explore" ||
             isFetchingRef.current ||
+            !isOnline ||
+            (typeof navigator !== "undefined" && !navigator.onLine) ||
+            explore.error ||
+            Date.now() - lastErrorTimeRef.current < ERROR_COOLDOWN_MS ||
+            explore.items.length === 0 ||
             !explore.hasMore ||
             explore.isLoading ||
             explore.isLoadingMore
@@ -226,11 +290,30 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
             return;
         }
         fetchPage(explore.page + 1, false);
-    }, [activeTab, explore.hasMore, explore.isLoading, explore.isLoadingMore, explore.page, fetchPage]);
+    }, [
+        activeTab,
+        isOnline,
+        explore.error,
+        explore.hasMore,
+        explore.isLoading,
+        explore.isLoadingMore,
+        explore.items.length,
+        explore.page,
+        fetchPage,
+    ]);
 
     // IntersectionObserver to automatically trigger loadMore when sentinel enters viewport
     useEffect(() => {
-        if (selectedUsername || activeTab !== "explore") return;
+        if (
+            selectedUsername ||
+            activeTab !== "explore" ||
+            !isOnline ||
+            explore.error ||
+            !explore.hasMore ||
+            explore.items.length === 0
+        ) {
+            return;
+        }
         const sentinel = sentinelRef.current;
         const container = containerRef.current;
         if (!sentinel) return;
@@ -244,7 +327,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
             },
             {
                 root: container,
-                rootMargin: "300px",
+                rootMargin: "250px",
                 threshold: 0,
             }
         );
@@ -253,23 +336,59 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
         return () => {
             observer.disconnect();
         };
-    }, [selectedUsername, activeTab, handleLoadMore]);
+    }, [
+        selectedUsername,
+        activeTab,
+        isOnline,
+        explore.error,
+        explore.hasMore,
+        explore.items.length,
+        handleLoadMore,
+    ]);
 
-    // Container onScroll fallback handler for instant responsiveness
+    // Container onScroll fallback handler with strict throttling and empty-list protection
     const handleContainerScroll = useCallback(
         (e: React.UIEvent<HTMLElement>) => {
             if (selectedUsername || activeTab !== "explore") return;
+
+            // Immediately abort if offline, in error state, list is empty, or no more items
+            if (!isOnline || (typeof navigator !== "undefined" && !navigator.onLine)) return;
+            if (explore.items.length === 0 || !explore.hasMore || explore.error) return;
+            if (isFetchingRef.current || explore.isLoading || explore.isLoadingMore) return;
+
+            // Throttle scroll checks to 150ms window to prevent firing on every scroll tick
+            if (scrollThrottleRef.current) return;
+            scrollThrottleRef.current = window.setTimeout(() => {
+                scrollThrottleRef.current = null;
+            }, 150);
+
             const target = e.currentTarget;
             const remainingScroll = target.scrollHeight - target.scrollTop - target.clientHeight;
             if (remainingScroll < 350) {
                 handleLoadMore();
             }
         },
-        [selectedUsername, activeTab, handleLoadMore]
+        [
+            selectedUsername,
+            activeTab,
+            isOnline,
+            explore.items.length,
+            explore.hasMore,
+            explore.error,
+            explore.isLoading,
+            explore.isLoadingMore,
+            handleLoadMore,
+        ]
     );
 
     const handleRefresh = async () => {
+        if (typeof navigator !== "undefined" && !navigator.onLine) {
+            toast.error("You appear to be offline. Please verify your internet connection.", { title: "Offline" });
+            return;
+        }
         setIsRefreshing(true);
+        lastErrorTimeRef.current = 0;
+        dispatch(clearExploreError());
         if (activeTab === "explore") {
             await fetchPage(1, true);
             toast.success("Public developer profiles updated", { title: "Refreshed" });
@@ -613,6 +732,12 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
                                 Explore Developers
                             </h1>
+                            {!isOnline && (
+                                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] text-black border-2 border-black text-xs font-mono font-black shadow-[2px_2px_0px_#000]">
+                                    <WifiOff className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>OFFLINE</span>
+                                </div>
+                            )}
                         </div>
                         <p className="text-xs sm:text-sm font-bold text-neutral-700">
                             Discover public developer profiles, review verified multi-platform analytics, and manage peer connections.
@@ -926,6 +1051,34 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                             Scanning verified developers...
                                         </p>
                                     </div>
+                                ) : (!isOnline || explore.error) && filteredDevelopers.length === 0 ? (
+                                    <div className="p-12 text-center rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 animate-in fade-in">
+                                        <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
+                                            <WifiOff className="w-7 h-7 text-black stroke-[2.5]" />
+                                        </div>
+                                        <div className="space-y-1.5 max-w-md mx-auto">
+                                            <h3 className="text-lg font-black text-black">
+                                                {!isOnline ? "No Internet Connection" : "Unable to Connect to Server"}
+                                            </h3>
+                                            <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                                {!isOnline
+                                                    ? "Your device appears to be offline. Reconnect to the internet to explore developer profiles."
+                                                    : explore.error || "A network error occurred while retrieving public developer profiles."}
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                lastErrorTimeRef.current = 0;
+                                                dispatch(clearExploreError());
+                                                fetchPage(1, true);
+                                            }}
+                                            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-1 active:translate-y-1 cursor-pointer transition-all"
+                                        >
+                                            <RefreshCw className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Retry Connection</span>
+                                        </button>
+                                    </div>
                                 ) : filteredDevelopers.length === 0 ? (
                                     <div className="p-12 text-center rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
                                         <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
@@ -942,9 +1095,9 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                         {filteredDevelopers.map((candidate) => {
                                             const avatar =
-                                                candidate.avatarUrl ||
-                                                candidate.photoUrl ||
-                                                DEFAULT_AVATAR_URL;
+                                                (candidate.photoUrl && candidate.photoUrl !== DEFAULT_AVATAR_URL)
+                                                    ? candidate.photoUrl
+                                                    : (candidate.avatarUrl || candidate.photoUrl || DEFAULT_AVATAR_URL);
 
                                             const verifiedPortals = candidate.connectedPortals.filter((p) => p.verified);
                                             const isConnecting = actionInProgressId === (candidate.id || candidate.username);
@@ -1123,9 +1276,35 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                     </div>
                                 )}
 
+                                {/* Error on Loading More Banner */}
+                                {explore.items.length > 0 && (explore.error || !isOnline) && (
+                                    <div className="py-6 flex flex-col items-center justify-center gap-2 animate-in fade-in">
+                                        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]">
+                                            <WifiOff className="w-4 h-4 text-black stroke-[2.5]" />
+                                            <span className="text-xs font-bold text-black">
+                                                {!isOnline
+                                                    ? "You are offline. Unable to load more developers."
+                                                    : explore.error || "Failed to load more developers."}
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    lastErrorTimeRef.current = 0;
+                                                    dispatch(clearExploreError());
+                                                    fetchPage(explore.page + 1, false);
+                                                }}
+                                                className="ml-2 px-3 py-1 rounded-lg bg-black text-[#a2ff86] text-xs font-black hover:bg-neutral-800 transition-colors cursor-pointer"
+                                            >
+                                                Retry
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
 
-                                {/* IntersectionObserver Sentinel */}
-                                <div ref={sentinelRef} className="h-8 w-full pointer-events-none" />
+                                {/* IntersectionObserver Sentinel (Only rendered when there are items, more to load, online, and not in error) */}
+                                {explore.items.length > 0 && explore.hasMore && !explore.error && isOnline && (
+                                    <div ref={sentinelRef} className="h-8 w-full pointer-events-none" />
+                                )}
                             </>
                         )}
 
@@ -1190,7 +1369,10 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                 ) : (
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                         {filteredConnections.map((item) => {
-                                            const avatar = item.avatarUrl || DEFAULT_AVATAR_URL;
+                                            const avatar =
+                                                (item.photoUrl && item.photoUrl !== DEFAULT_AVATAR_URL)
+                                                    ? item.photoUrl
+                                                    : (item.avatarUrl || DEFAULT_AVATAR_URL);
                                             const isRemoving = actionInProgressId === item.relationshipId;
 
                                             return (
@@ -1397,7 +1579,10 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                         ) : (
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                                 {requests.incoming.map((item) => {
-                                                    const avatar = item.avatarUrl || DEFAULT_AVATAR_URL;
+                                                    const avatar =
+                                                        (item.photoUrl && item.photoUrl !== DEFAULT_AVATAR_URL)
+                                                            ? item.photoUrl
+                                                            : (item.avatarUrl || DEFAULT_AVATAR_URL);
                                                     const isBusy = actionInProgressId === item.relationshipId;
 
                                                     return (
@@ -1542,7 +1727,10 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                         ) : (
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
                                                 {requests.outgoing.map((item) => {
-                                                    const avatar = item.avatarUrl || DEFAULT_AVATAR_URL;
+                                                    const avatar =
+                                                        (item.photoUrl && item.photoUrl !== DEFAULT_AVATAR_URL)
+                                                            ? item.photoUrl
+                                                            : (item.avatarUrl || DEFAULT_AVATAR_URL);
                                                     const isBusy = actionInProgressId === item.relationshipId;
 
                                                     return (
