@@ -6,6 +6,7 @@ import {
     Globe,
     Lock,
     ShieldCheck,
+    MapPin,
 } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
@@ -14,6 +15,8 @@ import { evaluatePassword } from "../passwordValidator";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { CollegeAutocomplete } from "../../../components/CollegeAutocomplete";
+import type { InstitutionItem } from "../../../utils/profileApi";
 
 interface ClubSignupFormProps {
     onSwitchToPersonal?: () => void;
@@ -45,9 +48,12 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
     const toast = useToast();
     const dispatch = useAppDispatch();
 
+    const [selectedCollege, setSelectedCollege] = useState<InstitutionItem | null>(null);
+
     const [formData, setFormData] = useState({
         // Club info
         clubName: "",
+        collegeId: "",
         collegeName: "",
         collegeCity: "",
         collegeState: "",
@@ -83,6 +89,39 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
     const passwordStrength = evaluatePassword(formData.password);
 
+    const handleCollegeSelect = (college: InstitutionItem | null) => {
+        setSelectedCollege(college);
+        if (college) {
+            setFormData((prev) => ({
+                ...prev,
+                collegeId: college.id,
+                collegeName: college.officialName,
+                collegeCity: college.city || college.district || "",
+                collegeState: college.state || "",
+                collegeCountry: "India",
+                collegeWebsiteUrl: college.website || prev.collegeWebsiteUrl || "",
+            }));
+            setErrors((prev) => {
+                const updated = { ...prev };
+                delete updated.collegeName;
+                delete updated.collegeId;
+                delete updated.collegeCity;
+                delete updated.collegeState;
+                delete updated.collegeCountry;
+                return updated;
+            });
+        } else {
+            setFormData((prev) => ({
+                ...prev,
+                collegeId: "",
+                collegeName: "",
+                collegeCity: "",
+                collegeState: "",
+                collegeCountry: "India",
+            }));
+        }
+    };
+
     const validate = () => {
         const newErrors: Record<string, string> = {};
 
@@ -94,21 +133,8 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             newErrors.clubName = "Must be between 2 and 120 characters";
         }
 
-        const collegeNameTrim = formData.collegeName.trim();
-        if (!collegeNameTrim) {
-            newErrors.collegeName = "College / University name is required";
-        } else if (collegeNameTrim.length < 2 || collegeNameTrim.length > 200) {
-            newErrors.collegeName = "Must be between 2 and 200 characters";
-        }
-
-        if (!formData.collegeCity.trim()) {
-            newErrors.collegeCity = "City is required";
-        }
-        if (!formData.collegeState.trim()) {
-            newErrors.collegeState = "State / region is required";
-        }
-        if (!formData.collegeCountry.trim()) {
-            newErrors.collegeCountry = "Country is required";
+        if (!selectedCollege || !formData.collegeId) {
+            newErrors.collegeName = "Please search and select your institution from the verified directory";
         }
 
         // Representative info validation
@@ -197,10 +223,11 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
         const payload = {
             clubName: formData.clubName.trim(),
-            collegeName: formData.collegeName.trim(),
-            collegeCity: formData.collegeCity.trim(),
-            collegeState: formData.collegeState.trim(),
-            collegeCountry: formData.collegeCountry.trim(),
+            collegeId: selectedCollege?.id || undefined,
+            collegeName: (selectedCollege?.officialName || formData.collegeName).trim(),
+            collegeCity: (selectedCollege?.city || selectedCollege?.district || formData.collegeCity).trim(),
+            collegeState: (selectedCollege?.state || formData.collegeState).trim(),
+            collegeCountry: "India",
             clubCategory: formData.clubCategory,
             clubDescription: formData.clubDescription.trim() || undefined,
 
@@ -294,7 +321,11 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                     </h3>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* Club Name */}
+                <div>
+                    <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                        Club Name *
+                    </label>
                     <FormInput
                         name="clubName"
                         type="text"
@@ -307,61 +338,60 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                         }}
                         error={errors.clubName}
                     />
-
-                    <FormInput
-                        name="collegeName"
-                        type="text"
-                        placeholder="College / University Name (Full Official Name)"
-                        hideLabel
-                        value={formData.collegeName}
-                        onChange={(e) => {
-                            setFormData({ ...formData, collegeName: e.target.value });
-                            if (errors.collegeName) setErrors({ ...errors, collegeName: "" });
-                        }}
-                        error={errors.collegeName}
-                    />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <FormInput
-                        name="collegeCity"
-                        type="text"
-                        placeholder="City"
-                        hideLabel
-                        value={formData.collegeCity}
-                        onChange={(e) => {
-                            setFormData({ ...formData, collegeCity: e.target.value });
-                            if (errors.collegeCity) setErrors({ ...errors, collegeCity: "" });
-                        }}
-                        error={errors.collegeCity}
+                {/* Verified College / University Selector */}
+                <div className="pb-1">
+                    <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                        College / University (Verified Directory) *
+                    </label>
+                    <CollegeAutocomplete
+                        value={selectedCollege?.id}
+                        selectedCollege={selectedCollege}
+                        onChange={handleCollegeSelect}
+                        canChangeCollege={true}
+                        showChangeWarningModal={false}
+                        placeholder="Search verified Indian colleges, IITs, NITs, universities..."
                     />
-
-                    <FormInput
-                        name="collegeState"
-                        type="text"
-                        placeholder="State / Region"
-                        hideLabel
-                        value={formData.collegeState}
-                        onChange={(e) => {
-                            setFormData({ ...formData, collegeState: e.target.value });
-                            if (errors.collegeState) setErrors({ ...errors, collegeState: "" });
-                        }}
-                        error={errors.collegeState}
-                    />
-
-                    <FormInput
-                        name="collegeCountry"
-                        type="text"
-                        placeholder="Country (Default: India)"
-                        hideLabel
-                        value={formData.collegeCountry}
-                        onChange={(e) => {
-                            setFormData({ ...formData, collegeCountry: e.target.value });
-                            if (errors.collegeCountry) setErrors({ ...errors, collegeCountry: "" });
-                        }}
-                        error={errors.collegeCountry}
-                    />
+                    {errors.collegeName && (
+                        <p className="text-[11px] font-bold text-rose-600 mt-1">{errors.collegeName}</p>
+                    )}
                 </div>
+
+                {/* Auto-filled Verified Location Badges (Locked & Authoritative) */}
+                {selectedCollege && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-0.5 animate-in fade-in duration-200">
+                        <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
+                                <MapPin className="w-3 h-3 text-neutral-700" />
+                                City (Auto-filled)
+                            </span>
+                            <p className="text-xs font-black text-black truncate">
+                                {formData.collegeCity || "N/A"}
+                            </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
+                                <MapPin className="w-3 h-3 text-neutral-700" />
+                                State / UT (Auto-filled)
+                            </span>
+                            <p className="text-xs font-black text-black truncate">
+                                {formData.collegeState || "N/A"}
+                            </p>
+                        </div>
+
+                        <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
+                                <Lock className="w-3 h-3 text-neutral-700" />
+                                Country
+                            </span>
+                            <p className="text-xs font-black text-black truncate">
+                                {formData.collegeCountry || "India"}
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {/* Club Category Dropdown */}
                 <NeoSelect

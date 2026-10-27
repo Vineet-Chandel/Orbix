@@ -33,22 +33,29 @@ async function runPipelineTest() {
         console.log("   Created user:", userRes.rows[0]);
 
         // Step 2: Register Club Application & Initialize Timeline Stages
-        console.log("\n👉 Step 2: Registering club verification application...");
+        console.log("\n👉 Step 2: Registering club verification application with verified college...");
+        const instRes = await query(
+            `SELECT id, official_name, city, state, website FROM institutions WHERE is_active = true AND verification_status = 'verified' LIMIT 1;`
+        );
+        const testInst = instRes.rows[0];
+        console.log("   Selected verified institution from DB:", testInst.official_name, `[ID: ${testInst.id}]`);
+
         createdAppId = crypto.randomUUID();
         const appRes = await query(
             `INSERT INTO club_verification_requests (
-                id, auth_user_id, college_name, college_city, college_state, college_country,
+                id, auth_user_id, college_id, college_name, college_city, college_state, college_country,
                 club_name, club_category, club_description, contact_person_name, contact_person_role,
                 contact_email, terms_accepted, terms_version, privacy_policy_accepted, privacy_policy_version,
                 status, submitted_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, true, 'v1.0', true, 'v1.0', 'pending', NOW(), NOW())
-            RETURNING id, club_name, status, submitted_at;`,
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, 'v1.0', true, 'v1.0', 'pending', NOW(), NOW())
+            RETURNING id, club_name, college_id, status, submitted_at;`,
             [
                 createdAppId,
                 testUserId,
-                "Indian Institute of Technology, Test Campus",
-                "New Delhi",
-                "Delhi",
+                testInst.id,
+                testInst.official_name,
+                testInst.city || "New Delhi",
+                testInst.state || "Delhi",
                 "India",
                 testClubName,
                 "coding",
@@ -143,14 +150,15 @@ async function runPipelineTest() {
             // 4. Insert into verified_clubs
             const clubInsert = await client.query(
                 `INSERT INTO verified_clubs (
-                    id, auth_user_id, name, slug, category, college_name, college_city,
+                    id, auth_user_id, college_id, name, slug, category, college_name, college_city,
                     college_state, college_country, short_description, about, website_url,
                     social_links, is_active, verified_at, created_at, updated_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, NOW(), NOW(), NOW())
-                RETURNING id, name, slug;`,
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, NOW(), NOW(), NOW())
+                RETURNING id, name, slug, college_id;`,
                 [
                     createdClubId,
                     app.auth_user_id,
+                    app.college_id,
                     app.club_name,
                     candidateSlug,
                     app.club_category,

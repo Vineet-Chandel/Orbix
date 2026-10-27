@@ -141,7 +141,47 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
         // Validate complete club registration payload
         const validated: ValidatedClubRegistrationData = ClubRegistrationValidator(req.body);
 
-        // 1. Check if user already exists
+        // 1. Authoritatively validate and resolve the institution from the verified directory
+        let verifiedInst: any = null;
+        if (validated.collegeId) {
+            const instRes = await query(
+                `SELECT id, official_name, city, district, state, website, verification_status 
+                 FROM institutions 
+                 WHERE id = $1 AND verification_status = 'verified' AND is_active = true 
+                 LIMIT 1;`,
+                [validated.collegeId]
+            );
+            verifiedInst = instRes.rows[0];
+        }
+
+        // Fallback: Check by official name or AISHE code if collegeId was not directly passed
+        if (!verifiedInst && validated.collegeName) {
+            const instRes = await query(
+                `SELECT id, official_name, city, district, state, website, verification_status 
+                 FROM institutions 
+                 WHERE (LOWER(official_name) = LOWER($1) OR LOWER(aishe_code) = LOWER($1) OR LOWER(normalized_name) = LOWER($1))
+                   AND verification_status = 'verified' AND is_active = true 
+                 LIMIT 1;`,
+                [validated.collegeName]
+            );
+            verifiedInst = instRes.rows[0];
+        }
+
+        if (!verifiedInst) {
+            return res.status(400).json({
+                success: false,
+                message: "Selected college must be an official verified institution from the Orbix higher education directory. Custom or unregistered institutions are not permitted.",
+            });
+        }
+
+        const authoritativeCollegeId = verifiedInst.id;
+        const authoritativeCollegeName = verifiedInst.official_name;
+        const authoritativeCollegeCity = verifiedInst.city || verifiedInst.district || validated.collegeCity;
+        const authoritativeCollegeState = verifiedInst.state || validated.collegeState;
+        const authoritativeCollegeCountry = "India";
+        const authoritativeCollegeWebsite = verifiedInst.website || validated.collegeWebsiteUrl || null;
+
+        // 2. Check if user already exists
         const existingUserRes = await query(
             `SELECT id FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($2) LIMIT 1;`,
             [validated.contactEmail, validated.username]
@@ -153,7 +193,7 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
             });
         }
 
-        // 2. Check if active verification request exists for this email
+        // 3. Check if active verification request exists for this email
         const existingActiveReq = await query(
             `SELECT id FROM club_verification_requests 
              WHERE LOWER(contact_email) = LOWER($1) 
@@ -168,16 +208,16 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
             });
         }
 
-        // 3. Hash password
+        // 4. Hash password
         const hashedPassword = await bcrypt.hash(validated.password, 10);
         const newUserId = crypto.randomUUID();
 
-        // 4. Split representative full name into firstName and lastName for users table
+        // 5. Split representative full name into firstName and lastName for users table
         const nameParts = validated.contactPersonName.split(" ").filter(Boolean);
         const firstName = nameParts[0] || validated.contactPersonName;
         const lastName = nameParts.slice(1).join(" ") || "Representative";
 
-        // 5. Insert into auth.users (Supabase Auth table)
+        // 6. Insert into auth.users (Supabase Auth table)
         try {
             await query(
                 `INSERT INTO auth.users (
@@ -207,7 +247,7 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
             console.warn("Notice: auth.users sync note:", authErr.message || authErr);
         }
 
-        // 6. Insert into public.users with account_type = 'club'
+        // 7. Insert into public.users with account_type = 'club' and verified college_id
         const defaultAvatarUrl = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
         const userInsertRes = await query(
             `INSERT INTO users (
@@ -219,9 +259,10 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 password,
                 termsaccepted,
                 account_type,
-                avatar_url
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'club', $8)
-            RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", account_type AS "accountType", avatar_url AS "avatarUrl";`,
+                avatar_url,
+                college_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'club', $8, $9)
+            RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", account_type AS "accountType", avatar_url AS "avatarUrl", college_id AS "collegeId";`,
             [
                 newUserId,
                 validated.username,
@@ -231,14 +272,16 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 hashedPassword,
                 validated.termsAccepted,
                 defaultAvatarUrl,
+                authoritativeCollegeId,
             ]
         );
         const createdUser = userInsertRes.rows[0];
 
-        // 7. Insert into public.club_verification_requests
+        // 8. Insert into public.club_verification_requests with verified college details
         const requestInsertRes = await query(
             `INSERT INTO club_verification_requests (
                 auth_user_id,
+                college_id,
                 club_name,
                 college_name,
                 college_city,
@@ -261,17 +304,18 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 status
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-                $11, $12, $13, $14, $15, $16, $17, 'v1.0', $18, 'v1.0',
+                $11, $12, $13, $14, $15, $16, $17, $18, 'v1.0', $19, 'v1.0',
                 'pending'
             )
             RETURNING id, club_name, status, submitted_at;`,
             [
                 newUserId,
+                authoritativeCollegeId,
                 validated.clubName,
-                validated.collegeName,
-                validated.collegeCity,
-                validated.collegeState,
-                validated.collegeCountry,
+                authoritativeCollegeName,
+                authoritativeCollegeCity,
+                authoritativeCollegeState,
+                authoritativeCollegeCountry,
                 validated.clubCategory,
                 validated.clubDescription,
                 validated.contactPersonName,
@@ -279,7 +323,7 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 validated.contactEmail,
                 validated.collegeOfficialEmail,
                 validated.contactPhone,
-                validated.collegeWebsiteUrl,
+                authoritativeCollegeWebsite,
                 validated.clubWebsiteUrl,
                 validated.clubSocialUrl,
                 validated.termsAccepted,
@@ -985,6 +1029,7 @@ const handlePromoteClub = async (req: Request, res: Response) => {
             `INSERT INTO verified_clubs (
                 id,
                 auth_user_id,
+                college_id,
                 name,
                 slug,
                 category,
@@ -1000,11 +1045,12 @@ const handlePromoteClub = async (req: Request, res: Response) => {
                 verified_at,
                 created_at,
                 updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, NOW(), NOW(), NOW())
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, NOW(), NOW(), NOW())
             RETURNING *;`,
             [
                 newClubId,
                 app.auth_user_id,
+                app.college_id || null,
                 app.club_name,
                 candidateSlug,
                 app.club_category,

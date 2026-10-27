@@ -17,6 +17,7 @@ export type ClubCategory = (typeof VALID_CLUB_CATEGORIES)[number];
 export interface ClubRegistrationInput {
     // Club info
     clubName: string;
+    collegeId?: string;
     collegeName: string;
     collegeCity: string;
     collegeState: string;
@@ -48,6 +49,7 @@ export interface ClubRegistrationInput {
 
 export interface ValidatedClubRegistrationData {
     clubName: string;
+    collegeId: string | null;
     collegeName: string;
     collegeCity: string;
     collegeState: string;
@@ -221,8 +223,11 @@ export default function ClubRegistrationValidator(data: any): ValidatedClubRegis
         throw new ValidationError("Passwords do not match.");
     }
 
+    const collegeId = typeof data.collegeId === "string" && data.collegeId.trim() ? data.collegeId.trim() : null;
+
     return {
         clubName,
+        collegeId,
         collegeName,
         collegeCity,
         collegeState,

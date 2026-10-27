@@ -24,6 +24,7 @@ export interface CollegeAutocompleteProps {
     placeholder?: string;
     disabled?: boolean;
     canChangeCollege?: boolean;
+    showChangeWarningModal?: boolean;
     collegeUpdatedAt?: string | null;
     collegeLockRemainingMs?: number;
     nextAllowedCollegeChangeAt?: string | null;
@@ -36,6 +37,7 @@ export function CollegeAutocomplete({
     placeholder = "Search verified Indian colleges, IITs, NITs, universities...",
     disabled = false,
     canChangeCollege = true,
+    showChangeWarningModal = true,
     collegeUpdatedAt: _collegeUpdatedAt,
     collegeLockRemainingMs = 0,
     nextAllowedCollegeChangeAt,
@@ -243,7 +245,15 @@ export function CollegeAutocomplete({
                         <div className="flex items-center gap-2 flex-shrink-0 self-end sm:self-center">
                             <button
                                 type="button"
-                                onClick={() => setIsWarningModalOpen(true)}
+                                onClick={() => {
+                                    if (showChangeWarningModal && canChangeCollege !== false) {
+                                        setIsWarningModalOpen(true);
+                                    } else if (canChangeCollege !== false) {
+                                        handleClearSelection();
+                                    } else {
+                                        setIsWarningModalOpen(true);
+                                    }
+                                }}
                                 className={`px-3 py-1.5 rounded-lg text-black border-2 border-black text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer shadow-[1px_1px_0px_#000] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] ${
                                     canChangeCollege === false ? "bg-amber-100 hover:bg-amber-200" : "hover:bg-neutral-100"
                                 }`}

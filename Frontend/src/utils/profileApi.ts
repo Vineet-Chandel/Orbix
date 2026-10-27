@@ -387,6 +387,7 @@ export interface InstitutionItem {
     district?: string | null;
     institutionType?: string | null;
     aisheCode?: string | null;
+    website?: string | null;
     verificationStatus?: "verified" | "needs_review" | "unverified" | "inactive" | string | null;
 }
 

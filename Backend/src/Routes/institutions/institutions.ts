@@ -92,6 +92,7 @@ institutionsRouter.get("/:id", async (req: Request, res: Response) => {
                 district,
                 institution_type AS "institutionType",
                 aishe_code AS "aisheCode",
+                website,
                 verification_status AS "verificationStatus",
                 is_active AS "isActive"
             FROM institutions
