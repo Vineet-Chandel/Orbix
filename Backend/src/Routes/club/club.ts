@@ -10,6 +10,9 @@ import ClubRegistrationValidator, {
     type ValidatedClubRegistrationData,
 } from "../../validators/ClubRegistrationValidator.js";
 import { ValidationError } from "../../validators/SignupValidator.js";
+import { EmailVerificationService } from "../../services/email/emailVerificationService.js";
+import { PhoneVerificationService } from "../../services/sms/phoneVerificationService.js";
+import { normalizePhoneNumber } from "../../services/sms/smsGatewayService.js";
 
 const clubRouter = express.Router();
 
@@ -123,6 +126,136 @@ export const authenticateReviewer = async (
 };
 
 /**
+ * POST /api/club/verify/send-email-otp
+ * Dispatches an email verification OTP code to the applicant's primary email.
+ */
+clubRouter.post("/verify/send-email-otp", async (req: Request, res: Response) => {
+    try {
+        const email = req.body?.email;
+        const name = req.body?.name || "Club Representative";
+
+        if (!email || typeof email !== "string") {
+            return res.status(400).json({ success: false, message: "A valid primary email address is required." });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
+        const userAgent = req.headers["user-agent"] || "unknown";
+
+        const result = await EmailVerificationService.sendPreRegistrationOtp({
+            email,
+            name,
+            ipAddress: ip,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        const statusCode = err.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to send email verification code",
+            cooldownRemainingSeconds: err.cooldownRemainingSeconds || 0,
+        });
+    }
+});
+
+/**
+ * POST /api/club/verify/verify-email-otp
+ * Verifies the 6-digit email OTP and returns a cryptographically signed proof token.
+ */
+clubRouter.post("/verify/verify-email-otp", async (req: Request, res: Response) => {
+    try {
+        const { email, otp } = req.body;
+        if (!email || typeof email !== "string") {
+            return res.status(400).json({ success: false, message: "Email is required." });
+        }
+        if (!otp || typeof otp !== "string") {
+            return res.status(400).json({ success: false, message: "6-digit verification code is required." });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
+        const result = await EmailVerificationService.verifyPreRegistrationOtp({
+            email,
+            otp,
+            ipAddress: ip,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        const statusCode = err.statusCode || 400;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Email verification failed",
+        });
+    }
+});
+
+/**
+ * POST /api/club/verify/send-phone-otp
+ * Dispatches an SMS verification OTP code to the applicant's primary mobile phone.
+ */
+clubRouter.post("/verify/send-phone-otp", async (req: Request, res: Response) => {
+    try {
+        const phone = req.body?.phone;
+        const clubName = req.body?.clubName || "Orbix Club";
+
+        if (!phone || typeof phone !== "string") {
+            return res.status(400).json({ success: false, message: "Primary mobile phone number is required." });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
+        const userAgent = req.headers["user-agent"] || "unknown";
+
+        const result = await PhoneVerificationService.sendOtp({
+            phone,
+            clubName,
+            ipAddress: ip,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        const statusCode = err.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to send SMS verification code",
+            cooldownRemainingSeconds: err.cooldownRemainingSeconds || 0,
+        });
+    }
+});
+
+/**
+ * POST /api/club/verify/verify-phone-otp
+ * Verifies the 6-digit phone OTP and returns a cryptographically signed proof token.
+ */
+clubRouter.post("/verify/verify-phone-otp", async (req: Request, res: Response) => {
+    try {
+        const { phone, otp } = req.body;
+        if (!phone || typeof phone !== "string") {
+            return res.status(400).json({ success: false, message: "Phone number is required." });
+        }
+        if (!otp || typeof otp !== "string") {
+            return res.status(400).json({ success: false, message: "6-digit verification code is required." });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
+        const result = await PhoneVerificationService.verifyOtp({
+            phone,
+            otp,
+            ipAddress: ip,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        const statusCode = err.statusCode || 400;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Phone verification failed",
+        });
+    }
+});
+
+/**
  * POST /api/club/register
  * Registers a new club account and immediately creates a pending verification request.
  */
@@ -208,6 +341,48 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
             });
         }
 
+        // 3b. Verify Email & Phone proof tokens
+        let isEmailVerified = false;
+        let isPhoneVerified = false;
+
+        if (validated.emailVerificationToken) {
+            const validEmail = EmailVerificationService.verifyVerificationToken(
+                validated.emailVerificationToken,
+                validated.contactEmail
+            );
+            if (!validEmail) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Email verification proof is invalid or has expired. Please verify your email again.",
+                });
+            }
+            isEmailVerified = true;
+        }
+
+        if (validated.phoneVerificationToken) {
+            const validPhone = PhoneVerificationService.verifyVerificationToken(
+                validated.phoneVerificationToken,
+                validated.contactPhone
+            );
+            if (!validPhone) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Phone verification proof is invalid or has expired. Please verify your phone number again.",
+                });
+            }
+            isPhoneVerified = true;
+        }
+
+        // In production, enforce dual email & phone verification
+        if (isProduction && (!isEmailVerified || !isPhoneVerified)) {
+            return res.status(400).json({
+                success: false,
+                message: "Both primary email and primary mobile number must be verified before completing club registration.",
+            });
+        }
+
+        const verificationTimestamp = new Date();
+
         // 4. Hash password
         const hashedPassword = await bcrypt.hash(validated.password, 10);
         const newUserId = crypto.randomUUID();
@@ -240,6 +415,9 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                         account_type: "club",
                         club_name: validated.clubName,
                         contact_name: validated.contactPersonName,
+                        phone: validated.contactPhone,
+                        is_email_verified: isEmailVerified,
+                        is_phone_verified: isPhoneVerified,
                     }),
                 ]
             );
@@ -260,9 +438,15 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 termsaccepted,
                 account_type,
                 avatar_url,
-                college_id
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'club', $8, $9)
-            RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", account_type AS "accountType", avatar_url AS "avatarUrl", college_id AS "collegeId";`,
+                college_id,
+                phone,
+                is_email_verified,
+                email_verified_at,
+                is_phone_verified,
+                phone_verified_at,
+                phone_confirmed_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'club', $8, $9, $10, $11, $12, $13, $14, $15)
+            RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", account_type AS "accountType", avatar_url AS "avatarUrl", college_id AS "collegeId", phone, is_email_verified AS "isEmailVerified", is_phone_verified AS "isPhoneVerified";`,
             [
                 newUserId,
                 validated.username,
@@ -273,6 +457,12 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 validated.termsAccepted,
                 defaultAvatarUrl,
                 authoritativeCollegeId,
+                validated.contactPhone,
+                isEmailVerified,
+                isEmailVerified ? verificationTimestamp : null,
+                isPhoneVerified,
+                isPhoneVerified ? verificationTimestamp : null,
+                isPhoneVerified ? verificationTimestamp : null,
             ]
         );
         const createdUser = userInsertRes.rows[0];
@@ -301,13 +491,16 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 terms_version,
                 privacy_policy_accepted,
                 privacy_policy_version,
+                is_email_verified,
+                is_phone_verified,
+                phone_verified_at,
                 status
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                 $11, $12, $13, $14, $15, $16, $17, $18, 'v1.0', $19, 'v1.0',
-                'pending'
+                $20, $21, $22, 'pending'
             )
-            RETURNING id, club_name, status, submitted_at;`,
+            RETURNING id, club_name, status, submitted_at, is_email_verified AS "isEmailVerified", is_phone_verified AS "isPhoneVerified";`,
             [
                 newUserId,
                 authoritativeCollegeId,
@@ -328,6 +521,9 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 validated.clubSocialUrl,
                 validated.termsAccepted,
                 validated.privacyPolicyAccepted,
+                isEmailVerified,
+                isPhoneVerified,
+                isPhoneVerified ? verificationTimestamp : null,
             ]
         );
         const createdRequest = requestInsertRes.rows[0];

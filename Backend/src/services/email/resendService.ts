@@ -81,7 +81,7 @@ function generateVerificationEmailHtml(options: { name: string; otp: string; ema
               </p>
 
               <!-- Neo-Brutalist Code Box -->
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 24px 0;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 24px 0 8px 0;">
                 <tr>
                   <td align="center" style="background-color: #FAF6EE; border: 2px solid #000000; border-radius: 14px; box-shadow: 3px 3px 0px #000000; padding: 24px 16px;">
                     <div style="font-size: 11px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: #666666; margin-bottom: 8px;">
@@ -96,23 +96,6 @@ function generateVerificationEmailHtml(options: { name: string; otp: string; ema
                   </td>
                 </tr>
               </table>
-
-              <!-- Perks Section -->
-              <div style="background-color: #F8F9FA; border: 1.5px solid #E5E7EB; border-radius: 10px; padding: 14px 16px; margin-bottom: 24px;">
-                <div style="font-size: 12px; font-weight: 800; color: #000000; margin-bottom: 4px;">
-                  🔒 Why verify your email?
-                </div>
-                <div style="font-size: 12px; color: #555555; line-height: 1.5;">
-                  • Secures your public developer profile and account recovery<br>
-                  • Unlocks collegiate affiliation & campus league rankings<br>
-                  • Priority indexing on verified developer talent searches
-                </div>
-              </div>
-
-              <!-- Security Notice -->
-              <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #777777;">
-                If you did not request this verification code, please ignore this email. Someone may have entered your email address by mistake. Your account remains fully secure.
-              </p>
             </td>
           </tr>
 
@@ -161,7 +144,7 @@ export async function sendVerificationEmail(options: SendVerificationEmailOption
     try {
         const fromEmail = process.env.RESEND_FROM_EMAIL || "Orbix <onboarding@resend.dev>";
         const html = generateVerificationEmailHtml({ name, otp, email: to });
-        const text = `Hello ${name},\n\nYour Orbix account verification code is: ${otp}\n\nThis code expires in 10 minutes.\nIf you did not request this code, please ignore this email.`;
+        const text = `Hello ${name},\n\nYour Orbix account verification code is: ${otp}\n\nThis code expires in 10 minutes.`;
 
         const { data, error } = await client.emails.send({
             from: fromEmail,

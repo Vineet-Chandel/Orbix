@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
     Building2,
@@ -7,6 +7,12 @@ import {
     Lock,
     ShieldCheck,
     MapPin,
+    Mail,
+    Smartphone,
+    CheckCircle2,
+    ArrowRight,
+    ArrowLeft,
+    RotateCcw,
 } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
@@ -43,10 +49,86 @@ const ROLE_OPTIONS = [
     "Other",
 ];
 
+interface OtpSegmentedInputProps {
+    value: string;
+    onChange: (value: string) => void;
+    disabled?: boolean;
+    onComplete?: (code: string) => void;
+}
+
+function OtpSegmentedInput({ value, onChange, disabled, onComplete }: OtpSegmentedInputProps) {
+    const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+    const digits = (value + "      ").slice(0, 6).split("");
+
+    const handleChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+        const char = e.target.value.replace(/\D/g, "").slice(-1);
+        const newDigits = [...digits];
+        newDigits[index] = char;
+        const nextVal = newDigits.join("").trim();
+        onChange(nextVal);
+
+        if (char && index < 5) {
+            inputRefs.current[index + 1]?.focus();
+        }
+        if (nextVal.length === 6 && onComplete) {
+            onComplete(nextVal);
+        }
+    };
+
+    const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Backspace") {
+            if (!digits[index].trim() && index > 0) {
+                inputRefs.current[index - 1]?.focus();
+            }
+        } else if (e.key === "ArrowLeft" && index > 0) {
+            inputRefs.current[index - 1]?.focus();
+        } else if (e.key === "ArrowRight" && index < 5) {
+            inputRefs.current[index + 1]?.focus();
+        }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+        e.preventDefault();
+        const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+        if (pasted) {
+            onChange(pasted);
+            const nextIdx = Math.min(pasted.length, 5);
+            inputRefs.current[nextIdx]?.focus();
+            if (pasted.length === 6 && onComplete) {
+                onComplete(pasted);
+            }
+        }
+    };
+
+    return (
+        <div className="flex items-center justify-between gap-1.5 sm:gap-2.5 max-w-sm mx-auto">
+            {[0, 1, 2, 3, 4, 5].map((idx) => (
+                <input
+                    key={idx}
+                    ref={(el) => { inputRefs.current[idx] = el; }}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    pattern="[0-9]*"
+                    maxLength={1}
+                    disabled={disabled}
+                    value={digits[idx].trim()}
+                    onChange={(e) => handleChange(idx, e)}
+                    onKeyDown={(e) => handleKeyDown(idx, e)}
+                    onPaste={handlePaste}
+                    className="w-10 h-12 sm:w-12 sm:h-14 text-center font-mono text-xl sm:text-2xl font-black rounded-xl bg-[#FAF6EE] border-2 border-black text-black shadow-[2px_2px_0px_#000] focus:bg-white focus:shadow-[3px_3px_0px_#000] focus:outline-none transition-all disabled:opacity-50"
+                />
+            ))}
+        </div>
+    );
+}
+
 export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal }: ClubSignupFormProps = {}) {
     const navigate = useNavigate();
     const toast = useToast();
     const dispatch = useAppDispatch();
+
+    const [formStep, setFormStep] = useState<"details" | "verification">("details");
 
     const [selectedCollege, setSelectedCollege] = useState<InstitutionItem | null>(null);
 
@@ -87,7 +169,43 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
     const [loading, setLoading] = useState(false);
     const [usernameFocused, setUsernameFocused] = useState(false);
 
+    // Verification state
+    const [emailOtp, setEmailOtp] = useState("");
+    const [phoneOtp, setPhoneOtp] = useState("");
+    const [emailVerified, setEmailVerified] = useState(false);
+    const [phoneVerified, setPhoneVerified] = useState(false);
+    const [emailVerificationToken, setEmailVerificationToken] = useState<string | null>(null);
+    const [phoneVerificationToken, setPhoneVerificationToken] = useState<string | null>(null);
+
+    const [emailCooldown, setEmailCooldown] = useState(0);
+    const [phoneCooldown, setPhoneCooldown] = useState(0);
+
+    const [sendingEmailOtp, setSendingEmailOtp] = useState(false);
+    const [sendingPhoneOtp, setSendingPhoneOtp] = useState(false);
+    const [verifyingEmail, setVerifyingEmail] = useState(false);
+    const [verifyingPhone, setVerifyingPhone] = useState(false);
+
+    const [devEmailOtp, setDevEmailOtp] = useState<string | null>(null);
+    const [devPhoneOtp, setDevPhoneOtp] = useState<string | null>(null);
+
     const passwordStrength = evaluatePassword(formData.password);
+
+    // Cooldown countdown timers
+    useEffect(() => {
+        if (emailCooldown <= 0) return;
+        const interval = setInterval(() => {
+            setEmailCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [emailCooldown]);
+
+    useEffect(() => {
+        if (phoneCooldown <= 0) return;
+        const interval = setInterval(() => {
+            setPhoneCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [phoneCooldown]);
 
     const handleCollegeSelect = (college: InstitutionItem | null) => {
         setSelectedCollege(college);
@@ -156,6 +274,16 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             newErrors.contactEmail = "Please enter a valid email address";
         }
 
+        const rawPhone = formData.contactPhone.trim();
+        if (!rawPhone) {
+            newErrors.contactPhone = "Primary contact mobile phone number is required";
+        } else {
+            const digits = rawPhone.replace(/\D/g, "");
+            if (digits.length < 10 || digits.length > 15) {
+                newErrors.contactPhone = "Please enter a valid 10-digit mobile phone number";
+            }
+        }
+
         if (formData.collegeOfficialEmail.trim()) {
             const normalizedOfficial = formData.collegeOfficialEmail.trim().toLowerCase();
             if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedOfficial)) {
@@ -214,10 +342,159 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         return isValid;
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    // Dispatch Email OTP
+    const handleSendEmailOtp = async () => {
+        const email = formData.contactEmail.trim().toLowerCase();
+        if (!email) return;
 
+        setSendingEmailOtp(true);
+        try {
+            const res = await fetch("/api/club/verify/send-email-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email,
+                    name: formData.contactPersonName.trim(),
+                }),
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(data?.message || "Failed to dispatch email verification code.");
+            }
+
+            setEmailCooldown(data?.cooldownSeconds || 60);
+            if (data?.devOtp) setDevEmailOtp(data.devOtp);
+            toast.success(`Verification code sent to ${email}`, { title: "Email Code Sent" });
+        } catch (err: any) {
+            toast.error(err.message || "Failed to send email verification code");
+        } finally {
+            setSendingEmailOtp(false);
+        }
+    };
+
+    // Dispatch Phone OTP
+    const handleSendPhoneOtp = async () => {
+        const phone = formData.contactPhone.trim();
+        if (!phone) return;
+
+        setSendingPhoneOtp(true);
+        try {
+            const res = await fetch("/api/club/verify/send-phone-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    phone,
+                    clubName: formData.clubName.trim(),
+                }),
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(data?.message || "Failed to dispatch SMS verification code.");
+            }
+
+            setPhoneCooldown(data?.cooldownSeconds || 60);
+            if (data?.devOtp) setDevPhoneOtp(data.devOtp);
+            toast.success(`SMS verification code sent to ${data?.phone || phone}`, { title: "SMS Code Sent" });
+        } catch (err: any) {
+            toast.error(err.message || "Failed to send SMS verification code");
+        } finally {
+            setSendingPhoneOtp(false);
+        }
+    };
+
+    // Transition from details form to verification step
+    const handleProceedToVerification = (e: React.FormEvent) => {
+        e.preventDefault();
         if (!validate()) return;
+
+        setFormStep("verification");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+
+        // Trigger both OTPs if not already verified
+        if (!emailVerified) {
+            handleSendEmailOtp();
+        }
+        if (!phoneVerified) {
+            handleSendPhoneOtp();
+        }
+    };
+
+    // Verify Email OTP
+    const handleVerifyEmail = async (codeToVerify?: string) => {
+        const code = (codeToVerify || emailOtp).trim();
+        if (code.length !== 6) {
+            toast.error("Please enter the complete 6-digit email verification code.");
+            return;
+        }
+
+        setVerifyingEmail(true);
+        try {
+            const res = await fetch("/api/club/verify/verify-email-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    email: formData.contactEmail.trim().toLowerCase(),
+                    otp: code,
+                }),
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(data?.message || "Invalid email verification code.");
+            }
+
+            setEmailVerified(true);
+            setEmailVerificationToken(data.token);
+            toast.success("Primary email verified successfully!", { title: "Email Verified ✓" });
+        } catch (err: any) {
+            toast.error(err.message || "Email verification failed");
+        } finally {
+            setVerifyingEmail(false);
+        }
+    };
+
+    // Verify Phone OTP
+    const handleVerifyPhone = async (codeToVerify?: string) => {
+        const code = (codeToVerify || phoneOtp).trim();
+        if (code.length !== 6) {
+            toast.error("Please enter the complete 6-digit phone verification code.");
+            return;
+        }
+
+        setVerifyingPhone(true);
+        try {
+            const res = await fetch("/api/club/verify/verify-phone-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    phone: formData.contactPhone.trim(),
+                    otp: code,
+                }),
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(data?.message || "Invalid SMS verification code.");
+            }
+
+            setPhoneVerified(true);
+            setPhoneVerificationToken(data.token);
+            toast.success("Primary phone number verified successfully!", { title: "Phone Verified ✓" });
+        } catch (err: any) {
+            toast.error(err.message || "Phone verification failed");
+        } finally {
+            setVerifyingPhone(false);
+        }
+    };
+
+    // Final Submission after both Email & Phone are verified
+    const executeFinalSubmission = async () => {
+        if (!emailVerified || !phoneVerified) {
+            toast.error("Please verify both your primary email and phone number before submitting.");
+            return;
+        }
 
         setLoading(true);
 
@@ -235,7 +512,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             contactPersonRole: formData.contactPersonRole.trim(),
             contactEmail: formData.contactEmail.trim().toLowerCase(),
             collegeOfficialEmail: formData.collegeOfficialEmail.trim().toLowerCase() || undefined,
-            contactPhone: formData.contactPhone.trim() || undefined,
+            contactPhone: formData.contactPhone.trim(),
 
             collegeWebsiteUrl: formData.collegeWebsiteUrl.trim() || undefined,
             clubWebsiteUrl: formData.clubWebsiteUrl.trim() || undefined,
@@ -243,6 +520,9 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
             username: formData.username.trim().toLowerCase(),
             password: formData.password,
+
+            emailVerificationToken: emailVerificationToken || undefined,
+            phoneVerificationToken: phoneVerificationToken || undefined,
 
             termsAccepted: formData.termsAccepted,
             privacyPolicyAccepted: formData.privacyPolicyAccepted,
@@ -296,8 +576,8 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
             dispatch(setUser(clubUser));
 
-            toast.success("Club application submitted for verification successfully!", {
-                title: "Application Received",
+            toast.success("Contact verified & club application received successfully!", {
+                title: "Application Received ✓",
             });
 
             // Redirect immediately to standalone club application-status page
@@ -311,386 +591,652 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-            {/* SECTION A: CLUB INFORMATION */}
-            <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
-                <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
-                    <Building2 className="w-4 h-4 text-black" />
-                    <h3 className="text-xs font-black uppercase tracking-wider text-black">
-                        1. Club & Institution Information
-                    </h3>
-                </div>
-
-                {/* Club Name */}
-                <div>
-                    <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
-                        Club Name *
-                    </label>
-                    <FormInput
-                        name="clubName"
-                        type="text"
-                        placeholder="Club Name (e.g. Google Developer Student Club)"
-                        hideLabel
-                        value={formData.clubName}
-                        onChange={(e) => {
-                            setFormData({ ...formData, clubName: e.target.value });
-                            if (errors.clubName) setErrors({ ...errors, clubName: "" });
-                        }}
-                        error={errors.clubName}
-                    />
-                </div>
-
-                {/* Verified College / University Selector */}
-                <div className="pb-1">
-                    <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
-                        College / University (Verified Directory) *
-                    </label>
-                    <CollegeAutocomplete
-                        value={selectedCollege?.id}
-                        selectedCollege={selectedCollege}
-                        onChange={handleCollegeSelect}
-                        canChangeCollege={true}
-                        showChangeWarningModal={false}
-                        placeholder="Search verified Indian colleges, IITs, NITs, universities..."
-                    />
-                    {errors.collegeName && (
-                        <p className="text-[11px] font-bold text-rose-600 mt-1">{errors.collegeName}</p>
-                    )}
-                </div>
-
-                {/* Auto-filled Verified Location Badges (Locked & Authoritative) */}
-                {selectedCollege && (
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-0.5 animate-in fade-in duration-200">
-                        <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
-                                <MapPin className="w-3 h-3 text-neutral-700" />
-                                City (Auto-filled)
-                            </span>
-                            <p className="text-xs font-black text-black truncate">
-                                {formData.collegeCity || "N/A"}
-                            </p>
+        <form onSubmit={formStep === "details" ? handleProceedToVerification : (e) => { e.preventDefault(); executeFinalSubmission(); }} className="space-y-6" noValidate>
+            {formStep === "details" ? (
+                <>
+                    {/* SECTION A: CLUB INFORMATION */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
+                        <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
+                            <Building2 className="w-4 h-4 text-black" />
+                            <h3 className="text-xs font-black uppercase tracking-wider text-black">
+                                1. Club & Institution Information
+                            </h3>
                         </div>
 
-                        <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
-                                <MapPin className="w-3 h-3 text-neutral-700" />
-                                State / UT (Auto-filled)
-                            </span>
-                            <p className="text-xs font-black text-black truncate">
-                                {formData.collegeState || "N/A"}
-                            </p>
+                        {/* Club Name */}
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                                Club Name *
+                            </label>
+                            <FormInput
+                                name="clubName"
+                                type="text"
+                                placeholder="Club Name (e.g. Google Developer Student Club)"
+                                hideLabel
+                                value={formData.clubName}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, clubName: e.target.value });
+                                    if (errors.clubName) setErrors({ ...errors, clubName: "" });
+                                }}
+                                error={errors.clubName}
+                            />
                         </div>
 
-                        <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
-                                <Lock className="w-3 h-3 text-neutral-700" />
-                                Country
-                            </span>
-                            <p className="text-xs font-black text-black truncate">
-                                {formData.collegeCountry || "India"}
-                            </p>
+                        {/* Verified College / University Selector */}
+                        <div className="pb-1">
+                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                                College / University (Verified Directory) *
+                            </label>
+                            <CollegeAutocomplete
+                                value={selectedCollege?.id}
+                                selectedCollege={selectedCollege}
+                                onChange={handleCollegeSelect}
+                                canChangeCollege={true}
+                                showChangeWarningModal={false}
+                                placeholder="Search verified Indian colleges, IITs, NITs, universities..."
+                            />
+                            {errors.collegeName && (
+                                <p className="text-[11px] font-bold text-rose-600 mt-1">{errors.collegeName}</p>
+                            )}
                         </div>
-                    </div>
-                )}
 
-                {/* Club Category Dropdown */}
-                <NeoSelect
-                    label="Club Category"
-                    value={formData.clubCategory}
-                    onChange={(val) => setFormData({ ...formData, clubCategory: val })}
-                    options={CATEGORY_OPTIONS}
-                />
+                        {/* Auto-filled Verified Location Badges (Locked & Authoritative) */}
+                        {selectedCollege && (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-0.5 animate-in fade-in duration-200">
+                                <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
+                                        <MapPin className="w-3 h-3 text-neutral-700" />
+                                        City (Auto-filled)
+                                    </span>
+                                    <p className="text-xs font-black text-black truncate">
+                                        {formData.collegeCity || "N/A"}
+                                    </p>
+                                </div>
 
-                {/* Club Description */}
-                <div>
-                    <textarea
-                        rows={2}
-                        placeholder="Short description of your club's purpose and activities (optional)"
-                        value={formData.clubDescription}
-                        onChange={(e) => setFormData({ ...formData, clubDescription: e.target.value })}
-                        className="w-full p-3 rounded-2xl bg-[#FAF6EE] border-2 border-black text-xs font-medium text-black placeholder:text-neutral-500 shadow-[2px_2px_0px_#000] focus:outline-none focus:bg-white resize-none"
-                    />
-                </div>
-            </div>
+                                <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
+                                        <MapPin className="w-3 h-3 text-neutral-700" />
+                                        State / UT (Auto-filled)
+                                    </span>
+                                    <p className="text-xs font-black text-black truncate">
+                                        {formData.collegeState || "N/A"}
+                                    </p>
+                                </div>
 
-            {/* SECTION B: REPRESENTATIVE INFORMATION */}
-            <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
-                <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
-                    <UserCheck className="w-4 h-4 text-black" />
-                    <h3 className="text-xs font-black uppercase tracking-wider text-black">
-                        2. Representative Details
-                    </h3>
-                </div>
+                                <div className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-600 flex items-center gap-1 mb-0.5">
+                                        <Lock className="w-3 h-3 text-neutral-700" />
+                                        Country
+                                    </span>
+                                    <p className="text-xs font-black text-black truncate">
+                                        {formData.collegeCountry || "India"}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <FormInput
-                        name="contactPersonName"
-                        type="text"
-                        placeholder="Representative's Full Name"
-                        hideLabel
-                        value={formData.contactPersonName}
-                        onChange={(e) => {
-                            setFormData({ ...formData, contactPersonName: e.target.value });
-                            if (errors.contactPersonName) setErrors({ ...errors, contactPersonName: "" });
-                        }}
-                        error={errors.contactPersonName}
-                        autoComplete="name"
-                    />
-
-                    <div>
+                        {/* Club Category Dropdown */}
                         <NeoSelect
-                            value={formData.contactPersonRole}
-                            onChange={(val) => setFormData({ ...formData, contactPersonRole: val })}
-                            options={ROLE_OPTIONS.map((r) => ({
-                                value: r,
-                                label: `Role: ${r}`,
-                            }))}
-                        />
-                    </div>
-                </div>
-
-                {/* Account Email (Primary authentication login address) */}
-                <FormInput
-                    name="contactEmail"
-                    type="email"
-                    placeholder="Primary Contact & Account Email"
-                    hideLabel
-                    value={formData.contactEmail}
-                    onChange={(e) => {
-                        setFormData({ ...formData, contactEmail: e.target.value });
-                        if (errors.contactEmail) setErrors({ ...errors, contactEmail: "" });
-                    }}
-                    error={errors.contactEmail}
-                    autoComplete="email"
-                />
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <FormInput
-                        name="collegeOfficialEmail"
-                        type="email"
-                        placeholder="Official College Email (optional)"
-                        hideLabel
-                        value={formData.collegeOfficialEmail}
-                        onChange={(e) => {
-                            setFormData({ ...formData, collegeOfficialEmail: e.target.value });
-                            if (errors.collegeOfficialEmail) setErrors({ ...errors, collegeOfficialEmail: "" });
-                        }}
-                        error={errors.collegeOfficialEmail}
-                    />
-
-                    <FormInput
-                        name="contactPhone"
-                        type="tel"
-                        placeholder="Phone Number (optional)"
-                        hideLabel
-                        value={formData.contactPhone}
-                        onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value })}
-                        error={errors.contactPhone}
-                        autoComplete="tel"
-                    />
-                </div>
-            </div>
-
-            {/* SECTION C: VERIFICATION REFERENCES */}
-            <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
-                <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
-                    <Globe className="w-4 h-4 text-black" />
-                    <h3 className="text-xs font-black uppercase tracking-wider text-black">
-                        3. Verification References (Optional)
-                    </h3>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <FormInput
-                        name="collegeWebsiteUrl"
-                        type="url"
-                        placeholder="College Website (e.g. https://college.edu.in)"
-                        hideLabel
-                        value={formData.collegeWebsiteUrl}
-                        onChange={(e) => {
-                            setFormData({ ...formData, collegeWebsiteUrl: e.target.value });
-                            if (errors.collegeWebsiteUrl) setErrors({ ...errors, collegeWebsiteUrl: "" });
-                        }}
-                        error={errors.collegeWebsiteUrl}
-                    />
-
-                    <FormInput
-                        name="clubWebsiteUrl"
-                        type="url"
-                        placeholder="Club Website (e.g. https://gdsc-college.dev)"
-                        hideLabel
-                        value={formData.clubWebsiteUrl}
-                        onChange={(e) => {
-                            setFormData({ ...formData, clubWebsiteUrl: e.target.value });
-                            if (errors.clubWebsiteUrl) setErrors({ ...errors, clubWebsiteUrl: "" });
-                        }}
-                        error={errors.clubWebsiteUrl}
-                    />
-                </div>
-
-                <FormInput
-                    name="clubSocialUrl"
-                    type="url"
-                    placeholder="Official Social Profile or Directory Listing URL"
-                    hideLabel
-                    value={formData.clubSocialUrl}
-                    onChange={(e) => {
-                        setFormData({ ...formData, clubSocialUrl: e.target.value });
-                        if (errors.clubSocialUrl) setErrors({ ...errors, clubSocialUrl: "" });
-                    }}
-                    error={errors.clubSocialUrl}
-                />
-            </div>
-
-            {/* SECTION D: ACCOUNT CREDENTIALS */}
-            <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
-                <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
-                    <Lock className="w-4 h-4 text-black" />
-                    <h3 className="text-xs font-black uppercase tracking-wider text-black">
-                        4. Account Credentials
-                    </h3>
-                </div>
-
-                {/* Username Input with live rules indicator */}
-                <div>
-                    <FormInput
-                        name="username"
-                        type="text"
-                        placeholder="Representative Username"
-                        hideLabel
-                        value={formData.username}
-                        onChange={(e) => {
-                            setFormData({ ...formData, username: e.target.value.toLowerCase() });
-                            if (errors.username) setErrors({ ...errors, username: "" });
-                        }}
-                        onFocus={() => setUsernameFocused(true)}
-                        onBlur={() => setUsernameFocused(false)}
-                        error={errors.username}
-                        autoComplete="username"
-                    />
-
-                    <UsernameRulesIndicator
-                        username={formData.username}
-                        hasInput={formData.username.length > 0}
-                        isFocused={usernameFocused}
-                    />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
-                    {/* Password Input */}
-                    <div>
-                        <FormInput
-                            name="password"
-                            isPassword
-                            placeholder="Password"
-                            hideLabel
-                            value={formData.password}
-                            onChange={(e) => {
-                                setFormData({ ...formData, password: e.target.value });
-                                if (errors.password) setErrors({ ...errors, password: "" });
-                            }}
-                            error={errors.password}
-                            autoComplete="new-password"
+                            label="Club Category"
+                            value={formData.clubCategory}
+                            onChange={(val) => setFormData({ ...formData, clubCategory: val })}
+                            options={CATEGORY_OPTIONS}
                         />
 
-                        {/* Interactive Password Strength Indicator */}
-                        <PasswordStrengthIndicator
-                            result={passwordStrength}
-                            hasInput={formData.password.length > 0}
-                        />
-                    </div>
-
-                    {/* Password Confirmation */}
-                    <div>
-                        <FormInput
-                            name="passwordConfirm"
-                            isPassword
-                            placeholder="Confirm Password"
-                            hideLabel
-                            value={formData.passwordConfirm}
-                            onChange={(e) => {
-                                setFormData({ ...formData, passwordConfirm: e.target.value });
-                                if (errors.passwordConfirm) setErrors({ ...errors, passwordConfirm: "" });
-                            }}
-                            error={errors.passwordConfirm}
-                            autoComplete="new-password"
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* SECTION E: LEGAL ACCEPTANCE */}
-            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2.5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
-                        <input
-                            type="checkbox"
-                            checked={formData.termsAccepted}
-                            onChange={(e) => {
-                                setFormData({ ...formData, termsAccepted: e.target.checked });
-                                if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
-                            }}
-                            className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
-                        />
-                        <span className="leading-snug font-medium">
-                            I accept the{" "}
-                            <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                Terms of Service
-                            </a>
-                            .
-                        </span>
-                    </label>
-
-                    <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
-                        <input
-                            type="checkbox"
-                            checked={formData.privacyPolicyAccepted}
-                            onChange={(e) => {
-                                setFormData({ ...formData, privacyPolicyAccepted: e.target.checked });
-                                if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
-                            }}
-                            className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
-                        />
-                        <span className="leading-snug font-medium">
-                            I accept the{" "}
-                            <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                Privacy Policy
-                            </a>
-                            .
-                        </span>
-                    </label>
-                </div>
-                {errors.termsAccepted && (
-                    <p className="text-xs font-bold text-rose-600 px-1">{errors.termsAccepted}</p>
-                )}
-                {errors.privacyPolicyAccepted && (
-                    <p className="text-xs font-bold text-rose-600 px-1">{errors.privacyPolicyAccepted}</p>
-                )}
-            </div>
-
-            {/* Submission Actions */}
-            <div className="pt-2 space-y-3">
-                <button
-                    type="submit"
-                    disabled={loading || !formData.termsAccepted || !formData.privacyPolicyAccepted}
-                    className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                >
-                    {loading ? (
-                        <div className="flex items-center gap-2">
-                            <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                            </svg>
-                            <span>Submitting Club Application...</span>
+                        {/* Club Description */}
+                        <div>
+                            <textarea
+                                rows={2}
+                                placeholder="Short description of your club's purpose and activities (optional)"
+                                value={formData.clubDescription}
+                                onChange={(e) => setFormData({ ...formData, clubDescription: e.target.value })}
+                                className="w-full p-3 rounded-2xl bg-[#FAF6EE] border-2 border-black text-xs font-medium text-black placeholder:text-neutral-500 shadow-[2px_2px_0px_#000] focus:outline-none focus:bg-white resize-none"
+                            />
                         </div>
-                    ) : (
-                        <span className="inline-flex items-center gap-2">
-                            <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                            <span>Submit Club for Verification</span>
-                        </span>
-                    )}
-                </button>
-            </div>
+                    </div>
+
+                    {/* SECTION B: REPRESENTATIVE DETAILS */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
+                        <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
+                            <UserCheck className="w-4 h-4 text-black" />
+                            <h3 className="text-xs font-black uppercase tracking-wider text-black">
+                                2. Representative Details
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                    Representative Full Name *
+                                </label>
+                                <FormInput
+                                    name="contactPersonName"
+                                    type="text"
+                                    placeholder="Representative's Full Name"
+                                    hideLabel
+                                    value={formData.contactPersonName}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, contactPersonName: e.target.value });
+                                        if (errors.contactPersonName) setErrors({ ...errors, contactPersonName: "" });
+                                    }}
+                                    error={errors.contactPersonName}
+                                    autoComplete="name"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                    Position / Role in Club *
+                                </label>
+                                <NeoSelect
+                                    value={formData.contactPersonRole}
+                                    onChange={(val) => setFormData({ ...formData, contactPersonRole: val })}
+                                    options={ROLE_OPTIONS.map((r) => ({
+                                        value: r,
+                                        label: `Role: ${r}`,
+                                    }))}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Primary Account Email */}
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                    Primary Contact & Account Email *
+                                </label>
+                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-black">
+                                    Primary Verification Target
+                                </span>
+                            </div>
+                            <FormInput
+                                name="contactEmail"
+                                type="email"
+                                placeholder="e.g. leader@college.edu or name@gmail.com"
+                                hideLabel
+                                value={formData.contactEmail}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, contactEmail: e.target.value });
+                                    if (errors.contactEmail) setErrors({ ...errors, contactEmail: "" });
+                                }}
+                                error={errors.contactEmail}
+                                autoComplete="email"
+                            />
+                            <p className="text-[10px] text-neutral-500 font-semibold mt-1">
+                                A 6-digit one-time code will be dispatched to verify ownership.
+                            </p>
+                        </div>
+
+                        {/* Primary Contact Phone */}
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                    Primary Contact Mobile Phone Number *
+                                </label>
+                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-black">
+                                    Primary Verification Target
+                                </span>
+                            </div>
+                            <FormInput
+                                name="contactPhone"
+                                type="tel"
+                                placeholder="e.g. 9389205207 or +91 93892 05207"
+                                hideLabel
+                                value={formData.contactPhone}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, contactPhone: e.target.value });
+                                    if (errors.contactPhone) setErrors({ ...errors, contactPhone: "" });
+                                }}
+                                error={errors.contactPhone}
+                                autoComplete="tel"
+                            />
+                            <p className="text-[10px] text-neutral-500 font-semibold mt-1">
+                                A 6-digit one-time SMS code will be dispatched to verify this phone number.
+                            </p>
+                        </div>
+
+                        {/* Official College Email (Optional) */}
+                        <div>
+                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                Official College Email (Optional)
+                            </label>
+                            <FormInput
+                                name="collegeOfficialEmail"
+                                type="email"
+                                placeholder="Official College Email (optional)"
+                                hideLabel
+                                value={formData.collegeOfficialEmail}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, collegeOfficialEmail: e.target.value });
+                                    if (errors.collegeOfficialEmail) setErrors({ ...errors, collegeOfficialEmail: "" });
+                                }}
+                                error={errors.collegeOfficialEmail}
+                            />
+                        </div>
+                    </div>
+
+                    {/* SECTION C: VERIFICATION REFERENCES */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
+                        <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
+                            <Globe className="w-4 h-4 text-black" />
+                            <h3 className="text-xs font-black uppercase tracking-wider text-black">
+                                3. Verification References (Optional)
+                            </h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                            <FormInput
+                                name="collegeWebsiteUrl"
+                                type="url"
+                                placeholder="College Website (e.g. https://college.edu.in)"
+                                hideLabel
+                                value={formData.collegeWebsiteUrl}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, collegeWebsiteUrl: e.target.value });
+                                    if (errors.collegeWebsiteUrl) setErrors({ ...errors, collegeWebsiteUrl: "" });
+                                }}
+                                error={errors.collegeWebsiteUrl}
+                            />
+
+                            <FormInput
+                                name="clubWebsiteUrl"
+                                type="url"
+                                placeholder="Club Website (e.g. https://gdsc-college.dev)"
+                                hideLabel
+                                value={formData.clubWebsiteUrl}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, clubWebsiteUrl: e.target.value });
+                                    if (errors.clubWebsiteUrl) setErrors({ ...errors, clubWebsiteUrl: "" });
+                                }}
+                                error={errors.clubWebsiteUrl}
+                            />
+                        </div>
+
+                        <FormInput
+                            name="clubSocialUrl"
+                            type="url"
+                            placeholder="Official Social Profile or Directory Listing URL"
+                            hideLabel
+                            value={formData.clubSocialUrl}
+                            onChange={(e) => {
+                                setFormData({ ...formData, clubSocialUrl: e.target.value });
+                                if (errors.clubSocialUrl) setErrors({ ...errors, clubSocialUrl: "" });
+                            }}
+                            error={errors.clubSocialUrl}
+                        />
+                    </div>
+
+                    {/* SECTION D: ACCOUNT CREDENTIALS */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
+                        <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
+                            <Lock className="w-4 h-4 text-black" />
+                            <h3 className="text-xs font-black uppercase tracking-wider text-black">
+                                4. Account Credentials
+                            </h3>
+                        </div>
+
+                        {/* Username Input with live rules indicator */}
+                        <div>
+                            <FormInput
+                                name="username"
+                                type="text"
+                                placeholder="Representative Username"
+                                hideLabel
+                                value={formData.username}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, username: e.target.value.toLowerCase() });
+                                    if (errors.username) setErrors({ ...errors, username: "" });
+                                }}
+                                onFocus={() => setUsernameFocused(true)}
+                                onBlur={() => setUsernameFocused(false)}
+                                error={errors.username}
+                                autoComplete="username"
+                            />
+
+                            <UsernameRulesIndicator
+                                username={formData.username}
+                                hasInput={formData.username.length > 0}
+                                isFocused={usernameFocused}
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
+                            {/* Password Input */}
+                            <div>
+                                <FormInput
+                                    name="password"
+                                    isPassword
+                                    placeholder="Password"
+                                    hideLabel
+                                    value={formData.password}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, password: e.target.value });
+                                        if (errors.password) setErrors({ ...errors, password: "" });
+                                    }}
+                                    error={errors.password}
+                                    autoComplete="new-password"
+                                />
+
+                                <PasswordStrengthIndicator
+                                    result={passwordStrength}
+                                    hasInput={formData.password.length > 0}
+                                />
+                            </div>
+
+                            {/* Confirm Password */}
+                            <FormInput
+                                name="passwordConfirm"
+                                isPassword
+                                placeholder="Confirm Password"
+                                hideLabel
+                                value={formData.passwordConfirm}
+                                onChange={(e) => {
+                                    setFormData({ ...formData, passwordConfirm: e.target.value });
+                                    if (errors.passwordConfirm) setErrors({ ...errors, passwordConfirm: "" });
+                                }}
+                                error={errors.passwordConfirm}
+                                autoComplete="new-password"
+                            />
+                        </div>
+                    </div>
+
+                    {/* SECTION E: LEGAL CONSENT */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-2.5">
+                        <div className="space-y-2 pt-1">
+                            <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.termsAccepted}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, termsAccepted: e.target.checked });
+                                        if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
+                                    }}
+                                    className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
+                                />
+                                <span className="leading-snug font-medium">
+                                    I accept the{" "}
+                                    <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                        Terms of Service
+                                    </a>
+                                    .
+                                </span>
+                            </label>
+
+                            <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
+                                <input
+                                    type="checkbox"
+                                    checked={formData.privacyPolicyAccepted}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, privacyPolicyAccepted: e.target.checked });
+                                        if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
+                                    }}
+                                    className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
+                                />
+                                <span className="leading-snug font-medium">
+                                    I accept the{" "}
+                                    <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                        Privacy Policy
+                                    </a>
+                                    .
+                                </span>
+                            </label>
+                        </div>
+                        {errors.termsAccepted && (
+                            <p className="text-xs font-bold text-rose-600 px-1">{errors.termsAccepted}</p>
+                        )}
+                        {errors.privacyPolicyAccepted && (
+                            <p className="text-xs font-bold text-rose-600 px-1">{errors.privacyPolicyAccepted}</p>
+                        )}
+                    </div>
+
+                    {/* Proceed Button */}
+                    <div className="pt-2">
+                        <button
+                            type="submit"
+                            disabled={!formData.termsAccepted || !formData.privacyPolicyAccepted}
+                            className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                            <span className="inline-flex items-center gap-2">
+                                <span>Continue to Contact Verification</span>
+                                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                            </span>
+                        </button>
+                    </div>
+                </>
+            ) : (
+                /* STEP 2: EMAIL & PHONE VERIFICATION VIEW (ON SAME PAGE) */
+                <div className="space-y-5 animate-in fade-in slide-in-from-right duration-250">
+                    {/* Stepper Navigation */}
+                    <div className="p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs font-black">
+                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]">
+                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span className="hidden sm:inline">1. Application Details</span>
+                                <span className="sm:hidden">1. Details</span>
+                            </span>
+                            <ArrowRight className="w-3.5 h-3.5 text-neutral-400" />
+                            <span className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span className="hidden sm:inline">2. Contact Verification</span>
+                                <span className="sm:hidden">2. Verify</span>
+                            </span>
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setFormStep("details")}
+                            className="px-3 py-1.5 rounded-xl bg-neutral-100 hover:bg-neutral-200 text-black border-2 border-black text-xs font-black transition-all flex items-center gap-1 cursor-pointer shadow-[1px_1px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>Edit Details</span>
+                        </button>
+                    </div>
+
+                    {/* Two-Factor Guidance Banner */}
+                    <div className="p-4 rounded-2xl bg-[#FFE566]/25 border-2 border-black shadow-[3px_3px_0px_#000] space-y-1">
+                        <div className="flex items-center gap-2">
+                            <ShieldCheck className="w-4 h-4 text-black stroke-[2.5]" />
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                Mandatory Two-Factor Contact Verification
+                            </h4>
+                        </div>
+                        <p className="text-xs text-neutral-700 font-semibold leading-relaxed">
+                            To ensure authentic student community leadership, verify both your primary email address and your primary mobile number. Both codes must be verified to complete submission.
+                        </p>
+                    </div>
+
+                    {/* CARD 1: PRIMARY EMAIL VERIFICATION */}
+                    <div className={`p-4 sm:p-5 rounded-3xl border-2 border-black shadow-[4px_4px_0px_#000] transition-all space-y-3.5 ${
+                        emailVerified ? "bg-[#a2ff86]/15 border-black" : "bg-white"
+                    }`}>
+                        <div className="flex items-center justify-between pb-2.5 border-b-2 border-black/10 flex-wrap gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black shadow-[1px_1px_0px_#000] flex-shrink-0">
+                                    <Mail className="w-4 h-4 stroke-[2.5]" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                        Primary Email Verification
+                                    </span>
+                                    <span className="text-xs sm:text-sm font-black text-black truncate block">
+                                        {formData.contactEmail}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {emailVerified ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                                    <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Email Verified</span>
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-900">
+                                    <span>Awaiting Code</span>
+                                </span>
+                            )}
+                        </div>
+
+                        {!emailVerified ? (
+                            <div className="space-y-3 pt-1">
+                                <p className="text-xs text-neutral-600 font-semibold text-center">
+                                    Enter the 6-digit verification code sent to <strong className="text-black">{formData.contactEmail}</strong>
+                                </p>
+
+                                <OtpSegmentedInput
+                                    value={emailOtp}
+                                    onChange={(val) => setEmailOtp(val)}
+                                    disabled={verifyingEmail}
+                                    onComplete={(code) => handleVerifyEmail(code)}
+                                />
+
+                                {devEmailOtp && (
+                                    <div className="text-center">
+                                        <span className="inline-block text-[10px] font-mono font-bold bg-neutral-100 border border-black/30 px-2 py-0.5 rounded text-neutral-600">
+                                            Dev Mode OTP: <strong className="text-black">{devEmailOtp}</strong>
+                                        </span>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={emailCooldown > 0 || sendingEmailOtp}
+                                        onClick={handleSendEmailOtp}
+                                        className="text-xs font-black text-black underline underline-offset-2 hover:text-neutral-700 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+                                    >
+                                        <RotateCcw className={`w-3.5 h-3.5 stroke-[2.5] ${sendingEmailOtp ? "animate-spin" : ""}`} />
+                                        <span>{emailCooldown > 0 ? `Resend email code (${emailCooldown}s)` : "Resend Email Code"}</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={emailOtp.length !== 6 || verifyingEmail}
+                                        onClick={() => handleVerifyEmail(emailOtp)}
+                                        className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black uppercase tracking-wider shadow-[2px_2px_0px_#000] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
+                                    >
+                                        {verifyingEmail ? "Verifying..." : "Verify Email"}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-2 text-xs font-bold text-emerald-900">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 stroke-[2.5]" />
+                                <span>Primary email address authenticated cryptographically.</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* CARD 2: PRIMARY MOBILE PHONE VERIFICATION */}
+                    <div className={`p-4 sm:p-5 rounded-3xl border-2 border-black shadow-[4px_4px_0px_#000] transition-all space-y-3.5 ${
+                        phoneVerified ? "bg-[#a2ff86]/15 border-black" : "bg-white"
+                    }`}>
+                        <div className="flex items-center justify-between pb-2.5 border-b-2 border-black/10 flex-wrap gap-2">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black shadow-[1px_1px_0px_#000] flex-shrink-0">
+                                    <Smartphone className="w-4 h-4 stroke-[2.5]" />
+                                </div>
+                                <div className="min-w-0">
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                        Primary Mobile Phone Verification
+                                    </span>
+                                    <span className="text-xs sm:text-sm font-black text-black truncate block">
+                                        {formData.contactPhone}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {phoneVerified ? (
+                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                                    <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Phone Verified</span>
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-900">
+                                    <span>Awaiting SMS Code</span>
+                                </span>
+                            )}
+                        </div>
+
+                        {!phoneVerified ? (
+                            <div className="space-y-3 pt-1">
+                                <p className="text-xs text-neutral-600 font-semibold text-center">
+                                    Enter the 6-digit SMS code dispatched to <strong className="text-black">{formData.contactPhone}</strong>
+                                </p>
+
+                                <OtpSegmentedInput
+                                    value={phoneOtp}
+                                    onChange={(val) => setPhoneOtp(val)}
+                                    disabled={verifyingPhone}
+                                    onComplete={(code) => handleVerifyPhone(code)}
+                                />
+
+                                {devPhoneOtp && (
+                                    <div className="text-center">
+                                        <span className="inline-block text-[10px] font-mono font-bold bg-neutral-100 border border-black/30 px-2 py-0.5 rounded text-neutral-600">
+                                            Dev Mode OTP: <strong className="text-black">{devPhoneOtp}</strong>
+                                        </span>
+                                    </div>
+                                )}
+
+                                <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={phoneCooldown > 0 || sendingPhoneOtp}
+                                        onClick={handleSendPhoneOtp}
+                                        className="text-xs font-black text-black underline underline-offset-2 hover:text-neutral-700 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+                                    >
+                                        <RotateCcw className={`w-3.5 h-3.5 stroke-[2.5] ${sendingPhoneOtp ? "animate-spin" : ""}`} />
+                                        <span>{phoneCooldown > 0 ? `Resend SMS code (${phoneCooldown}s)` : "Resend SMS Code"}</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        disabled={phoneOtp.length !== 6 || verifyingPhone}
+                                        onClick={() => handleVerifyPhone(phoneOtp)}
+                                        className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black uppercase tracking-wider shadow-[2px_2px_0px_#000] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
+                                    >
+                                        {verifyingPhone ? "Verifying..." : "Verify Phone"}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-2 text-xs font-bold text-emerald-900">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 stroke-[2.5]" />
+                                <span>Mobile phone number authenticated cryptographically via SMS OTP.</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Final Submission Button */}
+                    <div className="pt-2 space-y-3">
+                        <button
+                            type="button"
+                            disabled={!emailVerified || !phoneVerified || loading}
+                            onClick={executeFinalSubmission}
+                            className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        >
+                            {loading ? (
+                                <div className="flex items-center gap-2">
+                                    <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                    </svg>
+                                    <span>Submitting Verified Club Application...</span>
+                                </div>
+                            ) : (
+                                <span className="inline-flex items-center gap-2">
+                                    <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                                    <span>
+                                        {emailVerified && phoneVerified
+                                            ? "Submit Verified Club Application"
+                                            : `Verify both email & phone to submit (${(emailVerified ? 1 : 0) + (phoneVerified ? 1 : 0)}/2 verified)`}
+                                    </span>
+                                </span>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
         </form>
     );
 }

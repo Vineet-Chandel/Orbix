@@ -1,5 +1,6 @@
 import validator from "validator";
 import { ValidationError } from "./SignupValidator.js";
+import { normalizePhoneNumber } from "../services/sms/smsGatewayService.js";
 
 export const VALID_CLUB_CATEGORIES = [
     "coding",
@@ -30,7 +31,7 @@ export interface ClubRegistrationInput {
     contactPersonRole: string;
     contactEmail: string;
     collegeOfficialEmail?: string;
-    contactPhone?: string;
+    contactPhone: string;
 
     // Verification references
     collegeWebsiteUrl?: string;
@@ -41,6 +42,10 @@ export interface ClubRegistrationInput {
     username: string;
     password: string;
     confirmPassword?: string;
+
+    // Verification tokens
+    emailVerificationToken?: string;
+    phoneVerificationToken?: string;
 
     // Consent
     termsAccepted: boolean;
@@ -61,7 +66,8 @@ export interface ValidatedClubRegistrationData {
     contactPersonRole: string;
     contactEmail: string;
     collegeOfficialEmail: string | null;
-    contactPhone: string | null;
+    contactPhone: string;
+    contactPhoneFormatted: string;
 
     collegeWebsiteUrl: string | null;
     clubWebsiteUrl: string | null;
@@ -69,6 +75,9 @@ export interface ValidatedClubRegistrationData {
 
     username: string;
     password: string;
+
+    emailVerificationToken: string | null;
+    phoneVerificationToken: string | null;
 
     termsAccepted: boolean;
     privacyPolicyAccepted: boolean;
@@ -165,14 +174,16 @@ export default function ClubRegistrationValidator(data: any): ValidatedClubRegis
         collegeOfficialEmail = rawOfficial;
     }
 
-    let contactPhone: string | null = null;
-    if (typeof data.contactPhone === "string" && data.contactPhone.trim()) {
-        const rawPhone = data.contactPhone.trim();
-        if (!/^[+0-9\s\-()]{7,20}$/.test(rawPhone)) {
-            throw new ValidationError("Please provide a valid phone number.");
-        }
-        contactPhone = rawPhone;
+    const rawPhone = typeof data.contactPhone === "string" ? data.contactPhone.trim() : "";
+    if (!rawPhone) {
+        throw new ValidationError("Primary contact phone number is required.");
     }
+    const normPhone = normalizePhoneNumber(rawPhone);
+    if (!normPhone.isValid) {
+        throw new ValidationError("Please provide a valid 10-digit mobile phone number (e.g. 9389205207).");
+    }
+    const contactPhone = normPhone.canonical;
+    const contactPhoneFormatted = normPhone.formatted;
 
     // 4. Verification References
     let collegeWebsiteUrl: string | null = null;
@@ -224,6 +235,12 @@ export default function ClubRegistrationValidator(data: any): ValidatedClubRegis
     }
 
     const collegeId = typeof data.collegeId === "string" && data.collegeId.trim() ? data.collegeId.trim() : null;
+    const emailVerificationToken = typeof data.emailVerificationToken === "string" && data.emailVerificationToken.trim()
+        ? data.emailVerificationToken.trim()
+        : null;
+    const phoneVerificationToken = typeof data.phoneVerificationToken === "string" && data.phoneVerificationToken.trim()
+        ? data.phoneVerificationToken.trim()
+        : null;
 
     return {
         clubName,
@@ -240,6 +257,7 @@ export default function ClubRegistrationValidator(data: any): ValidatedClubRegis
         contactEmail,
         collegeOfficialEmail,
         contactPhone,
+        contactPhoneFormatted,
 
         collegeWebsiteUrl,
         clubWebsiteUrl,
@@ -247,6 +265,9 @@ export default function ClubRegistrationValidator(data: any): ValidatedClubRegis
 
         username,
         password,
+
+        emailVerificationToken,
+        phoneVerificationToken,
 
         termsAccepted: true,
         privacyPolicyAccepted: true,

@@ -45,10 +45,10 @@ async function runPipelineTest() {
             `INSERT INTO club_verification_requests (
                 id, auth_user_id, college_id, college_name, college_city, college_state, college_country,
                 club_name, club_category, club_description, contact_person_name, contact_person_role,
-                contact_email, terms_accepted, terms_version, privacy_policy_accepted, privacy_policy_version,
-                status, submitted_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, true, 'v1.0', true, 'v1.0', 'pending', NOW(), NOW())
-            RETURNING id, club_name, college_id, status, submitted_at;`,
+                contact_email, contact_phone, terms_accepted, terms_version, privacy_policy_accepted, privacy_policy_version,
+                is_email_verified, is_phone_verified, status, submitted_at, updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, true, 'v1.0', true, 'v1.0', true, true, 'pending', NOW(), NOW())
+            RETURNING id, club_name, college_id, status, submitted_at, is_email_verified, is_phone_verified;`,
             [
                 createdAppId,
                 testUserId,
@@ -63,6 +63,7 @@ async function runPipelineTest() {
                 "Alex Rivera",
                 "Lead Organizer",
                 `alex-${testRunId}@iit-test.edu`,
+                "+919389205207",
             ]
         );
         console.log("   Application registered:", appRes.rows[0]);
