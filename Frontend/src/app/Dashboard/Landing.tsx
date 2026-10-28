@@ -74,15 +74,16 @@ export default function Dashboard() {
                     const handle = (p.portalUsername || p.portal_username || p.username || "").trim();
                     if (!next[k] || !next[k].username || next[k].username !== handle) {
                         next[k] = {
+                            ...(prev[k] || {}),
                             portal: k,
                             username: handle,
-                            profileUrl: p.link || p.profileUrl || "",
+                            profileUrl: p.link || p.profileUrl || prev[k]?.profileUrl || "",
                             verified: p.verified !== false,
                             displayName: p.displayName || p.display_name || handle,
-                            avatarUrl: p.avatarUrl || p.avatar_url,
-                            stats: p.stats,
-                            syncStatus: p.lastSyncStatus || p.syncStatus || "valid",
-                            lastSyncAt: p.lastSyncAt || p.last_sync_at,
+                            avatarUrl: p.avatarUrl || p.avatar_url || prev[k]?.avatarUrl,
+                            stats: p.stats || prev[k]?.stats,
+                            syncStatus: p.lastSyncStatus || p.syncStatus || prev[k]?.syncStatus || "valid",
+                            lastSyncAt: p.lastSyncAt || p.last_sync_at || prev[k]?.lastSyncAt,
                         };
                         hasChanges = true;
                     }

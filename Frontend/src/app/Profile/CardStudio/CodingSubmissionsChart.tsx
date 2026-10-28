@@ -94,43 +94,66 @@ export const CodingSubmissionsChart: React.FC<CodingSubmissionsChartProps> = Rea
             };
         }
 
-        const rawMap = cachedData?.dailyMerged || {};
+        // Robust multi-source calendar merger: merges client cached submissions with remote server submissions
+        const rawMap: Record<string, { count: number; platforms: string[]; platformCounts?: Record<string, number> }> = {};
+
+        if (clientAgg.dailyMerged) {
+            for (const [dateKey, val] of Object.entries(clientAgg.dailyMerged)) {
+                rawMap[dateKey] = {
+                    count: val.count,
+                    platforms: [...(val.platforms || [])],
+                    platformCounts: { ...((val as any).platformCounts || {}) },
+                };
+            }
+        }
+
+        if (cachedData?.dailyMerged) {
+            for (const [dateKey, val] of Object.entries(cachedData.dailyMerged)) {
+                if (!rawMap[dateKey]) {
+                    rawMap[dateKey] = {
+                        count: val.count,
+                        platforms: [...(val.platforms || [])],
+                        platformCounts: { ...((val as any).platformCounts || {}) },
+                    };
+                } else {
+                    const existing = rawMap[dateKey];
+                    existing.count = Math.max(existing.count, val.count);
+                    for (const p of val.platforms || []) {
+                        if (!existing.platforms.includes(p)) existing.platforms.push(p);
+                    }
+                    if ((val as any).platformCounts) {
+                        existing.platformCounts = {
+                            ...(existing.platformCounts || {}),
+                            ...((val as any).platformCounts || {}),
+                        };
+                    }
+                }
+            }
+        }
+
         const activePortalsSet = new Set(Array.from(activePortalsMap.keys()));
 
         const sanitizedMap: Record<string, { count: number; platforms: string[] }> = {};
         let totalCount = 0;
 
-        if (Object.keys(rawMap).length > 0) {
-            for (const [dateStr, entry] of Object.entries(rawMap)) {
-                const filteredPlatforms = (entry.platforms || []).filter((p) => activePortalsSet.has(p.toLowerCase()));
-                if (filteredPlatforms.length === 0) continue;
+        for (const [dateStr, entry] of Object.entries(rawMap)) {
+            const filteredPlatforms = (entry.platforms || []).filter((p) => activePortalsSet.has(p.toLowerCase()));
+            if (filteredPlatforms.length === 0) continue;
 
-                let cellCount = entry.count;
-                if ((entry as any).platformCounts) {
-                    cellCount = filteredPlatforms.reduce(
-                        (sum, p) => sum + ((entry as any).platformCounts[p] || 0),
-                        0
-                    );
-                }
-                if (cellCount <= 0) cellCount = 1;
+            let cellCount = entry.count;
+            if ((entry as any).platformCounts) {
+                cellCount = filteredPlatforms.reduce(
+                    (sum, p) => sum + ((entry as any).platformCounts[p] || 0),
+                    0
+                );
+            }
+            if (cellCount <= 0) cellCount = 1;
 
-                sanitizedMap[dateStr] = {
-                    count: cellCount,
-                    platforms: filteredPlatforms,
-                };
-                totalCount += cellCount;
-            }
-        } else {
-            for (const [dateStr, cell] of clientAgg.weeks.flat().map((c) => [c.dateStr, c] as const)) {
-                if (cell.count <= 0) continue;
-                const filteredPlatforms = cell.platforms.filter((p) => activePortalsSet.has(p.toLowerCase()));
-                if (filteredPlatforms.length === 0) continue;
-                sanitizedMap[dateStr] = {
-                    count: cell.count,
-                    platforms: filteredPlatforms,
-                };
-                totalCount += cell.count;
-            }
+            sanitizedMap[dateStr] = {
+                count: cellCount,
+                platforms: filteredPlatforms,
+            };
+            totalCount += cellCount;
         }
 
         const built = buildWeeklySubmissionColumns(sanitizedMap, weeksCount);

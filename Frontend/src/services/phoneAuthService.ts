@@ -249,9 +249,14 @@ export async function sendFirebasePhoneOtp(
             case "auth/operation-not-allowed":
                 if (originalMessage && (originalMessage.toLowerCase().includes("region") || originalMessage.toLowerCase().includes("sms unable"))) {
                     userMessage = `SMS delivery to this country is restricted by Firebase SMS Region Policy. Please allow your region (e.g., India +91) in Firebase Console > Authentication > Settings > SMS Regions, or use a configured test phone number.`;
+                } else if (originalMessage && originalMessage.includes("BILLING_NOT_ENABLED")) {
+                    userMessage = `Firebase project '${currentProjectId}' is on the Spark (free) plan and requires upgrading to the Blaze (Pay as you go) plan in Firebase Console to send real cellular SMS messages via Google Cloud. To test for free without billing, add your phone number to 'Phone numbers for testing' in Firebase Console (Authentication > Sign-in method > Phone) and use a fixed code like 123456.`;
                 } else {
                     userMessage = `Phone Authentication is disabled or region-restricted in Firebase Console for project '${currentProjectId}'. Please ensure Phone is enabled and SMS Region Policy allows your region (Firebase Console > Authentication > Settings > SMS Regions), or use a registered test phone number.`;
                 }
+                break;
+            case "auth/unauthorized-domain":
+                userMessage = `This domain is not authorized in Firebase Console for project '${currentProjectId}'. Please add your current domain/IP (e.g. localhost) to Firebase Console > Authentication > Settings > Authorized domains.`;
                 break;
             case "auth/invalid-phone-number":
                 userMessage = "The phone number format is invalid. Please check and try again.";
@@ -269,13 +274,15 @@ export async function sendFirebasePhoneOtp(
                 userMessage = "Phone number is required.";
                 break;
             case "auth/billing-not-enabled":
-                userMessage = "Firebase SMS service requires billing or reached the Spark free tier quota (10 SMS/day). You can add test phone numbers in Firebase Console for free unlimited testing.";
+                userMessage = `Firebase project '${currentProjectId}' requires the Blaze (Pay as you go) plan in Firebase Console to send real SMS messages to cellular carriers. Alternatively, add your phone number to 'Phone numbers for testing' in Firebase Console (Authentication > Sign-in method > Phone) to test instantly with a fixed code (e.g. 123456).`;
                 break;
             case "auth/network-request-failed":
                 userMessage = "Network error while connecting to Firebase. Please check your internet connection.";
                 break;
             default:
-                if (originalMessage && !originalMessage.includes("internal-error")) {
+                if (originalMessage && originalMessage.includes("BILLING_NOT_ENABLED")) {
+                    userMessage = `Firebase project '${currentProjectId}' requires the Blaze (Pay as you go) plan in Firebase Console to send real SMS messages. Alternatively, add your phone number to 'Phone numbers for testing' in Firebase Console (Authentication > Sign-in method > Phone) and test with a fixed code (e.g. 123456).`;
+                } else if (originalMessage && !originalMessage.includes("internal-error")) {
                     userMessage = originalMessage;
                 }
                 break;

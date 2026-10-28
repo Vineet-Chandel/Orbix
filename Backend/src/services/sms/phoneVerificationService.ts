@@ -303,6 +303,8 @@ export class PhoneVerificationService {
             await redis.set(`otp:phone_verification:${canonical}`, redisPayload, "EX", OTP_TTL_SECONDS);
         }
 
+        const isDev = process.env.NODE_ENV !== "production";
+
         return {
             success: true,
             message: sendResult.simulated && sendResult.providerError
@@ -314,6 +316,7 @@ export class PhoneVerificationService {
             providerError: sendResult.providerError,
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresInSeconds: OTP_TTL_SECONDS,
+            devOtp: (isDev || sendResult.simulated) ? otp : undefined,
         };
     }
 

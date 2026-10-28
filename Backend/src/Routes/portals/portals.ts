@@ -1493,46 +1493,94 @@ async function fetchSubstack(username: string): Promise<PortalProfileData | null
     };
 }
 
-export async function verifyAndFetchPortal(portal: string, username: string): Promise<PortalProfileData | null> {
+export async function verifyAndFetchPortal(
+    portal: string,
+    username: string,
+    options?: { forceFresh?: boolean; maxAgeSeconds?: number }
+): Promise<PortalProfileData | null> {
     const cleanPortal = String(portal || "").toLowerCase().trim();
     const cleanUsername = String(username || "").trim();
     if (!cleanPortal || !cleanUsername) return null;
 
+    const cacheKey = `portal:profile:${cleanPortal}:${cleanUsername.toLowerCase()}`;
+    const forceFresh = options?.forceFresh ?? false;
+    const maxAge = options?.maxAgeSeconds ?? 3600 * 2; // 2 hours default cache
+
+    if (!forceFresh && redis && redis.status === "ready") {
+        try {
+            const cached = await redis.get(cacheKey);
+            if (cached) {
+                const parsed = JSON.parse(cached) as PortalProfileData;
+                if (parsed && parsed.success) {
+                    return parsed;
+                }
+            }
+        } catch {
+            // non-fatal fallback to live fetch
+        }
+    }
+
+    let result: PortalProfileData | null = null;
     switch (cleanPortal) {
         case "leetcode":
-            return await fetchLeetCode(cleanUsername);
+            result = await fetchLeetCode(cleanUsername);
+            break;
         case "codeforces":
-            return await fetchCodeforces(cleanUsername);
+            result = await fetchCodeforces(cleanUsername);
+            break;
         case "github":
-            return await fetchGitHub(cleanUsername);
+            result = await fetchGitHub(cleanUsername);
+            break;
         case "codechef":
-            return await fetchCodeChef(cleanUsername);
+            result = await fetchCodeChef(cleanUsername);
+            break;
         case "geeksforgeeks":
-            return await fetchGeeksforGeeks(cleanUsername);
+            result = await fetchGeeksforGeeks(cleanUsername);
+            break;
         case "hackerrank":
-            return await fetchHackerRank(cleanUsername);
+            result = await fetchHackerRank(cleanUsername);
+            break;
         case "atcoder":
-            return await fetchAtCoder(cleanUsername);
+            result = await fetchAtCoder(cleanUsername);
+            break;
         case "cses":
-            return await fetchCSES(cleanUsername);
+            result = await fetchCSES(cleanUsername);
+            break;
         case "hackerearth":
-            return await fetchHackerEarth(cleanUsername);
+            result = await fetchHackerEarth(cleanUsername);
+            break;
         case "interviewbit":
-            return await fetchInterviewBit(cleanUsername);
+            result = await fetchInterviewBit(cleanUsername);
+            break;
         case "topcoder":
-            return await fetchTopCoder(cleanUsername);
+            result = await fetchTopCoder(cleanUsername);
+            break;
         case "code360":
         case "codingninjas":
-            return await fetchCode360(cleanUsername);
+            result = await fetchCode360(cleanUsername);
+            break;
         case "spoj":
-            return await fetchSPOJ(cleanUsername);
+            result = await fetchSPOJ(cleanUsername);
+            break;
         case "medium":
-            return await fetchMedium(cleanUsername);
+            result = await fetchMedium(cleanUsername);
+            break;
         case "substack":
-            return await fetchSubstack(cleanUsername);
+            result = await fetchSubstack(cleanUsername);
+            break;
         default:
             return null;
     }
+
+    if (result && result.success && redis && redis.status === "ready") {
+        try {
+            await redis.set(cacheKey, JSON.stringify(result), "EX", maxAge);
+        } catch {
+            // non-fatal
+        }
+    }
+
+    return result;
 }
 
 portalsRouter.get("/fetch", async (req: Request, res: Response) => {
@@ -1579,8 +1627,9 @@ export async function calculateUnifiedSubmissions(
     clientPortals?: Record<string, string>
 ) {
     // Query Postgres for user's connected platforms excluding github using case-insensitive matching
+    // Strictly include snapshot so historical submission calendars are never lost if external APIs time out
     const result = await query(
-        `SELECT portal, portal_username, verified, display_name, stats
+        `SELECT portal, portal_username, verified, display_name, stats, snapshot
          FROM user_links
          WHERE (
             LOWER(username) = LOWER($1)
@@ -1615,6 +1664,7 @@ export async function calculateUnifiedSubmissions(
                     verified: true,
                     display_name: p,
                     stats: [],
+                    snapshot: null,
                 });
             }
         }
@@ -1635,7 +1685,7 @@ export async function calculateUnifiedSubmissions(
     const dailyMerged: Record<string, { count: number; platforms: string[]; platformCounts: Record<string, number> }> = {};
     const collectedRecentSolves: RecentProblemRecord[] = [];
 
-    // Process all platforms in parallel with 3.5s timeout guard per platform
+    // Process all platforms in parallel with 7.5s timeout guard per platform
     await Promise.allSettled(
         effectiveRows.map(async (row: any) => {
             const portal = (row.portal || "").toLowerCase().trim();
@@ -1644,13 +1694,65 @@ export async function calculateUnifiedSubmissions(
 
             let profileData: any = null;
             try {
-                // Quick fetch with 3.5s timeout per platform to prevent stalling
+                // Quick fetch with 7.5s timeout per platform to give LeetCode and other platforms ample time
                 profileData = await Promise.race([
                     verifyAndFetchPortal(portal, portalUsername),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3500)),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 7500)),
                 ]);
             } catch {
                 profileData = null;
+            }
+
+            // CRITICAL RESILIENCE: If live fetch failed, timed out, or returned no submission calendar,
+            // fall back to the PostgreSQL row.snapshot so submission history is NEVER lost!
+            const dbSnapshot = (row.snapshot && typeof row.snapshot === "object" && Object.keys(row.snapshot).length > 0)
+                ? row.snapshot
+                : null;
+
+            if (dbSnapshot) {
+                if (!profileData) {
+                    profileData = dbSnapshot;
+                } else {
+                    const liveCal = profileData.submissionCalendar;
+                    const hasLiveCal = liveCal && typeof liveCal === "object" && Object.keys(liveCal).length > 0;
+                    const dbCal = dbSnapshot.submissionCalendar;
+                    const hasDbCal = dbCal && typeof dbCal === "object" && Object.keys(dbCal).length > 0;
+
+                    if (!hasLiveCal && hasDbCal) {
+                        profileData.submissionCalendar = dbCal;
+                    } else if (hasLiveCal && hasDbCal) {
+                        // Merge historical calendar with live calendar so older years are permanently retained
+                        profileData.submissionCalendar = {
+                            ...dbCal,
+                            ...liveCal,
+                        };
+                    }
+
+                    // Preserve recent submissions if live fetch returned empty
+                    if ((!profileData.recentSubmissions || profileData.recentSubmissions.length === 0) && Array.isArray(dbSnapshot.recentSubmissions)) {
+                        profileData.recentSubmissions = dbSnapshot.recentSubmissions;
+                    }
+                }
+            }
+
+            // Persist updated live snapshot to DB asynchronously so Postgres always holds the latest rich profile
+            if (profileData && profileData.success && profileData !== dbSnapshot && profileData.submissionCalendar) {
+                query(
+                    `UPDATE user_links
+                     SET snapshot = $1::jsonb,
+                         stats = COALESCE($2::jsonb, stats),
+                         last_sync_status = 'valid',
+                         last_sync_at = CURRENT_TIMESTAMP,
+                         updated_at = CURRENT_TIMESTAMP
+                     WHERE (LOWER(username) = LOWER($3) OR user_id = (SELECT id FROM users WHERE LOWER(username) = LOWER($3) LIMIT 1))
+                       AND LOWER(portal) = LOWER($4);`,
+                    [
+                        JSON.stringify(profileData),
+                        JSON.stringify(profileData.stats || row.stats || []),
+                        username,
+                        portal,
+                    ]
+                ).catch(() => null);
             }
 
             let subCount = profileData?.totalSubmissions || 0;
@@ -1718,6 +1820,9 @@ export async function calculateUnifiedSubmissions(
                         if (!isNaN(d.getTime())) {
                             dateStr = d.toISOString().split("T")[0] || key;
                         }
+                    } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(key)) {
+                        const parts = key.split("-");
+                        dateStr = `${parts[0]}-${(parts[1] || "1").padStart(2, "0")}-${(parts[2] || "1").padStart(2, "0")}`;
                     }
 
                     const portalKey = portal.toLowerCase();
@@ -1750,6 +1855,47 @@ export async function calculateUnifiedSubmissions(
             }
         })
     );
+
+    // Safeguard Guard: Check if any connected platform has submissions reported in platformBreakdown,
+    // but 0 entries in dailyMerged. If so, attempt to restore its calendar from dbSnapshot!
+    for (const [pName, pStat] of Object.entries(platformBreakdown)) {
+        if (pName === "github") continue;
+        const pSubmissions = Math.max(pStat.submissions || 0, pStat.solved || 0);
+        if (pSubmissions > 0) {
+            const hasEntries = Object.values(dailyMerged).some(
+                (d) => d.platforms.includes(pName) || (d.platformCounts && (d.platformCounts[pName] || 0) > 0)
+            );
+            if (!hasEntries) {
+                const matchedRow = effectiveRows.find((r: any) => (r.portal || "").toLowerCase() === pName);
+                const snapCal = matchedRow?.snapshot?.submissionCalendar;
+                if (snapCal && typeof snapCal === "object") {
+                    for (const [key, val] of Object.entries(snapCal)) {
+                        const count = typeof val === "number" ? val : parseInt(String(val), 10) || 0;
+                        if (count <= 0) continue;
+                        let dateStr = key;
+                        if (/^\d{9,14}$/.test(key)) {
+                            const num = parseInt(key, 10);
+                            const ms = key.length <= 11 ? num * 1000 : num;
+                            const d = new Date(ms);
+                            if (!isNaN(d.getTime())) dateStr = d.toISOString().split("T")[0] || key;
+                        } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(key)) {
+                            const parts = key.split("-");
+                            dateStr = `${parts[0]}-${(parts[1] || "1").padStart(2, "0")}-${(parts[2] || "1").padStart(2, "0")}`;
+                        }
+                        if (!dailyMerged[dateStr]) {
+                            dailyMerged[dateStr] = { count: 0, platforms: [], platformCounts: {} };
+                        }
+                        const entry = dailyMerged[dateStr];
+                        if (entry) {
+                            entry.count += count;
+                            if (!entry.platforms.includes(pName)) entry.platforms.push(pName);
+                            entry.platformCounts[pName] = (entry.platformCounts[pName] || 0) + count;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Reconcile dailyMerged with dates from verified recent solves
     for (const solve of collectedRecentSolves) {
@@ -2096,6 +2242,25 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
                         }
                     }
 
+                    // Cache Integrity Check: Verify that connected platforms with submissions actually have dailyMerged entries
+                    if (!cacheMismatched && parsed.platformBreakdown && parsed.dailyMerged) {
+                        for (const [portal, stat] of Object.entries(parsed.platformBreakdown as Record<string, any>)) {
+                            if (portal === "github") continue;
+                            const subCount = Math.max(stat.submissions || 0, stat.solved || 0);
+                            if (subCount > 5) {
+                                const hasDays = Object.values(parsed.dailyMerged as Record<string, any>).some((day: any) =>
+                                    (day.platforms && day.platforms.includes(portal.toLowerCase())) ||
+                                    (day.platformCounts && (day.platformCounts[portal.toLowerCase()] || 0) > 0)
+                                );
+                                if (!hasDays) {
+                                    // Corrupted cache detected: platform reports submissions but dailyMerged has 0 entries
+                                    cacheMismatched = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     if (!cacheMismatched) {
                         res.status(200).json(parsed);
 
@@ -2105,6 +2270,28 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
                             activeSubmissionsRefreshes.add(cleanUser);
                             calculateUnifiedSubmissions(username, Object.keys(clientPortals).length > 0 ? clientPortals : undefined)
                                 .then(async (fresh) => {
+                                    // CRITICAL CACHE GUARD: Never overwrite a rich cache with a degraded or truncated one!
+                                    const oldDays = Object.keys(parsed.dailyMerged || {}).length;
+                                    const newDays = Object.keys(fresh.dailyMerged || {}).length;
+                                    if (oldDays > 10 && newDays < oldDays * 0.7) {
+                                        console.warn(`[Submissions Cache Guard] Rejecting degraded background cache update for ${cleanUser} (${newDays} days vs ${oldDays} days)`);
+                                        return;
+                                    }
+
+                                    // Verify no connected platform lost its submissions
+                                    for (const [p, s] of Object.entries(parsed.platformBreakdown || {})) {
+                                        if (p === "github") continue;
+                                        const sub = (s as any).submissions || 0;
+                                        if (sub > 10) {
+                                            const hadDays = Object.values(parsed.dailyMerged || {}).some((d: any) => d.platforms?.includes(p));
+                                            const hasDaysNow = Object.values(fresh.dailyMerged || {}).some((d: any) => d.platforms?.includes(p));
+                                            if (hadDays && !hasDaysNow) {
+                                                console.warn(`[Submissions Cache Guard] Rejecting degraded cache update for ${cleanUser}: platform ${p} lost submissions calendar`);
+                                                return;
+                                            }
+                                        }
+                                    }
+
                                     if (
                                         fresh.totalSubmissions !== parsed.totalSubmissions ||
                                         fresh.activeDays !== parsed.activeDays ||

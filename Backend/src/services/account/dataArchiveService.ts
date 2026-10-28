@@ -202,12 +202,17 @@ export class DataArchiveService {
 
         const isDev = process.env.NODE_ENV !== "production";
 
-        return {
+        const response: { success: boolean; message: string; cooldownSeconds: number; devOtp?: string } = {
             success: true,
             message: `Verification code sent to your primary email address (${user.email}).`,
             cooldownSeconds: 60,
-            devOtp: (isDev || sendResult.simulated) ? otp : undefined,
         };
+
+        if (isDev || sendResult.simulated) {
+            response.devOtp = otp;
+        }
+
+        return response;
     }
 
     /**
@@ -237,7 +242,7 @@ export class DataArchiveService {
             const incomingHash = crypto.createHash("sha256").update(stepUpOtp.trim()).digest("hex");
             if (incomingHash !== otpHash) {
                 const err: any = new Error("Invalid verification code. Please check your inbox and try again.");
-                err.statusCode = 400;
+                err.statusCode = 401;
                 throw err;
             }
             // Consume OTP

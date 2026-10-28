@@ -153,9 +153,46 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
 
     // Build weeks, daily counts, and totals from sanitized data (strictly excluding removed platforms)
     const { weeks, monthNames, totalSubmissions, streakMetrics } = useMemo(() => {
-        const rawMap = (remoteData?.dailyMerged && Object.keys(remoteData.dailyMerged).length > 0)
-            ? remoteData.dailyMerged
-            : (clientAgg.dailyMerged || {});
+        // Robust multi-source calendar merger: merges client cached submissions with remote server submissions
+        // so no connected platform's submission history is ever lost
+        const rawMap: Record<string, { count: number; platforms: string[]; platformCounts?: Record<string, number> }> = {};
+
+        if (clientAgg.dailyMerged) {
+            for (const [dateKey, val] of Object.entries(clientAgg.dailyMerged)) {
+                rawMap[dateKey] = {
+                    count: val.count,
+                    platforms: [...(val.platforms || [])],
+                    platformCounts: { ...((val as any).platformCounts || {}) },
+                };
+            }
+        }
+
+        if (remoteData?.dailyMerged) {
+            for (const [dateKey, val] of Object.entries(remoteData.dailyMerged)) {
+                if (!rawMap[dateKey]) {
+                    rawMap[dateKey] = {
+                        count: val.count,
+                        platforms: [...(val.platforms || [])],
+                        platformCounts: { ...((val as any).platformCounts || {}) },
+                    };
+                } else {
+                    const existing = rawMap[dateKey];
+                    existing.count = Math.max(existing.count, val.count);
+                    for (const p of val.platforms || []) {
+                        if (!existing.platforms.includes(p)) {
+                            existing.platforms.push(p);
+                        }
+                    }
+                    if ((val as any).platformCounts) {
+                        existing.platformCounts = {
+                            ...(existing.platformCounts || {}),
+                            ...((val as any).platformCounts || {}),
+                        };
+                    }
+                }
+            }
+        }
+
         const activePortalsSet = new Set(Object.keys(platformBreakdown).map((p) => p.toLowerCase()));
 
         const sanitizedMap: Record<string, { count: number; platforms: string[] }> = {};

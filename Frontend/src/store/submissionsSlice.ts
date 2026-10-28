@@ -241,7 +241,20 @@ export const submissionsSlice = createSlice({
                 const user = action.payload.username;
                 if (user) {
                     state.loadingByUser[user] = false;
-                    state.dataByUser[user] = action.payload;
+                    const prev = state.dataByUser[user];
+                    const next = { ...action.payload };
+
+                    // Client-side cache guard:
+                    // If previously stored data had significantly more daily calendar days (e.g. from an earlier successful fetch),
+                    // merge the daily calendar so that a temporary glitch or server timeout never zeroes out historical submissions
+                    if (prev && prev.dailyMerged && Object.keys(prev.dailyMerged).length > Object.keys(next.dailyMerged || {}).length) {
+                        next.dailyMerged = {
+                            ...prev.dailyMerged,
+                            ...(next.dailyMerged || {}),
+                        };
+                    }
+
+                    state.dataByUser[user] = next;
                     state.lastFetchedAtByUser[user] = Date.now();
                     saveStoredSubmissions(state.dataByUser);
                 }

@@ -224,6 +224,10 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         verifiedPhoneNumber === canonicalCurrentPhone
     );
 
+    const isConfiguredTestNumber =
+        canonicalCurrentPhone === "+919389205207" ||
+        formData.contactPhone.replace(/\D/g, "") === "9389205207";
+
     // Clean up RecaptchaVerifier instance when component unmounts
     useEffect(() => {
         return () => {
@@ -473,12 +477,62 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             // Clean up verifier on error so subsequent requests can re-initialize cleanly
             clearRecaptchaVerifier(recaptchaVerifierRef.current, "firebase-recaptcha-wrapper");
             recaptchaVerifierRef.current = null;
-            if (err?.code === "auth/operation-not-allowed" || err?.message?.includes("Firebase Console")) {
+            if (
+                err?.code === "auth/operation-not-allowed" ||
+                err?.code === "auth/billing-not-enabled" ||
+                err?.message?.includes("Firebase") ||
+                err?.message?.includes("Blaze") ||
+                err?.message?.includes("Billing")
+            ) {
                 setFirebaseNotice(err.message);
             }
             toast.error(err.message || "Failed to send SMS verification code");
         } finally {
             sendingPhoneOtpRef.current = false;
+            setSendingPhoneOtp(false);
+        }
+    };
+
+    // Simulated Dev OTP fallback handler when real carrier SMS cannot be received
+    const handleSendSimulatedPhoneOtp = async () => {
+        const phone = formData.contactPhone.trim();
+        if (!phone) return;
+
+        const parsed = formatToE164(phone);
+        if (!parsed.isValid) {
+            toast.error("Please enter a valid 10-digit mobile phone number.", { title: "Invalid Phone" });
+            return;
+        }
+
+        setSendingPhoneOtp(true);
+        try {
+            const res = await fetch("/api/club/verify/send-phone-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    phone: parsed.e164,
+                    clubName: formData.clubName.trim(),
+                }),
+            });
+
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(data?.message || "Failed to dispatch SMS verification code.");
+            }
+
+            // Clear Firebase confirmationResult so handleVerifyPhone directly sends OTP code to backend
+            setConfirmationResult(null);
+            setPhoneCooldown(data?.cooldownSeconds || 60);
+
+            if (data?.devOtp) {
+                setPhoneOtp(data.devOtp);
+                toast.success(`Simulated OTP code generated: ${data.devOtp}`, { title: "Dev OTP Ready" });
+            } else {
+                toast.success(`Verification code dispatched to ${data?.phone || parsed.formatted}`, { title: "Code Dispatched" });
+            }
+        } catch (err: any) {
+            toast.error(err.message || "Failed to send simulated verification code");
+        } finally {
             setSendingPhoneOtp(false);
         }
     };
@@ -1345,15 +1399,49 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                     Enter the 6-digit SMS code dispatched to <strong className="text-black">{formData.contactPhone}</strong>
                                 </p>
 
+                                {isConfiguredTestNumber && (
+                                    <div className="p-3.5 rounded-2xl bg-sky-50 border-2 border-sky-500 text-left space-y-2 shadow-[2px_2px_0px_#0284c7]">
+                                        <div className="flex items-center justify-between flex-wrap gap-2">
+                                            <div className="flex items-center gap-1.5 text-xs font-black text-sky-950">
+                                                <ShieldCheck className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                                                <span>Firebase Test Number Active (+91 93892 05207)</span>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                disabled={sendingPhoneOtp || verifyingPhone}
+                                                onClick={() => {
+                                                    setPhoneOtp("123456");
+                                                    handleVerifyPhone("123456");
+                                                }}
+                                                className="px-2.5 py-1 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-black shadow-[1px_1px_0px_#000] cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                Fill 123456 & Verify
+                                            </button>
+                                        </div>
+                                        <p className="text-[11px] font-medium text-sky-900 leading-relaxed">
+                                            By Firebase security design, numbers configured in <em>&quot;Phone numbers for testing&quot;</em> <strong>never receive carrier SMS messages</strong> on their physical SIM. Enter preconfigured code <code className="font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-sky-300 text-sky-950">123456</code> to verify instantly.
+                                        </p>
+                                    </div>
+                                )}
+
                                 {firebaseNotice && (
-                                    <div className="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-500 text-left space-y-1.5 shadow-[2px_2px_0px_#d97706]">
+                                    <div className="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-500 text-left space-y-2 shadow-[2px_2px_0px_#d97706]">
                                         <div className="flex items-center gap-1.5 text-xs font-black text-amber-900">
                                             <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                                            <span>Firebase Console Action Required</span>
+                                            <span>Firebase SMS Dispatch Notice</span>
                                         </div>
                                         <p className="text-[11px] font-medium text-amber-900 leading-relaxed">
                                             {firebaseNotice}
                                         </p>
+                                        <div className="pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={handleSendSimulatedPhoneOtp}
+                                                className="px-3 py-1.5 rounded-xl bg-black hover:bg-neutral-800 text-amber-300 text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-all"
+                                            >
+                                                Switch to Simulated Dev OTP (Bypasses Carrier SMS)
+                                            </button>
+                                        </div>
                                     </div>
                                 )}
 
@@ -1365,15 +1453,28 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 />
 
                                 <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
-                                    <button
-                                        type="button"
-                                        disabled={phoneCooldown > 0 || sendingPhoneOtp}
-                                        onClick={() => handleSendPhoneOtp(true)}
-                                        className="text-xs font-black text-black underline underline-offset-2 hover:text-neutral-700 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
-                                    >
-                                        <RotateCcw className={`w-3.5 h-3.5 stroke-[2.5] ${sendingPhoneOtp ? "animate-spin" : ""}`} />
-                                        <span>{phoneCooldown > 0 ? `Resend SMS code (${phoneCooldown}s)` : "Resend SMS Code"}</span>
-                                    </button>
+                                    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                        <button
+                                            type="button"
+                                            disabled={phoneCooldown > 0 || sendingPhoneOtp}
+                                            onClick={() => handleSendPhoneOtp(true)}
+                                            className="text-xs font-black text-black underline underline-offset-2 hover:text-neutral-700 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
+                                        >
+                                            <RotateCcw className={`w-3.5 h-3.5 stroke-[2.5] ${sendingPhoneOtp ? "animate-spin" : ""}`} />
+                                            <span>{phoneCooldown > 0 ? `Resend SMS (${phoneCooldown}s)` : "Resend SMS"}</span>
+                                        </button>
+
+                                        <span className="text-neutral-300 hidden sm:inline">|</span>
+
+                                        <button
+                                            type="button"
+                                            disabled={sendingPhoneOtp}
+                                            onClick={handleSendSimulatedPhoneOtp}
+                                            className="text-xs font-bold text-neutral-600 hover:text-black underline underline-offset-2 cursor-pointer"
+                                        >
+                                            Use Simulated Dev OTP
+                                        </button>
+                                    </div>
 
                                     <button
                                         type="button"

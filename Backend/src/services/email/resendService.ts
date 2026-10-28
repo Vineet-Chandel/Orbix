@@ -190,7 +190,9 @@ async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailRe
     }
 
     try {
-      const from = customFromEmail || `${fromName} <${defaultFromEmail}>`;
+      const from = customFromEmail
+        ? (customFromEmail.includes("<") ? customFromEmail : `${fromName} <${customFromEmail}>`)
+        : `${fromName} <${defaultFromEmail}>`;
       const { data, error } = await resendClient.emails.send({
         from,
         to: [normalizedTo],
@@ -303,17 +305,18 @@ function generateVerificationEmailHtml(options: { name: string; otp: string; ema
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
                   <td>
-                    <!-- Orbix Brand with Lucide Terminal SVG -->
-                    <table role="presentation" cellspacing="0" cellpadding="0">
+                    <!-- Exact Orbix Brand Logo from Sidebar + Brand Name -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
                       <tr>
-                        <td style="vertical-align: middle; padding-right: 8px;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a2ff86" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block;">
-                            <polyline points="4 17 10 11 4 5"></polyline>
-                            <line x1="12" y1="19" x2="20" y2="19"></line>
-                          </svg>
+                        <td style="vertical-align: middle; padding-right: 9px; line-height: 0; font-size: 0;">
+                          <img src="https://res.cloudinary.com/bh1mhiwb/image/upload/c_fit,h_120,w_120/v1793205819/orbix/brand/orbix_logo_green.png" 
+                               alt="Orbix Logo" 
+                               width="24" 
+                               height="24" 
+                               style="display: block; width: 24px; height: 24px; border: 0; outline: none; text-decoration: none;" />
                         </td>
                         <td style="vertical-align: middle;">
-                          <span style="font-size: 18px; font-weight: 900; letter-spacing: 1.5px; color: #a2ff86; text-transform: uppercase;">
+                          <span style="font-size: 18px; font-weight: 900; letter-spacing: 1.5px; color: #a2ff86; text-transform: uppercase; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                             ORBIX
                           </span>
                         </td>
@@ -321,21 +324,9 @@ function generateVerificationEmailHtml(options: { name: string; otp: string; ema
                     </table>
                   </td>
                   <td align="right">
-                    <!-- Pill with Lucide ShieldCheck SVG -->
-                    <span style="background-color: #FFE566; color: #000000; padding: 5px 12px; border-radius: 999px; border: 1.5px solid #000000; box-shadow: 1px 1px 0px #000000; display: inline-block;">
-                      <table role="presentation" cellspacing="0" cellpadding="0">
-                        <tr>
-                          <td style="vertical-align: middle; padding-right: 5px;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block;">
-                              <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path>
-                              <path d="m9 12 2 2 4-4"></path>
-                            </svg>
-                          </td>
-                          <td style="vertical-align: middle; font-size: 11px; font-weight: 900; color: #000000; text-transform: uppercase; letter-spacing: 0.5px;">
-                            Verify Account
-                          </td>
-                        </tr>
-                      </table>
+                    <!-- Pill with Verify Account -->
+                    <span style="background-color: #FFE566; color: #000000; padding: 5px 12px; border-radius: 999px; border: 1.5px solid #000000; box-shadow: 1px 1px 0px #000000; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block;">
+                      Verify Account
                     </span>
                   </td>
                 </tr>
@@ -346,14 +337,15 @@ function generateVerificationEmailHtml(options: { name: string; otp: string; ema
           <!-- Card Content -->
           <tr>
             <td style="padding: 32px 28px 28px 28px;">
-              <!-- Neo-Brutalist Lucide Mail Hero Icon Box -->
+              <!-- Neo-Brutalist Mail Hero Icon Box -->
               <table role="presentation" cellspacing="0" cellpadding="0" style="margin-bottom: 20px;">
                 <tr>
-                  <td align="center" style="width: 50px; height: 50px; background-color: #FFE566; border: 2px solid #000000; border-radius: 12px; box-shadow: 3px 3px 0px #000000; text-align: center; vertical-align: middle;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: block; margin: auto;">
-                      <rect x="2" y="4" width="20" height="16" rx="2"></rect>
-                      <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path>
-                    </svg>
+                  <td align="center" style="width: 50px; height: 50px; background-color: #FFE566; border: 2px solid #000000; border-radius: 12px; box-shadow: 3px 3px 0px #000000; text-align: center; vertical-align: middle; padding: 0;">
+                    <img src="https://res.cloudinary.com/bh1mhiwb/image/upload/c_fit,h_120,w_120/v1793205819/orbix/brand/orbix_mail_badge.png" 
+                         alt="Email" 
+                         width="28" 
+                         height="28" 
+                         style="display: block; width: 28px; height: 28px; margin: 0 auto; border: 0; outline: none; text-decoration: none;" />
                   </td>
                 </tr>
               </table>
@@ -409,23 +401,24 @@ function generateVerificationEmailHtml(options: { name: string; otp: string; ema
             </td>
           </tr>
 
-          <!-- Footer with Lucide Terminal SVG -->
+          <!-- Footer with Orbix Brand Logo -->
           <tr>
             <td style="padding: 18px 28px 14px 28px; border-top: 1px solid #EEEEEE; background-color: #FAFAFA; text-align: center;">
               <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                 <tr>
-                  <td style="vertical-align: middle; padding-right: 6px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block;">
-                      <polyline points="4 17 10 11 4 5"></polyline>
-                      <line x1="12" y1="19" x2="20" y2="19"></line>
-                    </svg>
+                  <td style="vertical-align: middle; padding-right: 7px; line-height: 0; font-size: 0;">
+                    <img src="https://res.cloudinary.com/bh1mhiwb/image/upload/c_fit,h_60,w_60/v1793205819/orbix/brand/orbix_logo_gray.png" 
+                         alt="Orbix" 
+                         width="14" 
+                         height="14" 
+                         style="display: block; width: 14px; height: 14px; border: 0; outline: none; text-decoration: none;" />
                   </td>
-                  <td style="vertical-align: middle; font-size: 11px; font-weight: 700; color: #888888;">
+                  <td style="vertical-align: middle; font-size: 11px; font-weight: 700; color: #888888; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                     Orbix • Unified Developer Identity & Analytics
                   </td>
                 </tr>
               </table>
-              <p style="margin: 4px 0 0 0; font-size: 10px; color: #AAAAAA;">
+              <p style="margin: 4px 0 0 0; font-size: 10px; color: #AAAAAA; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                 Automated security message. Please do not reply directly to this email.
               </p>
             </td>
@@ -500,12 +493,26 @@ function generateSecurityNotificationHtml(options: {
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
                 <tr>
                   <td>
-                    <span style="font-size: 18px; font-weight: 900; letter-spacing: 1.5px; color: #a2ff86; text-transform: uppercase;">
-                      ORBIX
-                    </span>
+                    <!-- Exact Orbix Brand Logo from Sidebar + Brand Name -->
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="vertical-align: middle; padding-right: 9px; line-height: 0; font-size: 0;">
+                          <img src="https://res.cloudinary.com/bh1mhiwb/image/upload/c_fit,h_120,w_120/v1793205819/orbix/brand/orbix_logo_green.png" 
+                               alt="Orbix Logo" 
+                               width="24" 
+                               height="24" 
+                               style="display: block; width: 24px; height: 24px; border: 0; outline: none; text-decoration: none;" />
+                        </td>
+                        <td style="vertical-align: middle;">
+                          <span style="font-size: 18px; font-weight: 900; letter-spacing: 1.5px; color: #a2ff86; text-transform: uppercase; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+                            ORBIX
+                          </span>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                   <td align="right">
-                    <span style="background-color: ${headerBadgeBg}; color: ${headerBadgeText}; padding: 5px 12px; border-radius: 999px; border: 1.5px solid #000000; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">
+                    <span style="background-color: ${headerBadgeBg}; color: ${headerBadgeText}; padding: 5px 12px; border-radius: 999px; border: 1.5px solid #000000; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px; display: inline-block;">
                       ${badgeText}
                     </span>
                   </td>
@@ -531,23 +538,24 @@ function generateSecurityNotificationHtml(options: {
             </td>
           </tr>
 
-          <!-- Footer with Lucide Terminal SVG -->
+          <!-- Footer with Orbix Brand Logo -->
           <tr>
             <td style="padding: 18px 28px 14px 28px; border-top: 1px solid #EEEEEE; background-color: #FAFAFA; text-align: center;">
               <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                 <tr>
-                  <td style="vertical-align: middle; padding-right: 6px;">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block;">
-                      <polyline points="4 17 10 11 4 5"></polyline>
-                      <line x1="12" y1="19" x2="20" y2="19"></line>
-                    </svg>
+                  <td style="vertical-align: middle; padding-right: 7px; line-height: 0; font-size: 0;">
+                    <img src="https://res.cloudinary.com/bh1mhiwb/image/upload/c_fit,h_60,w_60/v1793205819/orbix/brand/orbix_logo_gray.png" 
+                         alt="Orbix" 
+                         width="14" 
+                         height="14" 
+                         style="display: block; width: 14px; height: 14px; border: 0; outline: none; text-decoration: none;" />
                   </td>
-                  <td style="vertical-align: middle; font-size: 11px; font-weight: 700; color: #888888;">
+                  <td style="vertical-align: middle; font-size: 11px; font-weight: 700; color: #888888; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                     Orbix • Unified Developer Identity & Analytics
                   </td>
                 </tr>
               </table>
-              <p style="margin: 4px 0 0 0; font-size: 10px; color: #AAAAAA;">
+              <p style="margin: 4px 0 0 0; font-size: 10px; color: #AAAAAA; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
                 Automated security message. Please do not reply directly to this email.
               </p>
             </td>
@@ -583,7 +591,7 @@ export async function sendVerificationEmail(options: SendVerificationEmailOption
     subject: `Orbix Verification Code: ${otp}`,
     html,
     text,
-    fromName: "Orbix",
+    fromName: "Orbix Team",
     defaultFromEmail: "onboarding@resend.dev",
     logContext: "Verification email",
   });

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
     Mail,
     UserCog,
@@ -23,7 +24,6 @@ import {
     Eye,
     RefreshCw,
     FileCheck,
-    Sparkles,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppDispatch } from "../../store";
@@ -106,6 +106,34 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
 
     const availabilityCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+    // ============================================================================
+    // DATA ARCHIVE & PORTABILITY STATE (GDPR Article 20 / CCPA Compliance)
+    // ============================================================================
+    const [archiveInfo, setArchiveInfo] = useState<ArchiveStatusInfo | null>(null);
+    const [isLoadingArchiveInfo, setIsLoadingArchiveInfo] = useState(false);
+    const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+    const [archiveScopeMode, setArchiveScopeMode] = useState<"full" | "custom">("full");
+    const [selectedCategories, setSelectedCategories] = useState<ArchiveCategoryKey[]>([
+        "identity",
+        "platforms",
+        "resumes",
+        "security",
+        "support",
+        "network",
+    ]);
+    const [archiveStepUpType, setArchiveStepUpType] = useState<"password" | "email_otp">("password");
+    const [archivePassword, setArchivePassword] = useState("");
+    const [archiveOtp, setArchiveOtp] = useState("");
+    const [isRequestingArchiveOtp, setIsRequestingArchiveOtp] = useState(false);
+    const [archiveOtpCooldown, setArchiveOtpCooldown] = useState(0);
+    const [archiveDevOtp, setArchiveDevOtp] = useState<string | null>(null);
+    const [isGeneratingArchive, setIsGeneratingArchive] = useState(false);
+    const [generationStage, setGenerationStage] = useState<string>("");
+    const [generatedResult, setGeneratedResult] = useState<GenerateArchiveResult | null>(null);
+    const [isPreviewJsonOpen, setIsPreviewJsonOpen] = useState(false);
+    const [isCopiedChecksum, setIsCopiedChecksum] = useState(false);
+    const [previewPayload, setPreviewPayload] = useState<any | null>(null);
+
     // Fetch authoritative status
     const loadStatus = async (showLoading = true) => {
         if (showLoading) setIsLoading(true);
@@ -129,9 +157,138 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
         }
     };
 
+    const loadArchiveInfo = async () => {
+        setIsLoadingArchiveInfo(true);
+        try {
+            const info = await fetchDataArchiveInfo();
+            setArchiveInfo(info);
+            if (!info.hasPasswordAuth) {
+                setArchiveStepUpType("email_otp");
+            }
+        } catch (e: any) {
+            console.error("Failed to load archive status:", e);
+        } finally {
+            setIsLoadingArchiveInfo(false);
+        }
+    };
+
     useEffect(() => {
         loadStatus(true);
+        loadArchiveInfo();
     }, []);
+
+    const handleOpenArchiveModal = (mode: "full" | "custom") => {
+        setArchiveScopeMode(mode);
+        setArchivePassword("");
+        setArchiveOtp("");
+        setGeneratedResult(null);
+        setGenerationStage("");
+        if (archiveInfo && !archiveInfo.hasPasswordAuth) {
+            setArchiveStepUpType("email_otp");
+        } else {
+            setArchiveStepUpType("password");
+        }
+        setIsArchiveModalOpen(true);
+    };
+
+    const handleToggleCategory = (catKey: ArchiveCategoryKey) => {
+        setSelectedCategories((prev) => {
+            if (prev.includes(catKey)) {
+                if (prev.length === 1) {
+                    toast.error("At least one data category must be selected.");
+                    return prev;
+                }
+                return prev.filter((k) => k !== catKey);
+            } else {
+                return [...prev, catKey];
+            }
+        });
+    };
+
+    const handleRequestArchiveOtp = async () => {
+        if (archiveOtpCooldown > 0 || isRequestingArchiveOtp) return;
+        setIsRequestingArchiveOtp(true);
+        try {
+            const res = await requestDataArchiveOtp();
+            setArchiveOtpCooldown(res.cooldownSeconds || 60);
+            if (res.devOtp) {
+                setArchiveDevOtp(res.devOtp);
+            }
+            toast.success(res.message || "Archive authorization code sent to your email! ✓", {
+                title: "Code Sent",
+            });
+        } catch (err: any) {
+            toast.error(err.message || "Failed to send verification code.");
+        } finally {
+            setIsRequestingArchiveOtp(false);
+        }
+    };
+
+    const triggerDownload = (payload: any, filename: string) => {
+        const jsonStr = JSON.stringify(payload, null, 2);
+        const blob = new Blob([jsonStr], { type: "application/json;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    const handleGenerateArchive = async () => {
+        if (archiveStepUpType === "password" && !archivePassword) {
+            toast.error("Please enter your account password to authorize export.");
+            return;
+        }
+        if (archiveStepUpType === "email_otp" && archiveOtp.trim().length !== 6) {
+            toast.error("Please enter the 6-digit verification code sent to your email.");
+            return;
+        }
+
+        setIsGeneratingArchive(true);
+        setGenerationStage("Authenticating step-up security credentials...");
+
+        try {
+            await new Promise((r) => setTimeout(r, 350));
+            setGenerationStage("Querying PostgreSQL across all user data domains...");
+
+            const result = await generateDataArchive({
+                categories: archiveScopeMode === "full" ? "all" : selectedCategories,
+                stepUpPassword: archiveStepUpType === "password" ? archivePassword : undefined,
+                stepUpOtp: archiveStepUpType === "email_otp" ? archiveOtp.trim() : undefined,
+            });
+
+            setGenerationStage("Sealing payload with SHA-256 cryptographic checksum...");
+            await new Promise((r) => setTimeout(r, 350));
+
+            setGeneratedResult(result);
+            setGenerationStage("Archive generated and verified successfully! ✓");
+
+            // Automatically trigger file download
+            triggerDownload(result.archivePayload, result.filename);
+
+            toast.success(`Export ready! ${result.filename} (${(result.fileSizeBytes / 1024).toFixed(1)} KB) downloaded.`, {
+                title: "Data Archive Sealed",
+            });
+
+            // Refresh recent exports list
+            await loadArchiveInfo();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to generate data archive.");
+            setGenerationStage("");
+        } finally {
+            setIsGeneratingArchive(false);
+        }
+    };
+
+    const handleCopyChecksum = (checksum: string) => {
+        navigator.clipboard.writeText(checksum);
+        setIsCopiedChecksum(true);
+        toast.success("SHA-256 Checksum copied to clipboard! ✓", { title: "Copied" });
+        setTimeout(() => setIsCopiedChecksum(false), 2000);
+    };
 
     // Cooldown timers
     useEffect(() => {
@@ -157,6 +314,14 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
         }, 1000);
         return () => clearInterval(timer);
     }, [usernameCooldown]);
+
+    useEffect(() => {
+        if (archiveOtpCooldown <= 0) return;
+        const timer = setInterval(() => {
+            setArchiveOtpCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [archiveOtpCooldown]);
 
     // Live Debounced Username Availability Check
     useEffect(() => {
@@ -209,6 +374,24 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             }
         };
     }, [newUsernameInput, isUsernameModalOpen]);
+
+    // Lock background scrolling when any modal is open
+    const isAnyModalOpen = Boolean(
+        isEmailChangeModalOpen ||
+        isPrimaryVerifyModalOpen ||
+        isUsernameModalOpen ||
+        isArchiveModalOpen ||
+        isPreviewJsonOpen
+    );
+
+    useEffect(() => {
+        if (!isAnyModalOpen || typeof document === "undefined") return;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+            document.body.style.overflow = previousOverflow;
+        };
+    }, [isAnyModalOpen]);
 
     // Handle Start Email Change (Continuous transition inside same modal)
     const handleStartEmailChange = async (e: React.FormEvent) => {
@@ -481,28 +664,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
         }
     };
 
-    // Account Data Export
-    const handleExportData = () => {
-        const exportData = {
-            user: {
-                username: statusData?.username || user?.username,
-                email: statusData?.primaryEmail || user?.email,
-                isEmailVerified: statusData?.isEmailVerified || false,
-                emailVerifiedAt: statusData?.emailVerifiedAt || null,
-                exportedAt: new Date().toISOString(),
-            },
-            monthlyLimits: statusData?.monthlyLimits,
-            auditVersion: "2.0.0",
-        };
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `orbix-account-${statusData?.username || "export"}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("Account data archive downloaded.", { title: "Export Complete" });
-    };
+
 
     if (isLoading) {
         return (
@@ -708,31 +870,202 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                 </div>
             </div>
 
-            {/* SECTION 3: DATA ARCHIVE & DANGER ZONE */}
-            <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                <div className="space-y-1">
-                    <h3 className="text-base sm:text-lg font-black text-black">
-                        Data Archive & Portability
-                    </h3>
-                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                        Download a cryptographically verified copy of your account profile, coding credentials, and security history.
-                    </p>
+            {/* SECTION 3: DATA ARCHIVE & PORTABILITY (GDPR ART. 20 & CCPA COMPLIANCE) */}
+            <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-6">
+                {/* Header & Badges */}
+                <div className="flex items-start justify-between gap-4 flex-wrap pb-4 border-b-2 border-black/10">
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-11 h-11 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] shrink-0">
+                            <Database className="w-5 h-5 stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="text-base sm:text-lg font-black text-black">
+                                    Data Archive & Portability
+                                </h3>
+                                <span className="px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-[10px] font-black uppercase shadow-[1px_1px_0px_#000]">
+                                    GDPR Art. 20
+                                </span>
+                                <span className="px-2 py-0.5 rounded-full bg-sky-100 border border-black text-[10px] font-black uppercase shadow-[1px_1px_0px_#000]">
+                                    CCPA Standard
+                                </span>
+                            </div>
+                            <p className="text-xs text-neutral-600 font-medium">
+                                Export a dynamic, cryptographically sealed copy of your personal identity, platform submissions, career facts, and security history.
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-mono font-bold text-neutral-700 shadow-[2px_2px_0px_#000]">
+                            {isLoadingArchiveInfo ? (
+                                <RefreshCw className="w-3.5 h-3.5 text-neutral-500 animate-spin" />
+                            ) : (
+                                <Clock className="w-3.5 h-3.5 text-neutral-500" />
+                            )}
+                            <span>
+                                {isLoadingArchiveInfo
+                                    ? "Syncing status..."
+                                    : archiveInfo
+                                    ? `${archiveInfo.dailyExportsRemaining} of ${archiveInfo.dailyLimit} remaining today`
+                                    : "5 of 5 daily"}
+                            </span>
+                        </span>
+                    </div>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={handleExportData}
-                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer"
-                >
-                    <Download className="w-4 h-4 stroke-[2.5]" />
-                    <span>Download Account Data (.JSON)</span>
-                </button>
+                {/* Included Real Data Categories Breakdown Grid */}
+                <div className="space-y-2.5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-black">
+                            Dynamic Data Domains Included in Archive:
+                        </span>
+                        <span className="text-[11px] font-mono font-bold text-neutral-500">
+                            Live PostgreSQL Aggregation
+                        </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                            <div className="flex items-center gap-2">
+                                <span className="text-base">👤</span>
+                                <h4 className="text-xs font-black text-black">Identity & Academics</h4>
+                            </div>
+                            <p className="text-[11px] text-neutral-600 font-medium leading-relaxed">
+                                Full profile, bio, campus enrollment, verified coder badge, and timestamps.
+                            </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                            <div className="flex items-center gap-2">
+                                <Code2 className="w-4 h-4 text-black stroke-[2.5]" />
+                                <h4 className="text-xs font-black text-black">Coding Platforms</h4>
+                            </div>
+                            <p className="text-[11px] text-neutral-600 font-medium leading-relaxed">
+                                Synced LeetCode, Codeforces, GitHub, CodeChef handles, solved counts, & ratings.
+                            </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                            <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-black stroke-[2.5]" />
+                                <h4 className="text-xs font-black text-black">Career & Resumes</h4>
+                            </div>
+                            <p className="text-[11px] text-neutral-600 font-medium leading-relaxed">
+                                Uploaded resume versions, ATS analysis reports, skill facts & role fit matrices.
+                            </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                            <div className="flex items-center gap-2">
+                                <Shield className="w-4 h-4 text-black stroke-[2.5]" />
+                                <h4 className="text-xs font-black text-black">Security Audit Trail</h4>
+                            </div>
+                            <p className="text-[11px] text-neutral-600 font-medium leading-relaxed">
+                                History of account email & username changes, challenges, and security events.
+                            </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                            <div className="flex items-center gap-2">
+                                <HelpCircle className="w-4 h-4 text-black stroke-[2.5]" />
+                                <h4 className="text-xs font-black text-black">Help Center Inquiries</h4>
+                            </div>
+                            <p className="text-[11px] text-neutral-600 font-medium leading-relaxed">
+                                Support tickets, reported issues, priority flags & official resolution notes.
+                            </p>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                            <div className="flex items-center gap-2">
+                                <Users className="w-4 h-4 text-black stroke-[2.5]" />
+                                <h4 className="text-xs font-black text-black">Network & Community</h4>
+                            </div>
+                            <p className="text-[11px] text-neutral-600 font-medium leading-relaxed">
+                                Mutual connections counts, relationship requests & community settings.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Most Recent Generated Export Snapshot (if available) */}
+                {archiveInfo?.recentExports && archiveInfo.recentExports.length > 0 && (
+                    <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-3">
+                        <div className="flex items-start justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2.5">
+                                <div className="w-8 h-8 rounded-lg bg-[#a2ff86] border border-black flex items-center justify-center text-black shadow-[1px_1px_0px_#000] shrink-0">
+                                    <FileCheck className="w-4 h-4 stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <h4 className="text-xs font-black text-black">
+                                        Last Generated Archive Snapshot
+                                    </h4>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        {new Date(archiveInfo.recentExports[0].createdAt).toLocaleString()} •{" "}
+                                        {(archiveInfo.recentExports[0].fileSizeBytes / 1024).toFixed(1)} KB •{" "}
+                                        {archiveInfo.recentExports[0].categories.length} categories
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <a
+                                    href={`/api/settings/manage-account/data-archive/download/${archiveInfo.recentExports[0].exportId}`}
+                                    download
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs border border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer"
+                                >
+                                    <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Download Snapshot</span>
+                                </a>
+                            </div>
+                        </div>
+
+                        {/* SHA-256 Hash Display */}
+                        <div className="flex items-center justify-between gap-2 p-2.5 rounded-lg bg-white border border-black text-xs font-mono">
+                            <div className="truncate text-neutral-700">
+                                <span className="font-black text-black">SHA-256: </span>
+                                <span className="text-[11px]">{archiveInfo.recentExports[0].sha256Checksum}</span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => handleCopyChecksum(archiveInfo.recentExports[0].sha256Checksum)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#FAF6EE] hover:bg-[#FFE566] text-black font-sans font-black text-[11px] border border-black transition-all cursor-pointer shrink-0"
+                            >
+                                {isCopiedChecksum ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                                <span>{isCopiedChecksum ? "Copied" : "Copy Hash"}</span>
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* Action Buttons Row */}
+                <div className="flex items-center gap-3 pt-1 flex-wrap">
+                    <button
+                        type="button"
+                        disabled={archiveInfo ? !archiveInfo.canExport : false}
+                        onClick={() => handleOpenArchiveModal("full")}
+                        className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                        <Download className="w-4 h-4 stroke-[2.5]" />
+                        <span>Request Complete Archive (.JSON)</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        disabled={archiveInfo ? !archiveInfo.canExport : false}
+                        onClick={() => handleOpenArchiveModal("custom")}
+                        className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white hover:bg-neutral-50 text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                        <UserCog className="w-4 h-4 stroke-[2.5]" />
+                        <span>Customize Categories & Security</span>
+                    </button>
+                </div>
             </div>
 
             {/* UNIFIED MODAL 1: CHANGE EMAIL REQUEST & 2-STEP OTP VERIFICATION (SEAMLESS SINGLE DIALOG) */}
-            {isEmailChangeModalOpen && (
+            {isEmailChangeModalOpen && typeof document !== "undefined" && createPortal(
                 <div
-                    className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-[2px] rounded-2xl animate-in fade-in duration-200"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
                     onClick={(e) => {
                         if (e.target === e.currentTarget && !isSubmittingStartEmail && !isSubmittingOtp) {
                             if (emailChangeStep === "input_email") {
@@ -742,7 +1075,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                     }}
                 >
                     <div
-                        className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150"
+                        className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto my-auto"
                         role="dialog"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -890,13 +1223,14 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                             </div>
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* MODAL 2: PRIMARY EMAIL VERIFICATION (FOR UNVERIFIED ACCOUNTS) */}
-            {isPrimaryVerifyModalOpen && (
+            {isPrimaryVerifyModalOpen && typeof document !== "undefined" && createPortal(
                 <div
-                    className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-[2px] rounded-2xl animate-in fade-in duration-200"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
                     onClick={(e) => {
                         if (e.target === e.currentTarget && !isSubmittingPrimaryOtp) {
                             setIsPrimaryVerifyModalOpen(false);
@@ -904,7 +1238,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                     }}
                 >
                     <div
-                        className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150"
+                        className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto my-auto"
                         role="dialog"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -977,13 +1311,14 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* MODAL 3: USERNAME CHANGE FLOW */}
-            {isUsernameModalOpen && (
+            {isUsernameModalOpen && typeof document !== "undefined" && createPortal(
                 <div
-                    className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/25 backdrop-blur-[2px] rounded-2xl animate-in fade-in duration-200"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
                     onClick={(e) => {
                         if (e.target === e.currentTarget && !isSubmittingUsernameRequest && !isSubmittingUsernameConfirm) {
                             setIsUsernameModalOpen(false);
@@ -991,7 +1326,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                     }}
                 >
                     <div
-                        className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150"
+                        className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto my-auto"
                         role="dialog"
                         onClick={(e) => e.stopPropagation()}
                     >
@@ -1143,7 +1478,372 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                             </div>
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body
+            )}
+
+            {/* UNIFIED MODAL 4: DATA ARCHIVE & PORTABILITY STEP-UP GENERATOR */}
+            {isArchiveModalOpen && typeof document !== "undefined" && createPortal(
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+                    onClick={(e) => {
+                        if (e.target === e.currentTarget && !isGeneratingArchive) {
+                            setIsArchiveModalOpen(false);
+                        }
+                    }}
+                >
+                    <div
+                        className="relative w-full max-w-lg bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto my-auto"
+                        role="dialog"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {/* Modal Header */}
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-2xl bg-[#a2ff86] border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] shrink-0">
+                                    <Database className="w-5 h-5 stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-black leading-tight">
+                                        {generatedResult ? "Archive Sealed & Ready" : "Export Personal Data Archive"}
+                                    </h3>
+                                    <p className="text-xs text-neutral-600 font-bold mt-0.5">
+                                        GDPR Article 20 & CCPA Cryptographic Portability
+                                    </p>
+                                </div>
+                            </div>
+
+                            <button
+                                type="button"
+                                disabled={isGeneratingArchive}
+                                onClick={() => setIsArchiveModalOpen(false)}
+                                className="w-8 h-8 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
+                                aria-label="Close dialog"
+                            >
+                                <X className="w-4 h-4 stroke-[2.5]" />
+                            </button>
+                        </div>
+
+                        {!generatedResult ? (
+                            /* State 1: Scope Selection & Step-up Authentication Form */
+                            <div className="space-y-4">
+                                {/* Scope Mode Tabs */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black uppercase tracking-wider text-neutral-600 block">
+                                        Archive Scope
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-2 p-1 bg-white border-2 border-black rounded-xl">
+                                        <button
+                                            type="button"
+                                            onClick={() => setArchiveScopeMode("full")}
+                                            className={`py-2 px-3 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                                archiveScopeMode === "full"
+                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    : "text-neutral-600 hover:text-black"
+                                            }`}
+                                        >
+                                            Full Archive (All 6 Domains)
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setArchiveScopeMode("custom")}
+                                            className={`py-2 px-3 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                                                archiveScopeMode === "custom"
+                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    : "text-neutral-600 hover:text-black"
+                                            }`}
+                                        >
+                                            Customize Categories
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Custom Categories Checkboxes (Shown if Custom Scope selected) */}
+                                {archiveScopeMode === "custom" && (
+                                    <div className="p-3.5 bg-white border-2 border-black rounded-xl space-y-2.5">
+                                        <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500 block">
+                                            Select Domains to Include:
+                                        </span>
+                                        <div className="grid grid-cols-2 gap-2 text-xs font-bold text-black">
+                                            {[
+                                                { key: "identity" as ArchiveCategoryKey, label: "Identity & Profile" },
+                                                { key: "platforms" as ArchiveCategoryKey, label: "Coding Platforms" },
+                                                { key: "resumes" as ArchiveCategoryKey, label: "Resumes & Career" },
+                                                { key: "security" as ArchiveCategoryKey, label: "Security & Audits" },
+                                                { key: "support" as ArchiveCategoryKey, label: "Support Tickets" },
+                                                { key: "network" as ArchiveCategoryKey, label: "Network & Social" },
+                                            ].map((cat) => {
+                                                const checked = selectedCategories.includes(cat.key);
+                                                return (
+                                                    <button
+                                                        key={cat.key}
+                                                        type="button"
+                                                        onClick={() => handleToggleCategory(cat.key)}
+                                                        className={`flex items-center gap-2 p-2 rounded-lg border-2 text-left transition-all cursor-pointer ${
+                                                            checked
+                                                                ? "bg-[#FAF6EE] border-black shadow-[2px_2px_0px_#000]"
+                                                                : "bg-white border-neutral-200 text-neutral-400"
+                                                        }`}
+                                                    >
+                                                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${checked ? "bg-black text-[#a2ff86] border-black" : "border-neutral-300"}`}>
+                                                            {checked && <Check className="w-3 h-3 stroke-[3]" />}
+                                                        </div>
+                                                        <span className="truncate">{cat.label}</span>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Step-Up Security Card */}
+                                <div className="p-4 bg-white border-2 border-black rounded-xl space-y-3.5">
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Lock className="w-4 h-4 text-black stroke-[2.5]" />
+                                            <span className="text-xs font-black uppercase tracking-wider text-black">
+                                                Security Step-Up Verification
+                                            </span>
+                                        </div>
+                                        {archiveInfo?.hasPasswordAuth && (
+                                            <div className="flex items-center gap-1 bg-[#FAF6EE] p-0.5 rounded-lg border border-black">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setArchiveStepUpType("password")}
+                                                    className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all cursor-pointer ${
+                                                        archiveStepUpType === "password" ? "bg-black text-white" : "text-neutral-600"
+                                                    }`}
+                                                >
+                                                    Password
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setArchiveStepUpType("email_otp")}
+                                                    className={`px-2 py-0.5 rounded text-[10px] font-black uppercase transition-all cursor-pointer ${
+                                                        archiveStepUpType === "email_otp" ? "bg-black text-white" : "text-neutral-600"
+                                                    }`}
+                                                >
+                                                    Email Code
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {archiveStepUpType === "password" ? (
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-bold text-neutral-600 block">
+                                                Enter Account Password
+                                            </label>
+                                            <input
+                                                type="password"
+                                                value={archivePassword}
+                                                onChange={(e) => setArchivePassword(e.target.value)}
+                                                placeholder="••••••••••••"
+                                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-sm font-mono font-bold text-black shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none"
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between text-xs font-medium text-neutral-700">
+                                                <span>Code to: <strong className="font-mono text-black">{archiveInfo?.primaryEmail || user?.email}</strong></span>
+                                                <button
+                                                    type="button"
+                                                    disabled={archiveOtpCooldown > 0 || isRequestingArchiveOtp}
+                                                    onClick={handleRequestArchiveOtp}
+                                                    className="inline-flex items-center gap-1 text-black hover:underline font-black text-xs disabled:opacity-50 cursor-pointer"
+                                                >
+                                                    <RefreshCw className={`w-3 h-3 ${isRequestingArchiveOtp ? "animate-spin" : ""}`} />
+                                                    <span>{archiveOtpCooldown > 0 ? `Resend (${archiveOtpCooldown}s)` : "Send Verification Code"}</span>
+                                                </button>
+                                            </div>
+
+                                            <OtpSegmentedInput
+                                                value={archiveOtp}
+                                                onChange={setArchiveOtp}
+                                                disabled={isGeneratingArchive}
+                                                autoFocus
+                                            />
+
+                                            {archiveDevOtp && (
+                                                <div className="text-center pt-1">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setArchiveOtp(archiveDevOtp)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] hover:bg-yellow-300 border-2 border-black text-xs font-mono font-black text-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                                    >
+                                                        <span>Quick-Fill Dev Code: {archiveDevOtp}</span>
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Active Generation Pipeline Status */}
+                                {isGeneratingArchive && (
+                                    <div className="p-3.5 rounded-xl bg-amber-50 border-2 border-black space-y-2 animate-in fade-in">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin shrink-0" />
+                                            <span className="text-xs font-black text-black">
+                                                {generationStage || "Generating Sealed Archive..."}
+                                            </span>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-neutral-200 rounded-full overflow-hidden border border-black">
+                                            <div className="h-full bg-black animate-pulse" style={{ width: "85%" }} />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Submit Generate Button */}
+                                <div className="pt-2">
+                                    <button
+                                        type="button"
+                                        disabled={
+                                            isGeneratingArchive ||
+                                            (archiveStepUpType === "password" && !archivePassword) ||
+                                            (archiveStepUpType === "email_otp" && archiveOtp.trim().length !== 6)
+                                        }
+                                        onClick={handleGenerateArchive}
+                                        className="w-full py-3.5 rounded-full bg-black text-sm font-black text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                                    >
+                                        <Download className="w-4 h-4 stroke-[2.5]" />
+                                        <span>
+                                            {isGeneratingArchive ? "Generating Archive..." : "Authorize & Generate Archive (.JSON)"}
+                                        </span>
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            /* State 2: Generation Complete Celebration & Verification Screen */
+                            <div className="space-y-4">
+                                <div className="p-5 rounded-2xl bg-[#a2ff86]/30 border-2 border-black text-center space-y-2">
+                                    <div className="w-12 h-12 rounded-full bg-[#a2ff86] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
+                                        <CheckCircle2 className="w-6 h-6 text-black stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-base font-black text-black">
+                                        Data Archive Successfully Generated & Sealed
+                                    </h4>
+                                    <p className="text-xs text-neutral-700 font-medium max-w-sm mx-auto">
+                                        Your complete personal record snapshot has been dynamically extracted from PostgreSQL and downloaded to your device.
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-white border-2 border-black space-y-2.5 text-xs font-mono">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-sans font-bold text-neutral-500">Archive File:</span>
+                                        <span className="font-bold text-black">{generatedResult.filename}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-sans font-bold text-neutral-500">File Size:</span>
+                                        <span className="font-bold text-black">{(generatedResult.fileSizeBytes / 1024).toFixed(1)} KB</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-sans font-bold text-neutral-500">SHA-256 Seal:</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleCopyChecksum(generatedResult.sha256Checksum)}
+                                            className="inline-flex items-center gap-1 text-[11px] font-sans font-bold text-black hover:underline cursor-pointer"
+                                        >
+                                            <span className="truncate max-w-[180px] font-mono">{generatedResult.sha256Checksum}</span>
+                                            <Copy className="w-3 h-3 shrink-0" />
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => triggerDownload(generatedResult.archivePayload, generatedResult.filename)}
+                                        className="py-2.5 px-4 rounded-xl bg-black text-[#a2ff86] font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <Download className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Download Again</span>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setPreviewPayload(generatedResult.archivePayload);
+                                            setIsPreviewJsonOpen(true);
+                                        }}
+                                        className="py-2.5 px-4 rounded-xl bg-white hover:bg-neutral-50 text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                    >
+                                        <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Preview Data JSON</span>
+                                    </button>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setGeneratedResult(null);
+                                        setIsArchiveModalOpen(false);
+                                    }}
+                                    className="w-full py-2.5 rounded-full bg-transparent hover:bg-black/5 text-xs font-black text-neutral-600 hover:text-black transition-all cursor-pointer"
+                                >
+                                    Close Window
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* UNIFIED MODAL 5: JSON DATA INSPECTION PREVIEW MODAL */}
+            {isPreviewJsonOpen && previewPayload && typeof document !== "undefined" && createPortal(
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+                    onClick={() => setIsPreviewJsonOpen(false)}
+                >
+                    <div
+                        className="relative w-full max-w-2xl bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-4 animate-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col my-auto"
+                        role="dialog"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between border-b-2 border-black/10 pb-3">
+                            <div className="flex items-center gap-2.5">
+                                <Code2 className="w-5 h-5 text-black stroke-[2.5]" />
+                                <div>
+                                    <h3 className="text-base font-black text-black">
+                                        Inspect Data Archive JSON
+                                    </h3>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Cryptographically Sealed GDPR / CCPA Machine-Readable Payload
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(JSON.stringify(previewPayload, null, 2));
+                                        toast.success("Complete JSON copied to clipboard! ✓");
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-100 text-black font-black text-xs border border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
+                                >
+                                    <Copy className="w-3.5 h-3.5" />
+                                    <span>Copy JSON</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsPreviewJsonOpen(false)}
+                                    className="w-8 h-8 rounded-xl bg-white hover:bg-neutral-100 border border-black flex items-center justify-center text-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                >
+                                    <X className="w-4 h-4 stroke-[2.5]" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-auto bg-neutral-900 border-2 border-black rounded-xl p-4 text-[#a2ff86] font-mono text-xs shadow-inner">
+                            <pre className="whitespace-pre-wrap break-all leading-relaxed">
+                                {JSON.stringify(previewPayload, null, 2)}
+                            </pre>
+                        </div>
+                    </div>
+                </div>,
+                document.body
             )}
         </div>
     );
