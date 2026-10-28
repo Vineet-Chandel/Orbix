@@ -184,7 +184,19 @@ export class EmailVerificationService {
         });
 
         if (!sendResult.success) {
-            throw new Error(sendResult.error || "Failed to dispatch verification email via Resend");
+            if (sendResult.sandboxRestricted) {
+                return {
+                    success: true,
+                    message: `Verification code generated! (Note: Resend test sandbox restricts external email delivery. Code provided below; configure SMTP in Backend/.env for live delivery).`,
+                    email: normalizedEmail,
+                    simulated: true,
+                    sandboxRestricted: true,
+                    devOtp: otp,
+                    cooldownSeconds: COOLDOWN_SECONDS,
+                    expiresInSeconds: OTP_TTL_SECONDS,
+                };
+            }
+            throw new Error(sendResult.error || "Failed to dispatch verification email");
         }
 
         return {
@@ -194,7 +206,9 @@ export class EmailVerificationService {
                 : `Verification code sent to ${normalizedEmail}`,
             email: normalizedEmail,
             simulated: Boolean(sendResult.simulated),
-            devOtp: sendResult.simulated ? otp : undefined,
+            devOtp: (sendResult.simulated || sendResult.sandboxRestricted || process.env.NODE_ENV !== "production") ? otp : undefined,
+            sandboxRestricted: Boolean(sendResult.sandboxRestricted),
+            provider: sendResult.provider,
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresInSeconds: OTP_TTL_SECONDS,
         };
@@ -500,6 +514,18 @@ export class EmailVerificationService {
         });
 
         if (!sendResult.success) {
+            if (sendResult.sandboxRestricted) {
+                return {
+                    success: true,
+                    message: `Verification code generated! (Note: Resend test sandbox restricts external email delivery. Code provided below; configure SMTP in Backend/.env for live delivery).`,
+                    email: normalizedEmail,
+                    simulated: true,
+                    sandboxRestricted: true,
+                    devOtp: otp,
+                    cooldownSeconds: COOLDOWN_SECONDS,
+                    expiresInSeconds: OTP_TTL_SECONDS,
+                };
+            }
             throw new Error(sendResult.error || "Failed to dispatch verification email");
         }
 
@@ -510,7 +536,9 @@ export class EmailVerificationService {
             message: `Verification code sent to ${normalizedEmail}`,
             email: normalizedEmail,
             simulated: Boolean(sendResult.simulated),
-            devOtp: isDev ? otp : undefined,
+            devOtp: (isDev || sendResult.sandboxRestricted) ? otp : undefined,
+            sandboxRestricted: Boolean(sendResult.sandboxRestricted),
+            provider: sendResult.provider,
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresInSeconds: OTP_TTL_SECONDS,
         };

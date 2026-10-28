@@ -17,6 +17,7 @@ import {
 } from './Routes/relationships/relationshipRoutes.js';
 import { helpRouter } from './Routes/help/helpRoutes.js';
 import verificationRouter from './Routes/verification/verificationRoutes.js';
+import manageAccountsRouter from './Routes/account/manageAccountsRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import redis from './redis/client.js';
 
@@ -66,6 +67,9 @@ app.use('/api/help', helpRouter);
 app.use('/help', helpRouter);
 app.use('/api/verification', verificationRouter);
 app.use('/api/settings/verification', verificationRouter);
+app.use('/api/settings/manage-account', manageAccountsRouter);
+app.use('/api/manage-account', manageAccountsRouter);
+app.use('/api/account', manageAccountsRouter);
 app.use('/relationships', relationshipRouter);
 app.use('/blocks', blockRouter);
 app.use('/profile', profileRouter);

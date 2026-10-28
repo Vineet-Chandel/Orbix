@@ -9,9 +9,6 @@ import {
     CheckCircle2,
     ExternalLink,
     Copy,
-    Download,
-    Trash2,
-    AlertTriangle,
     Lock,
     Laptop,
     Search,
@@ -38,7 +35,7 @@ import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import type { ConnectedUserItem } from "../../api/relationshipApi";
 import { HelpCenterView } from "./HelpCenterView";
-import { EmailVerificationSection } from "./EmailVerificationSection";
+import { ManageAccountView } from "./ManageAccountView";
 
 interface SettingDetailViewProps {
     viewKey: SettingsViewKey;
@@ -111,29 +108,6 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
         }, 600);
     };
 
-    const handleExportData = () => {
-        const exportData = {
-            user: {
-                username: user?.username,
-                email: user?.gmail || user?.email,
-                name: `${user?.firstName || ""} ${user?.lastName || ""}`.trim(),
-                createdAt: user?.createdAt,
-                platforms: user?.platforms,
-                college: user?.college,
-            },
-            exportDate: new Date().toISOString(),
-            formatVersion: "1.0",
-        };
-        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `orbix-account-data-${user?.username || "export"}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("Account data archive downloaded as JSON.", { title: "Data Exported" });
-    };
-
     const handleCopyInviteLink = () => {
         const link = `${window.location.origin}/signup?ref=${encodeURIComponent(user?.username || "dev")}`;
         navigator.clipboard.writeText(link);
@@ -146,8 +120,47 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             case "verify-account":
                 return (
                     <div className="space-y-6">
-                        {/* Primary Email Verification (Resend OTP Pipeline) */}
-                        <EmailVerificationSection user={user} />
+                        {/* Primary Email Verification Centralized Hub Card */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex items-start justify-between gap-4">
+                                <div className="space-y-1">
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#FFE566] text-black text-xs font-black uppercase border border-black shadow-[1px_1px_0px_#000]">
+                                        <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Account Email Security</span>
+                                    </div>
+                                    <h3 className="text-xl font-black text-black">
+                                        Primary Email Verification & Management
+                                    </h3>
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                                        Primary email verification, cryptographic OTP challenges, and 2-step email changes are centrally managed in Manage Accounts.
+                                    </p>
+                                </div>
+                                <span
+                                    className={`px-3 py-1 rounded-xl text-xs font-black uppercase border-2 border-black shrink-0 shadow-[2px_2px_0px_#000] ${
+                                        user?.isEmailVerified
+                                            ? "bg-[#a2ff86] text-black"
+                                            : "bg-amber-100 text-amber-900 border-amber-300"
+                                    }`}
+                                >
+                                    {user?.isEmailVerified ? "Verified" : "Unverified"}
+                                </span>
+                            </div>
+
+                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="space-y-0.5">
+                                    <p className="text-[11px] font-black uppercase text-neutral-500 font-bold">Registered Primary Email</p>
+                                    <p className="text-sm font-mono font-bold text-black">{user?.gmail || user?.email || "No email on record"}</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => onSelectView("manage-account")}
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-[#a2ff86] font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer shrink-0"
+                                >
+                                    <span>Manage Email in Account Center</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </button>
+                            </div>
+                        </div>
 
                         {/* Collegiate Enrollment & Identity */}
                         <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
@@ -326,62 +339,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                 );
 
             case "manage-account":
-                return (
-                    <div className="space-y-6">
-                        {/* Account Data & Archive */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="space-y-1">
-                                <h3 className="text-lg font-black text-black">Account Information & Export</h3>
-                                <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                    Download a copy of your Orbix profile details, verified coding platforms, and submission history in JSON format.
-                                </p>
-                            </div>
-
-                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-2">
-                                <div className="flex items-center justify-between text-xs font-bold text-neutral-700">
-                                    <span>Primary Account Email:</span>
-                                    <span className="font-mono text-black">{user?.gmail || user?.email || "No email on record"}</span>
-                                </div>
-                                <div className="flex items-center justify-between text-xs font-bold text-neutral-700">
-                                    <span>Registered Username:</span>
-                                    <span className="font-mono text-black">@{user?.username}</span>
-                                </div>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={handleExportData}
-                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer"
-                            >
-                                <Download className="w-4 h-4 stroke-[2.5]" />
-                                <span>Download Account Data (.JSON)</span>
-                            </button>
-                        </div>
-
-                        {/* Danger Zone */}
-                        <div className="p-6 rounded-2xl bg-rose-50/60 border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
-                            <div className="flex items-center gap-2 text-rose-700">
-                                <AlertTriangle className="w-5 h-5 stroke-[2.5]" />
-                                <h3 className="text-base font-black text-black">Danger Zone</h3>
-                            </div>
-                            <p className="text-xs text-neutral-700 font-medium leading-relaxed max-w-xl">
-                                Deactivating or deleting your account will remove your public showcase, unlink your external coding platforms, and withdraw you from active leaderboards.
-                            </p>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    toast.info("Account deletion requires email confirmation link. Check your inbox.", {
-                                        title: "Request Initiated",
-                                    });
-                                }}
-                                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
-                            >
-                                <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Request Account Deletion</span>
-                            </button>
-                        </div>
-                    </div>
-                );
+                return <ManageAccountView user={user} onBack={onBack} />;
 
             case "saved":
                 return (
@@ -1032,14 +990,16 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                     type="button"
                     onClick={onBack}
                     className="p-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer shrink-0"
-                    aria-label="Back to Settings Hub"
-                    title="Back to Settings"
+                    aria-label={["verify-account", "password-security", "manage-account"].includes(viewKey) ? "Back to Account Center" : "Back to Settings Hub"}
+                    title={["verify-account", "password-security", "manage-account"].includes(viewKey) ? "Back to Account Center" : "Back to Settings"}
                 >
                     <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
                 </button>
                 <div className="space-y-0.5">
                     <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500">
-                        Settings
+                        {["verify-account", "password-security", "manage-account"].includes(viewKey)
+                            ? "Settings • Account Center"
+                            : "Settings"}
                     </span>
                     <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
                         {getViewTitle()}

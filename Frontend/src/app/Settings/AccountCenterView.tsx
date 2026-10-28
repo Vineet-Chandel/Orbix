@@ -64,10 +64,10 @@ export const AccountCenterView: React.FC<AccountCenterViewProps> = ({
         {
             id: "manage-account" as SettingsViewKey,
             title: "Manage Account",
-            description: "Update primary contact email, download personal GDPR data archive & account deactivation.",
+            description: "Verify primary email, change email & username securely (with monthly quotas), and export data archive.",
             icon: <UserCog className="w-5 h-5 text-black stroke-[2.5]" />,
             iconBg: "bg-purple-200",
-            badge: "Account Owner",
+            badge: "Manage & Verify",
             badgeStyle: "bg-purple-100 text-purple-900 border border-purple-300",
         },
     ];

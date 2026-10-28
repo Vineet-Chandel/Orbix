@@ -118,6 +118,9 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_metadata JSONB DEFAULT '{}'::jsonb;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_email_verified BOOLEAN DEFAULT false;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_email VARCHAR(255) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_email_operation_id UUID NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS username_updated_at TIMESTAMPTZ NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_confirmed_at TIMESTAMPTZ NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_phone_verified BOOLEAN DEFAULT false;
@@ -154,6 +157,59 @@ export const testDatabaseConnection = async () => {
             );
             CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_otps(user_id, status);
             CREATE INDEX IF NOT EXISTS idx_email_verification_email ON email_verification_otps(email);
+
+            -- Ensure Manage Accounts system tables exist
+            CREATE TABLE IF NOT EXISTS account_change_operations (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL,
+                change_type VARCHAR(30) NOT NULL,
+                current_value VARCHAR(255) NOT NULL,
+                requested_value VARCHAR(255) NOT NULL,
+                stage VARCHAR(50) NOT NULL,
+                old_challenge_id UUID NULL,
+                new_challenge_id UUID NULL,
+                attempts INT DEFAULT 0,
+                expires_at TIMESTAMPTZ NOT NULL,
+                completed_at TIMESTAMPTZ NULL,
+                cancelled_at TIMESTAMPTZ NULL,
+                cancellation_reason TEXT NULL,
+                metadata JSONB DEFAULT '{}'::jsonb,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_account_change_ops_user_stage ON account_change_operations(user_id, stage);
+
+            CREATE TABLE IF NOT EXISTS account_change_challenges (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                operation_id UUID NOT NULL REFERENCES account_change_operations(id) ON DELETE CASCADE,
+                user_id UUID NOT NULL,
+                challenge_type VARCHAR(50) NOT NULL,
+                destination VARCHAR(255) NOT NULL,
+                otp_hash VARCHAR(64) NOT NULL,
+                status VARCHAR(20) DEFAULT 'pending',
+                attempts INT DEFAULT 0,
+                ip_address VARCHAR(45) NULL,
+                user_agent TEXT NULL,
+                resend_count INT DEFAULT 0,
+                last_resent_at TIMESTAMPTZ NULL,
+                expires_at TIMESTAMPTZ NOT NULL,
+                consumed_at TIMESTAMPTZ NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_account_change_challenges_op ON account_change_challenges(operation_id, status);
+
+            CREATE TABLE IF NOT EXISTS account_change_history (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id UUID NOT NULL,
+                operation_id UUID NULL UNIQUE,
+                change_type VARCHAR(30) NOT NULL,
+                old_value VARCHAR(255) NOT NULL,
+                new_value VARCHAR(255) NOT NULL,
+                ip_address VARCHAR(45) NULL,
+                user_agent TEXT NULL,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_account_change_history_monthly ON account_change_history(user_id, change_type, created_at DESC);
 
             -- Ensure resume upload intent tracking & cleanup queues exist
             CREATE TABLE IF NOT EXISTS resume_upload_intents (

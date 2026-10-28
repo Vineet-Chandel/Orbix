@@ -231,6 +231,7 @@ export async function sendFirebasePhoneOtp(
             formattedPhone: parsed.formatted,
         };
     } catch (err: unknown) {
+        console.error("[Firebase Phone Auth] Error during SMS dispatch:", err);
         // Safe user-friendly error translations
         let userMessage = "Failed to dispatch SMS verification code.";
         const errorRecord = typeof err === "object" && err !== null ? (err as Record<string, unknown>) : {};
@@ -246,7 +247,11 @@ export async function sendFirebasePhoneOtp(
 
         switch (errorCode) {
             case "auth/operation-not-allowed":
-                userMessage = `Phone Authentication is disabled in Firebase Console for project '${currentProjectId}'. Please open Firebase Console > Authentication > Sign-in method, click 'Phone', and enable it. (You can also add test phone numbers under 'Phone numbers for testing' for instant verification).`;
+                if (originalMessage && (originalMessage.toLowerCase().includes("region") || originalMessage.toLowerCase().includes("sms unable"))) {
+                    userMessage = `SMS delivery to this country is restricted by Firebase SMS Region Policy. Please allow your region (e.g., India +91) in Firebase Console > Authentication > Settings > SMS Regions, or use a configured test phone number.`;
+                } else {
+                    userMessage = `Phone Authentication is disabled or region-restricted in Firebase Console for project '${currentProjectId}'. Please ensure Phone is enabled and SMS Region Policy allows your region (Firebase Console > Authentication > Settings > SMS Regions), or use a registered test phone number.`;
+                }
                 break;
             case "auth/invalid-phone-number":
                 userMessage = "The phone number format is invalid. Please check and try again.";

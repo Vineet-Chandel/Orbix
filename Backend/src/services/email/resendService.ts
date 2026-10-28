@@ -1,42 +1,290 @@
 import { Resend } from "resend";
+import nodemailer from "nodemailer";
+import type { Transporter } from "nodemailer";
 
-interface SendVerificationEmailOptions {
-    to: string;
-    name?: string;
-    otp: string;
+export interface SendVerificationEmailOptions {
+  to: string;
+  name?: string;
+  otp: string;
 }
 
-interface SendEmailResult {
-    success: boolean;
-    simulated?: boolean;
-    messageId?: string;
-    error?: string;
+export interface SendSecurityNotificationEmailOptions {
+  to: string;
+  name?: string;
+  subject: string;
+  badgeText?: string;
+  headline: string;
+  message: string;
+  otp?: string;
+  otpLabel?: string;
+  isWarning?: boolean;
+  footerNotice?: string;
+}
+
+export interface SendEmailResult {
+  success: boolean;
+  simulated?: boolean;
+  messageId?: string;
+  error?: string;
+  provider?: "resend" | "smtp" | "simulation";
+  sandboxRestricted?: boolean;
 }
 
 let resendClientInstance: Resend | null = null;
+let smtpTransporterInstance: Transporter | null = null;
 
 /**
  * Returns an authenticated Resend client instance if RESEND_API_KEY is configured.
  */
-function getResendClient(): Resend | null {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey || apiKey.trim() === "" || apiKey.includes("your_resend_api_key")) {
-        return null;
+export function getResendClient(): Resend | null {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey || apiKey.trim() === "" || apiKey.includes("your_resend_api_key")) {
+    return null;
+  }
+  if (!resendClientInstance) {
+    resendClientInstance = new Resend(apiKey.trim());
+  }
+  return resendClientInstance;
+}
+
+/**
+ * Returns a configured Nodemailer SMTP transporter if SMTP credentials are provided.
+ * Supports standard SMTP (Gmail App Passwords, SendGrid, Amazon SES, Brevo, custom SMTP).
+ */
+export function getSmtpTransporter(): Transporter | null {
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+
+  if (!user || !pass || !user.trim() || !pass.trim()) {
+    return null;
+  }
+
+  if (!smtpTransporterInstance) {
+    const host = process.env.SMTP_HOST || (user.includes("@gmail.com") ? "smtp.gmail.com" : "localhost");
+    const port = Number(process.env.SMTP_PORT) || 465;
+    const secure = process.env.SMTP_SECURE !== undefined
+      ? process.env.SMTP_SECURE === "true"
+      : port === 465;
+
+    smtpTransporterInstance = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: {
+        user: user.trim(),
+        pass: pass.trim().replace(/\s+/g, ""), // clean accidental spaces in app passwords
+      },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
+  }
+
+  return smtpTransporterInstance;
+}
+
+/**
+ * Checks whether an error from Resend indicates trial sandbox recipient restriction.
+ */
+function isResendSandboxError(errorMsg?: string): boolean {
+  if (!errorMsg) return false;
+  const lower = errorMsg.toLowerCase();
+  return (
+    lower.includes("only send testing emails to your own email address") ||
+    lower.includes("verify a domain at resend.com/domains") ||
+    (lower.includes("validation_error") && lower.includes("domain"))
+  );
+}
+
+/**
+ * Sends an email using Nodemailer SMTP transporter.
+ */
+async function sendViaSmtp(
+  transporter: Transporter,
+  options: { to: string; subject: string; html: string; text: string; fromName: string }
+): Promise<SendEmailResult> {
+  const { to, subject, html, text, fromName } = options;
+  const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
+  const fromHeader = `"${fromName}" <${fromEmail}>`;
+
+  try {
+    const info = await transporter.sendMail({
+      from: fromHeader,
+      to,
+      subject,
+      html,
+      text,
+    });
+
+    console.log(`[SMTP Transporter] Email dispatched successfully to ${to} (MessageId: ${info.messageId})`);
+    return {
+      success: true,
+      provider: "smtp",
+      messageId: info.messageId,
+    };
+  } catch (smtpErr: any) {
+    console.error(`[SMTP Error] Failed sending email to ${to}:`, smtpErr.message || smtpErr);
+    return {
+      success: false,
+      provider: "smtp",
+      error: smtpErr.message || "Failed to dispatch email via SMTP",
+    };
+  }
+}
+
+interface DispatchEmailPayload {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+  fromName: string;
+  defaultFromEmail: string;
+  logContext: string;
+}
+
+/**
+ * Unified Multi-Provider Email Dispatcher.
+ * Intelligently chooses between Resend API, Nodemailer SMTP, and dev simulation.
+ * Automatically fails over to SMTP if Resend sandbox restricts non-owner destinations.
+ */
+async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailResult> {
+  const { to, subject, html, text, fromName, defaultFromEmail, logContext } = payload;
+  const normalizedTo = to.trim().toLowerCase();
+
+  const resendClient = getResendClient();
+  const smtpTransporter = getSmtpTransporter();
+  const providerPref = (process.env.EMAIL_PROVIDER || "auto").toLowerCase();
+
+  // 0. Simulation Mode: Neither Resend nor SMTP is configured
+  if (!resendClient && !smtpTransporter) {
+    console.log(`\n======================================================`);
+    console.log(`[EMAIL DISPATCHER] ⚠️ Neither Resend API key nor SMTP credentials configured.`);
+    console.log(`[DEV MODE SIMULATION] ${logContext} to ${normalizedTo}: ${subject}`);
+    console.log(`======================================================\n`);
+
+    return {
+      success: true,
+      simulated: true,
+      provider: "simulation",
+      messageId: `simulated_${Date.now()}`,
+    };
+  }
+
+  // 1. Explicit SMTP preference
+  if (providerPref === "smtp" && smtpTransporter) {
+    return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+  }
+
+  // 2. Resend API Flow
+  if (resendClient && providerPref !== "smtp") {
+    const customFromEmail = process.env.RESEND_FROM_EMAIL;
+    const isCustomDomain = Boolean(customFromEmail && !customFromEmail.includes("@resend.dev"));
+
+    // If using Resend sandbox (@resend.dev), it only delivers to the owner's email or internal @resend.dev test emails
+    const isResendInternalTestAddress = normalizedTo.endsWith("@resend.dev");
+    const isKnownSandboxOwner = normalizedTo === "vineetsinghbitu@gmail.com";
+
+    // Proactive SMTP routing: If destination is outside sandbox and SMTP is configured, route directly via SMTP!
+    if (!isCustomDomain && !isResendInternalTestAddress && !isKnownSandboxOwner && smtpTransporter) {
+      console.log(`[Email Dispatcher] Target (${normalizedTo}) is outside Resend sandbox. Routing directly via SMTP...`);
+      return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
     }
-    if (!resendClientInstance) {
-        resendClientInstance = new Resend(apiKey.trim());
+
+    try {
+      const from = customFromEmail || `${fromName} <${defaultFromEmail}>`;
+      const { data, error } = await resendClient.emails.send({
+        from,
+        to: [normalizedTo],
+        subject,
+        html,
+        text,
+      });
+
+      if (error) {
+        const errorMsg = error.message || "Failed to dispatch via Resend";
+        console.error(`[Resend API Error]:`, error);
+
+        // If trial sandbox limitation error:
+        if (isResendSandboxError(errorMsg)) {
+          // Immediate automated fallback to SMTP if configured
+          if (smtpTransporter) {
+            console.log(`[Email Dispatcher] Resend sandbox restriction encountered. Automatically failing over to SMTP for ${normalizedTo}...`);
+            return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+          }
+
+          // Otherwise log detailed guidance
+          console.warn(`\n======================================================`);
+          console.warn(`[EMAIL DELIVERY LIMITATION: RESEND SANDBOX MODE]`);
+          console.warn(`Recipient: ${normalizedTo}`);
+          console.warn(`Reason: Resend test sandbox only permits sending to the account owner (vineetsinghbitu@gmail.com).`);
+          console.warn(`To deliver live emails to any recipient in production:`);
+          console.warn(`  Option 1 (SMTP/Gmail): Add to Backend/.env:`);
+          console.warn(`     SMTP_USER=your_email@gmail.com`);
+          console.warn(`     SMTP_PASS=your_16_char_google_app_password`);
+          console.warn(`  Option 2 (Resend Custom Domain): Verify domain at resend.com/domains and set:`);
+          console.warn(`     RESEND_FROM_EMAIL=Orbix Security <support@yourdomain.com>`);
+          console.warn(`======================================================\n`);
+
+          return {
+            success: false,
+            sandboxRestricted: true,
+            provider: "resend",
+            error: errorMsg,
+          };
+        }
+
+        // If non-sandbox error and SMTP is available, attempt fallback
+        if (smtpTransporter) {
+          console.log(`[Email Dispatcher] Resend error (${errorMsg}). Attempting fallback to SMTP...`);
+          return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+        }
+
+        return {
+          success: false,
+          provider: "resend",
+          error: errorMsg,
+        };
+      }
+
+      console.log(`[Resend API] ${logContext} sent successfully to ${normalizedTo} (ID: ${data?.id})`);
+      return {
+        success: true,
+        provider: "resend",
+        messageId: data?.id,
+      };
+    } catch (resendEx: any) {
+      console.error(`[Resend Exception]:`, resendEx);
+      if (smtpTransporter) {
+        console.log(`[Email Dispatcher] Resend exception. Failing over to SMTP...`);
+        return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+      }
+      return {
+        success: false,
+        provider: "resend",
+        error: resendEx.message || "Internal error sending email via Resend",
+      };
     }
-    return resendClientInstance;
+  }
+
+  // 3. SMTP-Only Flow
+  if (smtpTransporter) {
+    return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+  }
+
+  return {
+    success: false,
+    error: "No usable email transport configured.",
+  };
 }
 
 /**
  * Generates the clean Neo-Brutalist HTML template matching the Orbix design system.
  */
 function generateVerificationEmailHtml(options: { name: string; otp: string; email: string }): string {
-    const { name, otp, email } = options;
-    const recipientName = name && name.trim() ? name.trim() : "Developer";
+  const { name, otp, email } = options;
+  const recipientName = name && name.trim() ? name.trim() : "Developer";
 
-    return `<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -193,58 +441,151 @@ function generateVerificationEmailHtml(options: { name: string; otp: string; ema
 }
 
 /**
- * Sends an email verification code using Resend.
- * In development or if RESEND_API_KEY is unset, logs the code to console and simulates success.
+ * Generates the clean Neo-Brutalist HTML template for security notification emails.
+ */
+function generateSecurityNotificationHtml(options: {
+  name: string;
+  headline: string;
+  message: string;
+  subject: string;
+  badgeText: string;
+  isWarning: boolean;
+  otp?: string;
+  otpLabel?: string;
+  footerNotice: string;
+}): string {
+  const { name, headline, message, subject, badgeText, isWarning, otp, otpLabel, footerNotice } = options;
+  const headerBadgeBg = isWarning ? "#FF6B6B" : "#FFE566";
+  const headerBadgeText = isWarning ? "#FFFFFF" : "#000000";
+
+  const otpSection = otp ? `
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin: 24px 0 8px 0;">
+        <tr>
+          <td align="center" style="background-color: #FAF6EE; border: 2px solid #000000; border-radius: 14px; box-shadow: 3px 3px 0px #000000; padding: 24px 16px;">
+            <div style="font-size: 11px; font-weight: 900; letter-spacing: 2px; text-transform: uppercase; color: #666666; margin-bottom: 8px;">
+              ${otpLabel || "Verification Code"}
+            </div>
+            <div style="font-family: 'SF Mono', 'Courier New', Courier, monospace; font-size: 38px; font-weight: 900; letter-spacing: 8px; color: #000000; line-height: 1.2;">
+              ${otp}
+            </div>
+            <div style="font-size: 11px; font-weight: 700; color: #555555; margin-top: 10px;">
+              Expires in 10 minutes • Valid for one attempt
+            </div>
+          </td>
+        </tr>
+      </table>` : "";
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #FAF6EE; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #000000;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background-color: #FAF6EE; padding: 40px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="100%" style="max-width: 520px; background-color: #FFFFFF; border: 2px solid #000000; border-radius: 16px; box-shadow: 4px 4px 0px #000000; overflow: hidden; border-collapse: separate;" cellspacing="0" cellpadding="0">
+          <tr>
+            <td style="background-color: #000000; padding: 18px 28px; text-align: left;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td>
+                    <span style="font-size: 18px; font-weight: 900; letter-spacing: 1.5px; color: #a2ff86; text-transform: uppercase;">
+                      ORBIX
+                    </span>
+                  </td>
+                  <td align="right">
+                    <span style="background-color: ${headerBadgeBg}; color: ${headerBadgeText}; padding: 5px 12px; border-radius: 999px; border: 1.5px solid #000000; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.5px;">
+                      ${badgeText}
+                    </span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 32px 28px 28px 28px;">
+              <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 900; color: #000000; letter-spacing: -0.5px;">
+                ${headline}
+              </h1>
+              <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #444444; font-weight: 500;">
+                Hello <strong>${name}</strong>,
+              </p>
+              <p style="margin: 0 0 20px 0; font-size: 14px; line-height: 1.6; color: #444444; font-weight: 500;">
+                ${message}
+              </p>
+              ${otpSection}
+              <p style="margin: 20px 0 0 0; font-size: 12px; line-height: 1.5; color: #777777; font-weight: 500; border-top: 1px solid #EEEEEE; padding-top: 16px;">
+                ${footerNotice}
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+/**
+ * Sends an email verification code using the multi-provider dispatcher (Resend / SMTP).
  */
 export async function sendVerificationEmail(options: SendVerificationEmailOptions): Promise<SendEmailResult> {
-    const { to, name = "Developer", otp } = options;
-    const client = getResendClient();
+  const { to, name = "Developer", otp } = options;
+  const html = generateVerificationEmailHtml({ name, otp, email: to });
+  const text = `Hello ${name},\n\nYour Orbix account verification code is: ${otp}\n\nThis code expires in 10 minutes.`;
 
-    if (!client) {
-        console.log(`\n======================================================`);
-        console.log(`[RESEND EMAIL SERVICE] ⚠️ RESEND_API_KEY not configured.`);
-        console.log(`[DEV MODE SIMULATION] Verification OTP for ${to}:`);
-        console.log(`>>> OTP: ${otp} <<<`);
-        console.log(`======================================================\n`);
+  return dispatchEmail({
+    to,
+    subject: `Orbix Verification Code: ${otp}`,
+    html,
+    text,
+    fromName: "Orbix",
+    defaultFromEmail: "onboarding@resend.dev",
+    logContext: "Verification email",
+  });
+}
 
-        return {
-            success: true,
-            simulated: true,
-            messageId: `simulated_${Date.now()}`,
-        };
-    }
+/**
+ * Sends a security notification or authorization OTP email using the multi-provider dispatcher (Resend / SMTP).
+ */
+export async function sendSecurityNotificationEmail(options: SendSecurityNotificationEmailOptions): Promise<SendEmailResult> {
+  const {
+    to,
+    name = "Developer",
+    subject,
+    badgeText = "Security Notice",
+    headline,
+    message,
+    otp,
+    otpLabel = "Verification Code",
+    isWarning = false,
+    footerNotice = "If you did not request this action, please secure your account immediately."
+  } = options;
 
-    try {
-        const fromEmail = process.env.RESEND_FROM_EMAIL || "Orbix <onboarding@resend.dev>";
-        const html = generateVerificationEmailHtml({ name, otp, email: to });
-        const text = `Hello ${name},\n\nYour Orbix account verification code is: ${otp}\n\nThis code expires in 10 minutes.`;
+  const html = generateSecurityNotificationHtml({
+    name,
+    headline,
+    message,
+    subject,
+    badgeText,
+    isWarning,
+    otp,
+    otpLabel,
+    footerNotice,
+  });
 
-        const { data, error } = await client.emails.send({
-            from: fromEmail,
-            to: [to],
-            subject: `Orbix Verification Code: ${otp}`,
-            html,
-            text,
-        });
+  const text = `Hello ${name},\n\n${headline}\n\n${message}${otp ? `\n\nCode: ${otp} (Expires in 10 minutes)` : ""}\n\n${footerNotice}`;
 
-        if (error) {
-            console.error("[Resend API Error]:", error);
-            return {
-                success: false,
-                error: error.message || "Failed to send email via Resend",
-            };
-        }
-
-        console.log(`[Resend API] Verification email sent successfully to ${to} (ID: ${data?.id})`);
-        return {
-            success: true,
-            messageId: data?.id,
-        };
-    } catch (err: any) {
-        console.error("[Resend Exception]:", err);
-        return {
-            success: false,
-            error: err.message || "Internal error sending email",
-        };
-    }
+  return dispatchEmail({
+    to,
+    subject,
+    html,
+    text,
+    fromName: "Orbix Security",
+    defaultFromEmail: "onboarding@resend.dev",
+    logContext: "Security notification",
+  });
 }
