@@ -6,7 +6,6 @@ import {
     X,
     ArrowLeft,
     CheckCircle2,
-    Sparkles,
 } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
@@ -47,7 +46,6 @@ export default function SignupForm() {
     const [showOtpModal, setShowOtpModal] = useState(false);
     const [otpCode, setOtpCode] = useState("");
     const [emailCooldown, setEmailCooldown] = useState(0);
-    const [devEmailOtp, setDevEmailOtp] = useState<string | null>(null);
     const [resendingOtp, setResendingOtp] = useState(false);
     const [verifyingAndRegistering, setVerifyingAndRegistering] = useState(false);
 
@@ -170,12 +168,6 @@ export default function SignupForm() {
             }
 
             setEmailCooldown(resData?.cooldownSeconds || 60);
-            if (resData?.devOtp) {
-                setDevEmailOtp(resData.devOtp);
-            } else {
-                setDevEmailOtp(null);
-            }
-
             setOtpCode("");
             setShowOtpModal(true);
             toast.success(`Verification code sent to ${email}`, { title: "Code Dispatched" });
@@ -234,7 +226,6 @@ export default function SignupForm() {
             }
 
             setEmailCooldown(resData?.cooldownSeconds || 60);
-            if (resData?.devOtp) setDevEmailOtp(resData.devOtp);
             toast.success(`New verification code sent to ${email}`, { title: "Code Resent" });
         } catch (err: any) {
             toast.error(err.message || "Failed to resend verification code");
@@ -601,23 +592,6 @@ export default function SignupForm() {
                                 onComplete={(code) => handleVerifyAndRegister(code)}
                                 autoFocus
                             />
-
-                            {/* Dev Mode OTP Auto-fill helper */}
-                            {devEmailOtp && (
-                                <div className="text-center pt-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setOtpCode(devEmailOtp);
-                                            handleVerifyAndRegister(devEmailOtp);
-                                        }}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] hover:bg-yellow-300 border-2 border-black text-xs font-mono font-black text-black shadow-[2px_2px_0px_#000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px] transition-all"
-                                    >
-                                        <Sparkles className="w-3.5 h-3.5 text-black" />
-                                        <span>Dev Auto-Fill: <strong>{devEmailOtp}</strong></span>
-                                    </button>
-                                </div>
-                            )}
 
                             {/* Resend Cooldown Counter & Action */}
                             <div className="flex items-center justify-between pt-2 px-1 text-xs font-black">

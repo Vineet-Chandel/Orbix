@@ -197,9 +197,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
     const [verifyingEmail, setVerifyingEmail] = useState(false);
     const [verifyingPhone, setVerifyingPhone] = useState(false);
 
-    const [devEmailOtp, setDevEmailOtp] = useState<string | null>(null);
-    const [devPhoneOtp, setDevPhoneOtp] = useState<string | null>(null);
-
     // Firebase Phone Auth confirmation result and RecaptchaVerifier
     const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
     const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
@@ -409,7 +406,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             }
 
             setEmailCooldown(data?.cooldownSeconds || 60);
-            if (data?.devOtp) setDevEmailOtp(data.devOtp);
             toast.success(`Verification code sent to ${email}`, { title: "Email Code Sent" });
         } catch (err: any) {
             toast.error(err.message || "Failed to send email verification code");
@@ -471,7 +467,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                 }
 
                 setPhoneCooldown(data?.cooldownSeconds || 60);
-                if (data?.devOtp) setDevPhoneOtp(data.devOtp);
                 toast.success(`SMS verification code dispatched to ${data?.phone || parsed.formatted}`, { title: "SMS Code Sent" });
             }
         } catch (err: any) {
@@ -519,7 +514,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             setEmailVerificationToken(null);
             setVerifiedEmailAddress(null);
             setEmailOtp("");
-            setDevEmailOtp(null);
         }
 
         // If phone was modified, invalidate previous phone verification
@@ -528,7 +522,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             setPhoneVerificationToken(null);
             setVerifiedPhoneNumber(null);
             setPhoneOtp("");
-            setDevPhoneOtp(null);
             setConfirmationResult(null);
         }
 
@@ -918,7 +911,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                         setEmailVerificationToken(null);
                                         setVerifiedEmailAddress(null);
                                         setEmailOtp("");
-                                        setDevEmailOtp(null);
                                     }
                                 }}
                                 error={errors.contactEmail}
@@ -964,7 +956,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                         setPhoneVerificationToken(null);
                                         setVerifiedPhoneNumber(null);
                                         setPhoneOtp("");
-                                        setDevPhoneOtp(null);
                                         setConfirmationResult(null);
                                     }
                                 }}
@@ -1279,14 +1270,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                     onComplete={(code) => handleVerifyEmail(code)}
                                 />
 
-                                {devEmailOtp && (
-                                    <div className="text-center">
-                                        <span className="inline-block text-[10px] font-mono font-bold bg-neutral-100 border border-black/30 px-2 py-0.5 rounded text-neutral-600">
-                                            Dev Mode OTP: <strong className="text-black">{devEmailOtp}</strong>
-                                        </span>
-                                    </div>
-                                )}
-
                                 <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
                                     <button
                                         type="button"
@@ -1380,26 +1363,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                     disabled={verifyingPhone}
                                     onComplete={(code) => handleVerifyPhone(code)}
                                 />
-
-                                {devPhoneOtp && (
-                                    <div className="p-3 rounded-2xl bg-[#FFF9E6] border-2 border-amber-500 text-left space-y-1.5 shadow-[2px_2px_0px_#b45309]">
-                                        <div className="flex items-center justify-between gap-2 flex-wrap">
-                                            <span className="text-[11px] font-black text-amber-950 uppercase tracking-wide">
-                                                Simulation Mode OTP
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setPhoneOtp(devPhoneOtp);
-                                                    handleVerifyPhone(devPhoneOtp);
-                                                }}
-                                                className="px-2.5 py-1 rounded-lg bg-black text-[#a2ff86] font-black text-xs hover:bg-neutral-800 transition cursor-pointer shadow-[1px_1px_0px_#000]"
-                                            >
-                                                Auto-fill ({devPhoneOtp})
-                                            </button>
-                                        </div>
-                                    </div>
-                                )}
 
                                 <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
                                     <button

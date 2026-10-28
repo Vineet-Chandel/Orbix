@@ -42,8 +42,6 @@ export const EmailVerificationSection: React.FC<EmailVerificationSectionProps> =
     const [hasSentOtp, setHasSentOtp] = useState<boolean>(false);
     const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [isSimulated, setIsSimulated] = useState<boolean>(false);
-    const [devOtp, setDevOtp] = useState<string | null>(null);
 
     // 6-digit OTP code state
     const [otpDigits, setOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
@@ -67,12 +65,6 @@ export const EmailVerificationSection: React.FC<EmailVerificationSectionProps> =
                     setHasSentOtp(true);
                 } else if (data.hasPendingOtp) {
                     setHasSentOtp(true);
-                }
-                if (data.simulated) {
-                    setIsSimulated(true);
-                }
-                if (data.devOtp) {
-                    setDevOtp(data.devOtp);
                 }
             } catch {
                 // If API is loading or fails, fallback to user object from Redux
@@ -175,12 +167,6 @@ export const EmailVerificationSection: React.FC<EmailVerificationSectionProps> =
             setHasSentOtp(true);
             setCooldownSeconds(res.cooldownSeconds || 60);
             setOtpDigits(["", "", "", "", "", ""]);
-            if (res.simulated) {
-                setIsSimulated(true);
-            }
-            if (res.devOtp) {
-                setDevOtp(res.devOtp);
-            }
 
             toast.success(`Verification code sent to ${registeredEmail}!`, {
                 title: "Code Dispatched",
@@ -200,15 +186,6 @@ export const EmailVerificationSection: React.FC<EmailVerificationSectionProps> =
         } finally {
             setIsSendingOtp(false);
         }
-    };
-
-    // Auto-fill dev simulation OTP
-    const handleAutofillDevOtp = (code: string) => {
-        const digits = code.split("").slice(0, 6);
-        while (digits.length < 6) digits.push("");
-        setOtpDigits(digits);
-        setErrorMessage(null);
-        inputRefs.current[5]?.focus();
     };
 
     // Action: Verify OTP Code
@@ -404,35 +381,6 @@ export const EmailVerificationSection: React.FC<EmailVerificationSectionProps> =
                                     </span>
                                 </button>
                             </div>
-
-                            {/* Dev Simulation Notice & Auto-Fill Banner */}
-                            {(isSimulated || devOtp) && (
-                                <div className="p-3.5 rounded-xl bg-[#FFF9E6] border-2 border-amber-500 text-amber-950 text-xs shadow-[2px_2px_0px_#b45309] space-y-2">
-                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                        <div className="flex items-start gap-2">
-                                            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                                            <div>
-                                                <span className="font-black text-amber-900 block">
-                                                    Development Simulation Mode
-                                                </span>
-                                                <span className="text-[11px] text-amber-800">
-                                                    <code className="bg-amber-200/80 px-1 py-0.5 rounded font-mono font-bold">RESEND_API_KEY</code> is not yet configured in <code className="bg-amber-200/80 px-1 py-0.5 rounded font-mono font-bold">Backend/.env</code>. Real emails require your Resend API key.
-                                                </span>
-                                            </div>
-                                        </div>
-                                        {devOtp && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handleAutofillDevOtp(devOtp)}
-                                                className="self-start sm:self-auto px-3 py-1.5 rounded-lg bg-black text-[#a2ff86] border border-black font-black text-xs shadow-[1px_1px_0px_#000] hover:bg-neutral-800 transition cursor-pointer flex items-center gap-1.5 shrink-0"
-                                            >
-                                                <span>Auto-Fill Code</span>
-                                                <span className="font-mono bg-white/20 px-1.5 py-0.5 rounded text-white">{devOtp}</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
 
                             {/* 6 Digit Neo-Brutalist Box Inputs */}
                             <div className="flex items-center justify-center gap-2 sm:gap-3 py-2">

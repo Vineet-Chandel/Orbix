@@ -1088,7 +1088,7 @@ export class ManageAccountsService {
             cooldownSeconds: COOLDOWN_SECONDS,
             expiresAt: expiresAt.toISOString(),
             simulated: Boolean(sendResult.simulated),
-            devOtp: (isDev || sendResult.sandboxRestricted || !sendResult.success) ? otp : undefined,
+            devOtp: (isDev || sendResult.sandboxRestricted) ? otp : undefined,
             sandboxRestricted: Boolean(sendResult.sandboxRestricted),
             provider: sendResult.provider,
         };
@@ -1125,7 +1125,7 @@ export class ManageAccountsService {
         // Check if user already owns this username
         const currentCheck = await query(`SELECT id, username FROM users WHERE id = $1;`, [currentUserId]);
         if (currentCheck.rows[0]?.username?.toLowerCase() === normalized) {
-            return { available: true, isCurrent: true, reason: "This is your current username." };
+            return { available: false, isCurrent: true, reason: "This is already your current username." };
         }
 
         // Check if taken in database

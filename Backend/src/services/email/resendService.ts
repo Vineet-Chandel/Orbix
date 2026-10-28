@@ -182,10 +182,9 @@ async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailRe
 
     // If using Resend sandbox (@resend.dev), it only delivers to the owner's email or internal @resend.dev test emails
     const isResendInternalTestAddress = normalizedTo.endsWith("@resend.dev");
-    const isKnownSandboxOwner = normalizedTo === "vineetsinghbitu@gmail.com";
 
     // Proactive SMTP routing: If destination is outside sandbox and SMTP is configured, route directly via SMTP!
-    if (!isCustomDomain && !isResendInternalTestAddress && !isKnownSandboxOwner && smtpTransporter) {
+    if (!isCustomDomain && !isResendInternalTestAddress && smtpTransporter) {
       console.log(`[Email Dispatcher] Target (${normalizedTo}) is outside Resend sandbox. Routing directly via SMTP...`);
       return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
     }
@@ -216,7 +215,7 @@ async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailRe
           console.warn(`\n======================================================`);
           console.warn(`[EMAIL DELIVERY LIMITATION: RESEND SANDBOX MODE]`);
           console.warn(`Recipient: ${normalizedTo}`);
-          console.warn(`Reason: Resend test sandbox only permits sending to the account owner (vineetsinghbitu@gmail.com).`);
+          console.warn(`Reason: Resend test sandbox only permits sending to the account owner email.`);
           console.warn(`To deliver live emails to any recipient in production:`);
           console.warn(`  Option 1 (SMTP/Gmail): Add to Backend/.env:`);
           console.warn(`     SMTP_USER=your_email@gmail.com`);
@@ -412,7 +411,7 @@ function generateVerificationEmailHtml(options: { name: string; otp: string; ema
 
           <!-- Footer with Lucide Terminal SVG -->
           <tr>
-            <td style="padding: 18px 28px 24px 28px; border-top: 1px solid #EEEEEE; background-color: #FAFAFA; text-align: center;">
+            <td style="padding: 18px 28px 14px 28px; border-top: 1px solid #EEEEEE; background-color: #FAFAFA; text-align: center;">
               <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                 <tr>
                   <td style="vertical-align: middle; padding-right: 6px;">
@@ -429,6 +428,16 @@ function generateVerificationEmailHtml(options: { name: string; otp: string; ema
               <p style="margin: 4px 0 0 0; font-size: 10px; color: #AAAAAA;">
                 Automated security message. Please do not reply directly to this email.
               </p>
+            </td>
+          </tr>
+
+          <!-- Bottom Desk Shelf Illustration -->
+          <tr>
+            <td align="center" style="padding: 0; line-height: 0; font-size: 0; background-color: #FAFAFA; text-align: center;">
+              <img src="https://res.cloudinary.com/dj0ivep44/image/upload/v1793203068/98898242-5f9b-4587-afc3-c1b298d918d7.png" 
+                   alt="Orbix Workspace" 
+                   width="520" 
+                   style="display: block; width: 100%; max-width: 520px; height: auto; border: 0; margin: 0 auto; outline: none; text-decoration: none;" />
             </td>
           </tr>
 
@@ -450,8 +459,8 @@ function generateSecurityNotificationHtml(options: {
   subject: string;
   badgeText: string;
   isWarning: boolean;
-  otp?: string;
-  otpLabel?: string;
+  otp?: string | undefined;
+  otpLabel?: string | undefined;
   footerNotice: string;
 }): string {
   const { name, headline, message, subject, badgeText, isWarning, otp, otpLabel, footerNotice } = options;
@@ -519,6 +528,38 @@ function generateSecurityNotificationHtml(options: {
               <p style="margin: 20px 0 0 0; font-size: 12px; line-height: 1.5; color: #777777; font-weight: 500; border-top: 1px solid #EEEEEE; padding-top: 16px;">
                 ${footerNotice}
               </p>
+            </td>
+          </tr>
+
+          <!-- Footer with Lucide Terminal SVG -->
+          <tr>
+            <td style="padding: 18px 28px 14px 28px; border-top: 1px solid #EEEEEE; background-color: #FAFAFA; text-align: center;">
+              <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
+                <tr>
+                  <td style="vertical-align: middle; padding-right: 6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#888888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: block;">
+                      <polyline points="4 17 10 11 4 5"></polyline>
+                      <line x1="12" y1="19" x2="20" y2="19"></line>
+                    </svg>
+                  </td>
+                  <td style="vertical-align: middle; font-size: 11px; font-weight: 700; color: #888888;">
+                    Orbix • Unified Developer Identity & Analytics
+                  </td>
+                </tr>
+              </table>
+              <p style="margin: 4px 0 0 0; font-size: 10px; color: #AAAAAA;">
+                Automated security message. Please do not reply directly to this email.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Bottom Desk Shelf Illustration -->
+          <tr>
+            <td align="center" style="padding: 0; line-height: 0; font-size: 0; background-color: #FAFAFA; text-align: center;">
+              <img src="https://res.cloudinary.com/dj0ivep44/image/upload/v1793203068/98898242-5f9b-4587-afc3-c1b298d918d7.png" 
+                   alt="Orbix Workspace" 
+                   width="520" 
+                   style="display: block; width: 100%; max-width: 520px; height: auto; border: 0; margin: 0 auto; outline: none; text-decoration: none;" />
             </td>
           </tr>
         </table>

@@ -7,11 +7,23 @@ import {
     RotateCcw,
     X,
     KeyRound,
-    Sparkles,
     ShieldCheck,
     Download,
     Clock,
     AtSign,
+    Code2,
+    FileText,
+    Shield,
+    HelpCircle,
+    Users,
+    Check,
+    Copy,
+    Lock,
+    Database,
+    Eye,
+    RefreshCw,
+    FileCheck,
+    Sparkles,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppDispatch } from "../../store";
@@ -29,7 +41,13 @@ import {
     checkUsernameAvailability,
     requestUsernameChange,
     confirmUsernameChange,
+    fetchDataArchiveInfo,
+    requestDataArchiveOtp,
+    generateDataArchive,
     type ManageAccountsStatus,
+    type ArchiveCategoryKey,
+    type ArchiveStatusInfo,
+    type GenerateArchiveResult,
 } from "../../api/manageAccountApi";
 
 interface ManageAccountViewProps {
@@ -57,7 +75,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
     const [isSubmittingStartEmail, setIsSubmittingStartEmail] = useState(false);
     const [otpCode, setOtpCode] = useState("");
     const [otpCooldown, setOtpCooldown] = useState(0);
-    const [devOtp, setDevOtp] = useState<string | null>(null);
+
     const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
     const [isResendingOtp, setIsResendingOtp] = useState(false);
 
@@ -65,7 +83,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
     const [isPrimaryVerifyModalOpen, setIsPrimaryVerifyModalOpen] = useState(false);
     const [primaryOtpCode, setPrimaryOtpCode] = useState("");
     const [primaryCooldown, setPrimaryCooldown] = useState(0);
-    const [primaryDevOtp, setPrimaryDevOtp] = useState<string | null>(null);
+
     const [isSubmittingPrimaryOtp, setIsSubmittingPrimaryOtp] = useState(false);
 
     // Username Change Flow Modals & State
@@ -74,6 +92,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
     const [usernameAvailability, setUsernameAvailability] = useState<{
         checking: boolean;
         available?: boolean;
+        isCurrent?: boolean;
         reason?: string;
     }>({ checking: false });
     const [isSubmittingUsernameRequest, setIsSubmittingUsernameRequest] = useState(false);
@@ -82,7 +101,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
     const [usernameOtpCode, setUsernameOtpCode] = useState("");
     const [usernamePasswordInput, setUsernamePasswordInput] = useState("");
     const [usernameCooldown, setUsernameCooldown] = useState(0);
-    const [usernameDevOtp, setUsernameDevOtp] = useState<string | null>(null);
+
     const [isSubmittingUsernameConfirm, setIsSubmittingUsernameConfirm] = useState(false);
 
     const availabilityCheckTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -176,6 +195,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                 setUsernameAvailability({
                     checking: false,
                     available: res.available,
+                    isCurrent: res.isCurrent,
                     reason: res.reason,
                 });
             } catch {
@@ -212,7 +232,6 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             setEmailChangeStep("verify_old_email");
             setOtpCode("");
             setOtpCooldown(result.cooldownSeconds || 60);
-            if (result.devOtp) setDevOtp(result.devOtp);
             toast.success("Authorization code sent to your current primary email.", { title: "Step 1 of 2" });
             loadStatus(false);
         } catch (err: any) {
@@ -253,7 +272,6 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                 setEmailChangeStep("verify_new_email");
                 setOtpCode("");
                 setOtpCooldown(result.cooldownSeconds || 60);
-                if (result.devOtp) setDevOtp(result.devOtp);
                 toast.success("Current email authorized! Verification code sent to your new email.", { title: "Step 2 of 2" });
                 loadStatus(false);
             } else {
@@ -293,7 +311,6 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
         try {
             const result = await resendEmailCode(opId, step);
             setOtpCooldown(result.cooldownSeconds || 60);
-            if (result.devOtp) setDevOtp(result.devOtp);
             toast.success("Verification code resent successfully.", { title: "Code Resent" });
         } catch (err: any) {
             toast.error(err.message || "Failed to resend code.");
@@ -352,7 +369,6 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             const result = await sendPrimaryEmailVerification();
             setPrimaryOtpCode("");
             setPrimaryCooldown(result.cooldownSeconds || 60);
-            if (result.devOtp) setPrimaryDevOtp(result.devOtp);
             setIsPrimaryVerifyModalOpen(true);
             toast.success("Verification code sent to your email.", { title: "Code Dispatched" });
         } catch (err: any) {
@@ -402,7 +418,6 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             setUsernameOperationId(result.operationId || null);
             setUsernameOtpCode("");
             setUsernamePasswordInput("");
-            if (result.devOtp) setUsernameDevOtp(result.devOtp);
             if (result.cooldownSeconds) setUsernameCooldown(result.cooldownSeconds);
             toast.info(result.message || "Step-up authorization required.", { title: "Security Step-Up" });
         } catch (err: any) {
@@ -828,21 +843,6 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                                         autoFocus
                                     />
 
-                                    {devOtp && (
-                                        <div className="text-center pt-1">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setOtpCode(devOtp);
-                                                    handleVerifyEmailChangeOtp(devOtp);
-                                                }}
-                                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] hover:bg-yellow-300 border-2 border-black text-xs font-mono font-black text-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                                            >
-                                                <Sparkles className="w-3.5 h-3.5 text-black" />
-                                                <span>Dev Auto-Fill: <strong>{devOtp}</strong></span>
-                                            </button>
-                                        </div>
-                                    )}
 
                                     <div className="flex items-center justify-between pt-2 px-1 text-xs font-black">
                                         <button
@@ -951,21 +951,6 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                                 autoFocus
                             />
 
-                            {primaryDevOtp && (
-                                <div className="text-center pt-1">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setPrimaryOtpCode(primaryDevOtp);
-                                            handleConfirmPrimaryVerification(primaryDevOtp);
-                                        }}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] hover:bg-yellow-300 border-2 border-black text-xs font-mono font-black text-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                                    >
-                                        <Sparkles className="w-3.5 h-3.5 text-black" />
-                                        <span>Dev Auto-Fill: <strong>{primaryDevOtp}</strong></span>
-                                    </button>
-                                </div>
-                            )}
 
                             <div className="flex items-center justify-between pt-2 px-1 text-xs font-black">
                                 <button
@@ -1061,6 +1046,11 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                                         <div className="pt-1 text-xs font-bold">
                                             {usernameAvailability.checking ? (
                                                 <span className="text-neutral-500">Checking availability...</span>
+                                            ) : usernameAvailability.isCurrent ? (
+                                                <span className="text-amber-600 flex items-center gap-1">
+                                                    <AlertCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    <span>This is already your current username</span>
+                                                </span>
                                             ) : usernameAvailability.available ? (
                                                 <span className="text-emerald-700 flex items-center gap-1">
                                                     <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -1112,22 +1102,6 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                                             onComplete={(code: string) => handleConfirmUsernameChange(code)}
                                             autoFocus
                                         />
-
-                                        {usernameDevOtp && (
-                                            <div className="text-center pt-1">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setUsernameOtpCode(usernameDevOtp);
-                                                        handleConfirmUsernameChange(usernameDevOtp);
-                                                    }}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] hover:bg-yellow-300 border-2 border-black text-xs font-mono font-black text-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                                                >
-                                                    <Sparkles className="w-3.5 h-3.5 text-black" />
-                                                    <span>Dev Auto-Fill: <strong>{usernameDevOtp}</strong></span>
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
                                 ) : (
                                     <div className="space-y-2">

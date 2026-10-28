@@ -60,7 +60,6 @@ export class EmailVerificationService {
         // Check active cooldown in Redis
         let cooldownRemainingSeconds = 0;
         let hasPendingOtp = false;
-        let devOtp: string | undefined = undefined;
         const isSimulated = !process.env.RESEND_API_KEY || !process.env.RESEND_API_KEY.startsWith("re_");
 
         try {
@@ -72,12 +71,6 @@ export class EmailVerificationService {
                 const raw = await redis.get(`otp:email_verification:${userId}`);
                 if (raw) {
                     hasPendingOtp = true;
-                    if (isSimulated) {
-                        try {
-                            const parsed = JSON.parse(raw);
-                            if (parsed.otp) devOtp = parsed.otp;
-                        } catch {}
-                    }
                 }
             }
         } catch (err: any) {
@@ -93,7 +86,6 @@ export class EmailVerificationService {
             hasPendingOtp,
             cooldownRemainingSeconds,
             simulated: isSimulated,
-            devOtp,
         };
     }
 
@@ -140,12 +132,9 @@ export class EmailVerificationService {
         const otp = this.generateSecureOtp();
         const otpHash = this.hashOtp(otp);
         const expiresAt = new Date(Date.now() + OTP_TTL_SECONDS * 1000);
-        const isSimulated = !process.env.RESEND_API_KEY || !process.env.RESEND_API_KEY.startsWith("re_");
-
         // 5. Cache in Redis with 10-minute TTL
         if (redis && redis.status === "ready") {
             const redisPayload = JSON.stringify({
-                otp: isSimulated ? otp : undefined,
                 otpHash,
                 email: normalizedEmail,
                 attempts: 0,
@@ -187,11 +176,10 @@ export class EmailVerificationService {
             if (sendResult.sandboxRestricted) {
                 return {
                     success: true,
-                    message: `Verification code generated! (Note: Resend test sandbox restricts external email delivery. Code provided below; configure SMTP in Backend/.env for live delivery).`,
+                    message: `Verification code generated! (Note: Resend test sandbox restricts external email delivery. Configure SMTP in Backend/.env for live delivery).`,
                     email: normalizedEmail,
                     simulated: true,
                     sandboxRestricted: true,
-                    devOtp: otp,
                     cooldownSeconds: COOLDOWN_SECONDS,
                     expiresInSeconds: OTP_TTL_SECONDS,
                 };
@@ -202,7 +190,7 @@ export class EmailVerificationService {
         return {
             success: true,
             message: sendResult.simulated
-                ? `DEV MODE: RESEND_API_KEY is not configured in Backend/.env. Your test code is: ${otp}`
+                ? `Verification code dispatched.`
                 : `Verification code sent to ${normalizedEmail}`,
             email: normalizedEmail,
             simulated: Boolean(sendResult.simulated),
@@ -517,11 +505,10 @@ export class EmailVerificationService {
             if (sendResult.sandboxRestricted) {
                 return {
                     success: true,
-                    message: `Verification code generated! (Note: Resend test sandbox restricts external email delivery. Code provided below; configure SMTP in Backend/.env for live delivery).`,
+                    message: `Verification code generated! (Note: Resend test sandbox restricts external email delivery. Configure SMTP in Backend/.env for live delivery).`,
                     email: normalizedEmail,
                     simulated: true,
                     sandboxRestricted: true,
-                    devOtp: otp,
                     cooldownSeconds: COOLDOWN_SECONDS,
                     expiresInSeconds: OTP_TTL_SECONDS,
                 };
@@ -529,14 +516,11 @@ export class EmailVerificationService {
             throw new Error(sendResult.error || "Failed to dispatch verification email");
         }
 
-        const isDev = process.env.NODE_ENV !== "production";
-
         return {
             success: true,
             message: `Verification code sent to ${normalizedEmail}`,
             email: normalizedEmail,
             simulated: Boolean(sendResult.simulated),
-            devOtp: (isDev || sendResult.sandboxRestricted) ? otp : undefined,
             sandboxRestricted: Boolean(sendResult.sandboxRestricted),
             provider: sendResult.provider,
             cooldownSeconds: COOLDOWN_SECONDS,

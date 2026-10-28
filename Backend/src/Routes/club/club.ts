@@ -87,7 +87,7 @@ export async function recordTimelineEvent({
 export const getReviewerAllowlist = (): string[] => {
     const raw =
         process.env.ORBIX_REVIEWER_EMAILS ||
-        "admin@orbix.dev,staff@orbix.dev,reviewer@orbix.dev,vineet@orbix.dev";
+        "admin@orbix.dev,staff@orbix.dev,reviewer@orbix.dev";
     return raw
         .split(",")
         .map((e) => e.trim().toLowerCase())

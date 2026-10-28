@@ -14,7 +14,6 @@ export interface SendSmsResult {
     success: boolean;
     messageId?: string | undefined;
     simulated?: boolean | undefined;
-    devOtp?: string | undefined;
     providerError?: string | undefined;
     error?: string | undefined;
 }
@@ -158,7 +157,6 @@ export async function sendVerificationSms(options: SendSmsOptions): Promise<Send
     return {
         success: true,
         simulated: true,
-        devOtp: isDev ? otp : undefined,
         providerError: lastProviderError,
         messageId: `sim_sms_${Date.now()}`,
     };

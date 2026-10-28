@@ -287,3 +287,121 @@ export async function confirmUsernameChange(payload: {
     }
     return data;
 }
+
+/**
+ * ============================================================================
+ * DATA ARCHIVE & PORTABILITY APIS (GDPR Art. 20 & CCPA Compliance)
+ * ============================================================================
+ */
+
+export type ArchiveCategoryKey =
+    | "identity"
+    | "platforms"
+    | "resumes"
+    | "security"
+    | "support"
+    | "network";
+
+export interface ArchiveCategoryMeta {
+    id: ArchiveCategoryKey;
+    label: string;
+    description: string;
+    icon: string;
+}
+
+export interface RecentArchiveExport {
+    exportId: string;
+    categories: string[];
+    fileSizeBytes: number;
+    sha256Checksum: string;
+    createdAt: string;
+    expiresAt: string;
+}
+
+export interface ArchiveStatusInfo {
+    success: boolean;
+    availableCategories: ArchiveCategoryMeta[];
+    dailyLimit: number;
+    dailyExportsUsed: number;
+    dailyExportsRemaining: number;
+    cooldownRemainingSeconds: number;
+    canExport: boolean;
+    hasPasswordAuth: boolean;
+    primaryEmail: string;
+    recentExports: RecentArchiveExport[];
+}
+
+export interface GenerateArchiveResult {
+    success: boolean;
+    exportId: string;
+    filename: string;
+    sha256Checksum: string;
+    fileSizeBytes: number;
+    recordCounts: Record<string, number>;
+    archivePayload: any;
+}
+
+/**
+ * Fetches data archive eligibility, category list, limits, and recent exports.
+ */
+export async function fetchDataArchiveInfo(): Promise<ArchiveStatusInfo> {
+    const res = await fetch(`${API_BASE}/data-archive/info`, {
+        method: "GET",
+        headers: getAuthHeaders(),
+        credentials: "include",
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+        throw new Error(data?.message || "Failed to load data archive status.");
+    }
+    return data;
+}
+
+/**
+ * Sends a single-use 6-digit email OTP for authorizing GDPR archive export.
+ */
+export async function requestDataArchiveOtp(): Promise<{
+    success: boolean;
+    message: string;
+    cooldownSeconds: number;
+    devOtp?: string;
+}> {
+    const res = await fetch(`${API_BASE}/data-archive/request-code`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+        throw new Error(data?.message || "Failed to request archive verification code.");
+    }
+    return data;
+}
+
+/**
+ * Generates a dynamic, cryptographically sealed data archive payload with step-up verification.
+ */
+export async function generateDataArchive(payload: {
+    categories?: ArchiveCategoryKey[] | "all";
+    stepUpPassword?: string;
+    stepUpOtp?: string;
+}): Promise<GenerateArchiveResult> {
+    const res = await fetch(`${API_BASE}/data-archive/generate`, {
+        method: "POST",
+        headers: getAuthHeaders(),
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+        throw new Error(data?.message || "Failed to generate data archive.");
+    }
+    return data;
+}
+
+/**
+ * Direct download URL for a generated archive.
+ */
+export function getArchiveDownloadUrl(exportId: string): string {
+    return `${API_BASE}/data-archive/download/${encodeURIComponent(exportId)}`;
+}

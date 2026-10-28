@@ -21,7 +21,6 @@ export interface VerificationStatusResponse {
     hasPendingOtp: boolean;
     cooldownRemainingSeconds: number;
     simulated?: boolean;
-    devOtp?: string;
     message?: string;
 }
 
@@ -30,7 +29,6 @@ export interface SendOtpResponse {
     message: string;
     email: string;
     simulated?: boolean;
-    devOtp?: string;
     cooldownSeconds: number;
     expiresInSeconds: number;
 }

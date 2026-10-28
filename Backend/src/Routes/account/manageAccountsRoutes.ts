@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { ManageAccountsService } from "../../services/account/manageAccountsService.js";
 import { EmailVerificationService } from "../../services/email/emailVerificationService.js";
+import { DataArchiveService } from "../../services/account/dataArchiveService.js";
 
 const manageAccountsRouter = Router();
 
@@ -423,6 +424,140 @@ manageAccountsRouter.post("/username/change/confirm", authenticate, async (req: 
             success: false,
             message: err.message || "Failed to update username.",
             attemptsRemaining: err.attemptsRemaining,
+        });
+    }
+});
+
+/**
+ * ============================================================================
+ * DATA ARCHIVE & PORTABILITY ENDPOINTS (GDPR Article 20 / CCPA Compliance)
+ * ============================================================================
+ */
+
+/**
+ * GET /api/settings/manage-account/data-archive/info
+ * Retrieves available categories, daily rate limit status, and recent exports.
+ */
+manageAccountsRouter.get("/data-archive/info", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized. Please log in." });
+        }
+
+        const info = await DataArchiveService.getArchiveInfo(userId);
+        return res.status(200).json({
+            success: true,
+            ...info,
+        });
+    } catch (err: any) {
+        const statusCode = err.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to retrieve archive status.",
+        });
+    }
+});
+
+/**
+ * POST /api/settings/manage-account/data-archive/request-code
+ * Sends a single-use 6-digit email OTP for authorizing GDPR archive export.
+ */
+manageAccountsRouter.post("/data-archive/request-code", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
+
+        const result = await DataArchiveService.requestStepUpCode(userId);
+        return res.status(200).json(result);
+    } catch (err: any) {
+        const statusCode = err.statusCode || 400;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to send verification code.",
+        });
+    }
+});
+
+/**
+ * POST /api/settings/manage-account/data-archive/generate
+ * Authenticated & step-up secured endpoint to generate a cryptographically sealed archive.
+ */
+manageAccountsRouter.post("/data-archive/generate", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
+
+        const { categories, stepUpPassword, stepUpOtp } = req.body;
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = req.headers["user-agent"] || "unknown";
+
+        const result = await DataArchiveService.generateArchive({
+            userId,
+            categories: categories || "all",
+            stepUpPassword,
+            stepUpOtp,
+            ipAddress: ip,
+            userAgent,
+        });
+
+        res.setHeader("X-Orbix-Export-Id", result.exportId);
+        res.setHeader("X-Orbix-SHA256-Checksum", result.sha256Checksum);
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        const statusCode = err.statusCode || 400;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to generate data archive.",
+        });
+    }
+});
+
+/**
+ * GET /api/settings/manage-account/data-archive/download/:exportId
+ * Streams the pre-generated data archive with attachment headers.
+ */
+manageAccountsRouter.get("/data-archive/download/:exportId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const exportId = req.params.exportId as string;
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
+        if (!exportId || typeof exportId !== "string") {
+            return res.status(400).json({ success: false, message: "Export ID is required." });
+        }
+
+        const archive = await DataArchiveService.getCachedArchivePayload(userId, exportId);
+        if (!archive) {
+            return res.status(404).json({
+                success: false,
+                message: "Archive not found or expired. Data archives expire after 24 hours.",
+            });
+        }
+
+        const username = req.user?.username || "developer";
+        const dateFormatted = new Date().toISOString().split("T")[0];
+        const filename = `orbix-data-archive-${username}-${dateFormatted}.json`;
+        const jsonContent = JSON.stringify(archive, null, 2);
+
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader("X-Orbix-Checksum-SHA256", archive.archiveManifest?.sha256Checksum || "");
+        res.setHeader("Content-Length", Buffer.byteLength(jsonContent, "utf8"));
+
+        return res.send(jsonContent);
+    } catch (err: any) {
+        const statusCode = err.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to download archive.",
         });
     }
 });
