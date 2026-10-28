@@ -118,6 +118,11 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS resume_metadata JSONB DEFAULT '{}'::jsonb;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_email_verified BOOLEAN DEFAULT false;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_confirmed_at TIMESTAMPTZ NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS is_phone_verified BOOLEAN DEFAULT false;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMPTZ NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users (LOWER(TRIM(phone))) WHERE phone IS NOT NULL AND TRIM(phone) != '';
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
             CREATE INDEX IF NOT EXISTS idx_users_lower_username ON users(LOWER(username));
             CREATE INDEX IF NOT EXISTS idx_users_orbix_score ON users(orbix_score DESC, username ASC);

@@ -226,26 +226,46 @@ clubRouter.post("/verify/send-phone-otp", async (req: Request, res: Response) =>
 
 /**
  * POST /api/club/verify/verify-phone-otp
- * Verifies the 6-digit phone OTP and returns a cryptographically signed proof token.
+ * POST /api/club/verify/verify-phone-firebase
+ * Verifies mobile phone authentication via Firebase ID Token (or legacy 6-digit OTP in test simulation)
+ * and returns a cryptographically signed continuation proof token for registration.
  */
-clubRouter.post("/verify/verify-phone-otp", async (req: Request, res: Response) => {
+const handleVerifyPhoneRequest = async (req: Request, res: Response) => {
     try {
-        const { phone, otp } = req.body;
+        const { phone, otp, idToken } = req.body;
         if (!phone || typeof phone !== "string") {
             return res.status(400).json({ success: false, message: "Phone number is required." });
         }
-        if (!otp || typeof otp !== "string") {
-            return res.status(400).json({ success: false, message: "6-digit verification code is required." });
-        }
 
         const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
-        const result = await PhoneVerificationService.verifyOtp({
-            phone,
-            otp,
-            ipAddress: ip,
-        });
+        const userAgent = req.headers["user-agent"] || "unknown";
 
-        return res.status(200).json(result);
+        // 1. Firebase Phone Authentication flow (primary)
+        if (idToken && typeof idToken === "string") {
+            const result = await PhoneVerificationService.verifyFirebasePhoneAssociation({
+                idToken,
+                expectedPhone: phone,
+                userId: req.user?.id,
+                ipAddress: ip,
+                userAgent,
+            });
+            return res.status(200).json(result);
+        }
+
+        // 2. Legacy / Simulation OTP fallback (for test suite)
+        if (otp && typeof otp === "string") {
+            const result = await PhoneVerificationService.verifyOtp({
+                phone,
+                otp,
+                ipAddress: ip,
+            });
+            return res.status(200).json(result);
+        }
+
+        return res.status(400).json({
+            success: false,
+            message: "Firebase ID token or verification code is required.",
+        });
     } catch (err: any) {
         const statusCode = err.statusCode || 400;
         return res.status(statusCode).json({
@@ -253,7 +273,10 @@ clubRouter.post("/verify/verify-phone-otp", async (req: Request, res: Response) 
             message: err.message || "Phone verification failed",
         });
     }
-});
+};
+
+clubRouter.post("/verify/verify-phone-otp", handleVerifyPhoneRequest);
+clubRouter.post("/verify/verify-phone-firebase", handleVerifyPhoneRequest);
 
 /**
  * POST /api/club/register
@@ -339,6 +362,20 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
                 success: false,
                 message: "An active club verification application already exists for this email address.",
             });
+        }
+
+        // 3a. Enforce phone uniqueness: prevent duplicate phone accounts
+        if (validated.contactPhone) {
+            const existingPhoneRes = await query(
+                `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
+                [validated.contactPhone]
+            );
+            if (existingPhoneRes.rows[0]) {
+                return res.status(409).json({
+                    success: false,
+                    message: "This mobile phone number is already registered to another Orbix account.",
+                });
+            }
         }
 
         // 3b. Verify Email & Phone proof tokens

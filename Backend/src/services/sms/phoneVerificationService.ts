@@ -3,6 +3,8 @@ import jwt from "jsonwebtoken";
 import redis from "../../redis/client.js";
 import { query } from "../../database/client.js";
 import { sendVerificationSms, normalizePhoneNumber } from "./smsGatewayService.js";
+import { verifyFirebaseIdToken, type VerifiedFirebaseUser } from "../../config/firebaseAdmin.js";
+import { deleteUserDetailsCache } from "../../redis/cache/cache-auth.js";
 
 const OTP_TTL_SECONDS = 600; // 10 minutes
 const COOLDOWN_SECONDS = 60; // 1 minute between OTP requests
@@ -13,15 +15,23 @@ const JWT_SECRET = process.env.JWT_SECRET || "orbix_secret_fallback_key_2026";
 
 export interface SendPhoneOtpParams {
     phone: string;
-    clubName?: string;
-    ipAddress?: string;
-    userAgent?: string;
+    clubName?: string | undefined;
+    ipAddress?: string | undefined;
+    userAgent?: string | undefined;
 }
 
 export interface VerifyPhoneOtpParams {
     phone: string;
     otp: string;
-    ipAddress?: string;
+    ipAddress?: string | undefined;
+}
+
+export interface VerifyFirebasePhoneParams {
+    idToken: string;
+    expectedPhone: string;
+    userId?: string | undefined;
+    ipAddress?: string | undefined;
+    userAgent?: string | undefined;
 }
 
 export class PhoneVerificationService {
@@ -42,12 +52,14 @@ export class PhoneVerificationService {
     /**
      * Issues a cryptographically signed verification proof token for verified phone numbers.
      */
-    static generateVerificationToken(canonicalPhone: string): string {
+    static generateVerificationToken(canonicalPhone: string, firebaseUid?: string): string {
         return jwt.sign(
             {
                 sub: canonicalPhone,
                 type: "phone_verification",
+                firebaseUid: firebaseUid || null,
                 verifiedAt: new Date().toISOString(),
+                jti: crypto.randomUUID(),
             },
             JWT_SECRET as string,
             {
@@ -69,13 +81,130 @@ export class PhoneVerificationService {
             });
             const normExpected = normalizePhoneNumber(expectedPhone);
             return (
-                decoded &&
+                Boolean(decoded) &&
                 decoded.type === "phone_verification" &&
                 decoded.sub === normExpected.canonical
             );
         } catch {
             return false;
         }
+    }
+
+    /**
+     * Authoritatively verifies a Firebase ID token, validates phone identity,
+     * enforces account phone uniqueness, and associates the phone with the Supabase account or registration state.
+     */
+    static async verifyFirebasePhoneAssociation(params: VerifyFirebasePhoneParams) {
+        const { idToken, expectedPhone, userId, ipAddress = "unknown", userAgent = "unknown" } = params;
+
+        // 1. Normalize and validate requested phone number
+        const norm = normalizePhoneNumber(expectedPhone);
+        if (!norm.isValid) {
+            const error: any = new Error("Please provide a valid 10-digit mobile phone number format.");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        // 2. Authoritatively verify Firebase ID token using Firebase Admin SDK
+        const verifiedFirebaseUser: VerifiedFirebaseUser = await verifyFirebaseIdToken(idToken);
+
+        // 3. Normalize verified phone number from Firebase token
+        const normFirebasePhone = normalizePhoneNumber(verifiedFirebaseUser.phoneNumber);
+        if (!normFirebasePhone.isValid) {
+            const error: any = new Error("Firebase token did not contain a valid phone number.");
+            error.statusCode = 400;
+            throw error;
+        }
+
+        // 4. Verify that token phone number matches the submitted phone number
+        if (normFirebasePhone.canonical !== norm.canonical) {
+            const error: any = new Error(
+                `Phone number mismatch: submitted number (${norm.formatted}) does not match the authenticated phone number (${normFirebasePhone.formatted}).`
+            );
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const canonical = norm.canonical;
+
+        // 5. Enforce Phone Uniqueness Policy: One account per verified phone number
+        const existingUserRes = await query(
+            `SELECT id, username, email FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
+            [canonical]
+        );
+
+        const existingUser = existingUserRes.rows[0];
+        if (existingUser && (!userId || existingUser.id !== userId)) {
+            const error: any = new Error(
+                "This mobile phone number is already associated with another Orbix account. If this is your account, please log in or contact support."
+            );
+            error.statusCode = 409;
+            throw error;
+        }
+
+        const verifiedAt = new Date();
+
+        // 6. Record audit entry in phone_verification_otps
+        try {
+            await query(
+                `INSERT INTO phone_verification_otps
+                 (user_id, phone, otp_hash, status, attempts, ip_address, user_agent, expires_at, verified_at, firebase_uid, auth_provider)
+                 VALUES ($1, $2, $3, 'verified', 1, $4, $5, $6, $7, $8, 'firebase');`,
+                [
+                    userId || null,
+                    canonical,
+                    "firebase_token_verified",
+                    ipAddress,
+                    userAgent,
+                    new Date(Date.now() + 3600 * 1000),
+                    verifiedAt,
+                    verifiedFirebaseUser.uid,
+                ]
+            );
+        } catch (dbErr: any) {
+            console.error("[PhoneVerificationService] Failed to record Firebase verification audit:", dbErr.message);
+        }
+
+        // 7. If user is currently authenticated (Supabase session), associate immediately
+        if (userId) {
+            await query(
+                `UPDATE users
+                 SET phone = $1,
+                     is_phone_verified = true,
+                     phone_verified_at = $2,
+                     phone_confirmed_at = $2
+                 WHERE id = $3;`,
+                [canonical, verifiedAt, userId]
+            );
+
+            // Invalidate auth cache in Redis
+            try {
+                await deleteUserDetailsCache(userId);
+            } catch {}
+
+            return {
+                success: true,
+                message: "Phone number verified and associated with your account successfully!",
+                phone: norm.formatted,
+                canonical: norm.canonical,
+                isAssociated: true,
+                verifiedAt: verifiedAt.toISOString(),
+            };
+        }
+
+        // 8. If in pre-registration (e.g. Club Registration before user creation):
+        // Issue a cryptographically signed continuation ticket bound to this phone number
+        const continuationToken = this.generateVerificationToken(canonical, verifiedFirebaseUser.uid);
+
+        return {
+            success: true,
+            message: "Phone number verified successfully!",
+            phone: norm.formatted,
+            canonical: norm.canonical,
+            isAssociated: false,
+            token: continuationToken,
+            verifiedAt: verifiedAt.toISOString(),
+        };
     }
 
     /**

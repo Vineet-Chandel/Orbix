@@ -1,21 +1,22 @@
 /**
  * Orbix SMS Gateway Service
- * Production-ready SMS dispatcher supporting Fast2SMS, Twilio, and localized development simulation.
+ * Mobile verification migrated to Firebase Phone Authentication.
+ * Legacy carrier fallback and localized development simulation.
  */
 
 export interface SendSmsOptions {
     to: string; // phone number (e.g. "+919389205207" or "9389205207")
     otp: string;
-    clubName?: string;
+    clubName?: string | undefined;
 }
 
 export interface SendSmsResult {
     success: boolean;
-    messageId?: string;
-    simulated?: boolean;
-    devOtp?: string;
-    providerError?: string;
-    error?: string;
+    messageId?: string | undefined;
+    simulated?: boolean | undefined;
+    devOtp?: string | undefined;
+    providerError?: string | undefined;
+    error?: string | undefined;
 }
 
 export interface NormalizedPhone {
@@ -98,41 +99,9 @@ export async function sendVerificationSms(options: SendSmsOptions): Promise<Send
 
     let lastProviderError: string | undefined;
 
-    // 1. Check Fast2SMS Gateway (popular for India)
-    const fast2smsApiKey = process.env.FAST2SMS_API_KEY;
-    if (fast2smsApiKey && fast2smsApiKey.trim() && !fast2smsApiKey.includes("your_fast2sms_api_key")) {
-        try {
-            const response = await fetch("https://www.fast2sms.com/dev/bulkV2", {
-                method: "POST",
-                headers: {
-                    authorization: fast2smsApiKey.trim(),
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    route: "otp",
-                    variables_values: otp,
-                    numbers: phone.rawDigits,
-                }),
-            });
-
-            const data: any = await response.json();
-            if (data?.return === true) {
-                console.log(`[Fast2SMS] Verification SMS dispatched successfully to ${phone.formatted}`);
-                return {
-                    success: true,
-                    messageId: data.request_id || `f2s_${Date.now()}`,
-                };
-            } else {
-                console.warn("[Fast2SMS] Provider message:", data?.message);
-                lastProviderError = data?.message || "Fast2SMS dispatch failed";
-            }
-        } catch (fastErr: any) {
-            console.error("[Fast2SMS] Dispatch error:", fastErr.message);
-            lastProviderError = fastErr.message;
-        }
-    }
-
-    // 2. Check Twilio Gateway
+    // Primary mobile verification is handled via Firebase Phone Authentication on the client SDK.
+    // Carrier fallback for auxiliary transactional notifications:
+    // Check Twilio Gateway
     const twilioSid = process.env.TWILIO_ACCOUNT_SID;
     const twilioAuth = process.env.TWILIO_AUTH_TOKEN;
     const twilioFrom = process.env.TWILIO_PHONE_NUMBER;

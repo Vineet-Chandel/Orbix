@@ -1,6 +1,7 @@
 import express, { type Request, type Response } from 'express';
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import validator from "validator";
 import SignupValidator, { ValidationError } from '../../validators/SignupValidator.js';
 import { query } from "../../database/client.js"
 import SigninValidator from '../../validators/SigninValidator.js';
@@ -10,6 +11,7 @@ import redis from '../../redis/client.js';
 import { authenticate } from '../../middlewares/auth.middleware.js';
 import { handleSavePortals, handleGetSavedPortals } from '../portals/portals.js';
 import { handleGetMyProfile, parseLinks } from '../profile/profile.js';
+import { EmailVerificationService } from '../../services/email/emailVerificationService.js';
 import { time } from 'node:console';
 const authRouter = express.Router();
 
@@ -32,10 +34,136 @@ const getAuthCookieOptions = () => ({
     secure: isProduction,
 });
 
+authRouter.post('/signup/send-email-otp', async (req: Request, res: Response) => {
+    try {
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+
+        const attempts = await failsOccursSignup({ ip });
+        if (attempts > 10) {
+            return res.status(429).json({
+                success: false,
+                message: "Too many verification requests. Please try again later."
+            });
+        }
+
+        const rawEmail = req.body?.email || req.body?.gmail;
+        if (!rawEmail || typeof rawEmail !== "string") {
+            return res.status(400).json({
+                success: false,
+                message: "A valid email address is required."
+            });
+        }
+
+        const normalizedEmail = rawEmail.trim().toLowerCase();
+        if (!validator.isEmail(normalizedEmail)) {
+            return res.status(400).json({
+                success: false,
+                message: "Please enter a valid email address."
+            });
+        }
+
+        // 1. Pre-check: Is email already registered?
+        const existingEmailResult = await query(
+            `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1;`,
+            [normalizedEmail]
+        );
+        if (existingEmailResult.rows.length > 0) {
+            return res.status(409).json({
+                success: false,
+                message: "An account with this email address already exists. Please sign in instead."
+            });
+        }
+
+        // 2. Pre-check: If username provided, is it taken?
+        const rawUsername = req.body?.username;
+        if (rawUsername && typeof rawUsername === "string") {
+            const normalizedUsername = rawUsername.trim().toLowerCase();
+            if (!validator.matches(normalizedUsername, /^[a-z0-9._-]{3,20}$/)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Username must be 3-20 characters: lowercase letters, numbers, dot, _, or -."
+                });
+            }
+
+            const existingUsernameResult = await query(
+                `SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
+                [normalizedUsername]
+            );
+            if (existingUsernameResult.rows.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: "This username is already taken. Please choose a different username."
+                });
+            }
+        }
+
+        // 3. Determine recipient display name for email
+        const firstName = req.body?.firstName ? String(req.body.firstName).trim() : "";
+        const lastName = req.body?.lastName ? String(req.body.lastName).trim() : "";
+        const displayName = [firstName, lastName].filter(Boolean).join(" ") || (rawUsername ? String(rawUsername).trim() : "Developer");
+
+        // 4. Send Pre-Registration OTP via Resend
+        const result = await EmailVerificationService.sendPreRegistrationOtp({
+            email: normalizedEmail,
+            name: displayName,
+            ipAddress: ip,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        const statusCode = err.statusCode || 500;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to send email verification code",
+            cooldownRemainingSeconds: err.cooldownRemainingSeconds || 0,
+        });
+    }
+});
+
+authRouter.post('/signup/verify-email-otp', async (req: Request, res: Response) => {
+    try {
+        const rawEmail = req.body?.email || req.body?.gmail;
+        const otp = req.body?.otp;
+
+        if (!rawEmail || typeof rawEmail !== "string") {
+            return res.status(400).json({
+                success: false,
+                message: "Email is required."
+            });
+        }
+
+        if (!otp || typeof otp !== "string") {
+            return res.status(400).json({
+                success: false,
+                message: "6-digit verification code is required."
+            });
+        }
+
+        const normalizedEmail = rawEmail.trim().toLowerCase();
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+
+        const result = await EmailVerificationService.verifyPreRegistrationOtp({
+            email: normalizedEmail,
+            otp: otp.trim(),
+            ipAddress: ip,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        const statusCode = err.statusCode || 400;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Email verification failed",
+        });
+    }
+});
+
 authRouter.post('/signup', async (req: Request, res: Response) => {
     try {
         // Rate Limiting
-        const ip = req.ip || "unknown";
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
         const attempts = await failsOccursSignup({ ip });
         if (attempts > 5) {
             return res.status(429).json({ success: false, message: "Too many signup attempts. Please try again later." });
@@ -44,24 +172,74 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
         // Validate Data
         const validatedData = SignupValidator(req.body);
 
+        // Enforce Email OTP Verification Requirement
+        const verificationToken = req.body?.verificationToken;
+        const directOtp = req.body?.otp;
+
+        let emailVerified = false;
+
+        if (verificationToken && typeof verificationToken === "string") {
+            const isValidToken = EmailVerificationService.verifyVerificationToken(
+                verificationToken,
+                validatedData.gmail
+            );
+            if (!isValidToken) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Email verification proof is invalid or has expired. Please verify your email again."
+                });
+            }
+            emailVerified = true;
+        } else if (directOtp && typeof directOtp === "string") {
+            // Direct atomic verification support
+            const otpResult = await EmailVerificationService.verifyPreRegistrationOtp({
+                email: validatedData.gmail,
+                otp: directOtp.trim(),
+                ipAddress: ip,
+            });
+            if (!otpResult || !otpResult.success) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid or expired verification code."
+                });
+            }
+            emailVerified = true;
+        } else {
+            return res.status(400).json({
+                success: false,
+                message: "Email verification is required before creating an account. Please verify your email via the OTP sent to your inbox."
+            });
+        }
+
+        if (!emailVerified) {
+            return res.status(400).json({
+                success: false,
+                message: "Email verification could not be confirmed. Please request a new code."
+            });
+        }
+
         // Hash Password AFTER validation
         const hashedPassword = await bcrypt.hash(validatedData.password, 10);
 
-        // 1. Insert into Database FIRST with default avatar
+        // 1. Insert into Database FIRST with default avatar, verified email and verified coder flag
         const defaultAvatarUrl = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
         const result = await query(
             `
                 INSERT INTO users (
-                username,
-                firstName,
-                middleName,
-                lastName,
-                email,
-                password,
-                termsAccepted,
-                avatar_url
-            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-            RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", avatar_url AS "avatarUrl", photo_url AS "photoUrl"`,
+                    username,
+                    firstname,
+                    middlename,
+                    lastname,
+                    email,
+                    password,
+                    termsaccepted,
+                    avatar_url,
+                    account_type,
+                    is_email_verified,
+                    email_verified_at,
+                    is_verified_coder
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'personal',true,CURRENT_TIMESTAMP,true)
+                RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", avatar_url AS "avatarUrl", photo_url AS "photoUrl", is_email_verified AS "isEmailVerified", is_verified_coder AS "isVerifiedCoder"`,
             [
                 validatedData.username,
                 validatedData.firstName,
@@ -76,6 +254,13 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
 
         const createdUser = result.rows[0];
         const userId = createdUser?.id || `usr-${Date.now()}`;
+
+        // Ensure leaderboard entry verification status is synchronized
+        try {
+            await query(`UPDATE leaderboard_entries SET is_verified = true WHERE user_id = $1;`, [userId]);
+        } catch {
+            // Non-blocking if user doesn't have leaderboard row yet
+        }
 
         // 2. Generate Access Token & Refresh Token
         const token = jwt.sign(
@@ -127,14 +312,14 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             gmail: validatedData.gmail,
             username: validatedData.username,
             password_hash: hashedPassword,
-            termsAccepted: validatedData.termsAccepted
+            termsAccepted: validatedData.termsAccepted,
+            accountType: "personal"
         });
 
         // 4. Return Success
-
         return res.status(201).json({
             success: true,
-            message: 'Account registered successfully!',
+            message: 'Account registered and email verified successfully!',
             token,
             user: {
                 id: userId,
@@ -143,9 +328,11 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 middleName: validatedData.middleName,
                 lastName: validatedData.lastName,
                 gmail: validatedData.gmail,
-                isEmailVerified: false,
-                isVerifiedCoder: false,
-                isVerified: false,
+                avatarUrl: defaultAvatarUrl,
+                photoUrl: null,
+                isEmailVerified: true,
+                isVerifiedCoder: true,
+                isVerified: true,
             }
         });
 

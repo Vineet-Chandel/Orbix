@@ -9,7 +9,7 @@ async function testContactVerification() {
     console.log("   ORBIX CLUB CONTACT VERIFICATION TEST SUITE");
     console.log("=================================================\n");
 
-    const testEmail = "vineetsinghk06@gmail.com";
+    const testEmail = "vineetsinghbitu@gmail.com";
     const testPhone = "9389205207";
 
     try {

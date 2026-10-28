@@ -422,7 +422,7 @@ export class EmailVerificationService {
         ipAddress?: string;
         userAgent?: string;
     }) {
-        const { email, name = "Club Representative", ipAddress = "unknown", userAgent = "unknown" } = params;
+        const { email, name = "Developer", ipAddress = "unknown", userAgent = "unknown" } = params;
         const normalizedEmail = email.trim().toLowerCase();
 
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

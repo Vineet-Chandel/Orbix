@@ -1,5 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import type { ConfirmationResult, RecaptchaVerifier } from "firebase/auth";
+import {
+    formatToE164,
+    createRecaptchaVerifier,
+    clearRecaptchaVerifier,
+    sendFirebasePhoneOtp,
+    confirmFirebasePhoneOtp,
+    isFirebaseConfigured,
+} from "../../../services/phoneAuthService";
 import {
     Building2,
     UserCheck,
@@ -13,6 +22,7 @@ import {
     ArrowRight,
     ArrowLeft,
     RotateCcw,
+    AlertCircle,
 } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
@@ -174,6 +184,8 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
     const [phoneOtp, setPhoneOtp] = useState("");
     const [emailVerified, setEmailVerified] = useState(false);
     const [phoneVerified, setPhoneVerified] = useState(false);
+    const [verifiedEmailAddress, setVerifiedEmailAddress] = useState<string | null>(null);
+    const [verifiedPhoneNumber, setVerifiedPhoneNumber] = useState<string | null>(null);
     const [emailVerificationToken, setEmailVerificationToken] = useState<string | null>(null);
     const [phoneVerificationToken, setPhoneVerificationToken] = useState<string | null>(null);
 
@@ -187,9 +199,41 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
     const [devEmailOtp, setDevEmailOtp] = useState<string | null>(null);
     const [devPhoneOtp, setDevPhoneOtp] = useState<string | null>(null);
-    const [phoneProviderNotice, setPhoneProviderNotice] = useState<string | null>(null);
+
+    // Firebase Phone Auth confirmation result and RecaptchaVerifier
+    const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
+    const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
+    const sendingPhoneOtpRef = useRef(false);
+    const [firebaseNotice, setFirebaseNotice] = useState<string | null>(null);
 
     const passwordStrength = evaluatePassword(formData.password);
+
+    // Synchronized verification state tied directly to the currently entered email & phone
+    const normalizedCurrentEmail = formData.contactEmail.trim().toLowerCase();
+    const parsedCurrentPhone = formatToE164(formData.contactPhone.trim());
+    const canonicalCurrentPhone = parsedCurrentPhone.isValid ? parsedCurrentPhone.e164 : formData.contactPhone.trim();
+
+    const isCurrentEmailVerified = Boolean(
+        emailVerified &&
+        emailVerificationToken &&
+        verifiedEmailAddress &&
+        verifiedEmailAddress === normalizedCurrentEmail
+    );
+
+    const isCurrentPhoneVerified = Boolean(
+        phoneVerified &&
+        phoneVerificationToken &&
+        verifiedPhoneNumber &&
+        verifiedPhoneNumber === canonicalCurrentPhone
+    );
+
+    // Clean up RecaptchaVerifier instance when component unmounts
+    useEffect(() => {
+        return () => {
+            clearRecaptchaVerifier(recaptchaVerifierRef.current, "firebase-recaptcha-wrapper");
+            recaptchaVerifierRef.current = null;
+        };
+    }, []);
 
     // Cooldown countdown timers
     useEffect(() => {
@@ -374,38 +418,72 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         }
     };
 
-    // Dispatch Phone OTP
-    const handleSendPhoneOtp = async () => {
+    // Dispatch Phone OTP via Firebase Phone Authentication
+    const handleSendPhoneOtp = async (isResend = false) => {
+        if (sendingPhoneOtpRef.current) return;
+
         const phone = formData.contactPhone.trim();
         if (!phone) return;
 
+        const parsed = formatToE164(phone);
+        if (!parsed.isValid) {
+            toast.error("Please enter a valid 10-digit mobile phone number.", { title: "Invalid Phone" });
+            return;
+        }
+
+        sendingPhoneOtpRef.current = true;
         setSendingPhoneOtp(true);
         try {
-            const res = await fetch("/api/club/verify/send-phone-otp", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    phone,
-                    clubName: formData.clubName.trim(),
-                }),
-            });
+            if (isFirebaseConfigured()) {
+                // For resend, cleanly purge previous verifier and prepare fresh container
+                if (isResend) {
+                    clearRecaptchaVerifier(recaptchaVerifierRef.current, "firebase-recaptcha-wrapper");
+                    recaptchaVerifierRef.current = null;
+                }
 
-            const data = await res.json().catch(() => null);
-            if (!res.ok) {
-                throw new Error(data?.message || "Failed to dispatch SMS verification code.");
-            }
+                recaptchaVerifierRef.current = createRecaptchaVerifier(
+                    "firebase-recaptcha-container",
+                    () => {
+                        toast.error("reCAPTCHA session expired. Please request SMS code again.");
+                    },
+                    isResend
+                );
 
-            setPhoneCooldown(data?.cooldownSeconds || 60);
-            if (data?.devOtp) setDevPhoneOtp(data.devOtp);
-            if (data?.providerError) {
-                setPhoneProviderNotice(data.providerError);
+                const result = await sendFirebasePhoneOtp(parsed.e164, recaptchaVerifierRef.current);
+                setConfirmationResult(result.confirmationResult || null);
+                setFirebaseNotice(null);
+                setPhoneCooldown(60);
+                toast.success(result.message, { title: "SMS Code Sent" });
             } else {
-                setPhoneProviderNotice(null);
+                // Dev simulation mode when Firebase env credentials are not configured locally
+                const res = await fetch("/api/club/verify/send-phone-otp", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        phone: parsed.e164,
+                        clubName: formData.clubName.trim(),
+                    }),
+                });
+
+                const data = await res.json().catch(() => null);
+                if (!res.ok) {
+                    throw new Error(data?.message || "Failed to dispatch SMS verification code.");
+                }
+
+                setPhoneCooldown(data?.cooldownSeconds || 60);
+                if (data?.devOtp) setDevPhoneOtp(data.devOtp);
+                toast.success(`SMS verification code dispatched to ${data?.phone || parsed.formatted}`, { title: "SMS Code Sent" });
             }
-            toast.success(`SMS verification code dispatched to ${data?.phone || phone}`, { title: "SMS Code Sent" });
         } catch (err: any) {
+            // Clean up verifier on error so subsequent requests can re-initialize cleanly
+            clearRecaptchaVerifier(recaptchaVerifierRef.current, "firebase-recaptcha-wrapper");
+            recaptchaVerifierRef.current = null;
+            if (err?.code === "auth/operation-not-allowed" || err?.message?.includes("Firebase Console")) {
+                setFirebaseNotice(err.message);
+            }
             toast.error(err.message || "Failed to send SMS verification code");
         } finally {
+            sendingPhoneOtpRef.current = false;
             setSendingPhoneOtp(false);
         }
     };
@@ -413,17 +491,56 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
     // Transition from details form to verification step
     const handleProceedToVerification = (e: React.FormEvent) => {
         e.preventDefault();
+        if (sendingPhoneOtpRef.current || sendingEmailOtp || formStep === "verification") return;
         if (!validate()) return;
+
+        // Check if current values match verified values
+        const emailNorm = formData.contactEmail.trim().toLowerCase();
+        const phoneParsed = formatToE164(formData.contactPhone.trim());
+        const phoneCanonical = phoneParsed.isValid ? phoneParsed.e164 : formData.contactPhone.trim();
+
+        const isEmailMatch = Boolean(
+            emailVerified &&
+            emailVerificationToken &&
+            verifiedEmailAddress &&
+            verifiedEmailAddress === emailNorm
+        );
+
+        const isPhoneMatch = Boolean(
+            phoneVerified &&
+            phoneVerificationToken &&
+            verifiedPhoneNumber &&
+            verifiedPhoneNumber === phoneCanonical
+        );
+
+        // If email was modified, invalidate previous email verification
+        if (!isEmailMatch) {
+            setEmailVerified(false);
+            setEmailVerificationToken(null);
+            setVerifiedEmailAddress(null);
+            setEmailOtp("");
+            setDevEmailOtp(null);
+        }
+
+        // If phone was modified, invalidate previous phone verification
+        if (!isPhoneMatch) {
+            setPhoneVerified(false);
+            setPhoneVerificationToken(null);
+            setVerifiedPhoneNumber(null);
+            setPhoneOtp("");
+            setDevPhoneOtp(null);
+            setConfirmationResult(null);
+        }
 
         setFormStep("verification");
         window.scrollTo({ top: 0, behavior: "smooth" });
 
-        // Trigger both OTPs if not already verified
-        if (!emailVerified) {
+        // Trigger OTPs only for the ones that need verification
+        if (!isEmailMatch) {
             handleSendEmailOtp();
         }
-        if (!phoneVerified) {
-            handleSendPhoneOtp();
+        if (!isPhoneMatch) {
+            handleSendPhoneOtp(false);
         }
     };
 
@@ -453,6 +570,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
             setEmailVerified(true);
             setEmailVerificationToken(data.token);
+            setVerifiedEmailAddress(formData.contactEmail.trim().toLowerCase());
             toast.success("Primary email verified successfully!", { title: "Email Verified ✓" });
         } catch (err: any) {
             toast.error(err.message || "Email verification failed");
@@ -461,7 +579,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         }
     };
 
-    // Verify Phone OTP
+    // Verify Phone OTP via Firebase and exchange for server continuation proof token
     const handleVerifyPhone = async (codeToVerify?: string) => {
         const code = (codeToVerify || phoneOtp).trim();
         if (code.length !== 6) {
@@ -469,15 +587,34 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             return;
         }
 
+        const parsed = formatToE164(formData.contactPhone.trim());
+        if (!parsed.isValid) {
+            toast.error("Invalid phone number format.");
+            return;
+        }
+
         setVerifyingPhone(true);
         try {
+            let idToken: string | undefined;
+
+            if (confirmationResult) {
+                // Confirm 6-digit code with Firebase Web Phone Auth
+                const confirmRes = await confirmFirebasePhoneOtp(confirmationResult, code);
+                idToken = confirmRes.idToken;
+            }
+
+            // Securely transmit to backend for server-side verification and continuation token generation
+            const payload: any = { phone: parsed.e164 };
+            if (idToken) {
+                payload.idToken = idToken;
+            } else {
+                payload.otp = code;
+            }
+
             const res = await fetch("/api/club/verify/verify-phone-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    phone: formData.contactPhone.trim(),
-                    otp: code,
-                }),
+                body: JSON.stringify(payload),
             });
 
             const data = await res.json().catch(() => null);
@@ -487,6 +624,9 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
             setPhoneVerified(true);
             setPhoneVerificationToken(data.token);
+            setVerifiedPhoneNumber(parsed.e164);
+            clearRecaptchaVerifier(recaptchaVerifierRef.current, "firebase-recaptcha-wrapper");
+            recaptchaVerifierRef.current = null;
             toast.success("Primary phone number verified successfully!", { title: "Phone Verified ✓" });
         } catch (err: any) {
             toast.error(err.message || "Phone verification failed");
@@ -497,7 +637,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
     // Final Submission after both Email & Phone are verified
     const executeFinalSubmission = async () => {
-        if (!emailVerified || !phoneVerified) {
+        if (!isCurrentEmailVerified || !isCurrentPhoneVerified) {
             toast.error("Please verify both your primary email and phone number before submitting.");
             return;
         }
@@ -751,9 +891,16 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 <label className="block text-xs font-black uppercase tracking-wider text-black">
                                     Primary Contact & Account Email *
                                 </label>
-                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-black">
-                                    Primary Verification Target
-                                </span>
+                                {isCurrentEmailVerified ? (
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-black flex items-center gap-1 shadow-[1px_1px_0px_#000]">
+                                        <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
+                                        <span>Verified</span>
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-black">
+                                        Primary Verification Target
+                                    </span>
+                                )}
                             </div>
                             <FormInput
                                 name="contactEmail"
@@ -762,8 +909,17 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 hideLabel
                                 value={formData.contactEmail}
                                 onChange={(e) => {
-                                    setFormData({ ...formData, contactEmail: e.target.value });
-                                    if (errors.contactEmail) setErrors({ ...errors, contactEmail: "" });
+                                    const nextVal = e.target.value;
+                                    setFormData((prev) => ({ ...prev, contactEmail: nextVal }));
+                                    if (errors.contactEmail) setErrors((prev) => ({ ...prev, contactEmail: "" }));
+                                    // Invalidate verified email state if user changes the address
+                                    if (verifiedEmailAddress && nextVal.trim().toLowerCase() !== verifiedEmailAddress) {
+                                        setEmailVerified(false);
+                                        setEmailVerificationToken(null);
+                                        setVerifiedEmailAddress(null);
+                                        setEmailOtp("");
+                                        setDevEmailOtp(null);
+                                    }
                                 }}
                                 error={errors.contactEmail}
                                 autoComplete="email"
@@ -779,9 +935,16 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 <label className="block text-xs font-black uppercase tracking-wider text-black">
                                     Primary Contact Mobile Phone Number *
                                 </label>
-                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-black">
-                                    Primary Verification Target
-                                </span>
+                                {isCurrentPhoneVerified ? (
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-black flex items-center gap-1 shadow-[1px_1px_0px_#000]">
+                                        <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
+                                        <span>Verified</span>
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-black">
+                                        Primary Verification Target
+                                    </span>
+                                )}
                             </div>
                             <FormInput
                                 name="contactPhone"
@@ -790,8 +953,20 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 hideLabel
                                 value={formData.contactPhone}
                                 onChange={(e) => {
-                                    setFormData({ ...formData, contactPhone: e.target.value });
-                                    if (errors.contactPhone) setErrors({ ...errors, contactPhone: "" });
+                                    const nextVal = e.target.value;
+                                    setFormData((prev) => ({ ...prev, contactPhone: nextVal }));
+                                    if (errors.contactPhone) setErrors((prev) => ({ ...prev, contactPhone: "" }));
+                                    // Invalidate verified phone state if user changes the phone number
+                                    const parsed = formatToE164(nextVal.trim());
+                                    const canonical = parsed.isValid ? parsed.e164 : nextVal.trim();
+                                    if (verifiedPhoneNumber && canonical !== verifiedPhoneNumber) {
+                                        setPhoneVerified(false);
+                                        setPhoneVerificationToken(null);
+                                        setVerifiedPhoneNumber(null);
+                                        setPhoneOtp("");
+                                        setDevPhoneOtp(null);
+                                        setConfirmationResult(null);
+                                    }
                                 }}
                                 error={errors.contactPhone}
                                 autoComplete="tel"
@@ -1053,7 +1228,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
                     {/* CARD 1: PRIMARY EMAIL VERIFICATION */}
                     <div className={`p-4 sm:p-5 rounded-3xl border-2 border-black shadow-[4px_4px_0px_#000] transition-all space-y-3.5 ${
-                        emailVerified ? "bg-[#a2ff86]/15 border-black" : "bg-white"
+                        isCurrentEmailVerified ? "bg-[#a2ff86]/15 border-black" : "bg-white"
                     }`}>
                         <div className="flex items-center justify-between pb-2.5 border-b-2 border-black/10 flex-wrap gap-2">
                             <div className="flex items-center gap-2.5 min-w-0">
@@ -1070,11 +1245,20 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 </div>
                             </div>
 
-                            {emailVerified ? (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
-                                    <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                    <span>Email Verified</span>
-                                </span>
+                            {isCurrentEmailVerified ? (
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                                        <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Email Verified</span>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormStep("details")}
+                                        className="text-[11px] font-black text-neutral-600 hover:text-black underline underline-offset-2 cursor-pointer"
+                                    >
+                                        Change
+                                    </button>
+                                </div>
                             ) : (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-900">
                                     <span>Awaiting Code</span>
@@ -1082,7 +1266,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                             )}
                         </div>
 
-                        {!emailVerified ? (
+                        {!isCurrentEmailVerified ? (
                             <div className="space-y-3 pt-1">
                                 <p className="text-xs text-neutral-600 font-semibold text-center">
                                     Enter the 6-digit verification code sent to <strong className="text-black">{formData.contactEmail}</strong>
@@ -1134,7 +1318,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
                     {/* CARD 2: PRIMARY MOBILE PHONE VERIFICATION */}
                     <div className={`p-4 sm:p-5 rounded-3xl border-2 border-black shadow-[4px_4px_0px_#000] transition-all space-y-3.5 ${
-                        phoneVerified ? "bg-[#a2ff86]/15 border-black" : "bg-white"
+                        isCurrentPhoneVerified ? "bg-[#a2ff86]/15 border-black" : "bg-white"
                     }`}>
                         <div className="flex items-center justify-between pb-2.5 border-b-2 border-black/10 flex-wrap gap-2">
                             <div className="flex items-center gap-2.5 min-w-0">
@@ -1151,11 +1335,20 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 </div>
                             </div>
 
-                            {phoneVerified ? (
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
-                                    <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                    <span>Phone Verified</span>
-                                </span>
+                            {isCurrentPhoneVerified ? (
+                                <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                                        <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Phone Verified</span>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setFormStep("details")}
+                                        className="text-[11px] font-black text-neutral-600 hover:text-black underline underline-offset-2 cursor-pointer"
+                                    >
+                                        Change
+                                    </button>
+                                </div>
                             ) : (
                                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-900">
                                     <span>Awaiting SMS Code</span>
@@ -1163,11 +1356,23 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                             )}
                         </div>
 
-                        {!phoneVerified ? (
+                        {!isCurrentPhoneVerified ? (
                             <div className="space-y-3 pt-1">
                                 <p className="text-xs text-neutral-600 font-semibold text-center">
                                     Enter the 6-digit SMS code dispatched to <strong className="text-black">{formData.contactPhone}</strong>
                                 </p>
+
+                                {firebaseNotice && (
+                                    <div className="p-3.5 rounded-2xl bg-amber-50 border-2 border-amber-500 text-left space-y-1.5 shadow-[2px_2px_0px_#d97706]">
+                                        <div className="flex items-center gap-1.5 text-xs font-black text-amber-900">
+                                            <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                                            <span>Firebase Console Action Required</span>
+                                        </div>
+                                        <p className="text-[11px] font-medium text-amber-900 leading-relaxed">
+                                            {firebaseNotice}
+                                        </p>
+                                    </div>
+                                )}
 
                                 <OtpSegmentedInput
                                     value={phoneOtp}
@@ -1193,11 +1398,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                                 Auto-fill ({devPhoneOtp})
                                             </button>
                                         </div>
-                                        {phoneProviderNotice && (
-                                            <p className="text-[10px] text-amber-900 font-medium">
-                                                <strong>Fast2SMS notice:</strong> {phoneProviderNotice}.
-                                            </p>
-                                        )}
                                     </div>
                                 )}
 
@@ -1205,7 +1405,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                     <button
                                         type="button"
                                         disabled={phoneCooldown > 0 || sendingPhoneOtp}
-                                        onClick={handleSendPhoneOtp}
+                                        onClick={() => handleSendPhoneOtp(true)}
                                         className="text-xs font-black text-black underline underline-offset-2 hover:text-neutral-700 disabled:opacity-50 disabled:no-underline disabled:cursor-not-allowed cursor-pointer flex items-center gap-1"
                                     >
                                         <RotateCcw className={`w-3.5 h-3.5 stroke-[2.5] ${sendingPhoneOtp ? "animate-spin" : ""}`} />
@@ -1234,7 +1434,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                     <div className="pt-2 space-y-3">
                         <button
                             type="button"
-                            disabled={!emailVerified || !phoneVerified || loading}
+                            disabled={!isCurrentEmailVerified || !isCurrentPhoneVerified || loading}
                             onClick={executeFinalSubmission}
                             className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                         >
@@ -1250,9 +1450,9 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 <span className="inline-flex items-center gap-2">
                                     <ShieldCheck className="w-5 h-5 text-emerald-400" />
                                     <span>
-                                        {emailVerified && phoneVerified
+                                        {isCurrentEmailVerified && isCurrentPhoneVerified
                                             ? "Submit Verified Club Application"
-                                            : `Verify both email & phone to submit (${(emailVerified ? 1 : 0) + (phoneVerified ? 1 : 0)}/2 verified)`}
+                                            : `Verify both email & phone to submit (${(isCurrentEmailVerified ? 1 : 0) + (isCurrentPhoneVerified ? 1 : 0)}/2 verified)`}
                                     </span>
                                 </span>
                             )}
@@ -1260,6 +1460,11 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                     </div>
                 </div>
             )}
+
+            {/* Persistent container wrapper for Firebase Phone Auth reCAPTCHA */}
+            <div id="firebase-recaptcha-wrapper" className="flex justify-center my-1">
+                <div id="firebase-recaptcha-container"></div>
+            </div>
         </form>
     );
 }
