@@ -110,7 +110,7 @@ export const ClubSidebar = ({
                         className={`flex items-center group cursor-pointer overflow-x-hidden ${
                             isExpanded ? "gap-3 min-w-0" : "justify-center mx-auto"
                         }`}
-                        title="Orbix Club — Verified Collegiate Space"
+                        title="Orbix — Empowering Dev Workflows"
                     >
                         {/* Pure Black Orbix Brand Star Logo (DEAD CENTER when collapsed) */}
                         <div className="w-7 h-7 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -121,11 +121,10 @@ export const ClubSidebar = ({
                         {isExpanded && (
                             <div className="flex flex-col min-w-0 overflow-x-hidden text-left animate-fadeIn">
                                 <span className="text-base font-black tracking-tight text-black leading-tight whitespace-nowrap truncate">
-                                    Orbix Club
+                                    Orbix
                                 </span>
-                                <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1 whitespace-nowrap truncate">
-                                    <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
-                                    Verified Space
+                                <span className="text-[11px] font-bold text-neutral-600 whitespace-nowrap truncate">
+                                    Empowering Dev Workflows
                                 </span>
                             </div>
                         )}
