@@ -12,6 +12,7 @@ import {
     ArrowRight,
     Mail,
 } from "lucide-react";
+import { NeoSelect } from "../../../components/NeoSelect";
 
 export const ProfilePrivacyDocumentary: React.FC = () => {
     // -------------------------------------------------------------------------
@@ -447,40 +448,56 @@ export const ProfilePrivacyDocumentary: React.FC = () => {
                 </p>
 
                 {/* Filter Chips */}
-                <div className="flex items-center gap-2 pt-2">
-                    <button
-                        type="button"
-                        onClick={() => setSelectedTab("all")}
-                        className={`px-3 py-1 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer ${
-                            selectedTab === "all"
-                                ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                : "bg-white text-black hover:bg-neutral-100"
-                        }`}
-                    >
-                        All Capabilities ({matrixCapabilities.length})
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setSelectedTab("allowed_both")}
-                        className={`px-3 py-1 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer ${
-                            selectedTab === "allowed_both"
-                                ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                : "bg-white text-black hover:bg-neutral-100"
-                        }`}
-                    >
-                        Allowed in Both (7 Items)
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setSelectedTab("public_only")}
-                        className={`px-3 py-1 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer ${
-                            selectedTab === "public_only"
-                                ? "bg-black text-[#FFE566] shadow-[2px_2px_0px_#000]"
-                                : "bg-white text-black hover:bg-neutral-100"
-                        }`}
-                    >
-                        Disabled in Private (8 Items)
-                    </button>
+                <div className="w-full pt-2">
+                    <div className="sm:hidden mb-2">
+                        <NeoSelect
+                            value={selectedTab}
+                            onChange={(val) => setSelectedTab(val as any)}
+                            options={[
+                                { value: "all", label: `All Capabilities (${matrixCapabilities.length})` },
+                                { value: "allowed_both", label: "Allowed in Both (7 Items)" },
+                                { value: "public_only", label: "Disabled in Private (8 Items)" },
+                            ]}
+                            size="sm"
+                            className="w-full"
+                            triggerClassName="bg-white text-xs font-black"
+                        />
+                    </div>
+                    <div className="hidden sm:flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setSelectedTab("all")}
+                            className={`px-3 py-1 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer ${
+                                selectedTab === "all"
+                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                    : "bg-white text-black hover:bg-neutral-100"
+                            }`}
+                        >
+                            All Capabilities ({matrixCapabilities.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSelectedTab("allowed_both")}
+                            className={`px-3 py-1 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer ${
+                                selectedTab === "allowed_both"
+                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                    : "bg-white text-black hover:bg-neutral-100"
+                            }`}
+                        >
+                            Allowed in Both (7 Items)
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setSelectedTab("public_only")}
+                            className={`px-3 py-1 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer ${
+                                selectedTab === "public_only"
+                                    ? "bg-black text-[#FFE566] shadow-[2px_2px_0px_#000]"
+                                    : "bg-white text-black hover:bg-neutral-100"
+                            }`}
+                        >
+                            Disabled in Private (8 Items)
+                        </button>
+                    </div>
                 </div>
 
                 {/* Matrix Table */}

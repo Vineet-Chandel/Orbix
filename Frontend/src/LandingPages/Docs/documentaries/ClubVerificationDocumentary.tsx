@@ -16,6 +16,7 @@ import {
     Check,
 } from "lucide-react";
 import { OrbixLogo } from "../../../components/OrbixLogo";
+import { NeoSelect, type NeoSelectOption } from "../../../components/NeoSelect";
 
 interface SampleApplication {
     id: string;
@@ -42,6 +43,13 @@ interface SampleApplication {
     riskColor: string;
     internalNotes: string;
 }
+
+const COLLEGE_CONTACT_OPTIONS: NeoSelectOption[] = [
+    { value: "not_started", label: "Not Started", description: "Outreach process has not yet been initiated" },
+    { value: "contacted", label: "Outreach Contacted (Awaiting Response)", description: "Direct registrar / faculty inquiry email dispatched" },
+    { value: "confirmed", label: "Confirmed with College Administration", description: "Official approval obtained on verified university email" },
+    { value: "not_found", label: "Institution / Club Not Found", description: "Institution not indexed or club disavowed by campus" },
+];
 
 const SAMPLE_APPLICATIONS: SampleApplication[] = [
     {
@@ -470,21 +478,39 @@ export const ClubVerificationDocumentary: React.FC = () => {
                     </div>
 
                     {/* App Picker */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                        {SAMPLE_APPLICATIONS.map((app) => (
-                            <button
-                                key={app.id}
-                                type="button"
-                                onClick={() => handleSwitchApp(app.id)}
-                                className={`px-3 py-1.5 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer ${
-                                    selectedAppId === app.id
-                                        ? "bg-black text-white shadow-[2px_2px_0px_#000]"
-                                        : "bg-white text-neutral-800 hover:bg-neutral-100"
-                                }`}
-                            >
-                                {app.clubName}
-                            </button>
-                        ))}
+                    <div className="w-full sm:w-auto">
+                        {/* Mobile NeoSelect Dropdown */}
+                        <div className="sm:hidden w-full">
+                            <NeoSelect
+                                value={selectedAppId}
+                                onChange={(val) => handleSwitchApp(val)}
+                                options={SAMPLE_APPLICATIONS.map((app) => ({
+                                    value: app.id,
+                                    label: app.clubName,
+                                    description: app.collegeName,
+                                }))}
+                                size="sm"
+                                className="w-full"
+                                triggerClassName="h-9 font-black bg-white text-xs"
+                            />
+                        </div>
+                        {/* Desktop Pill Buttons */}
+                        <div className="hidden sm:flex items-center gap-1.5 flex-wrap">
+                            {SAMPLE_APPLICATIONS.map((app) => (
+                                <button
+                                    key={app.id}
+                                    type="button"
+                                    onClick={() => handleSwitchApp(app.id)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer ${
+                                        selectedAppId === app.id
+                                            ? "bg-black text-white shadow-[2px_2px_0px_#000]"
+                                            : "bg-white text-neutral-800 hover:bg-neutral-100"
+                                    }`}
+                                >
+                                    {app.clubName}
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
@@ -597,16 +623,15 @@ export const ClubVerificationDocumentary: React.FC = () => {
                                 <label className="block text-[10px] font-black uppercase text-neutral-600">
                                     College Contact Outreach Status
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={collegeContactStatus}
-                                    onChange={(e) => setCollegeContactStatus(e.target.value as any)}
-                                    className="w-full h-9 px-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:outline-none focus:bg-white"
-                                >
-                                    <option value="not_started">Not Started</option>
-                                    <option value="contacted">Outreach Contacted (Awaiting Response)</option>
-                                    <option value="confirmed">Confirmed with College Administration</option>
-                                    <option value="not_found">Institution / Club Not Found</option>
-                                </select>
+                                    onChange={(val) => setCollegeContactStatus(val as any)}
+                                    options={COLLEGE_CONTACT_OPTIONS}
+                                    size="sm"
+                                    className="w-full"
+                                    triggerClassName="h-9 font-bold bg-[#FAF6EE] text-xs"
+                                    dropdownClassName="text-xs"
+                                />
                             </div>
 
                             {/* 3 Checkboxes */}
@@ -738,9 +763,11 @@ export const ClubVerificationDocumentary: React.FC = () => {
                                     <td className="p-3.5 text-center text-neutral-400">
                                         None
                                     </td>
-                                    <td className="p-3.5 text-center text-emerald-700 font-bold bg-[#FFE566]/10 flex items-center justify-center gap-1">
-                                        <ShieldCheck className="w-4 h-4 text-emerald-600 inline" />
-                                        <span>Official Verified Seal</span>
+                                    <td className="p-3.5 text-center bg-[#FFE566]/10">
+                                        <div className="flex items-center justify-center gap-1 text-emerald-700 font-bold">
+                                            <ShieldCheck className="w-4 h-4 text-emerald-600 inline" />
+                                            <span>Official Verified Seal</span>
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>

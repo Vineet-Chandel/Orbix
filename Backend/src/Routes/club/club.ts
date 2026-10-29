@@ -2572,7 +2572,7 @@ clubRouter.post("/:clubId/messages", authenticate, async (req: Request, res: Res
         const result = await sendMessageToClub({
             senderId,
             senderName,
-            clubId,
+            clubId: String(clubId),
             subject,
             body,
         });
@@ -2948,7 +2948,7 @@ clubRouter.post("/inbox/:conversationId/reply", authenticate, async (req: Reques
         const result = await sendClubReply({
             clubId: club.id,
             staffId: req.user!.id,
-            conversationId,
+            conversationId: String(conversationId),
             body,
         });
 

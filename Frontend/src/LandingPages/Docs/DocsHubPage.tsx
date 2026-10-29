@@ -1,7 +1,9 @@
 import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import NavBar from "../NavBar/Landing";
+import { Footer } from "../Main-Landing-Pages/Footer/Footer";
 import { OrbixLogo } from "../../components/OrbixLogo";
+import { NeoSelect } from "../../components/NeoSelect";
 import {
     DOCS_FOLDERS,
     type DocFolder,
@@ -88,7 +90,7 @@ export const DocsHubPage: React.FC = () => {
             {/* Global Top Navbar */}
             <NavBar activeTab="docs" />
 
-            <main className=" mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 sm:pt-36 sm:pb-32 space-y-12">
+            <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 sm:pt-36 sm:pb-32 space-y-12">
                 {/* ========================================================================= */}
                 {/* HEADER HERO SECTION                                                      */}
                 {/* ========================================================================= */}
@@ -148,34 +150,55 @@ export const DocsHubPage: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Folder Filter Chips */}
-                    <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs font-black">
-                        <button
-                            type="button"
-                            onClick={() => setSelectedFolderId("all")}
-                            className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border-2 border-black shrink-0 ${selectedFolderId === "all"
-                                ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                : "bg-[#FAF6EE] text-black hover:bg-neutral-200 shadow-[1px_1px_0px_#000]"
-                                }`}
-                        >
-                            All Folders ({totalFilesCount})
-                        </button>
-                        {DOCS_FOLDERS.map((folder) => (
+                    {/* Folder Filter Selector */}
+                    <div className="w-full">
+                        {/* Mobile NeoSelect */}
+                        <div className="sm:hidden mb-2">
+                            <NeoSelect
+                                value={selectedFolderId}
+                                onChange={(val) => setSelectedFolderId(val)}
+                                options={[
+                                    { value: "all", label: `All Topics (${totalFilesCount} Files)` },
+                                    ...DOCS_FOLDERS.map((f) => ({
+                                        value: f.id,
+                                        label: `${f.name} (${f.files.length})`,
+                                    })),
+                                ]}
+                                size="sm"
+                                className="w-full"
+                                triggerClassName="bg-[#FAF6EE] text-xs font-black"
+                            />
+                        </div>
+
+                        {/* Desktop Folder Filter Chips */}
+                        <div className="hidden sm:flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none text-xs font-black">
                             <button
-                                key={folder.id}
                                 type="button"
-                                onClick={() => setSelectedFolderId(folder.id)}
-                                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border-2 border-black shrink-0 flex items-center gap-1.5 ${selectedFolderId === folder.id
+                                onClick={() => setSelectedFolderId("all")}
+                                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border-2 border-black shrink-0 ${selectedFolderId === "all"
                                     ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
                                     : "bg-[#FAF6EE] text-black hover:bg-neutral-200 shadow-[1px_1px_0px_#000]"
                                     }`}
                             >
-                                <span>{folder.name}</span>
-                                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-black/10">
-                                    {folder.files.length}
-                                </span>
+                                All Folders ({totalFilesCount})
                             </button>
-                        ))}
+                            {DOCS_FOLDERS.map((folder) => (
+                                <button
+                                    key={folder.id}
+                                    type="button"
+                                    onClick={() => setSelectedFolderId(folder.id)}
+                                    className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border-2 border-black shrink-0 flex items-center gap-1.5 ${selectedFolderId === folder.id
+                                        ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                        : "bg-[#FAF6EE] text-black hover:bg-neutral-200 shadow-[1px_1px_0px_#000]"
+                                        }`}
+                                >
+                                    <span>{folder.name}</span>
+                                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-black/10">
+                                        {folder.files.length}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
@@ -268,7 +291,7 @@ export const DocsHubPage: React.FC = () => {
                                                         {/* Image-like View Header (Thumbnail Banner) */}
                                                         <Link
                                                             to={`/docs/${file.slug}`}
-                                                            className="block w-full relative overflow-hidden bg-black border-b-2 border-black shrink-0 h-48 sm:h-52"
+                                                            className="block w-full relative overflow-hidden bg-black border-b-2 border-black shrink-0 h-48 sm:h-[300px]"
                                                         >
                                                             <img
                                                                 src={file.image}
@@ -339,6 +362,9 @@ export const DocsHubPage: React.FC = () => {
                     )}
                 </div>
             </main>
+
+            {/* Global Footer */}
+            <Footer />
         </div>
     );
 };

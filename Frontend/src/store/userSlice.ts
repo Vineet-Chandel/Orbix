@@ -59,6 +59,8 @@ export interface User {
     emailVerifiedAt?: string | null;
     isVerified?: boolean;
     isVerifiedCoder?: boolean;
+    isTwoFactorEnabled?: boolean;
+    twoFactorEnabledAt?: string | null;
     college?: {
         id: string;
         officialName: string;

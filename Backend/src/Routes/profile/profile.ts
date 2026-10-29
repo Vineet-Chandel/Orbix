@@ -206,6 +206,8 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
                 email_verified_at AS "emailVerifiedAt",
                 (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
                 (COALESCE(is_email_verified, false) = true) AS "isVerified",
+                COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
+                two_factor_enabled_at AS "twoFactorEnabledAt",
                 college_id AS "collegeId",
                 college_updated_at AS "collegeUpdatedAt",
                 created_at AS "createdAt"

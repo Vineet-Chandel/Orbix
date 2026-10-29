@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
@@ -19,11 +19,13 @@ import {
     ShieldCheck,
     GraduationCap,
     MapPin,
+    X,
+    RefreshCw,
 } from "lucide-react";
 import type { SettingsViewKey } from "./types";
 import { useToast } from "../../context/ToastContext";
 import { NeoToggle } from "../../components/NeoToggle";
-import { useAppDispatch, useAppSelector } from "../../store";
+import { useAppDispatch, useAppSelector, setUser } from "../../store";
 import {
     fetchBlockedUsersThunk,
     unblockUserThunk,
@@ -72,7 +74,267 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
     }, [viewKey, dispatch]);
 
     // Local toggles for notification & security settings
-    const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+    const [twoFactorEnabled, setTwoFactorEnabled] = useState(Boolean(user?.isTwoFactorEnabled));
+
+    useEffect(() => {
+        setTwoFactorEnabled(Boolean(user?.isTwoFactorEnabled));
+    }, [user?.isTwoFactorEnabled]);
+
+    // 2FA Setup & Disable Modals State
+    const [showTwoFactorSetupModal, setShowTwoFactorSetupModal] = useState(false);
+    const [isSendingSetupOtp, setIsSendingSetupOtp] = useState(false);
+    const [isVerifyingSetupOtp, setIsVerifyingSetupOtp] = useState(false);
+    const [setupOtpDigits, setSetupOtpDigits] = useState<string[]>(["", "", "", "", "", ""]);
+    const [setupCooldownSeconds, setSetupCooldownSeconds] = useState(60);
+    const [setupMaskedEmail, setSetupMaskedEmail] = useState("");
+    const setupOtpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+    const [showTwoFactorDisableModal, setShowTwoFactorDisableModal] = useState(false);
+    const [disablePassword, setDisablePassword] = useState("");
+    const [isDisabling2FA, setIsDisabling2FA] = useState(false);
+
+    // Setup timer
+    useEffect(() => {
+        let timer: any = null;
+        if (showTwoFactorSetupModal && setupCooldownSeconds > 0) {
+            timer = setInterval(() => {
+                setSetupCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+            }, 1000);
+        }
+        return () => {
+            if (timer) clearInterval(timer);
+        };
+    }, [showTwoFactorSetupModal, setupCooldownSeconds]);
+
+    const handleToggleTwoFactor = async (nextVal: boolean) => {
+        if (nextVal) {
+            setIsSendingSetupOtp(true);
+            setShowTwoFactorSetupModal(true);
+            setSetupOtpDigits(["", "", "", "", "", ""]);
+            setSetupCooldownSeconds(60);
+            try {
+                const endpoints = ["http://localhost:3000/api/auth/2fa/setup/send-otp", "/api/auth/2fa/setup/send-otp"];
+                let response: Response | null = null;
+                let resultData: any = null;
+
+                for (const url of endpoints) {
+                    try {
+                        const res = await fetch(url, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                        });
+                        response = res;
+                        resultData = await res.json().catch(() => null);
+                        break;
+                    } catch {
+                        continue;
+                    }
+                }
+
+                if (!response || !response.ok) {
+                    await toast.handleError(response, "Failed to send 2FA verification code.");
+                    setShowTwoFactorSetupModal(false);
+                    return;
+                }
+
+                setSetupMaskedEmail(resultData?.maskedEmail || user?.gmail || "your email");
+                setSetupCooldownSeconds(resultData?.cooldownSeconds || 60);
+                toast.info(`A 6-digit verification code has been sent to ${resultData?.maskedEmail || user?.gmail} via Resend.`, {
+                    title: "2FA Verification Code",
+                });
+                setTimeout(() => {
+                    setupOtpRefs.current[0]?.focus();
+                }, 100);
+            } catch (err: any) {
+                await toast.handleError(err, "Failed to send 2FA setup verification code.");
+                setShowTwoFactorSetupModal(false);
+            } finally {
+                setIsSendingSetupOtp(false);
+            }
+        } else {
+            setDisablePassword("");
+            setShowTwoFactorDisableModal(true);
+        }
+    };
+
+    const handleResendSetupOtp = async () => {
+        if (setupCooldownSeconds > 0 || isSendingSetupOtp) return;
+        setIsSendingSetupOtp(true);
+        try {
+            const endpoints = ["http://localhost:3000/api/auth/2fa/setup/send-otp", "/api/auth/2fa/setup/send-otp"];
+            let response: Response | null = null;
+            let resultData: any = null;
+
+            for (const url of endpoints) {
+                try {
+                    const res = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                    });
+                    response = res;
+                    resultData = await res.json().catch(() => null);
+                    break;
+                } catch {
+                    continue;
+                }
+            }
+
+            if (!response || !response.ok) {
+                await toast.handleError(response, "Failed to resend 2FA verification code.");
+                return;
+            }
+
+            setSetupCooldownSeconds(resultData?.cooldownSeconds || 60);
+            toast.success("A new verification code was sent to your email.", { title: "Code Resent" });
+        } catch (err: any) {
+            await toast.handleError(err, "Failed to resend 2FA code.");
+        } finally {
+            setIsSendingSetupOtp(false);
+        }
+    };
+
+    const handleSetupOtpChange = (index: number, value: string) => {
+        const cleanVal = value.replace(/\D/g, "");
+        if (!cleanVal) {
+            const updated = [...setupOtpDigits];
+            updated[index] = "";
+            setSetupOtpDigits(updated);
+            return;
+        }
+
+        const digit = cleanVal.slice(-1);
+        const updated = [...setupOtpDigits];
+        updated[index] = digit;
+        setSetupOtpDigits(updated);
+
+        if (index < 5) {
+            setupOtpRefs.current[index + 1]?.focus();
+        }
+    };
+
+    const handleSetupOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === "Backspace" && !setupOtpDigits[index] && index > 0) {
+            setupOtpRefs.current[index - 1]?.focus();
+        }
+    };
+
+    const handleSetupOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+        e.preventDefault();
+        const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+        if (!pasted) return;
+
+        const updated = [...setupOtpDigits];
+        for (let i = 0; i < 6; i++) {
+            updated[i] = pasted[i] || "";
+        }
+        setSetupOtpDigits(updated);
+
+        const nextFocusIndex = Math.min(pasted.length, 5);
+        setupOtpRefs.current[nextFocusIndex]?.focus();
+    };
+
+    const handleConfirmEnable2FA = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        const code = setupOtpDigits.join("");
+        if (code.length !== 6) {
+            toast.error("Please enter the complete 6-digit verification code.", { title: "Incomplete Code" });
+            return;
+        }
+
+        setIsVerifyingSetupOtp(true);
+        try {
+            const endpoints = ["http://localhost:3000/api/auth/2fa/setup/verify-otp", "/api/auth/2fa/setup/verify-otp"];
+            let response: Response | null = null;
+            let resultData: any = null;
+
+            for (const url of endpoints) {
+                try {
+                    const res = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ otp: code }),
+                    });
+                    response = res;
+                    resultData = await res.json().catch(() => null);
+                    break;
+                } catch {
+                    continue;
+                }
+            }
+
+            if (!response || !response.ok) {
+                await toast.handleError(response, "Invalid or expired verification code.");
+                return;
+            }
+
+            setTwoFactorEnabled(true);
+            if (user) {
+                dispatch(setUser({
+                    ...user,
+                    isTwoFactorEnabled: true,
+                    twoFactorEnabledAt: resultData?.twoFactorEnabledAt || new Date().toISOString(),
+                }));
+            }
+            setShowTwoFactorSetupModal(false);
+            toast.success("Two-Factor Authentication is now enabled on your account!", {
+                title: "2FA Activated",
+            });
+        } catch (err: any) {
+            await toast.handleError(err, "Failed to activate Two-Factor Authentication.");
+        } finally {
+            setIsVerifyingSetupOtp(false);
+        }
+    };
+
+    const handleConfirmDisable2FA = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        setIsDisabling2FA(true);
+        try {
+            const endpoints = ["http://localhost:3000/api/auth/2fa/disable", "/api/auth/2fa/disable"];
+            let response: Response | null = null;
+
+            for (const url of endpoints) {
+                try {
+                    const res = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        credentials: "include",
+                        body: JSON.stringify({ password: disablePassword }),
+                    });
+                    response = res;
+                    break;
+                } catch {
+                    continue;
+                }
+            }
+
+            if (!response || !response.ok) {
+                await toast.handleError(response, "Incorrect password or unable to disable 2FA.");
+                return;
+            }
+
+            setTwoFactorEnabled(false);
+            if (user) {
+                dispatch(setUser({
+                    ...user,
+                    isTwoFactorEnabled: false,
+                    twoFactorEnabledAt: null,
+                }));
+            }
+            setShowTwoFactorDisableModal(false);
+            setDisablePassword("");
+            toast.success("Two-Factor Authentication has been disabled.", {
+                title: "2FA Disabled",
+            });
+        } catch (err: any) {
+            await toast.handleError(err, "Failed to disable Two-Factor Authentication.");
+        } finally {
+            setIsDisabling2FA(false);
+        }
+    };
     const [pushNotifications, setPushNotifications] = useState(true);
     const [emailContestAlerts, setEmailContestAlerts] = useState(true);
     const [recruiterMessages, setRecruiterMessages] = useState(true);
@@ -298,22 +560,22 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                         <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="space-y-1">
                                 <div className="flex items-center gap-2">
-                                    <Lock className="w-4 h-4 text-black stroke-[2.5]" />
+                                    <ShieldCheck className="w-5 h-5 text-black stroke-[2.5]" />
                                     <h3 className="text-base font-black text-black">Two-Factor Authentication (2FA)</h3>
+                                    {twoFactorEnabled && (
+                                        <span className="px-2 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black uppercase tracking-wider">
+                                            Active
+                                        </span>
+                                    )}
                                 </div>
-                                <p className="text-xs text-neutral-600 font-medium max-w-xl">
-                                    Protect your Orbix account with an extra layer of security using an authenticator app (Google Authenticator or 1Password).
+                                <p className="text-xs text-neutral-600 font-medium max-w-xl leading-relaxed">
+                                    Protect your Orbix account with verified email OTP. Whenever you sign in, a single-use 6-digit code will be sent to your registered email (<span className="font-mono font-bold text-black">{user?.gmail || "account email"}</span>) via Resend.
                                 </p>
                             </div>
 
                             <NeoToggle
                                 checked={twoFactorEnabled}
-                                onChange={(val) => {
-                                    setTwoFactorEnabled(val);
-                                    toast.info(`Two-Factor Authentication ${val ? "enabled" : "disabled"}.`, {
-                                        title: "Security Preference",
-                                    });
-                                }}
+                                onChange={handleToggleTwoFactor}
                                 onStatusText="2FA: Enabled"
                                 offStatusText="2FA: Disabled"
                                 ariaLabel="Toggle two-factor authentication"
@@ -1015,6 +1277,204 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             </div>
 
             {renderContent()}
+
+            {/* Two-Factor Authentication Setup Modal */}
+            {showTwoFactorSetupModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="w-full max-w-md bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-5 animate-scaleUp">
+                        {/* Modal Header */}
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                    <ShieldCheck className="w-5 h-5 text-black stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black text-black">
+                                        Enable Two-Factor Auth
+                                    </h3>
+                                    <p className="text-xs text-neutral-600 font-medium">
+                                        Email OTP via Resend
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setShowTwoFactorSetupModal(false)}
+                                className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 shadow-[1px_1px_0px_#000] cursor-pointer"
+                            >
+                                <X className="w-4 h-4 text-black" />
+                            </button>
+                        </div>
+
+                        {/* Notice & Masked Email */}
+                        <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                            <p className="text-xs text-neutral-700 font-medium leading-relaxed">
+                                We sent a 6-digit confirmation code to:
+                            </p>
+                            <p className="font-mono font-black text-sm text-black">
+                                {setupMaskedEmail || user?.gmail || "your email"}
+                            </p>
+                            <p className="text-[11px] text-neutral-500 font-medium pt-1">
+                                Enter the code below within 10 minutes to verify and activate 2FA.
+                            </p>
+                        </div>
+
+                        {/* 6-digit OTP Inputs */}
+                        <form onSubmit={handleConfirmEnable2FA} className="space-y-4">
+                            <div className="flex justify-between items-center gap-1.5 sm:gap-2">
+                                {setupOtpDigits.map((digit, idx) => (
+                                    <input
+                                        key={idx}
+                                        ref={(el) => {
+                                            setupOtpRefs.current[idx] = el;
+                                        }}
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        maxLength={1}
+                                        value={digit}
+                                        onChange={(e) => handleSetupOtpChange(idx, e.target.value)}
+                                        onKeyDown={(e) => handleSetupOtpKeyDown(idx, e)}
+                                        onPaste={handleSetupOtpPaste}
+                                        className="w-10 h-12 sm:w-12 sm:h-14 text-center font-mono font-black text-xl sm:text-2xl rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] focus:shadow-[4px_4px_0px_#000] focus:bg-[#FAF6EE] focus:outline-none transition-all select-all"
+                                        autoFocus={idx === 0}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* Resend Cooldown */}
+                            <div className="flex items-center justify-end text-xs">
+                                <button
+                                    type="button"
+                                    onClick={handleResendSetupOtp}
+                                    disabled={setupCooldownSeconds > 0 || isSendingSetupOtp}
+                                    className="inline-flex items-center gap-1 font-black text-black hover:text-neutral-800 disabled:text-neutral-400 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                                >
+                                    <RefreshCw className={`w-3.5 h-3.5 ${isSendingSetupOtp ? "animate-spin" : ""}`} />
+                                    <span>
+                                        {setupCooldownSeconds > 0
+                                            ? `Resend code in ${setupCooldownSeconds}s`
+                                            : "Resend Code"}
+                                    </span>
+                                </button>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowTwoFactorSetupModal(false)}
+                                    className="flex-1 py-2.5 px-4 rounded-xl bg-white border-2 border-black text-black font-black text-xs uppercase tracking-wider shadow-[2px_2px_0px_#000] hover:bg-neutral-100 transition-all cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isVerifyingSetupOtp || setupOtpDigits.join("").length !== 6}
+                                    className="flex-1 py-2.5 px-4 rounded-xl bg-black border-2 border-black text-[#a2ff86] font-black text-xs uppercase tracking-wider shadow-[2px_2px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isVerifyingSetupOtp ? (
+                                        <>
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <span>Verifying...</span>
+                                        </>
+                                    ) : (
+                                        <span>Activate 2FA</span>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Two-Factor Authentication Disable Confirmation Modal */}
+            {showTwoFactorDisableModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+                    <div className="w-full max-w-md bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-5 animate-scaleUp">
+                        {/* Modal Header */}
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-[#ff8686] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                    <Lock className="w-5 h-5 text-black stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-base font-black text-black">
+                                        Disable Two-Factor Auth
+                                    </h3>
+                                    <p className="text-xs text-neutral-600 font-medium">
+                                        Account Security Check
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setShowTwoFactorDisableModal(false);
+                                    setDisablePassword("");
+                                }}
+                                className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 shadow-[1px_1px_0px_#000] cursor-pointer"
+                            >
+                                <X className="w-4 h-4 text-black" />
+                            </button>
+                        </div>
+
+                        <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1.5">
+                            <p className="text-xs text-neutral-800 font-bold leading-relaxed">
+                                Are you sure you want to turn off Two-Factor Authentication?
+                            </p>
+                            <p className="text-[11px] text-neutral-600 font-medium">
+                                Your account will no longer require a 6-digit email OTP during sign-in, which may reduce account security.
+                            </p>
+                        </div>
+
+                        {/* Password confirmation form */}
+                        <form onSubmit={handleConfirmDisable2FA} className="space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-xs font-black uppercase tracking-wider text-black">
+                                    Confirm Account Password
+                                </label>
+                                <input
+                                    type="password"
+                                    value={disablePassword}
+                                    onChange={(e) => setDisablePassword(e.target.value)}
+                                    placeholder="Enter your current password"
+                                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none focus:shadow-[4px_4px_0px_#000]"
+                                    autoFocus
+                                />
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-2 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowTwoFactorDisableModal(false);
+                                        setDisablePassword("");
+                                    }}
+                                    className="flex-1 py-2.5 px-4 rounded-xl bg-white border-2 border-black text-black font-black text-xs uppercase tracking-wider shadow-[2px_2px_0px_#000] hover:bg-neutral-100 transition-all cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={isDisabling2FA}
+                                    className="flex-1 py-2.5 px-4 rounded-xl bg-[#ff8686] border-2 border-black text-black font-black text-xs uppercase tracking-wider shadow-[2px_2px_0px_#000] hover:bg-[#ff7070] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                >
+                                    {isDisabling2FA ? (
+                                        <>
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <span>Disabling...</span>
+                                        </>
+                                    ) : (
+                                        <span>Turn Off 2FA</span>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

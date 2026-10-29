@@ -76,8 +76,8 @@ export async function checkClubMessageQuota(
         // 3. Evaluate Limits
         // 3a. Pair Daily Limit (3 messages to same club per 24h)
         if (pairDailyCount >= CLUB_MESSAGE_LIMITS.pairDaily) {
-            const oldestPair = await redis.zrange(pairKey, 0, 0, "WITHSCORES");
-            const oldestTime = oldestPair.length >= 2 ? parseInt(oldestPair[1], 10) : dayAgo;
+            const oldestPair: string[] = await (redis as any).zrange(pairKey, 0, 0, "WITHSCORES");
+            const oldestTime = oldestPair[1] ? parseInt(oldestPair[1], 10) : dayAgo;
             const resetAt = new Date(oldestTime + WINDOW_DAY_MS);
             const retryAfterSeconds = Math.max(1, Math.ceil((resetAt.getTime() - now) / 1000));
 
@@ -95,8 +95,8 @@ export async function checkClubMessageQuota(
 
         // 3b. Global Daily Limit (20 per day)
         if (globalDailyCount >= CLUB_MESSAGE_LIMITS.globalDaily) {
-            const oldestDaily = await redis.zrangebyscore(globalKey, dayAgo, "+inf", "WITHSCORES", "LIMIT", 0, 1);
-            const oldestTime = oldestDaily.length >= 2 ? parseInt(oldestDaily[1], 10) : dayAgo;
+            const oldestDaily: string[] = await (redis as any).zrangebyscore(globalKey, dayAgo, "+inf", "WITHSCORES", "LIMIT", 0, 1);
+            const oldestTime = oldestDaily[1] ? parseInt(oldestDaily[1], 10) : dayAgo;
             const resetAt = new Date(oldestTime + WINDOW_DAY_MS);
             const retryAfterSeconds = Math.max(1, Math.ceil((resetAt.getTime() - now) / 1000));
 
@@ -114,8 +114,8 @@ export async function checkClubMessageQuota(
 
         // 3c. Global Weekly Limit (50 per week)
         if (globalWeeklyCount >= CLUB_MESSAGE_LIMITS.globalWeekly) {
-            const oldestWeekly = await redis.zrangebyscore(globalKey, weekAgo, "+inf", "WITHSCORES", "LIMIT", 0, 1);
-            const oldestTime = oldestWeekly.length >= 2 ? parseInt(oldestWeekly[1], 10) : weekAgo;
+            const oldestWeekly: string[] = await (redis as any).zrangebyscore(globalKey, weekAgo, "+inf", "WITHSCORES", "LIMIT", 0, 1);
+            const oldestTime = oldestWeekly[1] ? parseInt(oldestWeekly[1], 10) : weekAgo;
             const resetAt = new Date(oldestTime + WINDOW_WEEK_MS);
             const retryAfterSeconds = Math.max(1, Math.ceil((resetAt.getTime() - now) / 1000));
 
@@ -133,8 +133,8 @@ export async function checkClubMessageQuota(
 
         // 3d. Global Monthly Limit (200 per month)
         if (globalMonthlyCount >= CLUB_MESSAGE_LIMITS.globalMonthly) {
-            const oldestMonthly = await redis.zrange(globalKey, 0, 0, "WITHSCORES");
-            const oldestTime = oldestMonthly.length >= 2 ? parseInt(oldestMonthly[1], 10) : monthAgo;
+            const oldestMonthly: string[] = await (redis as any).zrange(globalKey, 0, 0, "WITHSCORES");
+            const oldestTime = oldestMonthly[1] ? parseInt(oldestMonthly[1], 10) : monthAgo;
             const resetAt = new Date(oldestTime + WINDOW_MONTH_MS);
             const retryAfterSeconds = Math.max(1, Math.ceil((resetAt.getTime() - now) / 1000));
 
@@ -299,12 +299,12 @@ export async function sendMessageToClub({
     body: string;
 }): Promise<{
     success: boolean;
-    conversationId?: string;
-    messageId?: string;
-    isMutedDelivery?: boolean;
-    error?: string;
-    code?: string;
-    retryAfterSeconds?: number;
+    conversationId?: string | undefined;
+    messageId?: string | undefined;
+    isMutedDelivery?: boolean | undefined;
+    error?: string | undefined;
+    code?: string | undefined;
+    retryAfterSeconds?: number | undefined;
 }> {
     const cleanBody = (body || "").trim();
     if (cleanBody.length < 2 || cleanBody.length > 5000) {

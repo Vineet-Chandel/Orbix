@@ -18,6 +18,71 @@ import {
     Sparkles,
     TrendingUp
 } from "lucide-react";
+import { NeoSelect } from "../../../components/NeoSelect";
+
+interface BenchmarkPreset {
+    id: string;
+    label: string;
+    description: string;
+    values: {
+        easy: number;
+        med: number;
+        hard: number;
+        contestRating: number;
+        contestsCount: number;
+        mergedPRs: number;
+        externalRepos: number;
+        publicRepos: number;
+        repoStars: number;
+        activeDays: number;
+        currentStreak: number;
+        publishedArticles: number;
+        readersCount: number;
+    };
+}
+
+const PRESET_PROFILES: BenchmarkPreset[] = [
+    {
+        id: "balanced",
+        label: "Balanced Senior Engineer (Target ~7,200 pts)",
+        description: "Solid problem solving, regular contests, and active open source",
+        values: {
+            easy: 120, med: 180, hard: 35, contestRating: 1820, contestsCount: 22,
+            mergedPRs: 14, externalRepos: 5, publicRepos: 12, repoStars: 65,
+            activeDays: 220, currentStreak: 32, publishedArticles: 3, readersCount: 1100,
+        },
+    },
+    {
+        id: "competitive",
+        label: "Top 1% Competitive Programmer (Target ~8,600 pts)",
+        description: "Candidate Master Elo, hundreds of Hard solves, frequent contests",
+        values: {
+            easy: 150, med: 350, hard: 110, contestRating: 2280, contestsCount: 65,
+            mergedPRs: 5, externalRepos: 2, publicRepos: 10, repoStars: 20,
+            activeDays: 450, currentStreak: 120, publishedArticles: 2, readersCount: 500,
+        },
+    },
+    {
+        id: "opensource",
+        label: "Open Source Maintainer (Target ~7,800 pts)",
+        description: "High repo stars, dozens of merged PRs, multi-org code reviews",
+        values: {
+            easy: 40, med: 80, hard: 15, contestRating: 1400, contestsCount: 6,
+            mergedPRs: 45, externalRepos: 18, publicRepos: 15, repoStars: 850,
+            activeDays: 380, currentStreak: 45, publishedArticles: 8, readersCount: 8500,
+        },
+    },
+    {
+        id: "explorer",
+        label: "Early Stage Explorer (Target ~3,100 pts)",
+        description: "Getting started with algorithmic practice and daily streaks",
+        values: {
+            easy: 35, med: 20, hard: 2, contestRating: 1250, contestsCount: 4,
+            mergedPRs: 2, externalRepos: 1, publicRepos: 6, repoStars: 8,
+            activeDays: 45, currentStreak: 12, publishedArticles: 1, readersCount: 80,
+        },
+    },
+];
 
 export const AlgorithmDocumentary: React.FC = () => {
     // -------------------------------------------------------------------------
@@ -36,6 +101,31 @@ export const AlgorithmDocumentary: React.FC = () => {
     const [currentStreak, setCurrentStreak] = useState<number>(28);
     const [publishedArticles, setPublishedArticles] = useState<number>(4);
     const [readersCount, setReadersCount] = useState<number>(1200);
+    const [selectedPreset, setSelectedPreset] = useState<string>("balanced");
+
+    const handleApplyPreset = (presetId: string) => {
+        setSelectedPreset(presetId);
+        const preset = PRESET_PROFILES.find((p) => p.id === presetId);
+        if (!preset) return;
+        setEasyProblems(preset.values.easy);
+        setMedProblems(preset.values.med);
+        setHardProblems(preset.values.hard);
+        setContestRating(preset.values.contestRating);
+        setContestsCount(preset.values.contestsCount);
+        setMergedPRs(preset.values.mergedPRs);
+        setExternalRepos(preset.values.externalRepos);
+        setPublicRepos(preset.values.publicRepos);
+        setRepoStars(preset.values.repoStars);
+        setActiveDays(preset.values.activeDays);
+        setCurrentStreak(preset.values.currentStreak);
+        setPublishedArticles(preset.values.publishedArticles);
+        setReadersCount(preset.values.readersCount);
+    };
+
+    const updateVal = (setter: (val: number) => void, val: number) => {
+        setSelectedPreset("custom");
+        setter(val);
+    };
 
     // -------------------------------------------------------------------------
     // Live Deterministic Mathematical Model (Mirrors Orbix Authoritative Score Specification v2.0.0)
@@ -461,10 +551,30 @@ export const AlgorithmDocumentary: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000] self-start sm:self-auto">
-                        <span className="text-xs text-neutral-400 font-bold uppercase">Estimated Score:</span>
-                        <span className="text-2xl font-black text-[#a2ff86] font-mono">{simResults.total.toLocaleString()}</span>
-                        <span className="text-xs text-neutral-400 font-bold">/ 10,000</span>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                        <div className="w-full sm:w-auto min-w-[280px]">
+                            <NeoSelect
+                                value={selectedPreset}
+                                onChange={(val) => handleApplyPreset(val)}
+                                options={[
+                                    { value: "custom", label: "Custom Profile (Manually Adjusted)" },
+                                    ...PRESET_PROFILES.map((p) => ({
+                                        value: p.id,
+                                        label: p.label,
+                                        description: p.description,
+                                    })),
+                                ]}
+                                size="sm"
+                                className="w-full"
+                                triggerClassName="bg-white text-xs font-black shadow-[2px_2px_0px_#000]"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000] self-start sm:self-auto shrink-0">
+                            <span className="text-xs text-neutral-400 font-bold uppercase">Estimated Score:</span>
+                            <span className="text-2xl font-black text-[#a2ff86] font-mono">{simResults.total.toLocaleString()}</span>
+                            <span className="text-xs text-neutral-400 font-bold">/ 10,000</span>
+                        </div>
                     </div>
                 </div>
 
@@ -489,7 +599,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="500"
                                     value={easyProblems}
-                                    onChange={(e) => setEasyProblems(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setEasyProblems, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -503,7 +613,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="400"
                                     value={medProblems}
-                                    onChange={(e) => setMedProblems(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setMedProblems, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -517,7 +627,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="150"
                                     value={hardProblems}
-                                    onChange={(e) => setHardProblems(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setHardProblems, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -544,7 +654,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     max="2600"
                                     step="10"
                                     value={contestRating}
-                                    onChange={(e) => setContestRating(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setContestRating, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -558,7 +668,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="60"
                                     value={contestsCount}
-                                    onChange={(e) => setContestsCount(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setContestsCount, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -584,7 +694,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="50"
                                     value={mergedPRs}
-                                    onChange={(e) => setMergedPRs(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setMergedPRs, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -598,7 +708,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="15"
                                     value={externalRepos}
-                                    onChange={(e) => setExternalRepos(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setExternalRepos, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -624,7 +734,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="30"
                                     value={publicRepos}
-                                    onChange={(e) => setPublicRepos(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setPublicRepos, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -638,7 +748,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="500"
                                     value={repoStars}
-                                    onChange={(e) => setRepoStars(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setRepoStars, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -664,7 +774,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="365"
                                     value={activeDays}
-                                    onChange={(e) => setActiveDays(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setActiveDays, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -678,7 +788,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="120"
                                     value={currentStreak}
-                                    onChange={(e) => setCurrentStreak(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setCurrentStreak, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -704,7 +814,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     min="0"
                                     max="10"
                                     value={publishedArticles}
-                                    onChange={(e) => setPublishedArticles(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setPublishedArticles, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>
@@ -719,7 +829,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                                     max="10000"
                                     step="100"
                                     value={readersCount}
-                                    onChange={(e) => setReadersCount(Number(e.target.value))}
+                                    onChange={(e) => updateVal(setReadersCount, Number(e.target.value))}
                                     className="w-full accent-black cursor-pointer"
                                 />
                             </div>

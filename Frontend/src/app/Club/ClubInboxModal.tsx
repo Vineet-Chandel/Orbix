@@ -4,8 +4,6 @@ import {
     Inbox,
     Mail,
     Search,
-    ShieldAlert,
-    ShieldCheck,
     VolumeX,
     Volume2,
     Ban,
@@ -14,10 +12,8 @@ import {
     RotateCcw,
     Send,
     Loader2,
-    Clock,
     ExternalLink,
     AlertTriangle,
-    Check,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "../../context/ToastContext";
@@ -65,7 +61,7 @@ interface MessageItem {
 export default function ClubInboxModal({
     isOpen,
     onClose,
-    clubId,
+    clubId: _clubId,
     clubName,
     onUnreadCountChange,
 }: ClubInboxModalProps) {

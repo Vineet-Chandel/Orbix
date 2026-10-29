@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { X, Send, AlertCircle, CheckCircle2, MessageSquare, ShieldCheck, Loader2 } from "lucide-react";
+import { X, Send, AlertCircle, CheckCircle2, ShieldCheck, Loader2 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
 import { Link } from "react-router-dom";
+import { NeoSelect } from "../../components/NeoSelect";
 
 interface MessageClubModalProps {
     isOpen: boolean;
@@ -181,17 +182,16 @@ export default function MessageClubModal({
                                 <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1.5">
                                     Inquiry Category
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={subject}
-                                    onChange={(e) => setSubject(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 rounded-xl border-2 border-black bg-white text-xs font-bold text-black focus:outline-none focus:ring-2 focus:ring-black shadow-[2px_2px_0px_#000]"
-                                >
-                                    {INQUIRY_CATEGORIES.map((cat) => (
-                                        <option key={cat} value={cat}>
-                                            {cat}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={(val) => setSubject(val)}
+                                    options={INQUIRY_CATEGORIES.map((cat) => ({
+                                        value: cat,
+                                        label: cat,
+                                    }))}
+                                    className="w-full"
+                                    triggerClassName="bg-white text-xs font-bold"
+                                />
                             </div>
 
                             <div>

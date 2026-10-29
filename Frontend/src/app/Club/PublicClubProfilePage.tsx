@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router-dom";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import {
     ShieldCheck,
+    ShieldAlert,
     Building2,
     Globe,
     Mail,
@@ -14,7 +15,12 @@ import {
     Check,
     AlertCircle,
     ArrowLeft,
+    MessageSquare,
+    Loader2,
 } from "lucide-react";
+import MessageClubModal from "./MessageClubModal";
+import { useToast } from "../../context/ToastContext";
+import { useAppSelector } from "../../store";
 
 interface PublicClub {
     id: string;
@@ -62,12 +68,18 @@ interface PublicEvent {
 export default function PublicClubProfilePage() {
     const { slug } = useParams<{ slug: string }>();
 
+    const toast = useToast();
+    const { user } = useAppSelector((state) => state.user);
+
     const [club, setClub] = useState<PublicClub | null>(null);
     const [upcomingEvents, setUpcomingEvents] = useState<PublicEvent[]>([]);
     const [pastEvents, setPastEvents] = useState<PublicEvent[]>([]);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
+    const [isBlockedByClub, setIsBlockedByClub] = useState(false);
     const [copiedShare, setCopiedShare] = useState(false);
+    const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
+    const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
 
     useEffect(() => {
         if (!slug) return;
@@ -76,12 +88,17 @@ export default function PublicClubProfilePage() {
             try {
                 setLoading(true);
                 setNotFound(false);
-                const res = await fetch(`/api/clubs/${slug}`);
+                setIsBlockedByClub(false);
+                const res = await fetch(`/api/clubs/${slug}`, { credentials: "include" });
                 if (res.status === 404) {
                     setNotFound(true);
                     return;
                 }
                 const data = await res.json();
+                if (data.isBlockedByClub) {
+                    setIsBlockedByClub(true);
+                    return;
+                }
                 if (data.success && data.club) {
                     setClub(data.club);
                     setUpcomingEvents(data.upcomingEvents || []);
@@ -106,6 +123,39 @@ export default function PublicClubProfilePage() {
         setTimeout(() => setCopiedShare(false), 2000);
     };
 
+    const handleRegisterEvent = async (eventId: string) => {
+        if (!user) {
+            toast.info("Please sign in to register for club events.");
+            return;
+        }
+
+        setRegisteringEventId(eventId);
+        try {
+            const res = await fetch(`/api/club/events/${eventId}/register`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+            });
+            const data = await res.json().catch(() => null);
+
+            if (!res.ok) {
+                if (res.status === 403) {
+                    toast.error("Access Restricted: You don't have permission to register for events by this club.", {
+                        title: "Registration Denied",
+                    });
+                    return;
+                }
+                throw new Error(data?.message || "Failed to register for event.");
+            }
+
+            toast.success(data?.message || "Successfully registered for this event!", { title: "RSVP Confirmed" });
+        } catch (err: any) {
+            toast.error(err.message || "Failed to complete event RSVP.", { title: "Error" });
+        } finally {
+            setRegisteringEventId(null);
+        }
+    };
+
     if (loading) {
         return (
             <div className="min-h-screen bg-[#FAF6EE] flex items-center justify-center font-sans">
@@ -115,6 +165,26 @@ export default function PublicClubProfilePage() {
                         Loading Club Profile...
                     </p>
                 </div>
+            </div>
+        );
+    }
+
+    if (isBlockedByClub) {
+        return (
+            <div className="min-h-screen bg-[#FAF6EE] flex flex-col items-center justify-center font-sans p-6 text-center select-none">
+                <div className="w-16 h-16 rounded-3xl bg-rose-100 border-2 border-black flex items-center justify-center text-rose-700 mb-4 shadow-[4px_4px_0px_#000]">
+                    <ShieldAlert className="w-8 h-8" />
+                </div>
+                <h1 className="text-2xl font-black text-neutral-900 mb-2">Access Restricted</h1>
+                <p className="text-xs font-bold text-neutral-600 max-w-sm mb-6 leading-relaxed">
+                    You don't have permission to access this club.
+                </p>
+                <Link
+                    to="/"
+                    className="px-5 py-2.5 rounded-2xl bg-black text-white font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-800"
+                >
+                    Back to Orbix
+                </Link>
             </div>
         );
     }
@@ -246,6 +316,15 @@ export default function PublicClubProfilePage() {
 
                         {/* Quick Action Links & Social Pills */}
                         <div className="mt-6 pt-5 border-t-2 border-black/10 flex flex-wrap items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setIsMessageModalOpen(true)}
+                                className="px-4 py-2 rounded-xl bg-black text-white hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-2 cursor-pointer"
+                            >
+                                <MessageSquare className="w-3.5 h-3.5 text-[#FFE566]" />
+                                <span>Message Club</span>
+                            </button>
+
                             {club.websiteUrl && (
                                 <a
                                     href={club.websiteUrl}
@@ -399,19 +478,32 @@ export default function PublicClubProfilePage() {
                                         </div>
                                     </div>
 
-                                    {ev.registrationUrl && (
-                                        <div className="mt-4 pt-3 border-t border-black/10">
+                                    <div className="mt-4 pt-3 border-t border-black/10 flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRegisterEvent(ev.id)}
+                                            disabled={registeringEventId === ev.id}
+                                            className="flex-1 py-2 rounded-xl bg-emerald-300 hover:bg-emerald-400 text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-60"
+                                        >
+                                            {registeringEventId === ev.id ? (
+                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            ) : (
+                                                <Calendar className="w-3.5 h-3.5" />
+                                            )}
+                                            <span>RSVP / Register</span>
+                                        </button>
+                                        {ev.registrationUrl && (
                                             <a
                                                 href={ev.registrationUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="w-full py-2 rounded-xl bg-black text-white hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer"
+                                                className="p-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-black shadow-[2px_2px_0px_#000]"
+                                                title="External event link"
                                             >
-                                                <span>Register for Event</span>
-                                                <ExternalLink className="w-3 h-3" />
+                                                <ExternalLink className="w-3.5 h-3.5" />
                                             </a>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -463,6 +555,15 @@ export default function PublicClubProfilePage() {
                     <span>• Verified Student Developer Ecosystem</span>
                 </div>
             </footer>
+
+            {/* Message Club Modal */}
+            <MessageClubModal
+                isOpen={isMessageModalOpen}
+                onClose={() => setIsMessageModalOpen(false)}
+                clubId={club.id}
+                clubName={club.name}
+                clubLogoUrl={club.logoUrl}
+            />
         </div>
     );
 }

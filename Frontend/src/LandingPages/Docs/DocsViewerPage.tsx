@@ -1,7 +1,9 @@
-import React from "react";
-import { useParams, Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import NavBar from "../NavBar/Landing";
+import { Footer } from "../Main-Landing-Pages/Footer/Footer";
 import { getDocBySlug, ALL_DOC_FILES } from "../../data/docsRegistry";
+import { NeoSelect } from "../../components/NeoSelect";
 import AlgorithmDocumentary from "./documentaries/AlgorithmDocumentary";
 import PlatformRegistryDocumentary from "./documentaries/PlatformRegistryDocumentary";
 import ResumeIntelligenceDocumentary from "./documentaries/ResumeIntelligenceDocumentary";
@@ -12,11 +14,22 @@ import {
     FileText,
     CheckCircle2,
     ArrowRight,
+    ArrowUp,
 } from "lucide-react";
 
 export const DocsViewerPage: React.FC = () => {
     const { slug, pageId, docId } = useParams<{ slug?: string; pageId?: string; docId?: string }>();
+    const navigate = useNavigate();
     const activeSlug = (slug || docId || pageId || "orbix-score-algorithm").toLowerCase();
+    const [showBackToTop, setShowBackToTop] = useState(false);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setShowBackToTop(window.scrollY > 400);
+        };
+        window.addEventListener("scroll", handleScroll, { passive: true });
+        return () => window.removeEventListener("scroll", handleScroll);
+    }, []);
 
     // Map common aliases
     const resolvedSlug =
@@ -43,11 +56,11 @@ export const DocsViewerPage: React.FC = () => {
             {/* Global Navigation */}
             <NavBar activeTab="docs" />
 
-            <main className=" mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24 sm:pt-32 sm:pb-32 space-y-8">
+            <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24 sm:pt-32 sm:pb-32 space-y-8">
                 {/* ========================================================================= */}
-                {/* BREADCRUMB NAVIGATION & BACK BUTTON                                       */}
+                {/* BREADCRUMB NAVIGATION & QUICK SWITCHER                                    */}
                 {/* ========================================================================= */}
-                <div className="flex items-center justify-between gap-3 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
                     <div className="flex items-center gap-2 text-xs font-bold text-neutral-600 flex-wrap">
                         <Link
                             to="/docs"
@@ -62,6 +75,22 @@ export const DocsViewerPage: React.FC = () => {
                         <span className="text-black font-black truncate max-w-[200px] sm:max-w-sm">
                             {doc?.title || "Documentary"}
                         </span>
+                    </div>
+
+                    {/* Quick Jump Document Selector */}
+                    <div className="w-full sm:w-auto shrink-0 min-w-[260px]">
+                        <NeoSelect
+                            value={resolvedSlug}
+                            onChange={(val) => navigate(`/docs/${val}`)}
+                            options={ALL_DOC_FILES.map((f) => ({
+                                value: f.slug,
+                                label: f.title,
+                                description: `${f.readTime} • ${f.folderName}`,
+                            }))}
+                            size="sm"
+                            className="w-full"
+                            triggerClassName="bg-white text-xs font-black shadow-[2px_2px_0px_#000]"
+                        />
                     </div>
                 </div>
 
@@ -177,6 +206,22 @@ export const DocsViewerPage: React.FC = () => {
                     </div>
                 </section>
             </main>
+
+            {/* Back To Top Floating Action */}
+            {showBackToTop && (
+                <button
+                    type="button"
+                    onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                    className="fixed bottom-6 right-6 z-40 p-3 rounded-2xl bg-[#FFE566] text-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none transition-all cursor-pointer flex items-center justify-center select-none"
+                    title="Back to Top"
+                    aria-label="Scroll back to top"
+                >
+                    <ArrowUp className="w-5 h-5 stroke-[2.5]" />
+                </button>
+            )}
+
+            {/* Global Footer */}
+            <Footer />
         </div>
     );
 };

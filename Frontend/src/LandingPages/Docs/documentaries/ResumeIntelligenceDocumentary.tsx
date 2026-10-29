@@ -14,6 +14,7 @@ import {
     TrendingUp,
     Check
 } from "lucide-react";
+import { NeoSelect } from "../../../components/NeoSelect";
 
 export const ResumeIntelligenceDocumentary: React.FC = () => {
     // -------------------------------------------------------------------------
@@ -929,22 +930,37 @@ export const ResumeIntelligenceDocumentary: React.FC = () => {
                         </span>
                     </div>
 
-                    {/* Domain Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                        {rewriteExamples.map((item) => (
-                            <button
-                                key={item.domain}
-                                type="button"
-                                onClick={() => setSelectedRewriteDomain(item.domain)}
-                                className={`px-3.5 py-1.5 rounded-xl border-2 border-black font-bold text-xs transition cursor-pointer ${
-                                    selectedRewriteDomain === item.domain
-                                        ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                        : "bg-white text-neutral-800 hover:bg-neutral-100"
-                                }`}
-                            >
-                                {item.title}
-                            </button>
-                        ))}
+                    {/* Domain Selector */}
+                    <div className="w-full">
+                        <div className="sm:hidden mb-2">
+                            <NeoSelect
+                                value={selectedRewriteDomain}
+                                onChange={(val) => setSelectedRewriteDomain(val)}
+                                options={rewriteExamples.map((item) => ({
+                                    value: item.domain,
+                                    label: item.title,
+                                }))}
+                                size="sm"
+                                className="w-full"
+                                triggerClassName="bg-white text-xs font-bold"
+                            />
+                        </div>
+                        <div className="hidden sm:flex flex-wrap gap-2">
+                            {rewriteExamples.map((item) => (
+                                <button
+                                    key={item.domain}
+                                    type="button"
+                                    onClick={() => setSelectedRewriteDomain(item.domain)}
+                                    className={`px-3.5 py-1.5 rounded-xl border-2 border-black font-bold text-xs transition cursor-pointer ${
+                                        selectedRewriteDomain === item.domain
+                                            ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                            : "bg-white text-neutral-800 hover:bg-neutral-100"
+                                    }`}
+                                >
+                                    {item.title}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
                     {(() => {

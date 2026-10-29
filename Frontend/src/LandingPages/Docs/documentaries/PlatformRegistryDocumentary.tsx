@@ -19,6 +19,7 @@ import {
     Activity,
 } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
+import { NeoSelect } from "../../../components/NeoSelect";
 
 export interface PlatformDetail {
     id: string;
@@ -706,21 +707,38 @@ export const PlatformRegistryDocumentary: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Category Pills Filter */}
-                <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-                    {categories.map((cat) => (
-                        <button
-                            key={cat}
-                            onClick={() => setSelectedCategory(cat)}
-                            className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all cursor-pointer whitespace-nowrap shadow-[2px_2px_0px_#000] ${
-                                selectedCategory === cat
-                                    ? "bg-black text-[#a2ff86] translate-x-[1px] translate-y-[1px] shadow-none"
-                                    : "bg-white text-black hover:bg-neutral-100"
-                            }`}
-                        >
-                            {cat}
-                        </button>
-                    ))}
+                {/* Category Selector */}
+                <div className="w-full">
+                    {/* Mobile NeoSelect */}
+                    <div className="sm:hidden mb-2">
+                        <NeoSelect
+                            value={selectedCategory}
+                            onChange={(val) => setSelectedCategory(val)}
+                            options={categories.map((cat) => ({
+                                value: cat,
+                                label: `Category: ${cat}`,
+                            }))}
+                            size="sm"
+                            className="w-full"
+                            triggerClassName="bg-white text-xs font-black"
+                        />
+                    </div>
+                    {/* Desktop Category Pills Filter */}
+                    <div className="hidden sm:flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+                        {categories.map((cat) => (
+                            <button
+                                key={cat}
+                                onClick={() => setSelectedCategory(cat)}
+                                className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black transition-all cursor-pointer whitespace-nowrap shadow-[2px_2px_0px_#000] ${
+                                    selectedCategory === cat
+                                        ? "bg-black text-[#a2ff86] translate-x-[1px] translate-y-[1px] shadow-none"
+                                        : "bg-white text-black hover:bg-neutral-100"
+                                }`}
+                            >
+                                {cat}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {/* 16-Platform Grid Selector */}

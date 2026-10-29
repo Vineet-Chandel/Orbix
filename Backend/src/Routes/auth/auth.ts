@@ -12,6 +12,7 @@ import { authenticate } from '../../middlewares/auth.middleware.js';
 import { handleSavePortals, handleGetSavedPortals } from '../portals/portals.js';
 import { handleGetMyProfile, parseLinks } from '../profile/profile.js';
 import { EmailVerificationService } from '../../services/email/emailVerificationService.js';
+import { TwoFactorAuthService } from '../../services/auth/twoFactorAuthService.js';
 import { enrichUserWithClubData } from '../../services/club/clubEnrichmentService.js';
 import { time } from 'node:console';
 const authRouter = express.Router();
@@ -429,6 +430,8 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
                 email_verified_at AS "emailVerifiedAt",
                 (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
                 (COALESCE(is_email_verified, false) = true) AS "isVerified",
+                COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
+                two_factor_enabled_at AS "twoFactorEnabledAt",
                 created_at AS "createdAt"
             FROM users
             WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
@@ -454,6 +457,30 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             return res.status(401).json({
                 success: false,
                 message: "Invalid Credentials"
+            });
+        }
+
+        // Intercept login if Two-Factor Authentication is enabled on this account
+        if (user.isTwoFactorEnabled) {
+            const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+            const userAgent = (req.headers["user-agent"] as string) || "unknown";
+
+            const twoFactorResult = await TwoFactorAuthService.initiateLogin2FA({
+                userId: user.id,
+                email: user.gmail,
+                username: user.username,
+                name: `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.username,
+                ipAddress: clientIp,
+                userAgent,
+            });
+
+            return res.status(200).json({
+                success: true,
+                requires2FA: true,
+                twoFactorChallengeToken: twoFactorResult.challengeToken,
+                maskedEmail: twoFactorResult.maskedEmail,
+                cooldownSeconds: twoFactorResult.cooldownSeconds,
+                message: twoFactorResult.message,
             });
         }
 
@@ -643,6 +670,8 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
                 email_verified_at AS "emailVerifiedAt",
                 (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
                 (COALESCE(is_email_verified, false) = true) AS "isVerified",
+                COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
+                two_factor_enabled_at AS "twoFactorEnabledAt",
                 created_at AS "createdAt"
             FROM users
             WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($1)
@@ -820,5 +849,261 @@ authRouter.get("/me", authenticate, handleGetMyProfile);
 // Profile portal save & retrieval endpoints (/api/profile/save)
 authRouter.post("/profile/save", authenticate, handleSavePortals);
 authRouter.get("/profile/save", authenticate, handleGetSavedPortals);
+
+/* ==========================================================================
+   Two-Factor Authentication (2FA) Routes
+   ========================================================================== */
+
+/**
+ * POST /api/auth/2fa/verify-login & /api/2fa/verify-login
+ * Verifies the 6-digit OTP sent to the user's email during login challenge.
+ */
+const handleVerifyLogin2FA = async (req: Request, res: Response) => {
+    try {
+        const { challengeToken, otp } = req.body;
+        if (!challengeToken || !otp) {
+            return res.status(400).json({
+                success: false,
+                message: "Challenge token and 6-digit verification code are required."
+            });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const { user } = await TwoFactorAuthService.verifyLoginOtp({
+            challengeToken: String(challengeToken).trim(),
+            otp: String(otp).trim(),
+            ipAddress: ip
+        });
+
+        // Generate Access Token & Refresh Token
+        const token = jwt.sign(
+            {
+                sub: user.id,
+                gmail: user.gmail,
+                username: user.username
+            },
+            JWT_SECRET,
+            {
+                expiresIn: "8h",
+                issuer: "orbix",
+                audience: "orbix-users"
+            }
+        );
+
+        const refreshToken = jwt.sign(
+            {
+                sub: user.id,
+                gmail: user.gmail,
+                username: user.username,
+                type: "refresh"
+            },
+            JWT_SECRET,
+            {
+                expiresIn: "7d",
+                issuer: "orbix",
+                audience: "orbix-users"
+            }
+        );
+
+        // Set Auth Cookies
+        res.cookie("token", token, {
+            ...getAuthCookieOptions(),
+            maxAge: ACCESS_TOKEN_EXPIRY_MS
+        });
+
+        res.cookie("refreshToken", refreshToken, {
+            ...getAuthCookieOptions(),
+            maxAge: REFRESH_TOKEN_EXPIRY_MS
+        });
+
+        const safeUser: any = { ...user };
+        safeUser.links = parseLinks(safeUser.links, safeUser);
+        safeUser.skills = Array.isArray(safeUser.skills) ? safeUser.skills : [];
+
+        const linksResult = await query(
+            `SELECT
+                id, portal, portal_username AS "portalUsername", link, raw_input AS "rawInput",
+                verified, display_name AS "displayName", avatar_url AS "avatarUrl", stats,
+                is_public AS "isPublic", last_sync_status AS "lastSyncStatus", last_sync_at AS "lastSyncAt"
+            FROM user_links
+            WHERE username = $1 OR username = $2
+            ORDER BY created_at ASC;`,
+            [user.username, user.gmail]
+        );
+        safeUser.platforms = linksResult.rows || [];
+
+        await enrichUserWithClubData(safeUser, user.id);
+        await resetSigninFailures({ email: user.gmail, ip });
+        await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, termsAccepted: user.termsAccepted });
+
+        return res.status(200).json({
+            success: true,
+            message: "Signed in successfully with Two-Factor Authentication",
+            token,
+            refreshToken,
+            user: safeUser
+        });
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to verify Two-Factor code."
+        });
+    }
+};
+
+authRouter.post('/auth/2fa/verify-login', handleVerifyLogin2FA);
+authRouter.post('/2fa/verify-login', handleVerifyLogin2FA);
+
+/**
+ * POST /api/auth/2fa/resend-login-otp & /api/2fa/resend-login-otp
+ * Resends the 6-digit OTP code to the registered email during login.
+ */
+const handleResendLoginOtp = async (req: Request, res: Response) => {
+    try {
+        const { challengeToken } = req.body;
+        if (!challengeToken) {
+            return res.status(400).json({
+                success: false,
+                message: "Verification challenge token is required."
+            });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+
+        const result = await TwoFactorAuthService.resendLoginOtp({
+            challengeToken: String(challengeToken).trim(),
+            ipAddress: ip,
+            userAgent
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to resend Two-Factor code."
+        });
+    }
+};
+
+authRouter.post('/auth/2fa/resend-login-otp', handleResendLoginOtp);
+authRouter.post('/2fa/resend-login-otp', handleResendLoginOtp);
+
+/**
+ * POST /api/auth/2fa/setup/send-otp & /api/2fa/setup/send-otp
+ * Authenticated endpoint: Sends a 6-digit verification OTP to user's email to enable 2FA in Settings.
+ */
+const handleSendSetupOtp = async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        const userId = authUser?.sub || authUser?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Authentication required" });
+        }
+
+        const userRes = await query(
+            `SELECT id, email, username, firstname, lastname, COALESCE(is_two_factor_enabled, false) as "isTwoFactorEnabled"
+             FROM users WHERE id = $1 LIMIT 1;`,
+            [userId]
+        );
+        const user = userRes.rows[0];
+        if (!user) {
+            return res.status(404).json({ success: false, message: "User account not found." });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+
+        const result = await TwoFactorAuthService.sendSetupOtp({
+            userId: user.id,
+            email: user.email,
+            name: `${user.firstname || ""} ${user.lastname || ""}`.trim() || user.username,
+            ipAddress: ip,
+            userAgent
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to send 2FA setup verification code."
+        });
+    }
+};
+
+authRouter.post('/auth/2fa/setup/send-otp', authenticate, handleSendSetupOtp);
+authRouter.post('/2fa/setup/send-otp', authenticate, handleSendSetupOtp);
+
+/**
+ * POST /api/auth/2fa/setup/verify-otp & /api/2fa/setup/verify-otp
+ * Authenticated endpoint: Verifies the 6-digit setup code and enables 2FA on the user's account.
+ */
+const handleVerifySetupOtp = async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        const userId = authUser?.sub || authUser?.id;
+        const { otp } = req.body;
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Authentication required" });
+        }
+        if (!otp || String(otp).trim().length !== 6) {
+            return res.status(400).json({ success: false, message: "Please provide a valid 6-digit verification code." });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const result = await TwoFactorAuthService.verifySetupOtp({
+            userId,
+            otp: String(otp).trim(),
+            ipAddress: ip
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to verify 2FA code."
+        });
+    }
+};
+
+authRouter.post('/auth/2fa/setup/verify-otp', authenticate, handleVerifySetupOtp);
+authRouter.post('/2fa/setup/verify-otp', authenticate, handleVerifySetupOtp);
+
+/**
+ * POST /api/auth/2fa/disable & /api/2fa/disable
+ * Authenticated endpoint: Disables 2FA on the user's account after optional password confirmation.
+ */
+const handleDisable2FA = async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        const userId = authUser?.sub || authUser?.id;
+        const { password } = req.body;
+
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Authentication required" });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const disablePayload: { userId: string; password?: string; ipAddress?: string } = {
+            userId: String(userId),
+            ipAddress: String(ip)
+        };
+        if (password) {
+            disablePayload.password = String(password);
+        }
+        const result = await TwoFactorAuthService.disable2FA(disablePayload);
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to disable Two-Factor Authentication."
+        });
+    }
+};
+
+authRouter.post('/auth/2fa/disable', authenticate, handleDisable2FA);
+authRouter.post('/2fa/disable', authenticate, handleDisable2FA);
 
 export default authRouter;
