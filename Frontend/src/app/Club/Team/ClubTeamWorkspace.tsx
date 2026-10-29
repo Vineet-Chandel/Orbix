@@ -34,7 +34,7 @@ interface ClubTeamWorkspaceProps {
     onOpenMobileSidebar?: () => void;
 }
 
-export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({ club, onOpenInbox, onOpenMobileSidebar }) => {
+export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({ club, onOpenMobileSidebar }) => {
     const toast = useToast();
 
     // Internal navigation tabs

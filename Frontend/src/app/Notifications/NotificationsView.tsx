@@ -12,6 +12,7 @@ import {
     Loader2,
     ArrowUpRight,
     User,
+    Users,
     UserPlus,
     UserCheck,
     GraduationCap,
@@ -185,6 +186,15 @@ export const NotificationsView: React.FC = () => {
         );
     }, []);
 
+    // Helper functions for club team invitations
+    const isClubTeamInvitation = useCallback((item: UserNotification): boolean => {
+        const type = item.type || (item as any).notification_type;
+        return (
+            type === "club_team_invitation" ||
+            Boolean((item.metadata as any)?.invitationId)
+        );
+    }, []);
+
     // Immediate reactive state updater when user accepts or declines connection in the UI
     const handleRelationshipStateChange = useCallback((notificationId: string, newState: string) => {
         setNotifications((prev) =>
@@ -254,11 +264,13 @@ export const NotificationsView: React.FC = () => {
     const filteredNotifications = useMemo(() => {
         return notifications.filter((item) => {
             const isConnReq = isPendingConnectionRequest(item);
+            const isTeamInv = isClubTeamInvitation(item);
+            const isPendingTeam = isTeamInv && (item.metadata?.invitationStatus === "pending" || !item.metadata?.invitationStatus);
             const isHire =
                 item.type === "hire_inquiry" ||
                 (item as any).notification_type === "hire_inquiry";
 
-            if (filter === "requests" && !isConnReq) return false;
+            if (filter === "requests" && !isConnReq && !isPendingTeam) return false;
             if (filter === "inquiries" && !isHire) return false;
             if (filter === "unread" && item.isRead) return false;
 
@@ -279,6 +291,9 @@ export const NotificationsView: React.FC = () => {
                 ""
             ).toLowerCase();
             const company = (meta.company || "").toLowerCase();
+            const clubName = (meta.clubName || "").toLowerCase();
+            const teamName = (meta.teamName || "").toLowerCase();
+            const positionTitle = (meta.positionTitle || "").toLowerCase();
             const body = (meta.fullMessage || item.body || "").toLowerCase();
             const commEmail = (meta.communicationEmail || "").toLowerCase();
             const college = (senderProfile.college || meta.college || "").toLowerCase();
@@ -287,19 +302,28 @@ export const NotificationsView: React.FC = () => {
                 senderName.includes(q) ||
                 username.includes(q) ||
                 company.includes(q) ||
+                clubName.includes(q) ||
+                teamName.includes(q) ||
+                positionTitle.includes(q) ||
                 body.includes(q) ||
                 commEmail.includes(q) ||
                 college.includes(q)
             );
         });
-    }, [notifications, filter, searchQuery, isPendingConnectionRequest]);
+    }, [notifications, filter, searchQuery, isPendingConnectionRequest, isClubTeamInvitation]);
 
     const activeItem = useMemo(() => {
         return notifications.find((n) => n.id === selectedId) || filteredNotifications[0] || null;
     }, [notifications, selectedId, filteredNotifications]);
 
     const totalCount = notifications.length;
-    const requestsCount = notifications.filter(isPendingConnectionRequest).length;
+    const requestsCount = notifications.filter((item) => {
+        return (
+            isPendingConnectionRequest(item) ||
+            (isClubTeamInvitation(item) &&
+                (item.metadata?.invitationStatus === "pending" || !item.metadata?.invitationStatus))
+        );
+    }).length;
     const inquiryCount = notifications.filter(
         (n) => n.type === "hire_inquiry" || (n as any).notification_type === "hire_inquiry"
     ).length;
@@ -416,6 +440,7 @@ export const NotificationsView: React.FC = () => {
                                 const isConnReq = isPendingConnectionRequest(item);
                                 const isConnAccepted = isConnectionAcceptedItem(item);
                                 const isConnInteraction = isConnectionInteraction(item);
+                                const isTeamInv = isClubTeamInvitation(item);
                                 const isHire =
                                     item.type === "hire_inquiry" ||
                                     (item as any).notification_type === "hire_inquiry";
@@ -423,23 +448,34 @@ export const NotificationsView: React.FC = () => {
                                 const meta = item.metadata || {};
                                 const senderProfile = meta.senderProfile || {};
 
+                                const invStatus = meta.invitationStatus || "pending";
+                                const isPendingTeamInv = isTeamInv && invStatus === "pending";
+                                const isAcceptedTeamInv = isTeamInv && invStatus === "accepted";
+                                const isDeclinedTeamInv = isTeamInv && invStatus === "declined";
+
                                 const senderDisplayName =
-                                    senderProfile.displayName ||
-                                    meta.displayName ||
-                                    meta.senderName ||
-                                    (isConnInteraction ? "Developer" : item.title || "Inquiry");
+                                    isTeamInv
+                                        ? (meta.clubName || "Club Team Invitation")
+                                        : (senderProfile.displayName ||
+                                           meta.displayName ||
+                                           meta.senderName ||
+                                           (isConnInteraction ? "Developer" : item.title || "Inquiry"));
 
                                 const senderAvatar =
-                                    senderProfile.avatarUrl ||
-                                    meta.avatarUrl ||
-                                    DEFAULT_AVATAR_URL;
+                                    isTeamInv
+                                        ? (meta.clubLogoUrl || DEFAULT_AVATAR_URL)
+                                        : (senderProfile.avatarUrl ||
+                                           meta.avatarUrl ||
+                                           DEFAULT_AVATAR_URL);
 
                                 const senderUsername =
-                                    senderProfile.username ||
-                                    meta.username ||
-                                    "";
+                                    isTeamInv
+                                        ? (meta.positionTitle ? `${meta.positionTitle}${meta.teamName ? ` · ${meta.teamName}` : ""}` : "")
+                                        : (senderProfile.username ||
+                                           meta.username ||
+                                           "");
 
-                                const snippet = meta.fullMessage || item.body || "";
+                                const snippet = meta.message || meta.fullMessage || item.body || "";
 
                                 return (
                                     <div
@@ -472,6 +508,11 @@ export const NotificationsView: React.FC = () => {
                                                         <UserCheck className="w-2.5 h-2.5 text-black stroke-[3]" />
                                                     </div>
                                                 )}
+                                                {isTeamInv && (
+                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black text-[#a2ff86] border border-black flex items-center justify-center">
+                                                        <Users className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Sender & Preview */}
@@ -495,6 +536,26 @@ export const NotificationsView: React.FC = () => {
                                                         </span>
                                                     )}
 
+                                                    {isTeamInv && isPendingTeamInv && (
+                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
+                                                            <Users className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                            <span>Team Invitation</span>
+                                                        </span>
+                                                    )}
+
+                                                    {isTeamInv && isAcceptedTeamInv && (
+                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
+                                                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                                            <span>Joined Team</span>
+                                                        </span>
+                                                    )}
+
+                                                    {isTeamInv && isDeclinedTeamInv && (
+                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-neutral-200 text-neutral-700 border border-black">
+                                                            Declined
+                                                        </span>
+                                                    )}
+
                                                     {isHire && meta.company && (
                                                         <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] truncate max-w-[130px]">
                                                             {meta.company}
@@ -505,7 +566,7 @@ export const NotificationsView: React.FC = () => {
                                                 {/* Handle and snippet */}
                                                 {senderUsername && (
                                                     <span className="text-[11px] font-mono font-bold text-neutral-500 block truncate">
-                                                        @{senderUsername}
+                                                        {isTeamInv ? senderUsername : `@${senderUsername}`}
                                                     </span>
                                                 )}
 
@@ -600,6 +661,317 @@ export const NotificationsView: React.FC = () => {
                                 senderProfile.id ||
                                 meta.actorId ||
                                 senderUsername;
+
+                            // -------------------------------------------------------------
+                            // CASE 0: CLUB TEAM INVITATION (CONSENT-BASED INVITATION)
+                            // -------------------------------------------------------------
+                            if (isClubTeamInvitation(activeItem)) {
+                                const clubName = meta.clubName || "Collegiate Club";
+                                const clubSlug = meta.clubSlug || "";
+                                const clubLogo = meta.clubLogoUrl || null;
+                                const collegeName = meta.collegeName || "Collegiate Institution";
+                                const teamName = meta.teamName || "Club Wide";
+                                const positionTitle = meta.positionTitle || "Member";
+                                const clubRole = meta.clubRole || "member";
+                                const teamRole = meta.teamRole || "member";
+                                const inviterName = meta.inviterName || "Club Management";
+                                const inviterUsername = meta.inviterUsername || "";
+                                const inviterAvatar = meta.inviterAvatarUrl || DEFAULT_AVATAR_URL;
+                                const invitationMessage = meta.message || null;
+                                const expiresAt = meta.expiresAt || null;
+                                const invitationId = meta.invitationId || "";
+                                const invStatus = meta.invitationStatus || "pending";
+                                const isPending = invStatus === "pending";
+                                const isAccepted = invStatus === "accepted";
+                                const isDeclined = invStatus === "declined";
+                                const isActing = actingInvitationId === invitationId;
+
+                                const isExpired = expiresAt && new Date(expiresAt).getTime() < Date.now();
+
+                                return (
+                                    <div className="flex-1 flex flex-col p-5 sm:p-6 space-y-5">
+                                        {/* Detail Top Header */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b-2 border-black/10">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                {/* Club Logo */}
+                                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-emerald-100 border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center font-black text-xl">
+                                                    {clubLogo ? (
+                                                        <img
+                                                            src={clubLogo}
+                                                            alt={clubName}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    ) : (
+                                                        clubName.slice(0, 2).toUpperCase()
+                                                    )}
+                                                </div>
+
+                                                <div className="min-w-0 space-y-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h3 className="text-lg sm:text-xl font-black text-black tracking-tight truncate">
+                                                            {clubName}
+                                                        </h3>
+                                                        <span className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-0.5 rounded-full bg-emerald-300 text-black border border-black shadow-[1px_1px_0px_#000] shrink-0">
+                                                            <ShieldCheck className="w-3.5 h-3.5" />
+                                                            <span>Verified Club</span>
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                                                        <span className="font-bold text-neutral-600 flex items-center gap-1">
+                                                            <Building2 className="w-3.5 h-3.5 text-neutral-400" />
+                                                            <span>{collegeName}</span>
+                                                        </span>
+                                                        <span className="text-neutral-400">•</span>
+                                                        <span className="text-neutral-500 font-mono font-bold text-[11px]">
+                                                            Received {formatFullDateTime(activeItem.createdAt)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Quick Actions Top Right */}
+                                            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                                                {clubSlug && (
+                                                    <Link
+                                                        to={`/clubs/${clubSlug}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                                    >
+                                                        <span>Club Page</span>
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                    </Link>
+                                                )}
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDelete(e, activeItem.id)}
+                                                    disabled={deletingId === activeItem.id}
+                                                    className="p-2 rounded-xl border-2 border-black bg-white text-black hover:text-rose-600 hover:bg-rose-50 shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
+                                                    title="Delete notification"
+                                                >
+                                                    {deletingId === activeItem.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                    ) : (
+                                                        <Trash2 className="w-4 h-4 stroke-[2]" />
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Team Invitation Summary Banner */}
+                                        <div className="p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
+                                            <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                                                <span className="text-[11px] font-black uppercase font-mono tracking-wider text-neutral-600 flex items-center gap-1.5">
+                                                    <Users className="w-3.5 h-3.5 text-black" />
+                                                    <span>Team Role & Department Offer</span>
+                                                </span>
+                                                {isPending && !isExpired && (
+                                                    <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                                        Action Required
+                                                    </span>
+                                                )}
+                                                {isAccepted && (
+                                                    <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
+                                                        <Check className="w-3 h-3 stroke-[3]" />
+                                                        <span>Accepted</span>
+                                                    </span>
+                                                )}
+                                                {isDeclined && (
+                                                    <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-neutral-200 text-neutral-700 border border-black">
+                                                        Declined
+                                                    </span>
+                                                )}
+                                                {isExpired && (
+                                                    <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-black">
+                                                        Expired
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* 4 Cards Assessment Grid */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                {/* Assigned Department */}
+                                                <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-sky-100 border border-black flex items-center justify-center shrink-0">
+                                                        <Building2 className="w-4 h-4 text-black stroke-[2]" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                                                            Department / Team
+                                                        </span>
+                                                        <span className="text-xs font-black text-black truncate block">
+                                                            {teamName}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Position Title */}
+                                                <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-[#a2ff86] border border-black flex items-center justify-center shrink-0">
+                                                        <Users className="w-4 h-4 text-black stroke-[2]" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                                                            Position Title
+                                                        </span>
+                                                        <span className="text-xs font-black text-black truncate block">
+                                                            {positionTitle}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Access Role */}
+                                                <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-purple-100 border border-black flex items-center justify-center shrink-0">
+                                                        <ShieldCheck className="w-4 h-4 text-black stroke-[2]" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                                                            Club Access Level
+                                                        </span>
+                                                        <span className="text-xs font-black text-black truncate block capitalize">
+                                                            {clubRole.replace("_", " ")} {teamRole !== "member" ? `(${teamRole.replace("_", " ")})` : ""}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Invited By */}
+                                                <div className="p-3 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-2.5">
+                                                    <div className="w-8 h-8 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shrink-0 overflow-hidden">
+                                                        <img src={inviterAvatar} alt={inviterName} className="w-full h-full object-cover" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <span className="block text-[10px] font-mono font-bold text-neutral-500 uppercase">
+                                                            Invited By
+                                                        </span>
+                                                        <span className="text-xs font-black text-black truncate block">
+                                                            {inviterName} {inviterUsername ? `(@${inviterUsername})` : ""}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Personal message from manager if provided */}
+                                            {invitationMessage && (
+                                                <div className="p-3.5 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] space-y-1">
+                                                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-neutral-500 block">
+                                                        Note from Manager
+                                                    </span>
+                                                    <p className="text-xs text-neutral-800 font-medium leading-relaxed italic">
+                                                        "{invitationMessage}"
+                                                    </p>
+                                                </div>
+                                            )}
+
+                                            {/* Expiry note */}
+                                            {expiresAt && isPending && (
+                                                <div className="flex items-center gap-2 text-[11px] font-mono text-neutral-600">
+                                                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                                                    <span>Invitation expires on {formatFullDateTime(expiresAt)}</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Explanatory consent note */}
+                                        <div className="p-4 rounded-xl bg-[#FAF6EE]/60 border-2 border-black/20 text-xs font-medium text-neutral-700 leading-relaxed space-y-1">
+                                            <p className="font-bold text-black">
+                                                What happens next?
+                                            </p>
+                                            <p>
+                                                Orbix uses a permissioned consent workflow. Accepting this invitation adds you directly to{" "}
+                                                <span className="font-black text-black">{clubName}</span> as an active {positionTitle}.
+                                                You will appear in the public club directory and gain internal team collaboration access.
+                                            </p>
+                                        </div>
+
+                                        {/* Bottom Decision Footer */}
+                                        {isPending && !isExpired && (
+                                            <div className="mt-auto p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                <div className="space-y-0.5">
+                                                    <span className="text-xs font-black text-black uppercase tracking-wider block">
+                                                        Membership Decision
+                                                    </span>
+                                                    <span className="text-xs text-neutral-600 font-medium block">
+                                                        Accept to activate your membership or decline to dismiss the request.
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center gap-2.5 self-end sm:self-auto">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDeclineTeamInvitation(activeItem.id, invitationId)}
+                                                        disabled={isActing}
+                                                        className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-neutral-800 font-bold text-xs border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer disabled:opacity-50"
+                                                    >
+                                                        Decline
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleAcceptTeamInvitation(activeItem.id, invitationId)}
+                                                        disabled={isActing}
+                                                        className="px-5 py-2 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                                                    >
+                                                        {isActing ? (
+                                                            <>
+                                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                                <span>Processing...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                                                <span>Accept Invitation</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {isAccepted && (
+                                            <div className="mt-auto p-4 rounded-2xl bg-[#a2ff86]/30 border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                <div className="space-y-0.5">
+                                                    <span className="text-xs font-black text-black uppercase tracking-wider flex items-center gap-1.5">
+                                                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                                        <span>You are a member of {clubName}</span>
+                                                    </span>
+                                                    <span className="text-xs text-neutral-700 font-medium block">
+                                                        Your position is registered as {positionTitle} ({teamName}).
+                                                    </span>
+                                                </div>
+                                                {clubSlug && (
+                                                    <Link
+                                                        to={`/clubs/${clubSlug}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all"
+                                                    >
+                                                        <span>Open Club Page</span>
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                    </Link>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {isDeclined && (
+                                            <div className="mt-auto p-4 rounded-2xl bg-neutral-100 border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between gap-4">
+                                                <span className="text-xs font-bold text-neutral-600">
+                                                    You declined this invitation to join {clubName}.
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {isExpired && isPending && (
+                                            <div className="mt-auto p-4 rounded-2xl bg-rose-50 border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-between gap-4">
+                                                <span className="text-xs font-bold text-rose-700">
+                                                    This invitation expired and can no longer be accepted. Contact the club manager to send a new one.
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            }
 
                             // -------------------------------------------------------------
                             // CASE A: DEVELOPER RELATIONSHIP / CONNECTION INTERACTION

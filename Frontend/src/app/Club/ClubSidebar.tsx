@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import {
     LayoutDashboard,
-    Users,
     CalendarDays,
     ShieldCheck,
     Edit3,
@@ -21,14 +20,11 @@ interface ClubSidebarProps {
         college_name: string;
         logo_url: string | null;
     };
-    activeSegment: "dashboard" | "team";
-    onSegmentChange: (segment: "dashboard" | "team") => void;
-    activeTab?: "overview" | "profile" | "events";
-    onTabChange?: (tab: "overview" | "profile" | "events") => void;
+    activeTab: "overview" | "profile" | "events";
+    onTabChange: (tab: "overview" | "profile" | "events") => void;
     isOpen: boolean;
     onClose: () => void;
     unreadInboxCount?: number;
-    teamPendingCount?: number;
     eventsCount?: number;
     onOpenInbox: () => void;
     onSignOut: () => void;
@@ -36,14 +32,11 @@ interface ClubSidebarProps {
 
 export const ClubSidebar = ({
     club,
-    activeSegment,
-    onSegmentChange,
-    activeTab = "overview",
+    activeTab,
     onTabChange,
     isOpen = false,
     onClose,
     unreadInboxCount = 0,
-    teamPendingCount = 0,
     eventsCount = 0,
     onOpenInbox,
     onSignOut,
@@ -101,8 +94,7 @@ export const ClubSidebar = ({
                     <button
                         type="button"
                         onClick={() => {
-                            onSegmentChange("dashboard");
-                            if (onTabChange) onTabChange("overview");
+                            onTabChange("overview");
                             if (onClose) onClose();
                         }}
                         className={`flex items-center group cursor-pointer overflow-x-hidden ${
@@ -141,17 +133,17 @@ export const ClubSidebar = ({
                     )}
                 </div>
 
-                {/* Main Navigation Items: Exactly 2 primary segments - Dashboard and Team */}
+                {/* Main Navigation Items: Dashboard, Events, and Manage Profile */}
                 <div className="pt-3.5 space-y-1.5 overflow-x-hidden">
-                    {/* Item 1: Dashboard */}
+                    {/* Item 1: Dashboard Overview */}
                     <button
                         type="button"
                         onClick={() => {
-                            onSegmentChange("dashboard");
+                            onTabChange("overview");
                             if (onClose) onClose();
                         }}
                         className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer overflow-x-hidden relative w-full ${
-                            activeSegment === "dashboard"
+                            activeTab === "overview"
                                 ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
@@ -160,7 +152,7 @@ export const ClubSidebar = ({
                         {/* Active vertical accent bar */}
                         <span
                             className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                activeSegment === "dashboard" && isExpanded
+                                activeTab === "overview" && isExpanded
                                     ? "bg-[#a2ff86] opacity-100"
                                     : "bg-transparent opacity-0"
                             }`}
@@ -169,35 +161,20 @@ export const ClubSidebar = ({
                         <div className="flex items-center overflow-x-hidden w-full">
                             {/* SVG Icon: DEAD-CENTER in 44px container */}
                             <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                <span
-                                    className={`w-5 h-5 flex items-center justify-center transition-colors ${
-                                        activeSegment === "dashboard"
+                                <LayoutDashboard
+                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                                        activeTab === "overview"
                                             ? "text-[#a2ff86]"
                                             : "text-neutral-700 group-hover:text-black"
                                     }`}
-                                >
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        className="w-5 h-5 flex-shrink-0"
-                                        viewBox="0 0 24 24"
-                                    >
-                                        <path
-                                            fill="none"
-                                            stroke="currentColor"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                            strokeWidth={2}
-                                            d="M2 5a2 2 0 0 1 2-2h6v18H4a2 2 0 0 1-2-2zm12-2h6a2 2 0 0 1 2 2v5h-8zm0 11h8v5a2 2 0 0 1-2 2h-6z"
-                                        />
-                                    </svg>
-                                </span>
+                                />
                             </div>
 
                             {/* Text label only rendered when expanded */}
                             {isExpanded && (
                                 <span
                                     className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${
-                                        activeSegment === "dashboard"
+                                        activeTab === "overview"
                                             ? "text-[#a2ff86] font-black"
                                             : "text-neutral-800 font-bold"
                                     }`}
@@ -208,24 +185,23 @@ export const ClubSidebar = ({
                         </div>
                     </button>
 
-                    {/* Item 2: Team */}
+                    {/* Item 2: Events Section */}
                     <button
                         type="button"
                         onClick={() => {
-                            onSegmentChange("team");
+                            onTabChange("events");
                             if (onClose) onClose();
                         }}
                         className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer overflow-x-hidden relative w-full ${
-                            activeSegment === "team"
+                            activeTab === "events"
                                 ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
-                        title={!isExpanded ? "Team" : undefined}
+                        title={!isExpanded ? "Events" : undefined}
                     >
-                        {/* Active vertical accent bar */}
                         <span
                             className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                activeSegment === "team" && isExpanded
+                                activeTab === "events" && isExpanded
                                     ? "bg-[#a2ff86] opacity-100"
                                     : "bg-transparent opacity-0"
                             }`}
@@ -233,9 +209,9 @@ export const ClubSidebar = ({
 
                         <div className="flex items-center overflow-x-hidden w-full">
                             <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                <Users
-                                    className={`w-5 h-5 transition-colors stroke-[2.2] ${
-                                        activeSegment === "team"
+                                <CalendarDays
+                                    className={`w-5 h-5 transition-colors ${
+                                        activeTab === "events"
                                             ? "text-[#a2ff86]"
                                             : "text-neutral-700 group-hover:text-black"
                                     }`}
@@ -246,25 +222,72 @@ export const ClubSidebar = ({
                                 <div className="flex items-center justify-between flex-1 pr-2.5 overflow-x-hidden animate-fadeIn">
                                     <span
                                         className={`whitespace-nowrap truncate pl-0.5 ${
-                                            activeSegment === "team"
+                                            activeTab === "events"
                                                 ? "text-[#a2ff86] font-black"
                                                 : "text-neutral-800 font-bold"
                                         }`}
                                     >
-                                        Team
+                                        Events
                                     </span>
-                                    {teamPendingCount !== undefined && teamPendingCount > 0 && (
+                                    {eventsCount !== undefined && eventsCount > 0 && (
                                         <span
                                             className={`px-2 py-0.5 rounded-full text-[10px] font-black border border-black ${
-                                                activeSegment === "team"
+                                                activeTab === "events"
                                                     ? "bg-[#a2ff86] text-black"
                                                     : "bg-[#FFE566] text-black shadow-[1px_1px_0px_#000]"
                                             }`}
                                         >
-                                            {teamPendingCount}
+                                            {eventsCount}
                                         </span>
                                     )}
                                 </div>
+                            )}
+                        </div>
+                    </button>
+
+                    {/* Item 3: Manage Profile */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onTabChange("profile");
+                            if (onClose) onClose();
+                        }}
+                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer overflow-x-hidden relative w-full ${
+                            activeTab === "profile"
+                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
+                        }`}
+                        title={!isExpanded ? "Manage Profile" : undefined}
+                    >
+                        <span
+                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
+                                activeTab === "profile" && isExpanded
+                                    ? "bg-[#a2ff86] opacity-100"
+                                    : "bg-transparent opacity-0"
+                            }`}
+                        />
+
+                        <div className="flex items-center overflow-x-hidden w-full">
+                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                <Edit3
+                                    className={`w-5 h-5 transition-colors ${
+                                        activeTab === "profile"
+                                            ? "text-[#a2ff86]"
+                                            : "text-neutral-700 group-hover:text-black"
+                                    }`}
+                                />
+                            </div>
+
+                            {isExpanded && (
+                                <span
+                                    className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${
+                                        activeTab === "profile"
+                                            ? "text-[#a2ff86] font-black"
+                                            : "text-neutral-800 font-bold"
+                                    }`}
+                                >
+                                    Manage Profile
+                                </span>
                             )}
                         </div>
                     </button>
@@ -281,103 +304,65 @@ export const ClubSidebar = ({
                     aria-expanded={isProfileMenuOpen}
                     aria-haspopup="menu"
                 >
-                    <div
-                        className={`flex items-center overflow-hidden w-full ${
-                            isExpanded ? "justify-start" : "justify-center"
-                        }`}
-                    >
-                        {/* Circular Avatar: Prominent & Centered with segmented ring */}
-                        <div className="flex items-center justify-center flex-shrink-0">
-                            <div className="relative flex-shrink-0 w-12 h-12 sm:w-[50px] sm:h-[50px]">
-                                {/* Segmented outer ring matching Personal Account */}
-                                <div
-                                    className="absolute inset-0 rounded-full"
-                                    style={{
-                                        background: `
-                                            conic-gradient(
-                                                from -75deg,
-                                                #C084FC 0deg 98deg,
-                                                #000000 98deg 103deg,
-                                                #38BDF8 103deg 190deg,
-                                                #000000 190deg 195deg,
-                                                #ff80d7ff 195deg 355deg,
-                                                #000000 355deg 360deg
-                                            )
-                                        `,
-                                        padding: "2.5px",
-                                    }}
-                                >
-                                    <div className="w-full h-full rounded-full bg-black p-[2px]">
-                                        <div className="w-full h-full rounded-full overflow-hidden bg-white border border-black flex items-center justify-center font-black text-xs text-neutral-900">
-                                            {club.logo_url ? (
-                                                <img
-                                                    src={club.logo_url}
-                                                    alt={club.name}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full bg-[#FAF6EE] flex items-center justify-center font-black text-xs text-black">
-                                                    {club.name.slice(0, 2).toUpperCase()}
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Unread badge if any */}
-                                {unreadInboxCount > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 flex h-3.5 w-3.5">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#FF6B6B] opacity-75" />
-                                        <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-[#FF6B6B] border border-black" />
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Name & College Details when expanded */}
-                        {isExpanded && (
-                            <div className="min-w-0 flex-1 overflow-hidden animate-fadeIn pl-2.5">
-                                <div className="flex items-center gap-1">
-                                    <h4 className="text-xs sm:text-sm font-black text-black whitespace-nowrap truncate group-hover:text-black">
-                                        {club.name}
-                                    </h4>
-                                    <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
-                                </div>
-                                <p className="text-[11px] font-bold text-neutral-600 whitespace-nowrap truncate">
-                                    {club.college_name}
-                                </p>
-                            </div>
-                        )}
-
-                        {isExpanded && (
-                            <div className="text-black transition-colors p-1 flex-shrink-0 pr-2 ml-auto">
-                                <ChevronDown
-                                    className={`w-4 h-4 transition-transform duration-200 stroke-[2.5] ${
-                                        isProfileMenuOpen ? "rotate-180" : ""
-                                    }`}
+                    {/* Fixed 44px container centering the club logo / initials avatar */}
+                    <div className="w-11 h-11 flex items-center justify-center flex-shrink-0 pl-0.5">
+                        <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center font-black text-black overflow-hidden relative group-hover:scale-105 transition-transform">
+                            {club.logo_url ? (
+                                <img
+                                    src={club.logo_url}
+                                    alt={club.name}
+                                    className="w-full h-full object-cover"
                                 />
-                            </div>
-                        )}
+                            ) : (
+                                <span className="text-xs tracking-tight">
+                                    {club.name.slice(0, 2).toUpperCase()}
+                                </span>
+                            )}
+                        </div>
                     </div>
+
+                    {/* Metadata text & Chevron: only rendered when sidebar is expanded */}
+                    {isExpanded && (
+                        <div className="flex items-center justify-between flex-1 min-w-0 pr-1 pl-2.5 animate-fadeIn">
+                            <div className="flex flex-col min-w-0 pr-2">
+                                <span className="text-xs font-black text-black leading-snug truncate">
+                                    {club.name}
+                                </span>
+                                <span className="text-[10px] font-bold text-neutral-600 truncate">
+                                    {club.college_name}
+                                </span>
+                            </div>
+                            <ChevronDown
+                                className={`w-4 h-4 text-black transition-transform duration-200 flex-shrink-0 ${
+                                    isProfileMenuOpen ? "rotate-180" : ""
+                                }`}
+                            />
+                        </div>
+                    )}
                 </button>
 
                 {/* Profile Popup Menu */}
                 {isProfileMenuOpen && (
                     <div
                         role="menu"
-                        className="absolute bottom-full mb-2 left-0 right-0 p-2 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[6px_6px_0px_#000] z-50 animate-fadeIn text-xs text-black"
+                        className="absolute bottom-full left-0 mb-2 w-64 bg-[#FAF6EE] border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-2 z-50 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150"
                     >
-                        <div className="px-3 py-2 border-b-2 border-black/15 mb-1.5">
-                            <p className="font-black text-black truncate">{club.name}</p>
-                            <p className="text-[11px] font-bold text-neutral-600 truncate">{club.college_name}</p>
+                        {/* Club Details Header in Popup */}
+                        <div className="px-3 py-2 border-b-2 border-black/15 mb-1.5 bg-white/80 rounded-xl">
+                            <p className="font-black text-black text-sm truncate flex items-center gap-1.5">
+                                <span>{club.name}</span>
+                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            </p>
+                            <p className="text-[10px] font-bold text-neutral-600 truncate mt-0.5">
+                                {club.college_name}
+                            </p>
                         </div>
 
                         <button
                             type="button"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
-                                onSegmentChange("dashboard");
-                                if (onTabChange) onTabChange("overview");
+                                onTabChange("overview");
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
@@ -389,27 +374,7 @@ export const ClubSidebar = ({
                             type="button"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
-                                onSegmentChange("team");
-                            }}
-                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <Users className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                <span className="truncate">Team Workspace</span>
-                            </div>
-                            {teamPendingCount !== undefined && teamPendingCount > 0 && (
-                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#FFE566] text-black border border-black min-w-[18px] text-center leading-none">
-                                    {teamPendingCount}
-                                </span>
-                            )}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setIsProfileMenuOpen(false);
-                                onSegmentChange("dashboard");
-                                if (onTabChange) onTabChange("events");
+                                onTabChange("events");
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
@@ -421,13 +386,12 @@ export const ClubSidebar = ({
                             type="button"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
-                                onSegmentChange("dashboard");
-                                if (onTabChange) onTabChange("profile");
+                                onTabChange("profile");
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
                             <Edit3 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Edit Club Profile</span>
+                            <span className="truncate">Manage Profile</span>
                         </button>
 
                         <button
@@ -443,7 +407,7 @@ export const ClubSidebar = ({
                                 <span className="truncate">Club Inbox</span>
                             </div>
                             {unreadInboxCount > 0 && (
-                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#FF6B6B] text-black border border-black min-w-[18px] text-center leading-none">
+                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#FF6B6B] text-black border border-black shadow-[1px_1px_0px_#000]">
                                     {unreadInboxCount}
                                 </span>
                             )}
@@ -457,10 +421,10 @@ export const ClubSidebar = ({
                                 setIsProfileMenuOpen(false);
                                 onSignOut();
                             }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-700 font-black hover:bg-rose-100/60 transition-colors cursor-pointer text-left"
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-rose-600 font-black hover:bg-rose-50 transition-colors text-left cursor-pointer"
                         >
-                            <LogOut className="w-3.5 h-3.5 text-rose-700 flex-shrink-0 stroke-[2.5]" />
-                            <span className="truncate">Sign out</span>
+                            <LogOut className="w-3.5 h-3.5 stroke-[2.5] flex-shrink-0" />
+                            <span className="truncate">Sign Out</span>
                         </button>
                     </div>
                 )}
@@ -470,27 +434,18 @@ export const ClubSidebar = ({
 
     return (
         <>
-            {/* Desktop Fixed Floating Sidebar:
-                Fixed-width placeholder rail keeps dashboard width 100% static so UI never hangs or reflows.
-                The expanding aside floats on top (absolute top-3 left-3 z-50).
-            */}
-            <div className="hidden lg:block h-screen sticky top-0 flex-shrink-0 w-[84px] sm:w-[88px] z-40 relative">
+            {/* Desktop persistent sidebar */}
+            <div className="hidden lg:block relative z-40 w-[68px] sm:w-[72px] flex-shrink-0 h-full">
                 {sidebarContent}
             </div>
 
-            {/* Mobile Responsive Slide-Over Drawer */}
+            {/* Mobile overlay and backdrop */}
             {isOpen && (
-                <div className="fixed inset-0 z-50 lg:hidden flex">
-                    {/* Backdrop */}
-                    <div
-                        onClick={onClose}
-                        className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity animate-fadeIn"
-                    />
-
-                    {/* Drawer Content */}
-                    <div className="relative z-50 p-3 h-full max-w-xs animate-slideRight">
-                        {sidebarContent}
-                    </div>
+                <div
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 lg:hidden"
+                    onClick={onClose}
+                >
+                    <div onClick={(e) => e.stopPropagation()}>{sidebarContent}</div>
                 </div>
             )}
         </>

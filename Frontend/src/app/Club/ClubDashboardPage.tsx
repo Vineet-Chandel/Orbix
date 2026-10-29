@@ -482,7 +482,7 @@ export default function ClubDashboardPage() {
 
     return (
         <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
-            {/* Club Sidebar — Dashboard, Events, and Manage Profile Navigation */}
+            {/* Club Sidebar — Dashboard, Events, and Manage Profile */}
             <ClubSidebar
                 club={club}
                 activeTab={activeTab}
