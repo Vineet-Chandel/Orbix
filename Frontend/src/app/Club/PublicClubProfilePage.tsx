@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
+import { OrbixLogo } from "../../components/OrbixLogo";
 import {
     ShieldCheck,
     Building2,
@@ -150,6 +151,7 @@ export default function PublicClubProfilePage() {
                         className="flex items-center gap-2 group text-xs font-black uppercase tracking-wider text-neutral-600 hover:text-black"
                     >
                         <ArrowLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" />
+                        <OrbixLogo className="w-4 h-4 text-black flex-shrink-0" />
                         <span>Orbix</span>
                     </Link>
                     <span className="text-neutral-300">/</span>
@@ -452,10 +454,11 @@ export default function PublicClubProfilePage() {
 
             {/* Footer */}
             <footer className="w-full py-6 text-center text-xs font-bold text-neutral-500 border-t-2 border-black/10 bg-white select-none">
-                <div className="flex items-center justify-center gap-1.5">
+                <div className="flex items-center justify-center gap-1.5 flex-wrap">
                     <span>Powered by</span>
-                    <Link to="/" className="font-black text-neutral-900 hover:underline">
-                        Orbix Club Platform
+                    <Link to="/" className="inline-flex items-center gap-1.5 font-black text-neutral-900 hover:underline">
+                        <OrbixLogo className="w-3.5 h-3.5 text-black flex-shrink-0" />
+                        <span>Orbix Club Platform</span>
                     </Link>
                     <span>• Verified Student Developer Ecosystem</span>
                 </div>

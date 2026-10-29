@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAppDispatch, clearUser } from "../../store";
 import { useToast } from "../../context/ToastContext";
+import { OrbixLogo } from "../../components/OrbixLogo";
 
 interface TimelineEvent {
     id: string;
@@ -47,6 +48,7 @@ interface ClubApplication {
     status: "pending" | "under_review" | "needs_information" | "rejected" | "ready_for_promotion" | "approved";
     submitted_at: string;
     updated_at: string;
+    reviewed_at?: string | null;
     verified_club_id?: string | null;
 }
 
@@ -57,6 +59,7 @@ interface VerifiedClub {
     category?: string;
     college_name?: string;
     logo_url?: string | null;
+    verified_at?: string | null;
 }
 
 const DEFAULT_STAGES: Array<{
@@ -279,7 +282,9 @@ export default function ClubStatusPage() {
         }
     };
 
-    // Compute dynamic stage representations from persisted timeline events
+    // Compute dynamic stage representations from application, verified club, and timeline events
+    const isApplicationApproved = application?.status === "approved" || !!verifiedClub;
+
     const resolvedStages = DEFAULT_STAGES.map((def) => {
         const matchingEvents = timelineEvents.filter((ev) => ev.stage === def.key);
         const latestEvent = matchingEvents[matchingEvents.length - 1];
@@ -290,8 +295,25 @@ export default function ClubStatusPage() {
         let actionRequired = latestEvent?.actionRequired || null;
         let timestamp = latestEvent?.createdAt || null;
 
-        // Fallback adjustments if database events haven't reached this stage
-        if (!latestEvent && application) {
+        // When application is approved, all verification stages are completed
+        if (isApplicationApproved) {
+            stageStatus = "completed";
+            if (def.key === "club_activated") {
+                stageTitle = "Club access activated";
+                stageMessage = "Your dedicated club dashboard and public profile are now live.";
+            } else if (def.key === "verification_decision") {
+                stageTitle = "Verification decision: Approved";
+                stageMessage = "Orbix reviewer verified all credentials and approved the application.";
+            } else if (def.key === "college_verification") {
+                stageTitle = "College verification completed";
+                stageMessage = "Institution recognition and representative authority confirmed.";
+            } else if (def.key === "initial_review") {
+                stageTitle = "Initial review completed";
+                stageMessage = "Application details and campus association validated.";
+            }
+            timestamp = timestamp || application?.reviewed_at || verifiedClub?.verified_at || application?.submitted_at || null;
+        } else if (!latestEvent && application) {
+            // Dynamic fallback if no events received
             if (def.key === "application_submitted") {
                 stageStatus = "completed";
                 timestamp = application.submitted_at;
@@ -333,8 +355,8 @@ export default function ClubStatusPage() {
                         className="flex items-center gap-2 group"
                         title="Orbix Home"
                     >
-                        <div className="w-8 h-8 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center font-black text-sm shadow-[1.5px_1.5px_0px_#000]">
-                            O
+                        <div className="w-8 h-8 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center p-1.5 shadow-[1.5px_1.5px_0px_#000] group-hover:scale-105 transition-transform flex-shrink-0">
+                            <OrbixLogo className="w-full h-full text-black" />
                         </div>
                         <span className="font-black text-lg tracking-tight text-black group-hover:text-neutral-700 transition-colors">
                             Orbix
@@ -545,9 +567,16 @@ export default function ClubStatusPage() {
                                             Each stage is backed by real persisted verification events from the database.
                                         </p>
                                     </div>
-                                    <span className="text-[11px] font-mono font-bold text-neutral-500">
-                                        5-Stage Verification Standard
-                                    </span>
+                                    <Link
+                                        to="/docs/club-verification-protocol"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-neutral-600 bg-neutral-100 hover:bg-neutral-200 px-2.5 py-1 rounded-full border border-black/15 transition-colors self-start sm:self-auto cursor-pointer"
+                                        title="View official documentation on Orbix club verification"
+                                    >
+                                        <span>5-Stage Verification Standard</span>
+                                        <ExternalLink className="w-3 h-3 text-neutral-600" />
+                                    </Link>
                                 </div>
 
                                 {/* 5 Stage Cards Grid */}

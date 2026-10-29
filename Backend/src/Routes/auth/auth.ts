@@ -12,6 +12,7 @@ import { authenticate } from '../../middlewares/auth.middleware.js';
 import { handleSavePortals, handleGetSavedPortals } from '../portals/portals.js';
 import { handleGetMyProfile, parseLinks } from '../profile/profile.js';
 import { EmailVerificationService } from '../../services/email/emailVerificationService.js';
+import { enrichUserWithClubData } from '../../services/club/clubEnrichmentService.js';
 import { time } from 'node:console';
 const authRouter = express.Router();
 
@@ -94,6 +95,22 @@ authRouter.post('/signup/send-email-otp', async (req: Request, res: Response) =>
                 return res.status(409).json({
                     success: false,
                     message: "This username is already taken. Please choose a different username."
+                });
+            }
+        }
+
+        // 2b. Pre-check: If phone number provided, is it taken?
+        const rawPhone = req.body?.phone;
+        if (rawPhone && typeof rawPhone === "string" && rawPhone.trim()) {
+            const normalizedPhone = rawPhone.trim();
+            const existingPhoneResult = await query(
+                `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
+                [normalizedPhone]
+            );
+            if (existingPhoneResult.rows.length > 0) {
+                return res.status(409).json({
+                    success: false,
+                    message: "This mobile phone number is already registered to another Orbix account."
                 });
             }
         }
@@ -508,29 +525,8 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
         );
         safeUser.platforms = linksResult.rows || [];
 
-        // Enrich club status & verified club details if club account
-        if (user.accountType === "club" || (user as any).account_type === "club") {
-            try {
-                const verifiedClubRes = await query(
-                    `SELECT id, name, slug, category, college_name, logo_url, is_active FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
-                    [user.id]
-                );
-                if (verifiedClubRes.rows[0]) {
-                    safeUser.verifiedClub = verifiedClubRes.rows[0];
-                    safeUser.clubStatus = "approved";
-                } else {
-                    const reqRes = await query(
-                        `SELECT id, status, club_name, submitted_at FROM club_verification_requests WHERE auth_user_id = $1 ORDER BY submitted_at DESC LIMIT 1;`,
-                        [user.id]
-                    );
-                    safeUser.clubStatus = reqRes.rows[0]?.status || "pending";
-                    safeUser.clubName = reqRes.rows[0]?.club_name || null;
-                    safeUser.application = reqRes.rows[0] || null;
-                }
-            } catch (clubErr) {
-                console.warn("Notice: club signin enrichment warning:", clubErr);
-            }
-        }
+        // Enrich club status & verified club details for all accounts
+        await enrichUserWithClubData(safeUser, user.id);
 
         await resetSigninFailures({ email: validatedData.gmail, ip: req.ip || "unknown" });
 
@@ -730,29 +726,8 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
         );
         safeUser.platforms = linksResult.rows || [];
 
-        // Enrich club status & verified club details if club account
-        if (user.accountType === "club" || (user as any).account_type === "club") {
-            try {
-                const verifiedClubRes = await query(
-                    `SELECT id, name, slug, category, college_name, logo_url, is_active FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
-                    [user.id]
-                );
-                if (verifiedClubRes.rows[0]) {
-                    safeUser.verifiedClub = verifiedClubRes.rows[0];
-                    safeUser.clubStatus = "approved";
-                } else {
-                    const reqRes = await query(
-                        `SELECT id, status, club_name, submitted_at FROM club_verification_requests WHERE auth_user_id = $1 ORDER BY submitted_at DESC LIMIT 1;`,
-                        [user.id]
-                    );
-                    safeUser.clubStatus = reqRes.rows[0]?.status || "pending";
-                    safeUser.clubName = reqRes.rows[0]?.club_name || null;
-                    safeUser.application = reqRes.rows[0] || null;
-                }
-            } catch (clubErr) {
-                console.warn("Notice: club signin enrichment warning:", clubErr);
-            }
-        }
+        // Enrich club status & verified club details for all accounts
+        await enrichUserWithClubData(safeUser, user.id);
 
         await userDetailsCache({ ...user, id: user.id });
 

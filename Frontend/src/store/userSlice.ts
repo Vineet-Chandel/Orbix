@@ -10,6 +10,8 @@ export interface User {
     termsAccepted?: boolean | string;
     accountType?: "personal" | "club" | "admin" | string;
     clubStatus?: "pending" | "under_review" | "needs_information" | "rejected" | "ready_for_promotion" | "approved" | "none" | string;
+    clubName?: string | null;
+    clubId?: string | null;
     verifiedClub?: {
         id: string;
         name: string;

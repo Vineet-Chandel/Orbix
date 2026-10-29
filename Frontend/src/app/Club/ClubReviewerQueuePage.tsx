@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { NeoSelect } from "../../components/NeoSelect";
+import { OrbixLogo } from "../../components/OrbixLogo";
 
 interface ReviewerApplication {
     id: string;
@@ -252,8 +253,8 @@ export default function ClubReviewerQueuePage() {
                         className="flex items-center gap-2 group"
                         title="Orbix Home"
                     >
-                        <div className="w-8 h-8 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center font-black text-sm shadow-[1.5px_1.5px_0px_#000]">
-                            O
+                        <div className="w-8 h-8 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center p-1.5 shadow-[1.5px_1.5px_0px_#000] group-hover:scale-105 transition-transform flex-shrink-0">
+                            <OrbixLogo className="w-full h-full text-black" />
                         </div>
                         <span className="font-black text-lg tracking-tight text-black group-hover:text-neutral-700 transition-colors">
                             Orbix Staff

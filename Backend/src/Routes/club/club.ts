@@ -3,7 +3,7 @@ import express, { type Request, type Response, type NextFunction } from "express
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { pool, query } from "../../database/client.js";
-import { authenticate } from "../../middlewares/auth.middleware.js";
+import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
 import { userDetailsCache } from "../../redis/cache/cache-auth.js";
 import { failsOccursSignup } from "../../redis/rate-limiters/rate-limiters-auth.js";
 import ClubRegistrationValidator, {
@@ -13,6 +13,20 @@ import { ValidationError } from "../../validators/SignupValidator.js";
 import { EmailVerificationService } from "../../services/email/emailVerificationService.js";
 import { PhoneVerificationService } from "../../services/sms/phoneVerificationService.js";
 import { normalizePhoneNumber } from "../../services/sms/smsGatewayService.js";
+import { enrichUserWithClubData } from "../../services/club/clubEnrichmentService.js";
+import {
+    getClubModerationState,
+    muteUserForClub,
+    unmuteUserForClub,
+    blockUserForClub,
+    unblockUserForClub,
+    listModeratedUsers,
+} from "../../services/club/clubModerationService.js";
+import {
+    sendMessageToClub,
+    sendClubReply,
+    checkClubMessageQuota,
+} from "../../services/club/clubInboxService.js";
 
 const clubRouter = express.Router();
 
@@ -47,37 +61,156 @@ export function generateSlug(text: string): string {
 /**
  * Record a persistent timeline event for an application.
  */
-export async function recordTimelineEvent({
-    applicationId,
-    authUserId,
-    stage,
-    status,
-    title,
-    message,
-    actionRequired,
-    isApplicantVisible = true,
-    actorId,
-}: {
-    applicationId: string;
-    authUserId: string;
-    stage: "application_submitted" | "initial_review" | "college_verification" | "verification_decision" | "club_activated";
-    status: "completed" | "in_progress" | "upcoming" | "action_required" | "rejected";
-    title: string;
-    message: string;
-    actionRequired?: string | null | undefined;
-    isApplicantVisible?: boolean | null | undefined;
-    actorId?: string | null | undefined;
-}) {
-    try {
-        await query(
-            `INSERT INTO club_verification_timeline_events (
-                application_id, auth_user_id, stage, status, title, message, action_required, is_applicant_visible, actor_id, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW());`,
-            [applicationId, authUserId, stage, status, title, message, actionRequired || null, isApplicantVisible, actorId || null]
-        );
-    } catch (err) {
-        console.warn("Notice: recordTimelineEvent failed:", err);
+/**
+ * Helper to dynamically generate the 5-stage verification timeline directly
+ * from the main club_verification_requests table and verified_clubs record.
+ * This guarantees the timeline is 100% reactive on every refresh,
+ * even when reviewers manually modify the database directly.
+ */
+export function computeDynamicTimelineEvents(application: any, verifiedClub?: any) {
+    if (!application && !verifiedClub) return [];
+
+    const appStatus = application?.status || (verifiedClub ? "approved" : "pending");
+    const submittedAt = application?.submitted_at || application?.created_at || new Date().toISOString();
+    const reviewedAt = application?.reviewed_at || application?.updated_at || submittedAt;
+    const clubName = application?.club_name || verifiedClub?.name || "your club";
+    const collegeName = application?.college_name || verifiedClub?.college_name || "your college";
+
+    // 1. Stage: application_submitted
+    const stage1 = {
+        id: "stage-1",
+        stage: "application_submitted",
+        status: "completed" as const,
+        title: "Application submitted",
+        message: `Your verification application for ${clubName} was received.`,
+        actionRequired: null,
+        createdAt: submittedAt,
+    };
+
+    // 2. Stage: initial_review
+    const isPending = appStatus === "pending";
+    const stage2 = {
+        id: "stage-2",
+        stage: "initial_review",
+        status: (isPending ? "in_progress" : "completed") as "completed" | "in_progress",
+        title: isPending ? "Initial review" : "Initial review completed",
+        message: isPending
+            ? "Orbix is reviewing the submitted details and institutional references."
+            : "Orbix initial intake check validated.",
+        actionRequired: null,
+        createdAt: isPending ? submittedAt : reviewedAt,
+    };
+
+    // 3. Stage: college_verification
+    let stage3Status: "completed" | "in_progress" | "upcoming" | "action_required" | "rejected" = "upcoming";
+    let stage3Title = "College verification";
+    let stage3Message = "The college and representative credentials will be checked.";
+    let stage3Action: string | null = null;
+
+    const collegeContactStatus = application?.college_contact_status || "not_started";
+    const isContactConfirmed = collegeContactStatus === "confirmed";
+    const allChecksConfirmed =
+        isContactConfirmed &&
+        application?.club_existence_confirmed &&
+        application?.college_authorization_confirmed &&
+        application?.representative_authority_confirmed;
+
+    if (appStatus === "pending") {
+        stage3Status = "upcoming";
+        stage3Title = "College verification";
+        stage3Message = "The college and representative credentials will be checked.";
+    } else if (["approved", "ready_for_promotion"].includes(appStatus) || verifiedClub || allChecksConfirmed) {
+        stage3Status = "completed";
+        stage3Title = "College verification completed";
+        stage3Message = `Institution recognition, club existence, and representative authority confirmed for ${collegeName}.`;
+    } else if (appStatus === "needs_information") {
+        stage3Status = "action_required";
+        stage3Title = "Action Required: Additional Details Needed";
+        stage3Message = application?.internal_notes || "Please check your contact email and provide the requested verification materials.";
+        stage3Action = "Provide requested institutional documents or credentials";
+    } else if (appStatus === "rejected") {
+        stage3Status = "rejected";
+        stage3Title = "College verification criteria unmet";
+        stage3Message = application?.internal_notes || "Could not verify institutional affiliation or representative credentials.";
+    } else if (appStatus === "under_review") {
+        stage3Status = "in_progress";
+        stage3Title = "College verification in progress";
+        stage3Message = collegeContactStatus === "contacted"
+            ? "Outreach initiated with institution administration or faculty advisor."
+            : "Reviewing college directory recognition and campus presence.";
     }
+
+    const stage3 = {
+        id: "stage-3",
+        stage: "college_verification",
+        status: stage3Status,
+        title: stage3Title,
+        message: stage3Message,
+        actionRequired: stage3Action,
+        createdAt: application?.last_college_contacted_at || reviewedAt,
+    };
+
+    // 4. Stage: verification_decision
+    let stage4Status: "completed" | "in_progress" | "upcoming" | "action_required" | "rejected" = "upcoming";
+    let stage4Title = "Verification decision";
+    let stage4Message = "Approval, additional information, or rejection.";
+    let stage4Action: string | null = null;
+
+    if (["approved", "ready_for_promotion"].includes(appStatus) || verifiedClub) {
+        stage4Status = "completed";
+        stage4Title = "Verification decision: Approved";
+        stage4Message = "Application verified and approved by Orbix reviewer.";
+    } else if (appStatus === "rejected") {
+        stage4Status = "rejected";
+        stage4Title = "Verification decision: Not Approved";
+        stage4Message = application?.internal_notes || "Application could not be approved under current standards.";
+    } else if (appStatus === "needs_information") {
+        stage4Status = "action_required";
+        stage4Title = "Verification decision: Information Required";
+        stage4Message = "Reviewer is awaiting clarifying documents or credentials before deciding.";
+        stage4Action = "Respond to verification inquiry";
+    }
+
+    const stage4 = {
+        id: "stage-4",
+        stage: "verification_decision",
+        status: stage4Status,
+        title: stage4Title,
+        message: stage4Message,
+        actionRequired: stage4Action,
+        createdAt: reviewedAt,
+    };
+
+    // 5. Stage: club_activated
+    let stage5Status: "completed" | "in_progress" | "upcoming" = "upcoming";
+    let stage5Title = "Club access activated";
+    let stage5Message = "Your dedicated club dashboard becomes available once approved.";
+
+    if (appStatus === "approved" || verifiedClub) {
+        stage5Status = "completed";
+        stage5Title = "Club access activated";
+        stage5Message = "Your dedicated club dashboard and public profile are now live.";
+    } else if (appStatus === "ready_for_promotion") {
+        stage5Status = "in_progress";
+        stage5Title = "Activating club access";
+        stage5Message = "Club credentials approved. Activation is in progress.";
+    }
+
+    const stage5 = {
+        id: "stage-5",
+        stage: "club_activated",
+        status: stage5Status,
+        title: stage5Title,
+        message: stage5Message,
+        actionRequired: null,
+        createdAt: verifiedClub?.verified_at || reviewedAt,
+    };
+
+    return [stage1, stage2, stage3, stage4, stage5];
+}
+
+export async function recordTimelineEvent(_params: any) {
+    // No-op: timeline is now derived dynamically from club_verification_requests and verified_clubs
 }
 
 /**
@@ -131,16 +264,22 @@ export const authenticateReviewer = async (
  */
 /**
  * GET /api/club/check-availability
- * Checks whether a username or email is available for registration.
+ * Checks whether a username, email, or mobile phone number is available for registration.
+ * Handles both guest applicants and authenticated users registering a club under their existing account.
  */
-clubRouter.get("/check-availability", async (req: Request, res: Response) => {
+clubRouter.get("/check-availability", optionalAuthenticate, async (req: Request, res: Response) => {
     try {
         const username = typeof req.query.username === "string" ? req.query.username.trim().toLowerCase() : null;
         const email = typeof req.query.email === "string" ? req.query.email.trim().toLowerCase() : null;
+        const rawPhone = typeof req.query.phone === "string" ? req.query.phone.trim() : null;
 
-        if (!username && !email) {
-            return res.status(400).json({ success: false, message: "Provide username or email to check availability." });
+        if (!username && !email && !rawPhone) {
+            return res.status(400).json({ success: false, message: "Provide username, email, or phone to check availability." });
         }
+
+        const callerUserId = req.user?.id;
+        const callerEmail = req.user?.gmail?.toLowerCase() || req.user?.email?.toLowerCase();
+        const callerUsername = req.user?.username?.toLowerCase();
 
         if (username) {
             if (!/^[a-z0-9._-]{3,20}$/.test(username)) {
@@ -151,40 +290,137 @@ clubRouter.get("/check-availability", async (req: Request, res: Response) => {
                     message: "Username must be 3-20 characters: lowercase letters, numbers, dot, _, or -."
                 });
             }
-            const userRes = await query(`SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`, [username]);
-            if (userRes.rows[0]) {
-                return res.json({
-                    success: true,
-                    available: false,
-                    field: "username",
-                    message: "This username is already taken. Please choose another."
-                });
+            if (callerUsername && callerUsername === username) {
+                // Caller's own username is valid for club registration under their account
+            } else {
+                const userRes = await query(`SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`, [username]);
+                if (userRes.rows[0]) {
+                    return res.json({
+                        success: true,
+                        available: false,
+                        field: "username",
+                        message: "This username is already taken. Please choose another."
+                    });
+                }
             }
         }
 
         if (email) {
-            const emailRes = await query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1;`, [email]);
-            if (emailRes.rows[0]) {
+            if (callerEmail && callerEmail === email) {
+                // Caller is registering a club using their signed-in account email.
+                // Check if they already hold an active club application or verified club.
+                const existingAppRes = await query(
+                    `SELECT id, club_name, status FROM club_verification_requests 
+                     WHERE auth_user_id = $1 
+                       AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
+                     LIMIT 1;`,
+                    [callerUserId]
+                );
+                if (existingAppRes.rows[0]) {
+                    return res.json({
+                        success: true,
+                        available: false,
+                        field: "email",
+                        message: `You already have an active club registration application for "${existingAppRes.rows[0].club_name}" (${existingAppRes.rows[0].status}).`
+                    });
+                }
+
+                const existingClubRes = await query(
+                    `SELECT id, name FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                    [callerUserId]
+                );
+                if (existingClubRes.rows[0]) {
+                    return res.json({
+                        success: true,
+                        available: false,
+                        field: "email",
+                        message: `You already lead the verified club "${existingClubRes.rows[0].name}".`
+                    });
+                }
+            } else {
+                const emailRes = await query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1;`, [email]);
+                if (emailRes.rows[0]) {
+                    return res.json({
+                        success: true,
+                        available: false,
+                        field: "email",
+                        message: "An account with this email address is already registered. Please sign in to register your club under this account."
+                    });
+                }
+                const appRes = await query(
+                    `SELECT id FROM club_verification_requests 
+                     WHERE LOWER(contact_email) = LOWER($1) 
+                       AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
+                     LIMIT 1;`,
+                    [email]
+                );
+                if (appRes.rows[0]) {
+                    return res.json({
+                        success: true,
+                        available: false,
+                        field: "email",
+                        message: "An active club verification application already exists for this email address."
+                    });
+                }
+            }
+        }
+
+        if (rawPhone) {
+            const norm = normalizePhoneNumber(rawPhone);
+            if (!norm.isValid) {
                 return res.json({
                     success: true,
                     available: false,
-                    field: "email",
-                    message: "An account with this email address is already registered. Please sign in instead."
+                    field: "phone",
+                    message: "Please enter a valid 10-digit mobile phone number format."
                 });
             }
-            const appRes = await query(
-                `SELECT id FROM club_verification_requests 
-                 WHERE LOWER(contact_email) = LOWER($1) 
-                   AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
-                 LIMIT 1;`,
-                [email]
+            const canonicalPhone = norm.canonical;
+
+            // Check users
+            const userPhoneRes = await query(
+                `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
+                [canonicalPhone]
             );
-            if (appRes.rows[0]) {
+            if (userPhoneRes.rows[0] && (!callerUserId || userPhoneRes.rows[0].id !== callerUserId)) {
                 return res.json({
                     success: true,
                     available: false,
-                    field: "email",
-                    message: "An active club verification application already exists for this email address."
+                    field: "phone",
+                    message: "This mobile phone number is already registered to another Orbix account."
+                });
+            }
+
+            // Check club_verification_requests
+            const appPhoneRes = await query(
+                `SELECT id, auth_user_id FROM club_verification_requests 
+                 WHERE LOWER(TRIM(contact_phone)) = LOWER(TRIM($1)) 
+                   AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
+                 LIMIT 1;`,
+                [canonicalPhone]
+            );
+            if (appPhoneRes.rows[0] && (!callerUserId || appPhoneRes.rows[0].auth_user_id !== callerUserId)) {
+                return res.json({
+                    success: true,
+                    available: false,
+                    field: "phone",
+                    message: "This mobile phone number is already associated with an active club verification application."
+                });
+            }
+
+            // Check verified_clubs
+            const clubPhoneRes = await query(
+                `SELECT id, auth_user_id FROM verified_clubs 
+                 WHERE LOWER(TRIM(contact_phone)) = LOWER(TRIM($1)) 
+                 LIMIT 1;`,
+                [canonicalPhone]
+            );
+            if (clubPhoneRes.rows[0] && (!callerUserId || clubPhoneRes.rows[0].auth_user_id !== callerUserId)) {
+                return res.json({
+                    success: true,
+                    available: false,
+                    field: "phone",
+                    message: "This mobile phone number is already associated with a verified club."
                 });
             }
         }
@@ -203,8 +439,9 @@ clubRouter.get("/check-availability", async (req: Request, res: Response) => {
 /**
  * POST /api/club/verify/send-email-otp
  * Dispatches an email verification OTP code to the applicant's primary email.
+ * Allows authenticated users registering a club under their existing account.
  */
-clubRouter.post("/verify/send-email-otp", async (req: Request, res: Response) => {
+clubRouter.post("/verify/send-email-otp", optionalAuthenticate, async (req: Request, res: Response) => {
     try {
         const rawEmail = req.body?.email;
         const name = req.body?.name || "Club Representative";
@@ -215,46 +452,91 @@ clubRouter.post("/verify/send-email-otp", async (req: Request, res: Response) =>
         }
 
         const normalizedEmail = rawEmail.trim().toLowerCase();
+        const callerUserId = req.user?.id;
+        const callerEmail = req.user?.gmail?.toLowerCase() || req.user?.email?.toLowerCase();
 
-        // 1. Pre-check email uniqueness against existing accounts
-        const existingEmailRes = await query(
-            `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1;`,
-            [normalizedEmail]
-        );
-        if (existingEmailRes.rows[0]) {
-            return res.status(409).json({
-                success: false,
-                message: "An account with this email address already exists. Please sign in instead.",
-            });
-        }
-
-        // 2. Pre-check email against existing active club applications
-        const existingAppRes = await query(
-            `SELECT id FROM club_verification_requests 
-             WHERE LOWER(contact_email) = LOWER($1) 
-               AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
-             LIMIT 1;`,
-            [normalizedEmail]
-        );
-        if (existingAppRes.rows[0]) {
-            return res.status(409).json({
-                success: false,
-                message: "An active club verification application already exists for this email address. Please sign in to check status.",
-            });
-        }
-
-        // 3. Pre-check username uniqueness if provided
-        if (rawUsername && typeof rawUsername === "string") {
-            const normalizedUsername = rawUsername.trim().toLowerCase();
-            const existingUsernameRes = await query(
-                `SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
-                [normalizedUsername]
+        // 1. Pre-check email uniqueness
+        if (callerEmail && callerEmail === normalizedEmail) {
+            // Caller is authenticated using their own email.
+            // Ensure they don't already have an active application or verified club.
+            const existingAppRes = await query(
+                `SELECT id, club_name, status FROM club_verification_requests 
+                 WHERE auth_user_id = $1 
+                   AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
+                 LIMIT 1;`,
+                [callerUserId]
             );
-            if (existingUsernameRes.rows[0]) {
+            if (existingAppRes.rows[0]) {
                 return res.status(409).json({
                     success: false,
-                    message: "This username is already taken. Please choose another username.",
+                    message: `You already have an active club registration application for "${existingAppRes.rows[0].club_name}" (${existingAppRes.rows[0].status}).`,
                 });
+            }
+
+            const existingClubRes = await query(
+                `SELECT id, name FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                [callerUserId]
+            );
+            if (existingClubRes.rows[0]) {
+                return res.status(409).json({
+                    success: false,
+                    message: `You already lead the verified club "${existingClubRes.rows[0].name}".`,
+                });
+            }
+        } else {
+            // Unauthenticated guest registration
+            const existingEmailRes = await query(
+                `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1;`,
+                [normalizedEmail]
+            );
+            if (existingEmailRes.rows[0]) {
+                return res.status(409).json({
+                    success: false,
+                    message: "An account with this email address already exists. Please sign in to register your club under this account.",
+                });
+            }
+
+            const existingAppRes = await query(
+                `SELECT id FROM club_verification_requests 
+                 WHERE LOWER(contact_email) = LOWER($1) 
+                   AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
+                 LIMIT 1;`,
+                [normalizedEmail]
+            );
+            if (existingAppRes.rows[0]) {
+                return res.status(409).json({
+                    success: false,
+                    message: "An active club verification application already exists for this email address. Please sign in to check status.",
+                });
+            }
+
+            const existingClubRes = await query(
+                `SELECT id FROM verified_clubs WHERE LOWER(contact_email) = LOWER($1) LIMIT 1;`,
+                [normalizedEmail]
+            );
+            if (existingClubRes.rows[0]) {
+                return res.status(409).json({
+                    success: false,
+                    message: "A verified club already exists with this email address.",
+                });
+            }
+        }
+
+        // 2. Pre-check username uniqueness if provided and not owned by caller
+        if (rawUsername && typeof rawUsername === "string") {
+            const normalizedUsername = rawUsername.trim().toLowerCase();
+            const callerUsername = req.user?.username?.toLowerCase();
+            if (!callerUsername || callerUsername !== normalizedUsername) {
+                const existingUsernameRes = await query(
+                    `SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
+                    [normalizedUsername]
+                );
+                if (existingUsernameRes.rows[0]) {
+                    return res.status(409).json({
+                        success: false,
+                        message: "This username is already taken. Please choose another username.",
+                    });
+                }
             }
         }
 
@@ -313,8 +595,9 @@ clubRouter.post("/verify/verify-email-otp", async (req: Request, res: Response) 
 /**
  * POST /api/club/verify/send-phone-otp
  * Dispatches an SMS verification OTP code to the applicant's primary mobile phone.
+ * Pre-checks that the mobile phone number is unique before expending SMS resources.
  */
-clubRouter.post("/verify/send-phone-otp", async (req: Request, res: Response) => {
+clubRouter.post("/verify/send-phone-otp", optionalAuthenticate, async (req: Request, res: Response) => {
     try {
         const phone = req.body?.phone;
         const clubName = req.body?.clubName || "Orbix Club";
@@ -323,12 +606,14 @@ clubRouter.post("/verify/send-phone-otp", async (req: Request, res: Response) =>
             return res.status(400).json({ success: false, message: "Primary mobile phone number is required." });
         }
 
-        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
+        const callerUserId = req.user?.id;
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
         const userAgent = req.headers["user-agent"] || "unknown";
 
         const result = await PhoneVerificationService.sendOtp({
             phone,
             clubName,
+            userId: callerUserId,
             ipAddress: ip,
             userAgent,
         });
@@ -400,9 +685,12 @@ clubRouter.post("/verify/verify-phone-firebase", handleVerifyPhoneRequest);
 
 /**
  * POST /api/club/register
- * Registers a new club account and immediately creates a pending verification request.
+ * Registers a new club application.
+ * Supports both:
+ * 1. Authenticated users registering a club under their existing email account.
+ * 2. Unauthenticated guest applicants creating a new account alongside the club application.
  */
-clubRouter.post("/register", async (req: Request, res: Response) => {
+clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Response) => {
     try {
         // Rate limiting
         const ip = req.ip || "unknown";
@@ -414,8 +702,10 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
             });
         }
 
-        // Validate complete club registration payload
-        const validated: ValidatedClubRegistrationData = ClubRegistrationValidator(req.body);
+        const isExistingUser = Boolean(req.user);
+
+        // Validate complete club registration payload (password optional if already authenticated)
+        const validated: ValidatedClubRegistrationData = ClubRegistrationValidator(req.body, { isExistingUser });
 
         // 1. Authoritatively validate and resolve the institution from the verified directory
         let verifiedInst: any = null;
@@ -457,7 +747,241 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
         const authoritativeCollegeCountry = "India";
         const authoritativeCollegeWebsite = verifiedInst.website || validated.collegeWebsiteUrl || null;
 
-        // 2. Check if user already exists
+        // 2. Branch: Authenticated existing user vs. Unauthenticated guest registration
+        if (isExistingUser && req.user) {
+            const authUserId = req.user.id;
+
+            // 2a. Check if existing user already has an active application or verified club
+            const existingActiveReq = await query(
+                `SELECT id, club_name, status FROM club_verification_requests 
+                 WHERE auth_user_id = $1 
+                   AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion')
+                 LIMIT 1;`,
+                [authUserId]
+            );
+            if (existingActiveReq.rows[0]) {
+                return res.status(409).json({
+                    success: false,
+                    message: `You already have an active club registration application for "${existingActiveReq.rows[0].club_name}" (${existingActiveReq.rows[0].status}). Please check status instead.`,
+                });
+            }
+
+            const existingClub = await query(
+                `SELECT id, name FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                [authUserId]
+            );
+            if (existingClub.rows[0]) {
+                return res.status(409).json({
+                    success: false,
+                    message: `You already lead the verified club "${existingClub.rows[0].name}".`,
+                });
+            }
+
+            // 2b. If contactEmail is different from account email, ensure it's not taken by another user
+            if (req.user.gmail.toLowerCase() !== validated.contactEmail.toLowerCase()) {
+                const emailCheck = await query(
+                    `SELECT id FROM users WHERE LOWER(email) = LOWER($1) AND id != $2 LIMIT 1;`,
+                    [validated.contactEmail, authUserId]
+                );
+                if (emailCheck.rows[0]) {
+                    return res.status(409).json({
+                        success: false,
+                        message: "The contact email address is already registered to another Orbix account.",
+                    });
+                }
+            }
+
+            // 2c. Enforce phone uniqueness against other accounts
+            if (validated.contactPhone) {
+                const normPhone = normalizePhoneNumber(validated.contactPhone);
+                const canonicalPhone = normPhone.isValid ? normPhone.canonical : validated.contactPhone.trim();
+
+                const existingPhoneRes = await query(
+                    `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) AND id != $2 LIMIT 1;`,
+                    [canonicalPhone, authUserId]
+                );
+                if (existingPhoneRes.rows[0]) {
+                    return res.status(409).json({
+                        success: false,
+                        message: "This mobile phone number is already registered to another Orbix account.",
+                    });
+                }
+
+                const existingAppPhone = await query(
+                    `SELECT id FROM club_verification_requests 
+                     WHERE LOWER(TRIM(contact_phone)) = LOWER(TRIM($1)) AND auth_user_id != $2 
+                       AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
+                     LIMIT 1;`,
+                    [canonicalPhone, authUserId]
+                );
+                if (existingAppPhone.rows[0]) {
+                    return res.status(409).json({
+                        success: false,
+                        message: "This mobile phone number is already associated with an active club verification application.",
+                    });
+                }
+            }
+
+            // 2d. Verify Email & Phone proof tokens
+            let isEmailVerified = Boolean(
+                req.user.isEmailVerified &&
+                req.user.gmail.toLowerCase() === validated.contactEmail.toLowerCase()
+            );
+            let isPhoneVerified = false;
+
+            if (validated.emailVerificationToken) {
+                const validEmail = EmailVerificationService.verifyVerificationToken(
+                    validated.emailVerificationToken,
+                    validated.contactEmail
+                );
+                if (!validEmail) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Email verification proof is invalid or has expired. Please verify your email again.",
+                    });
+                }
+                isEmailVerified = true;
+            }
+
+            if (validated.phoneVerificationToken) {
+                const validPhone = PhoneVerificationService.verifyVerificationToken(
+                    validated.phoneVerificationToken,
+                    validated.contactPhone
+                );
+                if (!validPhone) {
+                    return res.status(400).json({
+                        success: false,
+                        message: "Phone verification proof is invalid or has expired. Please verify your phone number again.",
+                    });
+                }
+                isPhoneVerified = true;
+            }
+
+            if (isProduction && (!isEmailVerified || !isPhoneVerified)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Both primary email and primary mobile number must be verified before completing club registration.",
+                });
+            }
+
+            const verificationTimestamp = new Date();
+
+            // 2e. Update user's phone and college if applicable
+            await query(
+                `UPDATE users
+                 SET 
+                     phone = COALESCE($2, phone),
+                     is_phone_verified = true,
+                     phone_verified_at = COALESCE(phone_verified_at, $3),
+                     phone_confirmed_at = COALESCE(phone_confirmed_at, $3),
+                     college_id = COALESCE(college_id, $4)
+                 WHERE id = $1;`,
+                [
+                    authUserId,
+                    validated.contactPhone || null,
+                    verificationTimestamp,
+                    authoritativeCollegeId,
+                ]
+            );
+
+            // 2f. Insert into public.club_verification_requests
+            const requestInsertRes = await query(
+                `INSERT INTO club_verification_requests (
+                    auth_user_id,
+                    college_id,
+                    club_name,
+                    college_name,
+                    college_city,
+                    college_state,
+                    college_country,
+                    club_category,
+                    club_description,
+                    contact_person_name,
+                    contact_person_role,
+                    contact_email,
+                    college_official_email,
+                    contact_phone,
+                    college_website_url,
+                    club_website_url,
+                    club_social_url,
+                    terms_accepted,
+                    terms_version,
+                    privacy_policy_accepted,
+                    privacy_policy_version,
+                    is_email_verified,
+                    is_phone_verified,
+                    phone_verified_at,
+                    status
+                ) VALUES (
+                    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                    $11, $12, $13, $14, $15, $16, $17, $18, 'v1.0', $19, 'v1.0',
+                    $20, $21, $22, 'pending'
+                )
+                RETURNING id, club_name, status, submitted_at, is_email_verified AS "isEmailVerified", is_phone_verified AS "isPhoneVerified";`,
+                [
+                    authUserId,
+                    authoritativeCollegeId,
+                    validated.clubName,
+                    authoritativeCollegeName,
+                    authoritativeCollegeCity,
+                    authoritativeCollegeState,
+                    authoritativeCollegeCountry,
+                    validated.clubCategory,
+                    validated.clubDescription,
+                    validated.contactPersonName,
+                    validated.contactPersonRole,
+                    validated.contactEmail,
+                    validated.collegeOfficialEmail,
+                    validated.contactPhone,
+                    authoritativeCollegeWebsite,
+                    validated.clubWebsiteUrl,
+                    validated.clubSocialUrl,
+                    validated.termsAccepted,
+                    validated.privacyPolicyAccepted,
+                    isEmailVerified,
+                    isPhoneVerified,
+                    isPhoneVerified ? verificationTimestamp : null,
+                ]
+            );
+            const createdRequest = requestInsertRes.rows[0];
+
+            // 2g. Timeline is computed dynamically on refresh from club_verification_requests
+
+            // 2h. Fetch fresh user record and enrich with club details
+            const userRes = await query(
+                `SELECT id, username, firstname AS "firstName", lastname AS "lastName", email AS gmail, account_type AS "accountType", avatar_url AS "avatarUrl", college_id AS "collegeId", phone, is_email_verified AS "isEmailVerified", is_phone_verified AS "isPhoneVerified"
+                 FROM users WHERE id = $1 LIMIT 1;`,
+                [authUserId]
+            );
+            const userObj = userRes.rows[0] || {
+                id: authUserId,
+                username: req.user.username,
+                firstName: req.user.firstName,
+                lastName: req.user.lastName,
+                gmail: req.user.gmail,
+                accountType: req.user.accountType,
+            };
+
+            await enrichUserWithClubData(userObj, authUserId);
+
+            return res.status(201).json({
+                success: true,
+                message: "Club registration submitted for verification successfully.",
+                user: userObj,
+                request: {
+                    id: createdRequest.id,
+                    clubName: createdRequest.club_name,
+                    status: createdRequest.status,
+                    submittedAt: createdRequest.submitted_at,
+                },
+            });
+        }
+
+        // =====================================================================
+        // 3. Unauthenticated guest applicant registration
+        // =====================================================================
+
+        // Check if user already exists
         const existingUserRes = await query(
             `SELECT id FROM users WHERE LOWER(email) = LOWER($1) OR LOWER(username) = LOWER($2) LIMIT 1;`,
             [validated.contactEmail, validated.username]
@@ -465,11 +989,11 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
         if (existingUserRes.rows[0]) {
             return res.status(409).json({
                 success: false,
-                message: "An account with this email address or username is already registered.",
+                message: "An account with this email address or username is already registered. Please sign in to register your club under this account.",
             });
         }
 
-        // 3. Check if active verification request exists for this email
+        // Check if active verification request exists for this email
         const existingActiveReq = await query(
             `SELECT id FROM club_verification_requests 
              WHERE LOWER(contact_email) = LOWER($1) 
@@ -484,7 +1008,7 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
             });
         }
 
-        // 3a. Enforce phone uniqueness: prevent duplicate phone accounts
+        // Enforce phone uniqueness: prevent duplicate phone accounts
         if (validated.contactPhone) {
             const existingPhoneRes = await query(
                 `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
@@ -498,7 +1022,7 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
             }
         }
 
-        // 3b. Verify Email & Phone proof tokens
+        // Verify Email & Phone proof tokens
         let isEmailVerified = false;
         let isPhoneVerified = false;
 
@@ -540,16 +1064,16 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
 
         const verificationTimestamp = new Date();
 
-        // 4. Hash password
-        const hashedPassword = await bcrypt.hash(validated.password, 10);
+        // Hash password
+        const hashedPassword = await bcrypt.hash(validated.password || "TempPassword123!", 10);
         const newUserId = crypto.randomUUID();
 
-        // 5. Split representative full name into firstName and lastName for users table
+        // Split representative full name into firstName and lastName for users table
         const nameParts = validated.contactPersonName.split(" ").filter(Boolean);
         const firstName = nameParts[0] || validated.contactPersonName;
         const lastName = nameParts.slice(1).join(" ") || "Representative";
 
-        // 6. Insert into auth.users (Supabase Auth table)
+        // Insert into auth.users (Supabase Auth table)
         try {
             await query(
                 `INSERT INTO auth.users (
@@ -582,7 +1106,7 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
             console.warn("Notice: auth.users sync note:", authErr.message || authErr);
         }
 
-        // 7. Insert into public.users with account_type = 'club' and verified college_id
+        // Insert into public.users with account_type = 'club' and verified college_id
         const defaultAvatarUrl = "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png";
         const userInsertRes = await query(
             `INSERT INTO users (
@@ -624,7 +1148,7 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
         );
         const createdUser = userInsertRes.rows[0];
 
-        // 8. Insert into public.club_verification_requests with verified college details
+        // Insert into public.club_verification_requests with verified college details
         const requestInsertRes = await query(
             `INSERT INTO club_verification_requests (
                 auth_user_id,
@@ -685,20 +1209,9 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
         );
         const createdRequest = requestInsertRes.rows[0];
 
-        // 7b. Insert initial 5-stage timeline history into club_verification_timeline_events
-        await query(
-            `INSERT INTO club_verification_timeline_events (
-                application_id, auth_user_id, stage, status, title, message, is_applicant_visible, created_at
-            ) VALUES 
-            ($1, $2, 'application_submitted', 'completed', 'Application submitted', 'Your application was received.', true, NOW()),
-            ($1, $2, 'initial_review', 'in_progress', 'Initial review', 'Orbix is reviewing the submitted details.', true, NOW() + interval '1 millisecond'),
-            ($1, $2, 'college_verification', 'upcoming', 'College verification', 'The college and representative will be checked.', true, NOW() + interval '2 milliseconds'),
-            ($1, $2, 'verification_decision', 'upcoming', 'Verification decision', 'Approval, additional information, or rejection.', true, NOW() + interval '3 milliseconds'),
-            ($1, $2, 'club_activated', 'upcoming', 'Club access activated', 'Your dedicated club dashboard becomes available.', true, NOW() + interval '4 milliseconds');`,
-            [createdRequest.id, newUserId]
-        ).catch((err) => console.warn("Notice: initial timeline creation:", err.message || err));
+        // Timeline is computed dynamically on refresh from club_verification_requests
 
-        // 8. Generate JWT session tokens with accountType = 'club'
+        // Generate JWT session tokens with accountType = 'club'
         const token = jwt.sign(
             {
                 sub: newUserId,
@@ -740,7 +1253,7 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
             maxAge: REFRESH_TOKEN_EXPIRY_MS,
         });
 
-        // 9. Cache in Redis
+        // Cache in Redis
         await userDetailsCache({
             id: newUserId,
             firstName,
@@ -754,18 +1267,21 @@ clubRouter.post("/register", async (req: Request, res: Response) => {
             account_type: "club",
         }).catch(() => {});
 
+        const safeNewUser: any = {
+            id: newUserId,
+            username: validated.username,
+            firstName,
+            lastName,
+            gmail: validated.contactEmail,
+            accountType: "club",
+        };
+        await enrichUserWithClubData(safeNewUser, newUserId);
+
         return res.status(201).json({
             success: true,
             message: "Club registration submitted for verification successfully.",
             token,
-            user: {
-                id: newUserId,
-                username: validated.username,
-                firstName,
-                lastName,
-                gmail: validated.contactEmail,
-                accountType: "club",
-            },
+            user: safeNewUser,
             request: {
                 id: createdRequest.id,
                 clubName: createdRequest.club_name,
@@ -870,63 +1386,18 @@ clubRouter.get("/application-status", authenticate, async (req: Request, res: Re
             });
         }
 
+        // Compute dynamic 5-stage timeline directly from current application & club status
+        const timelineEvents = computeDynamicTimelineEvents(application, verifiedClub);
+
         // If club is verified, return isVerified: true and dashboard redirect info
         if (verifiedClub) {
-            const timelineRes = await query(
-                `SELECT id, stage, status, title, message, action_required AS "actionRequired", created_at AS "createdAt"
-                 FROM club_verification_timeline_events
-                 WHERE auth_user_id = $1 AND is_applicant_visible = true
-                 ORDER BY created_at ASC;`,
-                [userId]
-            );
-
             return res.json({
                 success: true,
                 isVerified: true,
                 verifiedClub,
                 application: application ? { ...application, status: "approved" } : { status: "approved", club_name: verifiedClub.name },
-                timelineEvents: timelineRes.rows,
+                timelineEvents,
             });
-        }
-
-        // Fetch timeline events for pending application
-        let timelineRes = await query(
-            `SELECT id, stage, status, title, message, action_required AS "actionRequired", created_at AS "createdAt"
-             FROM club_verification_timeline_events
-             WHERE auth_user_id = $1 AND is_applicant_visible = true
-             ORDER BY created_at ASC;`,
-            [userId]
-        );
-
-        let timelineEvents = timelineRes.rows;
-
-        // Backfill if empty for an existing application
-        if (timelineEvents.length === 0 && application) {
-            await query(
-                `INSERT INTO club_verification_timeline_events (
-                    application_id, auth_user_id, stage, status, title, message, is_applicant_visible, created_at
-                ) VALUES 
-                ($1, $2, 'application_submitted', 'completed', 'Application submitted', 'Your application was received.', true, $3),
-                ($1, $2, 'initial_review', $4, 'Initial review', 'Orbix is reviewing the submitted details.', true, $3 + interval '1 millisecond'),
-                ($1, $2, 'college_verification', 'upcoming', 'College verification', 'The college and representative will be checked.', true, $3 + interval '2 milliseconds'),
-                ($1, $2, 'verification_decision', 'upcoming', 'Verification decision', 'Approval, additional information, or rejection.', true, $3 + interval '3 milliseconds'),
-                ($1, $2, 'club_activated', 'upcoming', 'Club access activated', 'Your dedicated club dashboard becomes available.', true, $3 + interval '4 milliseconds');`,
-                [
-                    application.id,
-                    application.auth_user_id,
-                    application.submitted_at || new Date(),
-                    application.status === 'pending' ? 'in_progress' : 'completed',
-                ]
-            ).catch(() => {});
-
-            const refetch = await query(
-                `SELECT id, stage, status, title, message, action_required AS "actionRequired", created_at AS "createdAt"
-                 FROM club_verification_timeline_events
-                 WHERE auth_user_id = $1 AND is_applicant_visible = true
-                 ORDER BY created_at ASC;`,
-                [userId]
-            );
-            timelineEvents = refetch.rows;
         }
 
         return res.json({
@@ -1059,15 +1530,12 @@ clubRouter.get(
                 });
             }
 
-            const timelineRes = await query(
-                `SELECT * FROM club_verification_timeline_events WHERE application_id = $1 ORDER BY created_at ASC;`,
-                [id]
-            );
+            const timelineEvents = computeDynamicTimelineEvents(result.rows[0]);
 
             return res.json({
                 success: true,
                 request: result.rows[0],
-                timelineEvents: timelineRes.rows,
+                timelineEvents,
             });
         } catch (err: any) {
             console.error("Fetch verification request error:", err);
@@ -1425,17 +1893,7 @@ const handlePromoteClub = async (req: Request, res: Response) => {
         );
         const verifiedClub = clubInsertRes.rows[0];
 
-        // 6. Record timeline events for verification_decision and club_activated
-        await client.query(
-            `INSERT INTO club_verification_timeline_events (
-                application_id, auth_user_id, stage, status, title, message, is_applicant_visible, actor_id, created_at
-            ) VALUES 
-            ($1, $2, 'verification_decision', 'completed', 'Verification decision: Approved', 'Orbix reviewer confirmed all institution checks and representative credentials.', true, $3, NOW()),
-            ($1, $2, 'club_activated', 'completed', 'Club access activated', 'Your dedicated club dashboard and public profile are now live.', true, $3, NOW() + interval '1 millisecond');`,
-            [app.id, app.auth_user_id, reviewerId || null]
-        );
-
-        // 7. Atomically transition request to 'approved' and associate verified_club_id
+        // 6. Transition request to 'approved' and associate verified_club_id
         await client.query(
             `UPDATE club_verification_requests
              SET status = 'approved',

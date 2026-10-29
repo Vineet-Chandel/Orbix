@@ -29,7 +29,7 @@ import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
 import { UsernameRulesIndicator } from "../UsernameRulesIndicator";
 import { evaluatePassword } from "../passwordValidator";
 import { useToast } from "../../../context/ToastContext";
-import { useAppDispatch, setUser } from "../../../store";
+import { useAppDispatch, useAppSelector, setUser } from "../../../store";
 import { NeoSelect } from "../../../components/NeoSelect";
 import { CollegeAutocomplete } from "../../../components/CollegeAutocomplete";
 import type { InstitutionItem } from "../../../utils/profileApi";
@@ -137,6 +137,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
     const navigate = useNavigate();
     const toast = useToast();
     const dispatch = useAppDispatch();
+    const { user: authUser, isAuthenticated } = useAppSelector((state) => state.user);
 
     const [formStep, setFormStep] = useState<"details" | "verification">("details");
 
@@ -174,6 +175,24 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         termsAccepted: true,
         privacyPolicyAccepted: true,
     });
+
+    // Auto-populate logged-in user details if user is authenticated with their email account
+    useEffect(() => {
+        if (isAuthenticated && authUser) {
+            const fullName = [authUser.firstName, authUser.lastName].filter(Boolean).join(" ");
+            setFormData((prev) => ({
+                ...prev,
+                contactEmail: prev.contactEmail || authUser.gmail || "",
+                contactPersonName: prev.contactPersonName || fullName || "",
+                username: prev.username || authUser.username || "",
+            }));
+
+            if (authUser.isEmailVerified && authUser.gmail) {
+                setEmailVerified(true);
+                setVerifiedEmailAddress(authUser.gmail.toLowerCase());
+            }
+        }
+    }, [isAuthenticated, authUser]);
 
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [loading, setLoading] = useState(false);
@@ -357,16 +376,18 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             newErrors.username = "Must be 3-20 chars: lowercase, numbers, dot, _, or -";
         }
 
-        // Password validation
-        if (!formData.password) {
-            newErrors.password = "Password is required";
-        } else if (!passwordStrength.isValid) {
-            newErrors.password = "Please satisfy all password conditions below";
-        }
+        // Password validation (only required for new unauthenticated account signups)
+        if (!isAuthenticated) {
+            if (!formData.password) {
+                newErrors.password = "Password is required";
+            } else if (!passwordStrength.isValid) {
+                newErrors.password = "Please satisfy all password conditions below";
+            }
 
-        // Password confirmation validation
-        if (formData.password !== formData.passwordConfirm) {
-            newErrors.passwordConfirm = "Passwords do not match";
+            // Password confirmation validation
+            if (formData.password !== formData.passwordConfirm) {
+                newErrors.passwordConfirm = "Passwords do not match";
+            }
         }
 
         // Legal acceptance validation
@@ -388,21 +409,32 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         return isValid;
     };
 
-    // Live Unique Username and Email Checker
-    const checkAvailability = async (field: "username" | "email", value: string) => {
-        const clean = value.trim().toLowerCase();
-        if (!clean) return;
+    // Live Unique Username, Email, and Phone Checker
+    const checkAvailability = async (field: "username" | "email" | "phone", value: string): Promise<boolean> => {
+        const clean = value.trim();
+        if (!clean) return true;
         try {
-            const res = await fetch(`/api/club/check-availability?${field}=${encodeURIComponent(clean)}`);
+            const res = await fetch(`/api/club/check-availability?${field}=${encodeURIComponent(clean)}`, {
+                credentials: "include",
+            });
             const data = await res.json().catch(() => null);
+            const errorKey = field === "username" ? "username" : field === "email" ? "contactEmail" : "contactPhone";
             if (data?.success && !data.available) {
                 setErrors((prev) => ({
                     ...prev,
-                    [field === "username" ? "username" : "contactEmail"]: data.message,
+                    [errorKey]: data.message,
                 }));
+                return false;
+            } else {
+                setErrors((prev) => {
+                    const updated = { ...prev };
+                    delete updated[errorKey];
+                    return updated;
+                });
+                return true;
             }
         } catch {
-            // ignore network errors for live check
+            return true;
         }
     };
 
@@ -413,9 +445,16 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
         setSendingEmailOtp(true);
         try {
+            // Pre-check uniqueness before sending email OTP
+            const isAvail = await checkAvailability("email", email);
+            if (!isAvail) {
+                return;
+            }
+
             const res = await fetch("/api/club/verify/send-email-otp", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
+                credentials: "include",
                 body: JSON.stringify({
                     email,
                     name: formData.contactPersonName.trim(),
@@ -453,6 +492,12 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         sendingPhoneOtpRef.current = true;
         setSendingPhoneOtp(true);
         try {
+            // Pre-check phone uniqueness BEFORE invoking Firebase SMS or sending OTP
+            const isAvail = await checkAvailability("phone", parsed.e164);
+            if (!isAvail) {
+                return;
+            }
+
             if (isFirebaseConfigured()) {
                 // For resend, cleanly purge previous verifier and prepare fresh container
                 if (isResend) {
@@ -478,6 +523,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                 const res = await fetch("/api/club/verify/send-phone-otp", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
+                    credentials: "include",
                     body: JSON.stringify({
                         phone: parsed.e164,
                         clubName: formData.clubName.trim(),
@@ -557,7 +603,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
     };
 
     // Transition from details form to verification step
-    const handleProceedToVerification = (e: React.FormEvent) => {
+    const handleProceedToVerification = async (e: React.FormEvent) => {
         e.preventDefault();
         if (sendingPhoneOtpRef.current || sendingEmailOtp || formStep === "verification") return;
         if (!validate()) return;
@@ -569,7 +615,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
         const isEmailMatch = Boolean(
             emailVerified &&
-            emailVerificationToken &&
+            (emailVerificationToken || (isAuthenticated && authUser?.isEmailVerified && authUser.gmail?.toLowerCase() === emailNorm)) &&
             verifiedEmailAddress &&
             verifiedEmailAddress === emailNorm
         );
@@ -580,6 +626,25 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             verifiedPhoneNumber &&
             verifiedPhoneNumber === phoneCanonical
         );
+
+        setLoading(true);
+        try {
+            const checks: Promise<boolean>[] = [];
+            if (!isEmailMatch) {
+                checks.push(checkAvailability("email", emailNorm));
+            }
+            if (!isPhoneMatch) {
+                checks.push(checkAvailability("phone", phoneCanonical));
+            }
+
+            const results = await Promise.all(checks);
+            if (results.some((avail) => avail === false)) {
+                toast.error("Please resolve registration conflicts before proceeding.", { title: "Pre-check Failed" });
+                return;
+            }
+        } finally {
+            setLoading(false);
+        }
 
         // If email was modified, invalidate previous email verification
         if (!isEmailMatch) {
@@ -806,6 +871,58 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         <form onSubmit={formStep === "details" ? handleProceedToVerification : (e) => { e.preventDefault(); executeFinalSubmission(); }} className="space-y-6" noValidate>
             {formStep === "details" ? (
                 <>
+                    {/* Signed-in user account & club status banner */}
+                    {isAuthenticated && authUser && (
+                        <div className="mb-2">
+                            {authUser.verifiedClub ? (
+                                <div className="p-4 sm:p-5 rounded-3xl bg-[#E8F5E9] border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <Building2 className="w-7 h-7 text-emerald-700 shrink-0" />
+                                        <div>
+                                            <h4 className="font-black text-black text-sm">You Hold a Verified Club</h4>
+                                            <p className="text-xs font-semibold text-neutral-700">
+                                                You are the verified administrator for <strong>{authUser.verifiedClub.name}</strong>.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate("/club/dashboard")}
+                                        className="px-4 py-2 font-black text-xs uppercase tracking-wider bg-black text-white rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 transition-all cursor-pointer whitespace-nowrap"
+                                    >
+                                        Go to Dashboard →
+                                    </button>
+                                </div>
+                            ) : authUser.application || (authUser.clubStatus && authUser.clubStatus !== "none" && authUser.clubStatus !== "rejected") ? (
+                                <div className="p-4 sm:p-5 rounded-3xl bg-[#FFF8E1] border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <ShieldCheck className="w-7 h-7 text-amber-700 shrink-0" />
+                                        <div>
+                                            <h4 className="font-black text-black text-sm">Active Club Application Pending</h4>
+                                            <p className="text-xs font-semibold text-neutral-700">
+                                                Application for <strong>"{authUser.clubName || authUser.application?.clubName || 'Your Club'}"</strong> is currently <strong>{authUser.clubStatus || authUser.application?.status || 'under review'}</strong>.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => navigate("/club/status")}
+                                        className="px-4 py-2 font-black text-xs uppercase tracking-wider bg-[#FFAE96] text-black rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#FF9B80] transition-all cursor-pointer whitespace-nowrap"
+                                    >
+                                        Track Progress →
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="p-3.5 sm:p-4 rounded-2xl bg-[#EFF6FF] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                                    <UserCheck className="w-5 h-5 text-blue-700 shrink-0" />
+                                    <p className="text-xs font-semibold text-neutral-800">
+                                        Signed in as <strong>@{authUser.username}</strong> ({authUser.gmail}). This club will be linked directly to your account.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* SECTION A: CLUB INFORMATION */}
                     <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3.5">
                         <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2.5 mb-1">
@@ -1037,6 +1154,13 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                         setConfirmationResult(null);
                                     }
                                 }}
+                                onBlur={() => {
+                                    if (formData.contactPhone.trim()) {
+                                        const parsed = formatToE164(formData.contactPhone.trim());
+                                        const canonical = parsed.isValid ? parsed.e164 : formData.contactPhone.trim();
+                                        checkAvailability("phone", canonical);
+                                    }
+                                }}
                                 error={errors.contactPhone}
                                 autoComplete="tel"
                             />
@@ -1167,44 +1291,53 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                             />
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
-                            {/* Password Input */}
-                            <div>
+                        {isAuthenticated ? (
+                            <div className="p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black/20 flex items-center gap-3">
+                                <Lock className="w-5 h-5 text-neutral-600 shrink-0" />
+                                <p className="text-xs font-semibold text-neutral-700">
+                                    Linked to your signed-in account (<span className="font-bold text-black">{authUser?.gmail}</span>). You will use your existing account password to sign in.
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
+                                {/* Password Input */}
+                                <div>
+                                    <FormInput
+                                        name="password"
+                                        isPassword
+                                        placeholder="Password"
+                                        hideLabel
+                                        value={formData.password}
+                                        onChange={(e) => {
+                                            setFormData({ ...formData, password: e.target.value });
+                                            if (errors.password) setErrors({ ...errors, password: "" });
+                                        }}
+                                        error={errors.password}
+                                        autoComplete="new-password"
+                                    />
+
+                                    <PasswordStrengthIndicator
+                                        result={passwordStrength}
+                                        hasInput={formData.password.length > 0}
+                                    />
+                                </div>
+
+                                {/* Confirm Password */}
                                 <FormInput
-                                    name="password"
+                                    name="passwordConfirm"
                                     isPassword
-                                    placeholder="Password"
+                                    placeholder="Confirm Password"
                                     hideLabel
-                                    value={formData.password}
+                                    value={formData.passwordConfirm}
                                     onChange={(e) => {
-                                        setFormData({ ...formData, password: e.target.value });
-                                        if (errors.password) setErrors({ ...errors, password: "" });
+                                        setFormData({ ...formData, passwordConfirm: e.target.value });
+                                        if (errors.passwordConfirm) setErrors({ ...errors, passwordConfirm: "" });
                                     }}
-                                    error={errors.password}
+                                    error={errors.passwordConfirm}
                                     autoComplete="new-password"
                                 />
-
-                                <PasswordStrengthIndicator
-                                    result={passwordStrength}
-                                    hasInput={formData.password.length > 0}
-                                />
                             </div>
-
-                            {/* Confirm Password */}
-                            <FormInput
-                                name="passwordConfirm"
-                                isPassword
-                                placeholder="Confirm Password"
-                                hideLabel
-                                value={formData.passwordConfirm}
-                                onChange={(e) => {
-                                    setFormData({ ...formData, passwordConfirm: e.target.value });
-                                    if (errors.passwordConfirm) setErrors({ ...errors, passwordConfirm: "" });
-                                }}
-                                error={errors.passwordConfirm}
-                                autoComplete="new-password"
-                            />
-                        </div>
+                        )}
                     </div>
 
                     {/* SECTION E: LEGAL CONSENT */}

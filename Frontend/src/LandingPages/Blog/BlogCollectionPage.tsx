@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import NavBar from '../NavBar/Landing';
-import { Sparkles, Terminal, ArrowRight, Layers, ShieldCheck, Flame } from 'lucide-react';
+import { Terminal, ArrowRight, Layers, ShieldCheck, Flame } from 'lucide-react';
+import { OrbixLogo } from '../../components/OrbixLogo';
 
 const CHAPTERS = [
     {
@@ -51,7 +52,7 @@ export default function BlogCollectionPage() {
                 {/* Header Badge & Title */}
                 <div className="text-center max-w-3xl mx-auto space-y-4 mb-12">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#FFE566] border-2 border-black text-black font-black text-xs tracking-wider uppercase shadow-[2px_2px_0px_#000] select-none">
-                        <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <OrbixLogo className="w-3.5 h-3.5 text-black flex-shrink-0" />
                         <span>Orbix Publications & Workshop Guides</span>
                     </div>
 

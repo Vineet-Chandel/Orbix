@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import NavBar from "../NavBar/Landing";
+import { OrbixLogo } from "../../components/OrbixLogo";
 import {
     DOCS_FOLDERS,
     type DocFolder,
@@ -9,7 +10,6 @@ import {
     Search,
     Folder,
     FileText,
-    Sparkles,
     ArrowRight,
     Clock,
     Cpu,
@@ -17,7 +17,7 @@ import {
     Award,
     Terminal,
     Brain,
-    Shield,
+    ShieldCheck,
 } from "lucide-react";
 
 export const DocsHubPage: React.FC = () => {
@@ -38,7 +38,8 @@ export const DocsHubPage: React.FC = () => {
             case "Brain":
                 return <Brain className="w-5 h-5 text-black" />;
             case "Shield":
-                return <Shield className="w-5 h-5 text-black" />;
+            case "ShieldCheck":
+                return <ShieldCheck className="w-5 h-5 text-black" />;
             default:
                 return <Folder className="w-5 h-5 text-black" />;
         }
@@ -87,14 +88,14 @@ export const DocsHubPage: React.FC = () => {
             {/* Global Top Navbar */}
             <NavBar activeTab="docs" />
 
-            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 sm:pt-36 sm:pb-32 space-y-12">
+            <main className=" mx-auto px-4 sm:px-6 lg:px-8 pt-32 pb-24 sm:pt-36 sm:pb-32 space-y-12">
                 {/* ========================================================================= */}
                 {/* HEADER HERO SECTION                                                      */}
                 {/* ========================================================================= */}
                 <header className="text-center max-w-3xl mx-auto space-y-4">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#FFE566] border-2 border-black text-black font-black text-xs tracking-wider uppercase shadow-[2px_2px_0px_#000] select-none">
-                        <Sparkles className="w-3.5 h-3.5 stroke-[2.5]" />
-                        <span>Developer Documentation & Architecture</span>
+                        <OrbixLogo className="w-3.5 h-3.5 text-black flex-shrink-0" />
+                        <span>Orbix Architecture & Documentation</span>
                     </div>
 
                     <h1 className="text-4xl sm:text-6xl font-black tracking-tight text-black leading-[1.08]">
@@ -152,11 +153,10 @@ export const DocsHubPage: React.FC = () => {
                         <button
                             type="button"
                             onClick={() => setSelectedFolderId("all")}
-                            className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border-2 border-black shrink-0 ${
-                                selectedFolderId === "all"
-                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                    : "bg-[#FAF6EE] text-black hover:bg-neutral-200 shadow-[1px_1px_0px_#000]"
-                            }`}
+                            className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border-2 border-black shrink-0 ${selectedFolderId === "all"
+                                ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                : "bg-[#FAF6EE] text-black hover:bg-neutral-200 shadow-[1px_1px_0px_#000]"
+                                }`}
                         >
                             All Folders ({totalFilesCount})
                         </button>
@@ -165,11 +165,10 @@ export const DocsHubPage: React.FC = () => {
                                 key={folder.id}
                                 type="button"
                                 onClick={() => setSelectedFolderId(folder.id)}
-                                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border-2 border-black shrink-0 flex items-center gap-1.5 ${
-                                    selectedFolderId === folder.id
-                                        ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                        : "bg-[#FAF6EE] text-black hover:bg-neutral-200 shadow-[1px_1px_0px_#000]"
-                                }`}
+                                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer border-2 border-black shrink-0 flex items-center gap-1.5 ${selectedFolderId === folder.id
+                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                    : "bg-[#FAF6EE] text-black hover:bg-neutral-200 shadow-[1px_1px_0px_#000]"
+                                    }`}
                             >
                                 <span>{folder.name}</span>
                                 <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-black/10">
@@ -220,8 +219,8 @@ export const DocsHubPage: React.FC = () => {
                                 filteredFolders.length === 1
                                     ? "max-w-2xl mx-auto w-full space-y-8"
                                     : filteredFolders.length === 2 || filteredFolders.length === 4
-                                    ? "grid grid-cols-1 md:grid-cols-2 gap-7 items-stretch"
-                                    : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch"
+                                        ? "grid grid-cols-1 md:grid-cols-2 gap-7 items-stretch"
+                                        : "grid grid-cols-1 md:grid-cols-2  gap-6 items-stretch"
                             }
                         >
                             {filteredFolders.map((folder) => {

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "../../context/ToastContext";
+import { OrbixLogo } from "../../components/OrbixLogo";
 import Right from "./Right";
 
 interface AuthLayoutProps {
@@ -39,13 +40,10 @@ export const AuthLayout = ({
                     <Link
                         to="/"
                         className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white text-black font-black text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                        title="Back to Homepage"
+                        title="Back to Orbix Homepage"
                     >
-                        <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:-translate-x-0.5 stroke-[2.5]" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                            <line x1="19" y1="12" x2="5" y2="12" />
-                            <polyline points="12 19 5 12 12 5" />
-                        </svg>
-                        <span>Home</span>
+                        <OrbixLogo className="w-4 h-4 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                        <span>Orbix</span>
                     </Link>
                 </div>
 

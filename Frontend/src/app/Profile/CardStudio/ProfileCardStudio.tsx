@@ -18,6 +18,7 @@ import {
 import { LinkedInCard } from "./LinkedInCard";
 import { InstagramStoryCard } from "./InstagramStoryCard";
 import { CardCustomizerToolbar } from "./CardCustomizerToolbar";
+import { OrbixLogo } from "../../../components/OrbixLogo";
 
 interface ProfileCardStudioProps {
     user: any;
@@ -379,10 +380,8 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
             {/* Studio Header */}
             <div className="flex items-center justify-between pb-4 border-b-2 border-black/10">
                 <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-[#FFE566] text-black border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                        <svg className="w-4 h-4 text-black" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                        </svg>
+                    <div className="w-8 h-8 rounded-xl bg-[#FFE566] text-black border-2 border-black flex items-center justify-center p-1.5 shadow-[2px_2px_0px_#000] flex-shrink-0">
+                        <OrbixLogo className="w-full h-full text-black" />
                     </div>
                     <div>
                         <h2 className="text-base sm:text-lg font-black text-neutral-900 tracking-tight flex items-center gap-2">

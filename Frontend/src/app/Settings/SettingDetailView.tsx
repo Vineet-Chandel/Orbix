@@ -33,6 +33,7 @@ import {
 } from "../../store/networkSlice";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { OrbixLogo } from "../../components/OrbixLogo";
 import type { ConnectedUserItem } from "../../api/relationshipApi";
 import { HelpCenterView } from "./HelpCenterView";
 import { ManageAccountView } from "./ManageAccountView";
@@ -853,12 +854,18 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                 return (
                     <div className="space-y-5">
                         <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="space-y-1">
-                                <h3 className="text-xl font-black text-black">Orbix Privacy Center</h3>
-                                <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
-                                    We believe developer data belongs to developers. Orbix never sells your code, submissions, or contact details to third-party data brokers.
-                                </p>
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center p-2 shadow-[2px_2px_0px_#000] flex-shrink-0">
+                                    <OrbixLogo className="w-full h-full text-black" />
+                                </div>
+                                <div>
+                                    <h3 className="text-xl font-black text-black">Orbix Privacy Center</h3>
+                                    <p className="text-xs font-mono font-bold text-neutral-600">Zero telemetry selling • Developer First</p>
+                                </div>
                             </div>
+                            <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
+                                We believe developer data belongs to developers. Orbix never sells your code, submissions, or contact details to third-party data brokers.
+                            </p>
 
                             <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-3">
                                 <div className="flex items-center justify-between">
@@ -928,8 +935,8 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                 return (
                     <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center font-black text-xl shadow-[2px_2px_0px_#000]">
-                                O
+                            <div className="w-12 h-12 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center p-2 shadow-[2px_2px_0px_#000] flex-shrink-0">
+                                <OrbixLogo className="w-full h-full text-black" />
                             </div>
                             <div>
                                 <h3 className="text-xl font-black text-black">Orbix Platform</h3>

@@ -74,7 +74,7 @@ export interface ValidatedClubRegistrationData {
     clubSocialUrl: string | null;
 
     username: string;
-    password: string;
+    password?: string;
 
     emailVerificationToken: string | null;
     phoneVerificationToken: string | null;
@@ -85,7 +85,10 @@ export interface ValidatedClubRegistrationData {
 
 const URL_REGEX = /^https?:\/\/.+/i;
 
-export default function ClubRegistrationValidator(data: any): ValidatedClubRegistrationData {
+export default function ClubRegistrationValidator(
+    data: any,
+    options?: { isExistingUser?: boolean }
+): ValidatedClubRegistrationData {
     if (!data || typeof data !== "object") {
         throw new ValidationError("Invalid registration payload.");
     }
@@ -215,23 +218,41 @@ export default function ClubRegistrationValidator(data: any): ValidatedClubRegis
 
     // 5. Account Credentials
     const username = typeof data.username === "string" ? data.username.trim().toLowerCase() : "";
-    if (!username || !/^[a-z0-9._-]{3,20}$/.test(username)) {
+    if (!options?.isExistingUser) {
+        if (!username || !/^[a-z0-9._-]{3,20}$/.test(username)) {
+            throw new ValidationError("Username must be 3-20 characters: lowercase letters, numbers, dot, _, or -");
+        }
+    } else if (username && !/^[a-z0-9._-]{3,20}$/.test(username)) {
         throw new ValidationError("Username must be 3-20 characters: lowercase letters, numbers, dot, _, or -");
     }
 
     const password = typeof data.password === "string" ? data.password : "";
-    if (!password || password.length < 8) {
-        throw new ValidationError("Password must be at least 8 characters long.");
-    }
-    if (password.length > 128) {
-        throw new ValidationError("Password cannot exceed 128 characters.");
-    }
-    if (!validator.isStrongPassword(password, { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 })) {
-        throw new ValidationError("Password must contain at least one uppercase letter, one lowercase letter, one number, and one symbol.");
-    }
-
-    if (data.confirmPassword !== undefined && data.confirmPassword !== password) {
-        throw new ValidationError("Passwords do not match.");
+    if (!options?.isExistingUser) {
+        if (!password || password.length < 8) {
+            throw new ValidationError("Password must be at least 8 characters long.");
+        }
+        if (password.length > 128) {
+            throw new ValidationError("Password cannot exceed 128 characters.");
+        }
+        if (!validator.isStrongPassword(password, { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 })) {
+            throw new ValidationError("Password must contain at least one uppercase letter, one lowercase letter, one number, and one symbol.");
+        }
+        if (data.confirmPassword !== undefined && data.confirmPassword !== password) {
+            throw new ValidationError("Passwords do not match.");
+        }
+    } else if (password) {
+        if (password.length < 8) {
+            throw new ValidationError("Password must be at least 8 characters long.");
+        }
+        if (password.length > 128) {
+            throw new ValidationError("Password cannot exceed 128 characters.");
+        }
+        if (!validator.isStrongPassword(password, { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 })) {
+            throw new ValidationError("Password must contain at least one uppercase letter, one lowercase letter, one number, and one symbol.");
+        }
+        if (data.confirmPassword !== undefined && data.confirmPassword !== password) {
+            throw new ValidationError("Passwords do not match.");
+        }
     }
 
     const collegeId = typeof data.collegeId === "string" && data.collegeId.trim() ? data.collegeId.trim() : null;

@@ -13,7 +13,6 @@ import {
     HelpCircle,
     ShieldCheck,
     CheckCircle2,
-    Info,
     LogOut,
     ChevronRight,
     Search,
@@ -22,6 +21,7 @@ import {
     Globe,
 } from "lucide-react";
 import type { SettingsViewKey } from "./types";
+import { OrbixLogo } from "../../components/OrbixLogo";
 
 interface SettingsHubProps {
     user: any;
@@ -115,8 +115,8 @@ export const SettingsHub: React.FC<SettingsHubProps> = ({
             id: "about" as SettingsViewKey,
             title: "About",
             description: "Orbix version, terms of service, and licenses",
-            icon: <Info className="w-5 h-5 text-black stroke-[2.5]" />,
-            iconBg: "bg-neutral-200",
+            icon: <OrbixLogo className="w-5 h-5 text-black" />,
+            iconBg: "bg-[#FFE566]",
         },
     ];
 

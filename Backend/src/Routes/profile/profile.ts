@@ -15,6 +15,7 @@ import photoRouter from "./photo.js";
 import resumeRouter, { generateSignedResumeUrl } from "./resume.js";
 import { getBlockState } from "../../services/relationship/blockService.js";
 import { resolveRelationshipState, resolveRelationshipStatesBatch } from "../../services/relationship/relationshipService.js";
+import { enrichUserWithClubData } from "../../services/club/clubEnrichmentService.js";
 
 const profileRouter = express.Router();
 
@@ -260,19 +261,23 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
 
         const cooldownInfo = computeCollegeCooldown(userRow.collegeUpdatedAt);
 
+        const fullUser: any = {
+            ...userRow,
+            college,
+            collegeUpdatedAt: userRow.collegeUpdatedAt,
+            canChangeCollege: cooldownInfo.canChangeCollege,
+            collegeLockRemainingMs: cooldownInfo.collegeLockRemainingMs,
+            nextAllowedCollegeChangeAt: cooldownInfo.nextAllowedCollegeChangeAt,
+            skills: Array.isArray(userRow.skills) ? userRow.skills : [],
+            links: parseLinks(userRow.links, userRow),
+            platforms: linksResult.rows || [],
+        };
+
+        await enrichUserWithClubData(fullUser, authUser.id);
+
         return res.status(200).json({
             success: true,
-            user: {
-                ...userRow,
-                college,
-                collegeUpdatedAt: userRow.collegeUpdatedAt,
-                canChangeCollege: cooldownInfo.canChangeCollege,
-                collegeLockRemainingMs: cooldownInfo.collegeLockRemainingMs,
-                nextAllowedCollegeChangeAt: cooldownInfo.nextAllowedCollegeChangeAt,
-                skills: Array.isArray(userRow.skills) ? userRow.skills : [],
-                links: parseLinks(userRow.links, userRow),
-                platforms: linksResult.rows || [],
-            },
+            user: fullUser,
         });
     } catch (err: any) {
         console.error("GET /profile/me error:", err);

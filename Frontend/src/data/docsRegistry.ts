@@ -140,6 +140,34 @@ export const DOCS_FOLDERS: DocFolder[] = [
             },
         ],
     },
+    {
+        id: "club-governance",
+        name: "Campus & Club Governance",
+        badge: "Institutional Standard",
+        icon: "ShieldCheck",
+        color: "bg-[#FFE566]",
+        description: "Official 5-stage institutional club verification protocol, reviewer analysis standards, college outreach checklists, and verified club activation lifecycle.",
+        files: [
+            {
+                id: "club-verification-protocol",
+                slug: "club-verification-protocol",
+                title: "Institutional Club Verification: Architecture & Reviewer Evaluation Standard",
+                subtitle: "5-Stage Verification Standard • 4-Pillar Reviewer Audit • Institutional Registry Check • Dedicated Dashboard Activation",
+                folderId: "club-governance",
+                folderName: "Campus & Club Governance",
+                badge: "Verification Standard",
+                badgeColor: "bg-[#FFE566]",
+                image: "https://res.cloudinary.com/dj0ivep44/image/upload/v1793262961/Neon_Club_Registration_Verification_Dashboard_h0f0og.png",
+                summary: "Authoritative architectural documentation of the Orbix Club Verification Protocol. Details the complete end-to-end lifecycle: application intake, anti-squatting checks, direct institutional outreach, the 4 mandatory reviewer evaluation criteria, status state machines, and verified dashboard activation.",
+                tags: ["Club Verification", "Campus Directory", "Reviewer Audit", "Security", "5-Stage Standard", "Verified Badge"],
+                readTime: "10 min read",
+                updatedAt: "October 2026",
+                author: "Orbix Campus Architecture & Trust Team",
+                featured: true,
+                hasInteractiveSim: true,
+            },
+        ],
+    },
 ];
 
 export const ALL_DOC_FILES: DocFile[] = DOCS_FOLDERS.flatMap((folder) => folder.files);

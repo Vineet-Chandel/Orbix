@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { useToast } from "../../context/ToastContext";
+import { OrbixLogo } from "../../components/OrbixLogo";
 
 interface VerifiedClub {
     id: string;
@@ -420,8 +421,8 @@ export default function ClubDashboardPage() {
             {/* Mobile Header */}
             <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b-2 border-black sticky top-0 z-40">
                 <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-xl bg-black flex items-center justify-center text-white font-black text-sm border-2 border-black">
-                        O
+                    <div className="w-8 h-8 rounded-xl bg-black flex items-center justify-center p-1.5 border-2 border-black">
+                        <OrbixLogo className="w-full h-full text-white" />
                     </div>
                     <span className="font-black text-sm tracking-tight">{club.name}</span>
                 </div>
@@ -443,8 +444,8 @@ export default function ClubDashboardPage() {
                     {/* Brand Header */}
                     <div className="p-5 border-b-2 border-black flex items-center justify-between">
                         <Link to="/" className="flex items-center gap-2.5 group">
-                            <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center text-white font-black text-base border-2 border-black shadow-[2px_2px_0px_#000] group-hover:bg-neutral-800 transition-colors">
-                                O
+                            <div className="w-9 h-9 rounded-xl bg-black flex items-center justify-center p-1.5 border-2 border-black shadow-[2px_2px_0px_#000] group-hover:bg-neutral-800 transition-colors flex-shrink-0">
+                                <OrbixLogo className="w-full h-full text-white" />
                             </div>
                             <div>
                                 <span className="font-black text-base tracking-tight block">Orbix Club</span>

@@ -1,5 +1,6 @@
 import React from "react";
-import { X, Cpu, ShieldCheck, Award, Zap, Code2, BookOpen, GitPullRequest, Flame, CheckCircle2 } from "lucide-react";
+import { X, ShieldCheck, Award, Zap, Code2, BookOpen, GitPullRequest, Flame, CheckCircle2 } from "lucide-react";
+import { OrbixLogo } from "../../components/OrbixLogo";
 
 interface AlgorithmModalProps {
     isOpen: boolean;
@@ -119,8 +120,8 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b-2 border-black bg-white">
                     <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-black text-[#a2ff86] rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000]">
-                            <Cpu className="w-6 h-6 stroke-[2.5]" />
+                        <div className="p-2.5 bg-black text-[#a2ff86] rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center flex-shrink-0">
+                            <OrbixLogo className="w-6 h-6 text-[#a2ff86]" />
                         </div>
                         <div>
                             <div className="flex items-center gap-2 flex-wrap">

@@ -16,6 +16,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "orbix_secret_fallback_key_2026";
 export interface SendPhoneOtpParams {
     phone: string;
     clubName?: string | undefined;
+    userId?: string | undefined;
     ipAddress?: string | undefined;
     userAgent?: string | undefined;
 }
@@ -221,6 +222,42 @@ export class PhoneVerificationService {
         }
 
         const canonical = norm.canonical;
+
+        // 0. Pre-check: Enforce Phone Uniqueness Policy before sending SMS or expending quota
+        const existingUserRes = await query(
+            `SELECT id FROM users WHERE LOWER(TRIM(phone)) = LOWER(TRIM($1)) LIMIT 1;`,
+            [canonical]
+        );
+        if (existingUserRes.rows[0] && (!params.userId || existingUserRes.rows[0].id !== params.userId)) {
+            const error: any = new Error("This mobile phone number is already registered to an Orbix account.");
+            error.statusCode = 409;
+            throw error;
+        }
+
+        const existingAppRes = await query(
+            `SELECT id, auth_user_id FROM club_verification_requests 
+             WHERE LOWER(TRIM(contact_phone)) = LOWER(TRIM($1)) 
+               AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
+             LIMIT 1;`,
+            [canonical]
+        );
+        if (existingAppRes.rows[0] && (!params.userId || existingAppRes.rows[0].auth_user_id !== params.userId)) {
+            const error: any = new Error("This mobile phone number is already associated with an active club verification application.");
+            error.statusCode = 409;
+            throw error;
+        }
+
+        const existingClubRes = await query(
+            `SELECT id, auth_user_id FROM verified_clubs 
+             WHERE LOWER(TRIM(contact_phone)) = LOWER(TRIM($1)) 
+             LIMIT 1;`,
+            [canonical]
+        );
+        if (existingClubRes.rows[0] && (!params.userId || existingClubRes.rows[0].auth_user_id !== params.userId)) {
+            const error: any = new Error("This mobile phone number is already associated with a verified club.");
+            error.statusCode = 409;
+            throw error;
+        }
 
         // 1. Redis Rate Limiting: 60s cooldown
         if (redis && redis.status === "ready") {

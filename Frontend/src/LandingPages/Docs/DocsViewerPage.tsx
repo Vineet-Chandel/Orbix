@@ -6,6 +6,7 @@ import AlgorithmDocumentary from "./documentaries/AlgorithmDocumentary";
 import PlatformRegistryDocumentary from "./documentaries/PlatformRegistryDocumentary";
 import ResumeIntelligenceDocumentary from "./documentaries/ResumeIntelligenceDocumentary";
 import ProfilePrivacyDocumentary from "./documentaries/ProfilePrivacyDocumentary";
+import ClubVerificationDocumentary from "./documentaries/ClubVerificationDocumentary";
 import {
     ArrowLeft,
     FileText,
@@ -22,12 +23,14 @@ export const DocsViewerPage: React.FC = () => {
         activeSlug === "algorithm" || activeSlug === "scoring" || activeSlug === "leaderboard"
             ? "orbix-score-algorithm"
             : activeSlug === "platforms" || activeSlug === "platform-registry" || activeSlug === "connected-platforms"
-            ? "supported-platform-registry"
-            : activeSlug === "resume" || activeSlug === "resume-analytics" || activeSlug === "resume-algorithm" || activeSlug === "resume-intelligence" || activeSlug === "resume-intelligence-algorithm"
-            ? "resume-intelligence-algorithm"
-            : activeSlug === "privacy" || activeSlug === "public-vs-private" || activeSlug === "public-vs-private-profile" || activeSlug === "profile-privacy"
-            ? "public-vs-private-profile"
-            : activeSlug;
+                ? "supported-platform-registry"
+                : activeSlug === "resume" || activeSlug === "resume-analytics" || activeSlug === "resume-algorithm" || activeSlug === "resume-intelligence" || activeSlug === "resume-intelligence-algorithm"
+                    ? "resume-intelligence-algorithm"
+                    : activeSlug === "privacy" || activeSlug === "public-vs-private" || activeSlug === "public-vs-private-profile" || activeSlug === "profile-privacy"
+                        ? "public-vs-private-profile"
+                        : activeSlug === "club" || activeSlug === "club-verification" || activeSlug === "club-verification-protocol" || activeSlug === "club-verification-standard" || activeSlug === "clubs"
+                            ? "club-verification-protocol"
+                            : activeSlug;
 
     // Check if doc exists in registry
     const doc = getDocBySlug(resolvedSlug);
@@ -40,7 +43,7 @@ export const DocsViewerPage: React.FC = () => {
             {/* Global Navigation */}
             <NavBar activeTab="docs" />
 
-            <main className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24 sm:pt-32 sm:pb-32 space-y-8">
+            <main className=" mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24 sm:pt-32 sm:pb-32 space-y-8">
                 {/* ========================================================================= */}
                 {/* BREADCRUMB NAVIGATION & BACK BUTTON                                       */}
                 {/* ========================================================================= */}
@@ -73,6 +76,8 @@ export const DocsViewerPage: React.FC = () => {
                     <ResumeIntelligenceDocumentary />
                 ) : resolvedSlug === "public-vs-private-profile" ? (
                     <ProfilePrivacyDocumentary />
+                ) : resolvedSlug === "club-verification-protocol" ? (
+                    <ClubVerificationDocumentary />
                 ) : doc ? (
                     <article className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-8">
                         <header className="space-y-4 pb-6 border-b-2 border-black/15">
