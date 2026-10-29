@@ -13,6 +13,7 @@ import {
     ArrowUpRight,
     User,
     Users,
+    Building2,
     UserPlus,
     UserCheck,
     GraduationCap,
@@ -76,6 +77,7 @@ export const NotificationsView: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [actingInvitationId, setActingInvitationId] = useState<string | null>(null);
 
     // Load notifications with automatic read marking
     const loadNotifications = useCallback(
@@ -194,6 +196,74 @@ export const NotificationsView: React.FC = () => {
             Boolean((item.metadata as any)?.invitationId)
         );
     }, []);
+
+    const handleAcceptTeamInvitation = async (notificationId: string, invitationId: string) => {
+        setActingInvitationId(invitationId);
+        try {
+            const res = await fetch(`/api/club/team/invitations/${invitationId}/accept`, {
+                method: "POST",
+                credentials: "include",
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.message || "Failed to accept invitation.");
+                return;
+            }
+
+            setNotifications((prev) =>
+                prev.map((notif) => {
+                    if (notif.id === notificationId) {
+                        return {
+                            ...notif,
+                            metadata: {
+                                ...notif.metadata,
+                                invitationStatus: "accepted",
+                            },
+                        };
+                    }
+                    return notif;
+                })
+            );
+        } catch (err) {
+            console.error("Accept invitation error:", err);
+        } finally {
+            setActingInvitationId(null);
+        }
+    };
+
+    const handleDeclineTeamInvitation = async (notificationId: string, invitationId: string) => {
+        setActingInvitationId(invitationId);
+        try {
+            const res = await fetch(`/api/club/team/invitations/${invitationId}/decline`, {
+                method: "POST",
+                credentials: "include",
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                alert(data.message || "Failed to decline invitation.");
+                return;
+            }
+
+            setNotifications((prev) =>
+                prev.map((notif) => {
+                    if (notif.id === notificationId) {
+                        return {
+                            ...notif,
+                            metadata: {
+                                ...notif.metadata,
+                                invitationStatus: "declined",
+                            },
+                        };
+                    }
+                    return notif;
+                })
+            );
+        } catch (err) {
+            console.error("Decline invitation error:", err);
+        } finally {
+            setActingInvitationId(null);
+        }
+    };
 
     // Immediate reactive state updater when user accepts or declines connection in the UI
     const handleRelationshipStateChange = useCallback((notificationId: string, newState: string) => {
