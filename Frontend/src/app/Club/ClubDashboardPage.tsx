@@ -1,7 +1,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-    ShieldCheck,
     Calendar,
     CalendarDays,
     Plus,
@@ -11,9 +10,6 @@ import {
     MapPin,
     Save,
     X,
-    Building2,
-    ChevronRight,
-    Mail,
     Bell,
     ExternalLink,
     CheckCircle2,
@@ -424,28 +420,12 @@ export default function ClubDashboardPage() {
     const publishedEvents = useMemo(() => events.filter((e) => e.status === "published"), [events]);
     const draftEvents = useMemo(() => events.filter((e) => e.status === "draft"), [events]);
     const cancelledEvents = useMemo(() => events.filter((e) => e.status === "cancelled"), [events]);
-    const upcomingEvents = useMemo(
-        () => publishedEvents.filter((e) => new Date(e.startsAt) >= new Date()),
-        [publishedEvents]
-    );
 
     // Filtered Events for Events View
     const filteredEvents = useMemo(() => {
         if (eventFilter === "all") return events;
         return events.filter((e) => e.status === eventFilter);
     }, [events, eventFilter]);
-
-    // Calculate Profile Completeness Percentage
-    const profileCompleteness = useMemo(() => {
-        if (!club) return 0;
-        let score = 30; // base verified club creation
-        if (club.short_description && club.short_description.length > 20) score += 20;
-        if (club.about && club.about.length > 50) score += 20;
-        if (club.website_url) score += 10;
-        if (club.logo_url) score += 10;
-        if (club.social_links && Object.values(club.social_links).some((v) => Boolean(v))) score += 10;
-        return Math.min(100, score);
-    }, [club]);
 
     // Handle Logout
     const handleSignOut = async () => {
@@ -552,205 +532,7 @@ export default function ClubDashboardPage() {
                             </div>
                         </div>
 
-                        {/* TAB 1: OVERVIEW */}
-                        {activeTab === "overview" && (
-                            <div className="space-y-6">
-                                {/* Club Identity Summary Card */}
-                                <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 justify-between">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-black bg-emerald-200 flex items-center justify-center font-black text-2xl shadow-[3px_3px_0px_#000] overflow-hidden shrink-0">
-                                                {club.logo_url ? (
-                                                    <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    club.name.slice(0, 2).toUpperCase()
-                                                )}
-                                            </div>
-                                            <div>
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                    <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
-                                                        {club.name}
-                                                    </h2>
-                                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-emerald-300 border-2 border-black shadow-[2px_2px_0px_#000]">
-                                                        <ShieldCheck className="w-3.5 h-3.5" />
-                                                        Verified Club
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs sm:text-sm font-bold text-neutral-600 flex items-center gap-1.5 mt-1 flex-wrap">
-                                                    <Building2 className="w-4 h-4 text-neutral-400 shrink-0" />
-                                                    <span>{club.college_name}</span>
-                                                    <span className="text-neutral-400">•</span>
-                                                    <span>{club.college_city}, {club.college_state}</span>
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000]">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                                            <span>Active Chapter</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 4-Card Quick Metrics Grid: Upcoming, Draft, Total, and Club Inbox */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {/* Card 1: Upcoming Events -> Click switches to events tab filtered to published */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setActiveTab("events");
-                                            setEventFilter("published");
-                                        }}
-                                        className="p-5 rounded-2xl bg-emerald-100 hover:bg-emerald-200 border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between text-left transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900">
-                                                Upcoming Events
-                                            </span>
-                                            <ChevronRight className="w-4 h-4 text-emerald-800 transition-transform group-hover:translate-x-0.5" />
-                                        </div>
-                                        <div className="text-3xl font-black text-neutral-900 my-2">
-                                            {upcomingEvents.length}
-                                        </div>
-                                        <span className="text-[10px] font-bold text-emerald-800">Live for student registrations</span>
-                                    </button>
-
-                                    {/* Card 2: Draft Events -> Click switches to events tab filtered to draft */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setActiveTab("events");
-                                            setEventFilter("draft");
-                                        }}
-                                        className="p-5 rounded-2xl bg-amber-100 hover:bg-amber-200 border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between text-left transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-900">
-                                                Draft Events
-                                            </span>
-                                            <ChevronRight className="w-4 h-4 text-amber-800 transition-transform group-hover:translate-x-0.5" />
-                                        </div>
-                                        <div className="text-3xl font-black text-neutral-900 my-2">
-                                            {draftEvents.length}
-                                        </div>
-                                        <span className="text-[10px] font-bold text-amber-800">Unpublished drafts</span>
-                                    </button>
-
-                                    {/* Card 3: Total Events -> Click switches to events tab */}
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setActiveTab("events");
-                                            setEventFilter("all");
-                                        }}
-                                        className="p-5 rounded-2xl bg-white hover:bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between text-left transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[11px] font-black uppercase tracking-wider text-neutral-600">
-                                                Total Events
-                                            </span>
-                                            <ChevronRight className="w-4 h-4 text-neutral-700 transition-transform group-hover:translate-x-0.5" />
-                                        </div>
-                                        <div className="text-3xl font-black text-neutral-900 my-2">
-                                            {events.length}
-                                        </div>
-                                        <span className="text-[10px] font-bold text-neutral-500">All registered sessions</span>
-                                    </button>
-
-                                    {/* Card 4: Club Inbox & Inquiries */}
-                                    <div className="p-5 rounded-2xl bg-[#E8F0FE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[11px] font-black uppercase tracking-wider text-blue-900">
-                                                Club Inquiries
-                                            </span>
-                                            {inboxCounts.unreadCount > 0 ? (
-                                                <span className="px-2 py-0.5 rounded-full bg-[#FF6B6B] text-black border border-black text-[10px] font-black animate-pulse">
-                                                    {inboxCounts.unreadCount} New
-                                                </span>
-                                            ) : (
-                                                <Mail className="w-4 h-4 text-blue-700" />
-                                            )}
-                                        </div>
-                                        <div className="text-3xl font-black text-neutral-900 my-2">
-                                            {inboxCounts.unreadCount}
-                                            <span className="text-xs font-bold text-neutral-600 ml-1.5 font-sans">
-                                                unread
-                                            </span>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsInboxModalOpen(true)}
-                                            className="w-full py-1.5 rounded-lg bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all"
-                                        >
-                                            <span>Open Club Inbox</span>
-                                            <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Profile Completeness & Quick Action */}
-                                <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-5">
-                                    <div className="flex-1 max-w-xl">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-xs font-black uppercase tracking-wider text-neutral-500">
-                                                Profile Completeness
-                                            </span>
-                                            <span className="font-black text-sm text-neutral-900">
-                                                {profileCompleteness}%
-                                            </span>
-                                        </div>
-                                        <div className="w-full bg-neutral-100 rounded-full h-3 border-2 border-black overflow-hidden p-0.5">
-                                            <div
-                                                className="bg-emerald-400 h-full rounded-full transition-all duration-500"
-                                                style={{ width: `${profileCompleteness}%` }}
-                                            />
-                                        </div>
-                                        <p className="text-xs text-neutral-600 font-medium mt-2">
-                                            {profileCompleteness === 100
-                                                ? "Your club details and descriptions are fully complete."
-                                                : "Add club logo, description, and website to maximize credibility."}
-                                        </p>
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveTab("profile")}
-                                        className="px-4 py-2.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[2.5px_2.5px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-                                    >
-                                        <Edit3 className="w-3.5 h-3.5" />
-                                        <span>Update Profile Details</span>
-                                    </button>
-                                </div>
-
-                                {/* Institutional Accreditation Snapshot Card */}
-                                <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                                    <div className="flex items-center justify-between flex-wrap gap-2">
-                                        <div className="flex items-center gap-2">
-                                            <ShieldCheck className="w-5 h-5 text-emerald-600" />
-                                            <h3 className="text-base font-black text-neutral-900">Collegiate Verification Record</h3>
-                                        </div>
-                                        <span className="text-xs font-bold text-neutral-500">
-                                            Verified {new Date(club.verified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
-                                        </span>
-                                    </div>
-                                    <p className="text-xs text-neutral-600 leading-relaxed font-medium">
-                                        This organization operates as an authorized campus chapter of <strong>{club.college_name}</strong>. Event scheduling, workshop administration, and student messaging follow institutional governance guidelines.
-                                    </p>
-                                    <div className="pt-2 flex flex-wrap items-center gap-3 text-xs font-bold text-neutral-700">
-                                        <span className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] border border-black/30">
-                                            Campus: {club.college_city}, {club.college_state}
-                                        </span>
-                                        <span className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] border border-black/30">
-                                            Category: {club.category}
-                                        </span>
-                                        <span className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] border border-black/30">
-                                            Authority: Lead Student Representative
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* TAB 2: MANAGE CLUB PROFILE */}
+                        {/* TAB: MANAGE CLUB PROFILE */}
                         {activeTab === "profile" && (
                             <div className="space-y-6">
                                 <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
@@ -917,8 +699,8 @@ export default function ClubDashboardPage() {
                             </div>
                         )}
 
-                        {/* TAB 3: DEDICATED EVENTS & WORKSHOPS MANAGEMENT */}
-                        {activeTab === "events" && (
+                        {/* TAB: CLUB EVENTS & WORKSHOPS (PRIMARY DASHBOARD WORKSPACE) */}
+                        {(activeTab === "overview" || activeTab === "events") && (
                             <div className="space-y-6">
                                 {/* Header Card with Title and Prominent + Create New Event Button */}
                                 <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
