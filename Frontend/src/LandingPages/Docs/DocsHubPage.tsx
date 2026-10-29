@@ -268,7 +268,7 @@ export const DocsHubPage: React.FC = () => {
                                                         {/* Image-like View Header (Thumbnail Banner) */}
                                                         <Link
                                                             to={`/docs/${file.slug}`}
-                                                            className="block w-full relative overflow-hidden bg-black border-b-2 border-black shrink-0 h-52 sm:h-56"
+                                                            className="block w-full relative overflow-hidden bg-black border-b-2 border-black shrink-0 h-[250px] sm:h-[350px]"
                                                         >
                                                             <img
                                                                 src={file.image}
