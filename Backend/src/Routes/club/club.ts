@@ -2470,6 +2470,28 @@ const handleGetPublicClub = async (req: Request, res: Response) => {
 
         const club = clubRes.rows[0];
 
+        // Block check: if authenticated viewer is blocked by this club, deny access to protected club details & events
+        const viewerId = req.user?.id;
+        if (viewerId) {
+            const modState = await getClubModerationState(club.id, viewerId);
+            if (modState.isBlocked) {
+                return res.status(200).json({
+                    success: true,
+                    isBlockedByClub: true,
+                    club: {
+                        id: club.id,
+                        name: club.name,
+                        slug: club.slug,
+                        collegeName: club.collegeName,
+                    },
+                    upcomingEvents: [],
+                    pastEvents: [],
+                    totalEvents: 0,
+                    message: "Access Restricted: You don't have permission to access this club.",
+                });
+            }
+        }
+
         // Fetch published events
         const eventsRes = await query(
             `SELECT
@@ -2498,6 +2520,7 @@ const handleGetPublicClub = async (req: Request, res: Response) => {
 
         return res.json({
             success: true,
+            isBlockedByClub: false,
             club,
             upcomingEvents,
             pastEvents,
@@ -2509,7 +2532,552 @@ const handleGetPublicClub = async (req: Request, res: Response) => {
     }
 };
 
-clubRouter.get("/public/:slug", handleGetPublicClub);
-clubRouter.get("/:slug", handleGetPublicClub);
+clubRouter.get("/public/:slug", optionalAuthenticate, handleGetPublicClub);
+clubRouter.get("/:slug", optionalAuthenticate, handleGetPublicClub);
+
+// =========================================================================
+// CLUB INBOX & PUBLIC MESSAGING ENDPOINTS
+// =========================================================================
+
+/**
+ * Helper to retrieve staff verified club
+ */
+async function getStaffClub(userId: string) {
+    const res = await query(
+        `SELECT id, name, slug, auth_user_id AS "authUserId", is_active AS "isActive"
+         FROM verified_clubs
+         WHERE auth_user_id = $1 LIMIT 1;`,
+        [userId]
+    );
+    return res.rows[0] || null;
+}
+
+/**
+ * POST /api/club/:clubId/messages
+ * Allows any authenticated registered user to send an inquiry message to a verified club.
+ * Does NOT require connection with club owner.
+ * Enforces rate limits (daily, weekly, monthly, per-pair).
+ * Enforces club-specific block check.
+ * If user is muted, delivery is silent (notification to club suppressed).
+ */
+clubRouter.post("/:clubId/messages", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { clubId } = req.params;
+        const senderId = req.user!.id;
+        const senderName = req.user!.firstName
+            ? `${req.user!.firstName} ${req.user!.lastName || ""}`.trim()
+            : req.user!.username || "Orbix User";
+        const { subject, body } = req.body;
+
+        const result = await sendMessageToClub({
+            senderId,
+            senderName,
+            clubId,
+            subject,
+            body,
+        });
+
+        if (!result.success) {
+            const status = result.code === "RATE_LIMIT_EXCEEDED" ? 429
+                : result.code === "USER_BLOCKED_BY_CLUB" ? 403
+                : result.code === "CLUB_NOT_AVAILABLE" ? 404
+                : 400;
+
+            return res.status(status).json({
+                success: false,
+                code: result.code,
+                message: result.error,
+                retryAfterSeconds: result.retryAfterSeconds,
+            });
+        }
+
+        return res.status(201).json({
+            success: true,
+            message: "Message sent to club successfully.",
+            conversationId: result.conversationId,
+            messageId: result.messageId,
+            isMutedDelivery: result.isMutedDelivery,
+        });
+    } catch (err: any) {
+        console.error("POST /api/club/:clubId/messages error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error." });
+    }
+});
+
+/**
+ * GET /api/club/:clubId/my-conversation
+ * Retrieves the current user's conversation and messages with this club.
+ */
+clubRouter.get("/:clubId/my-conversation", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { clubId } = req.params;
+        const userId = req.user!.id;
+
+        const convRes = await query(
+            `SELECT id, subject, status, is_read_by_user AS "isReadByUser", last_message_at AS "lastMessageAt", created_at AS "createdAt"
+             FROM club_conversations
+             WHERE club_id = $1 AND user_id = $2
+             LIMIT 1;`,
+            [clubId, userId]
+        );
+
+        if (!convRes.rows[0]) {
+            return res.json({ success: true, conversation: null, messages: [] });
+        }
+
+        const conv = convRes.rows[0];
+        const msgsRes = await query(
+            `SELECT id, sender_id AS "senderId", sender_type AS "senderType", body, created_at AS "createdAt"
+             FROM club_messages
+             WHERE conversation_id = $1
+             ORDER BY created_at ASC;`,
+            [conv.id]
+        );
+
+        return res.json({
+            success: true,
+            conversation: conv,
+            messages: msgsRes.rows,
+        });
+    } catch (err: any) {
+        console.error("GET my-conversation error:", err);
+        return res.status(500).json({ success: false, message: "Failed to retrieve conversation." });
+    }
+});
+
+/**
+ * POST /api/club/events/:eventId/register
+ * Registers authenticated user for a club event.
+ * Enforces block check: blocked users CANNOT register or RSVP.
+ */
+clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user!.id;
+
+        const eventRes = await query(
+            `SELECT e.id, e.club_id, e.title, e.status, vc.name AS "clubName"
+             FROM club_events e
+             JOIN verified_clubs vc ON vc.id = e.club_id
+             WHERE e.id = $1
+             LIMIT 1;`,
+            [eventId]
+        );
+
+        if (!eventRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
+        const event = eventRes.rows[0];
+
+        // 1. Enforce Block Check
+        const mod = await getClubModerationState(event.club_id, userId);
+        if (mod.isBlocked) {
+            return res.status(403).json({
+                success: false,
+                code: "ACCESS_RESTRICTED",
+                message: "Access Restricted: You don't have permission to register for events by this club.",
+            });
+        }
+
+        // 2. Check existing registration
+        const existingReg = await query(
+            `SELECT id, status, ticket_code FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
+            [eventId, userId]
+        );
+        if (existingReg.rows[0]) {
+            if (existingReg.rows[0].status === "blocked") {
+                return res.status(403).json({
+                    success: false,
+                    code: "ACCESS_RESTRICTED",
+                    message: "Access Restricted: You don't have permission to access this event.",
+                });
+            }
+            return res.status(200).json({
+                success: true,
+                message: "You are already registered for this event.",
+                registration: existingReg.rows[0],
+            });
+        }
+
+        // 3. Register user
+        const regRes = await query(
+            `INSERT INTO club_event_registrations (event_id, club_id, user_id, status, registered_at, created_at, updated_at)
+             VALUES ($1, $2, $3, 'registered', NOW(), NOW(), NOW())
+             RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt";`,
+            [eventId, event.club_id, userId]
+        );
+
+        return res.status(201).json({
+            success: true,
+            message: `Successfully registered for ${event.title}!`,
+            registration: regRes.rows[0],
+        });
+    } catch (err: any) {
+        console.error("Event registration error:", err);
+        return res.status(500).json({ success: false, message: "Failed to register for event." });
+    }
+});
+
+/**
+ * POST /api/club/events/:eventId/checkin
+ * Checks in an attendee for an event. Enforces block check.
+ */
+clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const { ticketCode, attendeeUserId } = req.body;
+        const targetUserId = attendeeUserId || req.user!.id;
+
+        const eventRes = await query(`SELECT club_id FROM club_events WHERE id = $1 LIMIT 1;`, [eventId]);
+        if (!eventRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
+        const clubId = eventRes.rows[0].club_id;
+
+        // Block check
+        const mod = await getClubModerationState(clubId, targetUserId);
+        if (mod.isBlocked) {
+            return res.status(403).json({
+                success: false,
+                code: "ACCESS_RESTRICTED",
+                message: "Access Restricted: This attendee has been blocked by the club and cannot attend.",
+            });
+        }
+
+        const updateRes = await query(
+            `UPDATE club_event_registrations
+             SET status = 'attended', checked_in_at = NOW(), updated_at = NOW()
+             WHERE event_id = $1 AND (user_id = $2 OR ticket_code = $3) AND status = 'registered'
+             RETURNING id, user_id, status, checked_in_at;`,
+            [eventId, targetUserId, ticketCode || ""]
+        );
+
+        if (!updateRes.rows[0]) {
+            return res.status(400).json({ success: false, message: "No active registration found or already checked in." });
+        }
+
+        return res.json({ success: true, message: "Attendee checked in successfully.", checkin: updateRes.rows[0] });
+    } catch (err: any) {
+        console.error("Event checkin error:", err);
+        return res.status(500).json({ success: false, message: "Failed to check in." });
+    }
+});
+
+// =========================================================================
+// CLUB STAFF INBOX & MODERATION ENDPOINTS
+// =========================================================================
+
+/**
+ * GET /api/club/inbox
+ * Fetches conversations for the authenticated club staff.
+ * Filters: 'inbox' (normal/unmuted), 'muted' (filtered), 'archived', 'all'.
+ */
+clubRouter.get("/inbox", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden: verified club staff only." });
+
+        const filter = (req.query.filter as string) || "inbox";
+        const search = ((req.query.search as string) || "").trim().toLowerCase();
+
+        let sql = `
+            SELECT
+                c.id,
+                c.club_id AS "clubId",
+                c.user_id AS "userId",
+                c.subject,
+                c.status,
+                c.is_read_by_club AS "isReadByClub",
+                c.last_message_preview AS "lastMessagePreview",
+                c.last_message_at AS "lastMessageAt",
+                c.created_at AS "createdAt",
+                u.username,
+                u.firstname AS "firstName",
+                u.lastname AS "lastName",
+                COALESCE(u.photo_url, u.avatar_url) AS "avatarUrl",
+                u.email,
+                COALESCE(m.is_muted, false) AS "isMuted",
+                COALESCE(m.is_blocked, false) AS "isBlocked"
+            FROM club_conversations c
+            JOIN users u ON u.id = c.user_id
+            LEFT JOIN club_user_moderation m ON m.club_id = c.club_id AND m.user_id = c.user_id
+            WHERE c.club_id = $1
+        `;
+        const params: any[] = [club.id];
+
+        if (filter === "muted") {
+            sql += ` AND m.is_muted = true AND c.status != 'archived'`;
+        } else if (filter === "archived") {
+            sql += ` AND c.status = 'archived'`;
+        } else if (filter === "inbox") {
+            sql += ` AND (m.is_muted IS NULL OR m.is_muted = false) AND c.status != 'archived'`;
+        }
+
+        if (search) {
+            params.push(`%${search}%`);
+            sql += ` AND (LOWER(u.username) LIKE $${params.length} OR LOWER(u.firstname) LIKE $${params.length} OR LOWER(u.lastname) LIKE $${params.length} OR LOWER(c.subject) LIKE $${params.length} OR LOWER(c.last_message_preview) LIKE $${params.length})`;
+        }
+
+        sql += ` ORDER BY c.last_message_at DESC LIMIT 100;`;
+
+        const result = await query(sql, params);
+        return res.json({ success: true, count: result.rows.length, conversations: result.rows });
+    } catch (err: any) {
+        console.error("GET /api/club/inbox error:", err);
+        return res.status(500).json({ success: false, message: "Failed to retrieve club inbox." });
+    }
+});
+
+/**
+ * GET /api/club/inbox/unread-count
+ * Returns real-time unread count and muted count for the club inbox badge.
+ */
+clubRouter.get("/inbox/unread-count", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const countsRes = await query(
+            `SELECT
+                COUNT(*) FILTER (WHERE c.is_read_by_club = false AND (m.is_muted IS NULL OR m.is_muted = false) AND c.status != 'archived')::int AS "unreadCount",
+                COUNT(*) FILTER (WHERE m.is_muted = true)::int AS "mutedCount",
+                COUNT(*)::int AS "totalCount"
+             FROM club_conversations c
+             LEFT JOIN club_user_moderation m ON m.club_id = c.club_id AND m.user_id = c.user_id
+             WHERE c.club_id = $1;`,
+            [club.id]
+        );
+
+        return res.json({
+            success: true,
+            counts: countsRes.rows[0] || { unreadCount: 0, mutedCount: 0, totalCount: 0 },
+        });
+    } catch (err: any) {
+        console.error("GET /api/club/inbox/unread-count error:", err);
+        return res.status(500).json({ success: false, message: "Failed to fetch unread count." });
+    }
+});
+
+/**
+ * GET /api/club/inbox/:conversationId/messages
+ * Retrieves full chronological message history for a conversation and auto-marks it as read.
+ */
+clubRouter.get("/inbox/:conversationId/messages", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { conversationId } = req.params;
+
+        const convRes = await query(
+            `SELECT
+                c.id,
+                c.club_id AS "clubId",
+                c.user_id AS "userId",
+                c.subject,
+                c.status,
+                c.is_read_by_club AS "isReadByClub",
+                c.last_message_at AS "lastMessageAt",
+                c.created_at AS "createdAt",
+                u.username,
+                u.firstname AS "firstName",
+                u.lastname AS "lastName",
+                COALESCE(u.photo_url, u.avatar_url) AS "avatarUrl",
+                u.email,
+                COALESCE(m.is_muted, false) AS "isMuted",
+                COALESCE(m.is_blocked, false) AS "isBlocked",
+                m.mute_reason AS "muteReason",
+                m.block_reason AS "blockReason"
+             FROM club_conversations c
+             JOIN users u ON u.id = c.user_id
+             LEFT JOIN club_user_moderation m ON m.club_id = c.club_id AND m.user_id = c.user_id
+             WHERE c.id = $1 AND c.club_id = $2
+             LIMIT 1;`,
+            [conversationId, club.id]
+        );
+
+        if (!convRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "Conversation not found." });
+        }
+
+        // Auto mark as read by club
+        await query(`UPDATE club_conversations SET is_read_by_club = true, updated_at = NOW() WHERE id = $1;`, [conversationId]);
+
+        const msgsRes = await query(
+            `SELECT
+                m.id,
+                m.conversation_id AS "conversationId",
+                m.sender_id AS "senderId",
+                m.sender_type AS "senderType",
+                m.body,
+                m.is_muted_delivery AS "isMutedDelivery",
+                m.created_at AS "createdAt",
+                u.username AS "senderUsername",
+                u.firstname AS "senderFirstName",
+                COALESCE(u.photo_url, u.avatar_url) AS "senderAvatarUrl"
+             FROM club_messages m
+             JOIN users u ON u.id = m.sender_id
+             WHERE m.conversation_id = $1
+             ORDER BY m.created_at ASC;`,
+            [conversationId]
+        );
+
+        return res.json({
+            success: true,
+            conversation: convRes.rows[0],
+            messages: msgsRes.rows,
+        });
+    } catch (err: any) {
+        console.error("GET conversation messages error:", err);
+        return res.status(500).json({ success: false, message: "Failed to fetch messages." });
+    }
+});
+
+/**
+ * POST /api/club/inbox/:conversationId/reply
+ * Club staff sends reply to the user.
+ */
+clubRouter.post("/inbox/:conversationId/reply", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { conversationId } = req.params;
+        const { body } = req.body;
+
+        const result = await sendClubReply({
+            clubId: club.id,
+            staffId: req.user!.id,
+            conversationId,
+            body,
+        });
+
+        if (!result.success) {
+            return res.status(400).json({ success: false, message: result.error });
+        }
+
+        return res.status(201).json({ success: true, message: "Reply sent successfully.", reply: result.message });
+    } catch (err: any) {
+        console.error("POST club reply error:", err);
+        return res.status(500).json({ success: false, message: "Failed to post reply." });
+    }
+});
+
+/**
+ * PATCH /api/club/inbox/:conversationId/read
+ */
+clubRouter.patch("/inbox/:conversationId/read", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { conversationId } = req.params;
+        const { isRead = true } = req.body;
+
+        await query(
+            `UPDATE club_conversations SET is_read_by_club = $1, updated_at = NOW() WHERE id = $2 AND club_id = $3;`,
+            [Boolean(isRead), conversationId, club.id]
+        );
+
+        return res.json({ success: true, message: "Conversation read state updated." });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to update read state." });
+    }
+});
+
+/**
+ * PATCH /api/club/inbox/:conversationId/archive
+ */
+clubRouter.patch("/inbox/:conversationId/archive", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { conversationId } = req.params;
+        const { isArchived = true } = req.body;
+
+        await query(
+            `UPDATE club_conversations SET status = $1, updated_at = NOW() WHERE id = $2 AND club_id = $3;`,
+            [isArchived ? "archived" : "open", conversationId, club.id]
+        );
+
+        return res.json({ success: true, message: isArchived ? "Conversation archived." : "Conversation restored to inbox." });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to update archive state." });
+    }
+});
+
+// Moderation Endpoints
+clubRouter.post("/moderation/mute", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { userId, reason } = req.body;
+        if (!userId) return res.status(400).json({ success: false, message: "User ID is required." });
+
+        const state = await muteUserForClub({ clubId: club.id, userId, staffId: req.user!.id, reason });
+        return res.json({ success: true, message: "User muted for this club.", state });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to mute user." });
+    }
+});
+
+clubRouter.post("/moderation/unmute", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ success: false, message: "User ID is required." });
+
+        const state = await unmuteUserForClub(club.id, userId);
+        return res.json({ success: true, message: "User unmuted.", state });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to unmute user." });
+    }
+});
+
+clubRouter.post("/moderation/block", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { userId, reason } = req.body;
+        if (!userId) return res.status(400).json({ success: false, message: "User ID is required." });
+
+        const state = await blockUserForClub({ clubId: club.id, userId, staffId: req.user!.id, reason });
+        return res.json({ success: true, message: "User blocked from this club.", state });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to block user." });
+    }
+});
+
+clubRouter.post("/moderation/unblock", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { userId } = req.body;
+        if (!userId) return res.status(400).json({ success: false, message: "User ID is required." });
+
+        const state = await unblockUserForClub(club.id, userId);
+        return res.json({ success: true, message: "User unblocked.", state });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to unblock user." });
+    }
+});
+
+clubRouter.get("/moderation/list", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const list = await listModeratedUsers(club.id);
+        return res.json({ success: true, count: list.length, list });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: "Failed to list moderation list." });
+    }
+});
 
 export default clubRouter;
