@@ -469,7 +469,7 @@ export default function ClubStatusPage() {
 
                                             {verifiedClub?.slug && (
                                                 <a
-                                                    href={`/clubs/${verifiedClub.slug}`}
+                                                    href={`/clubs/${(verifiedClub as any)?.clubUsername || verifiedClub.slug}`}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
                                                     className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl bg-white text-black text-xs sm:text-sm font-bold border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-50 active:translate-x-[1px] active:translate-y-[1px] transition-all"

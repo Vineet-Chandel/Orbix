@@ -195,7 +195,8 @@ export default function ClubDashboardPage() {
     // Handle Copy Public Link
     const handleCopyPublicLink = () => {
         if (!club) return;
-        const url = `${window.location.origin}/clubs/${club.slug}`;
+        const clubHandle = (club as any)?.clubUsername || club.slug;
+        const url = `${window.location.origin}/clubs/${clubHandle}`;
         navigator.clipboard.writeText(url);
         setCopiedSlug(true);
         toast.success("Public club profile link copied to clipboard!", { title: "Link Copied" });
@@ -571,7 +572,7 @@ export default function ClubDashboardPage() {
                         </button>
 
                         <a
-                            href={`/clubs/${club.slug}`}
+                            href={`/clubs/${(club as any)?.clubUsername || club.slug}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="px-3.5 py-1.5 rounded-xl bg-emerald-300 hover:bg-emerald-400 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
@@ -650,7 +651,7 @@ export default function ClubDashboardPage() {
                                     <div className="flex items-center gap-2 truncate text-xs font-mono font-bold text-neutral-700">
                                         <Globe className="w-4 h-4 text-emerald-600 shrink-0" />
                                         <span className="truncate">
-                                            {window.location.origin}/clubs/{club.slug}
+                                            {window.location.origin}/clubs/{(club as any)?.clubUsername || club.slug}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
@@ -663,7 +664,7 @@ export default function ClubDashboardPage() {
                                             <span>{copiedSlug ? "Copied" : "Copy"}</span>
                                         </button>
                                         <a
-                                            href={`/clubs/${club.slug}`}
+                                            href={`/clubs/${(club as any)?.clubUsername || club.slug}`}
                                             target="_blank"
                                             rel="noopener noreferrer"
                                             className="px-3 py-1.5 rounded-xl bg-black text-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 flex items-center gap-1.5 cursor-pointer"
@@ -1217,7 +1218,7 @@ export default function ClubDashboardPage() {
                         {/* Actions */}
                         <div className="space-y-2 pt-2">
                             <a
-                                href={`/clubs/${club.slug}`}
+                                href={`/clubs/${(club as any)?.clubUsername || club.slug}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="w-full py-2.5 px-4 rounded-xl bg-emerald-300 hover:bg-emerald-400 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-2 cursor-pointer"

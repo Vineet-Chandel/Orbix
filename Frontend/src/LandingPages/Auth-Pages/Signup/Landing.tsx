@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { User, Users } from "lucide-react";
 import { AuthLayout } from "../AuthLayout";
 import SignupForm from "./Form";
@@ -6,8 +7,20 @@ import ClubSignupForm from "./ClubSignupForm";
 import { ClubRegistrationModal } from "./ClubRegistrationModal";
 
 export default function SignUpPage() {
-    const [registrationMode, setRegistrationMode] = useState<"personal" | "club">("personal");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabParam = searchParams.get("tab");
+    const [registrationMode, setRegistrationMode] = useState<"personal" | "club">(
+        tabParam === "club" ? "club" : "personal"
+    );
     const [isClubModalOpen, setIsClubModalOpen] = useState(false);
+
+    useEffect(() => {
+        if (tabParam === "club") {
+            setRegistrationMode("club");
+        } else if (tabParam === "personal") {
+            setRegistrationMode("personal");
+        }
+    }, [tabParam]);
 
     const handleSelectClub = () => {
         // Mandatory: immediately open the explanatory modal before showing club form
@@ -17,15 +30,18 @@ export default function SignUpPage() {
     const handleConfirmClubModal = () => {
         setIsClubModalOpen(false);
         setRegistrationMode("club");
+        setSearchParams({ tab: "club" });
     };
 
     const handleCancelClubModal = () => {
         setIsClubModalOpen(false);
         setRegistrationMode("personal");
+        setSearchParams({ tab: "personal" });
     };
 
     const handleSwitchToPersonal = () => {
         setRegistrationMode("personal");
+        setSearchParams({ tab: "personal" });
     };
 
     return (
@@ -38,9 +54,9 @@ export default function SignUpPage() {
                         : "Join the verified Orbix ecosystem for collegiate clubs, student developer communities, and tech teams."
                 }
                 trigger={false}
-                switchText="Already a member?"
+                switchText={registrationMode === "personal" ? "Already a member?" : "Already registered your club?"}
                 switchLinkText="Log in"
-                switchLinkHref="/auth/signin"
+                switchLinkHref={registrationMode === "personal" ? "/auth/signin" : "/auth/signin?tab=club"}
                 showSocialAuth={registrationMode === "personal"}
                 wide={registrationMode === "club"}
             >

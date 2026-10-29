@@ -129,20 +129,140 @@ export const authenticateReviewer = async (
  * POST /api/club/verify/send-email-otp
  * Dispatches an email verification OTP code to the applicant's primary email.
  */
+/**
+ * GET /api/club/check-availability
+ * Checks whether a username or email is available for registration.
+ */
+clubRouter.get("/check-availability", async (req: Request, res: Response) => {
+    try {
+        const username = typeof req.query.username === "string" ? req.query.username.trim().toLowerCase() : null;
+        const email = typeof req.query.email === "string" ? req.query.email.trim().toLowerCase() : null;
+
+        if (!username && !email) {
+            return res.status(400).json({ success: false, message: "Provide username or email to check availability." });
+        }
+
+        if (username) {
+            if (!/^[a-z0-9._-]{3,20}$/.test(username)) {
+                return res.json({
+                    success: true,
+                    available: false,
+                    field: "username",
+                    message: "Username must be 3-20 characters: lowercase letters, numbers, dot, _, or -."
+                });
+            }
+            const userRes = await query(`SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`, [username]);
+            if (userRes.rows[0]) {
+                return res.json({
+                    success: true,
+                    available: false,
+                    field: "username",
+                    message: "This username is already taken. Please choose another."
+                });
+            }
+        }
+
+        if (email) {
+            const emailRes = await query(`SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1;`, [email]);
+            if (emailRes.rows[0]) {
+                return res.json({
+                    success: true,
+                    available: false,
+                    field: "email",
+                    message: "An account with this email address is already registered. Please sign in instead."
+                });
+            }
+            const appRes = await query(
+                `SELECT id FROM club_verification_requests 
+                 WHERE LOWER(contact_email) = LOWER($1) 
+                   AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
+                 LIMIT 1;`,
+                [email]
+            );
+            if (appRes.rows[0]) {
+                return res.json({
+                    success: true,
+                    available: false,
+                    field: "email",
+                    message: "An active club verification application already exists for this email address."
+                });
+            }
+        }
+
+        return res.json({
+            success: true,
+            available: true,
+            message: "Available for registration."
+        });
+    } catch (err: any) {
+        console.error("Check availability error:", err);
+        return res.status(500).json({ success: false, message: "Error checking availability." });
+    }
+});
+
+/**
+ * POST /api/club/verify/send-email-otp
+ * Dispatches an email verification OTP code to the applicant's primary email.
+ */
 clubRouter.post("/verify/send-email-otp", async (req: Request, res: Response) => {
     try {
-        const email = req.body?.email;
+        const rawEmail = req.body?.email;
         const name = req.body?.name || "Club Representative";
+        const rawUsername = req.body?.username;
 
-        if (!email || typeof email !== "string") {
+        if (!rawEmail || typeof rawEmail !== "string") {
             return res.status(400).json({ success: false, message: "A valid primary email address is required." });
+        }
+
+        const normalizedEmail = rawEmail.trim().toLowerCase();
+
+        // 1. Pre-check email uniqueness against existing accounts
+        const existingEmailRes = await query(
+            `SELECT id FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1;`,
+            [normalizedEmail]
+        );
+        if (existingEmailRes.rows[0]) {
+            return res.status(409).json({
+                success: false,
+                message: "An account with this email address already exists. Please sign in instead.",
+            });
+        }
+
+        // 2. Pre-check email against existing active club applications
+        const existingAppRes = await query(
+            `SELECT id FROM club_verification_requests 
+             WHERE LOWER(contact_email) = LOWER($1) 
+               AND status IN ('pending', 'under_review', 'needs_information', 'ready_for_promotion') 
+             LIMIT 1;`,
+            [normalizedEmail]
+        );
+        if (existingAppRes.rows[0]) {
+            return res.status(409).json({
+                success: false,
+                message: "An active club verification application already exists for this email address. Please sign in to check status.",
+            });
+        }
+
+        // 3. Pre-check username uniqueness if provided
+        if (rawUsername && typeof rawUsername === "string") {
+            const normalizedUsername = rawUsername.trim().toLowerCase();
+            const existingUsernameRes = await query(
+                `SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
+                [normalizedUsername]
+            );
+            if (existingUsernameRes.rows[0]) {
+                return res.status(409).json({
+                    success: false,
+                    message: "This username is already taken. Please choose another username.",
+                });
+            }
         }
 
         const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || "unknown";
         const userAgent = req.headers["user-agent"] || "unknown";
 
         const result = await EmailVerificationService.sendPreRegistrationOtp({
-            email,
+            email: normalizedEmail,
             name,
             ipAddress: ip,
             userAgent,
@@ -695,9 +815,10 @@ clubRouter.get("/application-status", authenticate, async (req: Request, res: Re
 
         // Check if user already has an active verified club
         const verifiedRes = await query(
-            `SELECT id, name, slug, category, college_name, college_city, college_state, college_country, logo_url, is_active, verified_at
-             FROM verified_clubs
-             WHERE auth_user_id = $1 LIMIT 1;`,
+            `SELECT vc.id, vc.name, COALESCE(u.username, vc.slug) AS slug, u.username AS "clubUsername", vc.category, vc.college_name, vc.college_city, vc.college_state, vc.college_country, vc.logo_url, vc.is_active, vc.verified_at
+             FROM verified_clubs vc
+             LEFT JOIN users u ON u.id = vc.auth_user_id
+             WHERE vc.auth_user_id = $1 LIMIT 1;`,
             [userId]
         );
         const verifiedClub = verifiedRes.rows[0];
@@ -1241,8 +1362,13 @@ const handlePromoteClub = async (req: Request, res: Response) => {
             });
         }
 
-        // 4. Generate unique readable slug from club_name
-        let baseSlug = generateSlug(app.club_name);
+        // 4. Generate unique readable slug from the registered club username (preferred)
+        const clubUserRes = await client.query(
+            `SELECT username FROM users WHERE id = $1 LIMIT 1;`,
+            [app.auth_user_id]
+        );
+        const clubUsername = clubUserRes.rows[0]?.username;
+        let baseSlug = clubUsername ? generateSlug(clubUsername) : generateSlug(app.club_name);
         if (!baseSlug || baseSlug.length < 2) baseSlug = "club";
         let candidateSlug = baseSlug;
         let counter = 1;
@@ -1357,8 +1483,10 @@ clubRouter.get("/session-state", authenticate, async (req: Request, res: Respons
 
         // Check verified_clubs
         const verifiedRes = await query(
-            `SELECT id, name, slug, category, college_name, college_city, college_state, college_country, logo_url, is_active, verified_at
-             FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+            `SELECT vc.id, vc.name, COALESCE(u.username, vc.slug) AS slug, u.username AS "clubUsername", vc.category, vc.college_name, vc.college_city, vc.college_state, vc.college_country, vc.logo_url, vc.is_active, vc.verified_at
+             FROM verified_clubs vc
+             LEFT JOIN users u ON u.id = vc.auth_user_id
+             WHERE vc.auth_user_id = $1 LIMIT 1;`,
             [userId]
         );
 
@@ -1405,7 +1533,10 @@ clubRouter.get("/profile", authenticate, async (req: Request, res: Response) => 
     try {
         const userId = req.user?.id;
         const clubRes = await query(
-            `SELECT * FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+            `SELECT vc.*, COALESCE(u.username, vc.slug) AS slug, u.username AS "clubUsername"
+             FROM verified_clubs vc
+             LEFT JOIN users u ON u.id = vc.auth_user_id
+             WHERE vc.auth_user_id = $1 LIMIT 1;`,
             [userId]
         );
 
@@ -1847,25 +1978,27 @@ const handleGetPublicClub = async (req: Request, res: Response) => {
 
         const clubRes = await query(
             `SELECT
-                id,
-                name,
-                slug,
-                category,
-                college_name AS "collegeName",
-                college_city AS "collegeCity",
-                college_state AS "collegeState",
-                college_country AS "collegeCountry",
-                short_description AS "shortDescription",
-                about,
-                logo_url AS "logoUrl",
-                cover_image_url AS "coverImageUrl",
-                website_url AS "websiteUrl",
-                public_email AS "publicEmail",
-                social_links AS "socialLinks",
-                verified_at AS "verifiedAt",
-                created_at AS "createdAt"
-             FROM verified_clubs
-             WHERE LOWER(slug) = LOWER($1) AND is_active = true
+                vc.id,
+                vc.name,
+                COALESCE(u.username, vc.slug) AS slug,
+                u.username AS "clubUsername",
+                vc.category,
+                vc.college_name AS "collegeName",
+                vc.college_city AS "collegeCity",
+                vc.college_state AS "collegeState",
+                vc.college_country AS "collegeCountry",
+                vc.short_description AS "shortDescription",
+                vc.about,
+                vc.logo_url AS "logoUrl",
+                vc.cover_image_url AS "coverImageUrl",
+                vc.website_url AS "websiteUrl",
+                vc.public_email AS "publicEmail",
+                vc.social_links AS "socialLinks",
+                vc.verified_at AS "verifiedAt",
+                vc.created_at AS "createdAt"
+             FROM verified_clubs vc
+             LEFT JOIN users u ON u.id = vc.auth_user_id
+             WHERE (LOWER(vc.slug) = LOWER($1) OR LOWER(u.username) = LOWER($1)) AND vc.is_active = true
              LIMIT 1;`,
             [slug]
         );

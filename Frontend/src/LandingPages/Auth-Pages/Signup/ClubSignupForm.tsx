@@ -388,6 +388,24 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         return isValid;
     };
 
+    // Live Unique Username and Email Checker
+    const checkAvailability = async (field: "username" | "email", value: string) => {
+        const clean = value.trim().toLowerCase();
+        if (!clean) return;
+        try {
+            const res = await fetch(`/api/club/check-availability?${field}=${encodeURIComponent(clean)}`);
+            const data = await res.json().catch(() => null);
+            if (data?.success && !data.available) {
+                setErrors((prev) => ({
+                    ...prev,
+                    [field === "username" ? "username" : "contactEmail"]: data.message,
+                }));
+            }
+        } catch {
+            // ignore network errors for live check
+        }
+    };
+
     // Dispatch Email OTP
     const handleSendEmailOtp = async () => {
         const email = formData.contactEmail.trim().toLowerCase();
@@ -401,6 +419,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                 body: JSON.stringify({
                     email,
                     name: formData.contactPersonName.trim(),
+                    username: formData.username.trim().toLowerCase(),
                 }),
             });
 
@@ -967,6 +986,11 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                         setEmailOtp("");
                                     }
                                 }}
+                                onBlur={() => {
+                                    if (formData.contactEmail.trim()) {
+                                        checkAvailability("email", formData.contactEmail);
+                                    }
+                                }}
                                 error={errors.contactEmail}
                                 autoComplete="email"
                             />
@@ -1101,23 +1125,40 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                             </h3>
                         </div>
 
-                        {/* Username Input with live rules indicator */}
+                        {/* Username Input with live rules indicator and public URL preview */}
                         <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                    Club Username *
+                                </label>
+                                <span className="text-[10px] font-mono font-bold text-neutral-600 bg-[#FAF6EE] px-2 py-0.5 rounded-full border border-black/40">
+                                    /clubs/{formData.username || "<club-username>"}
+                                </span>
+                            </div>
                             <FormInput
                                 name="username"
                                 type="text"
-                                placeholder="Representative Username"
+                                placeholder="Unique Club Username (e.g. gdsc_cu)"
                                 hideLabel
                                 value={formData.username}
                                 onChange={(e) => {
-                                    setFormData({ ...formData, username: e.target.value.toLowerCase() });
+                                    setFormData({ ...formData, username: e.target.value.toLowerCase().replace(/\s+/g, "_") });
                                     if (errors.username) setErrors({ ...errors, username: "" });
                                 }}
                                 onFocus={() => setUsernameFocused(true)}
-                                onBlur={() => setUsernameFocused(false)}
+                                onBlur={() => {
+                                    setUsernameFocused(false);
+                                    if (formData.username.trim()) {
+                                        checkAvailability("username", formData.username);
+                                    }
+                                }}
                                 error={errors.username}
                                 autoComplete="username"
                             />
+
+                            <p className="text-[10px] text-neutral-500 font-semibold mt-1">
+                                Your unique club handle powers your public profile URL: <span className="font-mono font-bold text-black">/clubs/{formData.username || "<club-username>"}</span>
+                            </p>
 
                             <UsernameRulesIndicator
                                 username={formData.username}

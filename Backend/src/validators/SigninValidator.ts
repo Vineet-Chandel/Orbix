@@ -28,14 +28,18 @@ const SigninValidator = (data: any) => {
         throw new ValidationError("Credentials cannot be empty.");
     }
 
-    // 4. Format Validation
-    if (!validator.isEmail(normalizedGmail)) {
-        throw new Error("Gmail is not valid")
+    // 4. Format Validation: Allow valid email OR valid username
+    const isEmail = validator.isEmail(normalizedGmail);
+    const isValidUsername = /^[a-z0-9._-]{2,30}$/.test(normalizedGmail);
+
+    if (!isEmail && !isValidUsername) {
+        throw new ValidationError("Please enter a valid email address or username.");
     }
+
     return {
         gmail: normalizedGmail,
         password: password,
-        type: "gmail" as const
+        type: isEmail ? "gmail" : "username" as const
     };
 
 };

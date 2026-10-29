@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { InputHTMLAttributes, ReactNode } from "react";
+import { AlertCircle } from "lucide-react";
 
 interface FormInputProps extends InputHTMLAttributes<HTMLInputElement> {
     label?: string;
@@ -93,11 +94,7 @@ export const FormInput = ({
             {/* Error Message */}
             {error && (
                 <p className="flex items-center gap-1.5 text-xs font-bold text-rose-600 px-3 pt-1">
-                    <svg className="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <circle cx="12" cy="12" r="10" />
-                        <line x1="12" y1="8" x2="12" y2="12" />
-                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
+                    <AlertCircle className="h-3.5 w-3.5 stroke-[2.5] flex-shrink-0" />
                     <span>{error}</span>
                 </p>
             )}

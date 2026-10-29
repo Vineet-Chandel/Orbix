@@ -1,4 +1,5 @@
 import { useState, useId } from "react";
+import { AlertCircle } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../utils/portalParser";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { PortalProfileCard, type PortalProfileData } from "./PortalProfileCard";
@@ -219,20 +220,12 @@ export const PortalProfileInput = ({
                             </span>
                         ) : fetchState.error ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase bg-rose-100 text-rose-900 border-2 border-black shadow-[2px_2px_0px_#000]">
-                                <svg className="w-3 h-3 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="12" y1="8" x2="12" y2="12" />
-                                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                                </svg>
+                                <AlertCircle className="w-3 h-3 stroke-[2.5]" />
                                 Account Not Found
                             </span>
                         ) : judgment.badgeVariant === "error" ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-black uppercase bg-rose-100 text-rose-900 border-2 border-black shadow-[2px_2px_0px_#000]">
-                                <svg className="w-3 h-3 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="12" y1="8" x2="12" y2="12" />
-                                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                                </svg>
+                                <AlertCircle className="w-3 h-3 stroke-[2.5]" />
                                 {judgment.badgeLabel}
                             </span>
                         ) : judgment.badgeVariant === "username" ? (
@@ -327,11 +320,7 @@ export const PortalProfileInput = ({
                 <div className="px-1 pt-1">
                     {fetchState.error ? (
                         <p className="text-[11px] text-rose-700 font-bold flex items-center gap-1.5 animate-fadeIn">
-                            <svg className="w-3.5 h-3.5 stroke-[2.5] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <circle cx="12" cy="12" r="10" />
-                                <line x1="12" y1="8" x2="12" y2="12" />
-                                <line x1="12" y1="16" x2="12.01" y2="16" />
-                            </svg>
+                            <AlertCircle className="w-3.5 h-3.5 stroke-[2.5] flex-shrink-0" />
                             <span>{fetchState.error}</span>
                         </p>
                     ) : judgment.message ? (
@@ -342,11 +331,7 @@ export const PortalProfileInput = ({
                             </p>
                         ) : (
                             <p className="text-[11px] text-rose-700 font-bold flex items-center gap-1.5 animate-fadeIn">
-                                <svg className="w-3.5 h-3.5 stroke-[2.5] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <circle cx="12" cy="12" r="10" />
-                                    <line x1="12" y1="8" x2="12" y2="12" />
-                                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                                </svg>
+                                <AlertCircle className="w-3.5 h-3.5 stroke-[2.5] flex-shrink-0" />
                                 <span>{judgment.message}</span>
                             </p>
                         )

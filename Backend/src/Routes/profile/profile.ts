@@ -129,7 +129,10 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
         // Club accounts have a dedicated profile & dashboard. Return club session details cleanly
         if (authUser.accountType === "club" || (authUser as any).account_type === "club") {
             const verifiedClubRes = await query(
-                `SELECT id, name, slug, category, college_name, logo_url, is_active FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                `SELECT vc.id, vc.name, COALESCE(u.username, vc.slug) AS slug, u.username AS "clubUsername", vc.category, vc.college_name, vc.logo_url, vc.is_active 
+                 FROM verified_clubs vc 
+                 LEFT JOIN users u ON u.id = vc.auth_user_id 
+                 WHERE vc.auth_user_id = $1 LIMIT 1;`,
                 [authUser.id]
             );
             const verifiedClub = verifiedClubRes.rows[0];
@@ -301,7 +304,10 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
         // Club accounts have a dedicated profile & dashboard. Return club session details cleanly
         if (authUser.accountType === "club" || (authUser as any).account_type === "club") {
             const verifiedClubRes = await query(
-                `SELECT id, name, slug, category, college_name, logo_url, is_active FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                `SELECT vc.id, vc.name, COALESCE(u.username, vc.slug) AS slug, u.username AS "clubUsername", vc.category, vc.college_name, vc.logo_url, vc.is_active 
+                 FROM verified_clubs vc 
+                 LEFT JOIN users u ON u.id = vc.auth_user_id 
+                 WHERE vc.auth_user_id = $1 LIMIT 1;`,
                 [authUser.id]
             );
             const verifiedClub = verifiedClubRes.rows[0];

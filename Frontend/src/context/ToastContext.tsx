@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { AlertCircle, CheckCircle2, AlertTriangle, Info, X } from "lucide-react";
 import { parseError } from "../utils/errorParser";
 
 export type ToastType = "error" | "success" | "warning" | "info";
@@ -174,41 +175,29 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                                         {/* Icon based on notification type */}
                                         <div className="flex-shrink-0 mt-0.5">
                                             {item.type === "error" && (
-                                                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-200 border-2 border-black text-rose-700 shadow-[2px_2px_0px_#000]">
-                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                                                        <circle cx="12" cy="12" r="10" />
-                                                        <line x1="12" y1="8" x2="12" y2="12" />
-                                                        <line x1="12" y1="16" x2="12.01" y2="16" />
-                                                    </svg>
+                                                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FF4D4D] border-2 border-black text-white shadow-[2px_2px_0px_#000]">
+                                                    <AlertCircle className="w-5 h-5 stroke-[2.5]" />
                                                 </span>
                                             )}
                                             {item.type === "success" && (
-                                                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#a2ff86] border-2 border-black text-black shadow-[2px_2px_0px_#000]">
-                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                                        <polyline points="20 6 9 17 4 12" />
-                                                    </svg>
+                                                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#a2ff86] border-2 border-black text-black shadow-[2px_2px_0px_#000]">
+                                                    <CheckCircle2 className="w-5 h-5 stroke-[2.5]" />
                                                 </span>
                                             )}
                                             {item.type === "warning" && (
-                                                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#FFE566] border-2 border-black text-black shadow-[2px_2px_0px_#000]">
-                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                                    </svg>
+                                                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#FFE566] border-2 border-black text-black shadow-[2px_2px_0px_#000]">
+                                                    <AlertTriangle className="w-5 h-5 stroke-[2.5]" />
                                                 </span>
                                             )}
                                             {item.type === "info" && (
-                                                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-200 border-2 border-black text-black shadow-[2px_2px_0px_#000]">
-                                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.2">
-                                                        <circle cx="12" cy="12" r="10" />
-                                                        <line x1="12" y1="16" x2="12" y2="12" />
-                                                        <line x1="12" y1="8" x2="12.01" y2="8" />
-                                                    </svg>
+                                                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-sky-300 border-2 border-black text-black shadow-[2px_2px_0px_#000]">
+                                                    <Info className="w-5 h-5 stroke-[2.5]" />
                                                 </span>
                                             )}
                                         </div>
 
                                         {/* Content: Title & Message */}
-                                        <div className="flex-1 min-w-0 pr-2">
+                                        <div className="flex-1 min-w-0 pr-1">
                                             <div className="flex items-center gap-2">
                                                 <h4 className="text-sm font-black text-black tracking-tight leading-snug truncate">
                                                     {item.title}
@@ -219,7 +208,7 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                                                     </span>
                                                 )}
                                             </div>
-                                            <p className="mt-0.5 text-xs text-neutral-700 leading-relaxed break-words font-bold">
+                                            <p className="mt-0.5 text-xs text-neutral-800 leading-relaxed break-words font-bold">
                                                 {item.message}
                                             </p>
                                         </div>
@@ -228,13 +217,10 @@ export const ToastProvider = ({ children }: { children: ReactNode }) => {
                                         <button
                                             type="button"
                                             onClick={() => dismiss(item.id)}
-                                            className="flex-shrink-0 text-black hover:text-neutral-700 transition-colors p-1 rounded-lg bg-white border-2 border-black hover:bg-neutral-100 shadow-[1px_1px_0px_#000] focus:outline-none"
+                                            className="flex-shrink-0 text-black hover:bg-black hover:text-white transition-all p-1.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:shadow-none focus:outline-none cursor-pointer"
                                             aria-label="Dismiss notification"
                                         >
-                                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                                                <line x1="18" y1="6" x2="6" y2="18" />
-                                                <line x1="6" y1="6" x2="18" y2="18" />
-                                            </svg>
+                                            <X className="w-4 h-4 stroke-[2.5]" />
                                         </button>
                                     </div>
                                 </motion.div>

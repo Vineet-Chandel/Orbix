@@ -13,6 +13,7 @@ import {
     ArrowUpRight,
     User,
     UserPlus,
+    UserCheck,
     GraduationCap,
     MapPin,
     Trophy,
@@ -154,12 +155,105 @@ export const NotificationsView: React.FC = () => {
         setTimeout(() => setCopiedField(null), 2000);
     };
 
+    // Helper functions for relationship-aware notifications
+    const isPendingConnectionRequest = useCallback((item: UserNotification): boolean => {
+        const isConnReq =
+            item.type === "connection_request" ||
+            (item as any).notification_type === "connection_request";
+        const status = (item.metadata as any)?.relationshipStatus;
+        if (status && status !== "pending") return false;
+        if (item.type === "connection_accepted" || item.type === "connection_declined") return false;
+        return isConnReq;
+    }, []);
+
+    const isConnectionAcceptedItem = useCallback((item: UserNotification): boolean => {
+        return (
+            item.type === "connection_accepted" ||
+            (item as any).notification_type === "connection_accepted" ||
+            (item.metadata as any)?.relationshipStatus === "connected"
+        );
+    }, []);
+
+    const isConnectionInteraction = useCallback((item: UserNotification): boolean => {
+        const type = item.type || (item as any).notification_type;
+        const status = (item.metadata as any)?.relationshipStatus;
+        return (
+            type === "connection_request" ||
+            type === "connection_accepted" ||
+            type === "connection_declined" ||
+            Boolean(status)
+        );
+    }, []);
+
+    // Immediate reactive state updater when user accepts or declines connection in the UI
+    const handleRelationshipStateChange = useCallback((notificationId: string, newState: string) => {
+        setNotifications((prev) =>
+            prev.map((notif) => {
+                if (notif.id === notificationId) {
+                    const isNowConnected = newState === "connected";
+                    const isNowDeclined = newState === "declined" || newState === "none";
+                    return {
+                        ...notif,
+                        type: isNowConnected ? "connection_accepted" : isNowDeclined ? "connection_declined" : notif.type,
+                        title: isNowConnected ? "Connection Request Accepted" : isNowDeclined ? "Connection Request Declined" : notif.title,
+                        body: isNowConnected ? "You accepted the connection request. You are now connected!" : notif.body,
+                        metadata: {
+                            ...notif.metadata,
+                            relationshipStatus: newState,
+                        },
+                    };
+                }
+                return notif;
+            })
+        );
+    }, []);
+
+    // Listen for broadcast events so relationship changes anywhere in the app immediately reflect here
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+
+        const handleSync = (e: Event) => {
+            const customEvent = e as CustomEvent<{ targetUserId: string; state: string }>;
+            if (customEvent.detail?.targetUserId && customEvent.detail?.state) {
+                const { targetUserId, state } = customEvent.detail;
+                setNotifications((prev) =>
+                    prev.map((notif) => {
+                        const actorId = notif.metadata?.senderProfile?.id || notif.metadata?.actorId;
+                        const username = notif.metadata?.senderProfile?.username || notif.metadata?.username;
+                        const matches =
+                            (actorId && (actorId === targetUserId || actorId.toLowerCase() === targetUserId.toLowerCase())) ||
+                            (username && username.toLowerCase() === targetUserId.toLowerCase());
+
+                        if (matches) {
+                            const isNowConnected = state === "connected";
+                            const isNowDeclined = state === "declined" || state === "none";
+                            return {
+                                ...notif,
+                                type: isNowConnected ? "connection_accepted" : isNowDeclined ? "connection_declined" : notif.type,
+                                title: isNowConnected ? "Connection Request Accepted" : isNowDeclined ? "Connection Request Declined" : notif.title,
+                                body: isNowConnected ? "You accepted the connection request. You are now connected!" : notif.body,
+                                metadata: {
+                                    ...notif.metadata,
+                                    relationshipStatus: state,
+                                },
+                            };
+                        }
+                        return notif;
+                    })
+                );
+            }
+        };
+
+        window.addEventListener("orbix_relationship_changed", handleSync);
+        return () => {
+            window.removeEventListener("orbix_relationship_changed", handleSync);
+        };
+    }, []);
+
     // Filter and search logic
     const filteredNotifications = useMemo(() => {
         return notifications.filter((item) => {
-            const isConnReq =
-                item.type === "connection_request" ||
-                (item as any).notification_type === "connection_request";
+            const isConnReq = isPendingConnectionRequest(item);
             const isHire =
                 item.type === "hire_inquiry" ||
                 (item as any).notification_type === "hire_inquiry";
@@ -198,16 +292,14 @@ export const NotificationsView: React.FC = () => {
                 college.includes(q)
             );
         });
-    }, [notifications, filter, searchQuery]);
+    }, [notifications, filter, searchQuery, isPendingConnectionRequest]);
 
     const activeItem = useMemo(() => {
         return notifications.find((n) => n.id === selectedId) || filteredNotifications[0] || null;
     }, [notifications, selectedId, filteredNotifications]);
 
     const totalCount = notifications.length;
-    const requestsCount = notifications.filter(
-        (n) => n.type === "connection_request" || (n as any).notification_type === "connection_request"
-    ).length;
+    const requestsCount = notifications.filter(isPendingConnectionRequest).length;
     const inquiryCount = notifications.filter(
         (n) => n.type === "hire_inquiry" || (n as any).notification_type === "hire_inquiry"
     ).length;
@@ -321,9 +413,9 @@ export const NotificationsView: React.FC = () => {
                         ) : (
                             filteredNotifications.map((item) => {
                                 const isSelected = activeItem?.id === item.id;
-                                const isConnReq =
-                                    item.type === "connection_request" ||
-                                    (item as any).notification_type === "connection_request";
+                                const isConnReq = isPendingConnectionRequest(item);
+                                const isConnAccepted = isConnectionAcceptedItem(item);
+                                const isConnInteraction = isConnectionInteraction(item);
                                 const isHire =
                                     item.type === "hire_inquiry" ||
                                     (item as any).notification_type === "hire_inquiry";
@@ -335,7 +427,7 @@ export const NotificationsView: React.FC = () => {
                                     senderProfile.displayName ||
                                     meta.displayName ||
                                     meta.senderName ||
-                                    (isConnReq ? "Developer" : item.title || "Inquiry");
+                                    (isConnInteraction ? "Developer" : item.title || "Inquiry");
 
                                 const senderAvatar =
                                     senderProfile.avatarUrl ||
@@ -375,6 +467,11 @@ export const NotificationsView: React.FC = () => {
                                                         <UserPlus className="w-2.5 h-2.5 text-black stroke-[3]" />
                                                     </div>
                                                 )}
+                                                {isConnAccepted && (
+                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#a2ff86] border border-black flex items-center justify-center">
+                                                        <UserCheck className="w-2.5 h-2.5 text-black stroke-[3]" />
+                                                    </div>
+                                                )}
                                             </div>
 
                                             {/* Sender & Preview */}
@@ -388,6 +485,13 @@ export const NotificationsView: React.FC = () => {
                                                     {isConnReq && (
                                                         <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
                                                             Connection Request
+                                                        </span>
+                                                    )}
+
+                                                    {isConnAccepted && (
+                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
+                                                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                                            <span>Connected</span>
                                                         </span>
                                                     )}
 
@@ -436,9 +540,8 @@ export const NotificationsView: React.FC = () => {
                 <div className="lg:col-span-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden flex flex-col min-h-[580px]">
                     {activeItem ? (
                         (() => {
-                            const isConnectionRequest =
-                                activeItem.type === "connection_request" ||
-                                (activeItem as any).notification_type === "connection_request";
+                            const isConnAccepted = isConnectionAcceptedItem(activeItem);
+                            const isConnInteraction = isConnectionInteraction(activeItem);
 
                             const isHireInquiry =
                                 activeItem.type === "hire_inquiry" ||
@@ -456,7 +559,7 @@ export const NotificationsView: React.FC = () => {
                                 senderProfile.displayName ||
                                 meta.displayName ||
                                 meta.senderName ||
-                                (isConnectionRequest ? "Developer" : isHireInquiry ? "Recruiter" : activeItem.title || "Inquiry");
+                                (isConnInteraction ? "Developer" : isHireInquiry ? "Recruiter" : activeItem.title || "Inquiry");
 
                             const senderAvatar =
                                 senderProfile.avatarUrl ||
@@ -499,9 +602,9 @@ export const NotificationsView: React.FC = () => {
                                 senderUsername;
 
                             // -------------------------------------------------------------
-                            // CASE A: CONNECTION REQUEST (OPTIMIZED FOR JUDGING SENDER)
+                            // CASE A: DEVELOPER RELATIONSHIP / CONNECTION INTERACTION
                             // -------------------------------------------------------------
-                            if (isConnectionRequest) {
+                            if (isConnInteraction) {
                                 return (
                                     <div className="flex-1 flex flex-col p-5 sm:p-6 space-y-5">
                                         {/* Detail Top Header */}
@@ -529,10 +632,12 @@ export const NotificationsView: React.FC = () => {
                                                                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                                                             </span>
                                                         )}
-                                                        <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1 shrink-0">
-                                                            <UserPlus className="w-3 h-3 stroke-[2.5]" />
-                                                            <span>Connection Request</span>
-                                                        </span>
+                                                        {!isConnAccepted && (
+                                                            <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1 shrink-0">
+                                                                <UserPlus className="w-3 h-3 stroke-[2.5]" />
+                                                                <span>Connection Request</span>
+                                                            </span>
+                                                        )}
                                                     </div>
 
                                                     <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -562,7 +667,8 @@ export const NotificationsView: React.FC = () => {
                                                     targetUserId={actorId}
                                                     targetUsername={senderUsername}
                                                     targetDisplayName={senderDisplayName}
-                                                    initialState="incoming_pending"
+                                                    initialState={isConnAccepted ? "connected" : "incoming_pending"}
+                                                    onStateChange={(newState) => handleRelationshipStateChange(activeItem.id, newState)}
                                                 />
 
                                                 <button
@@ -677,37 +783,64 @@ export const NotificationsView: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        {/* Network Context Note */}
-                                        <div className="p-4 rounded-xl bg-[#FAF6EE]/60 border-2 border-black/20 text-xs font-medium text-neutral-700 leading-relaxed space-y-1">
-                                            <p className="font-bold text-black">
-                                                Why connect on Orbix?
-                                            </p>
-                                            <p>
-                                                Accepting this connection request adds{" "}
-                                                <span className="font-black text-black">{senderDisplayName}</span> to
-                                                your network, enabling shared progress tracking, mutual platform
-                                                insights, and direct updates.
-                                            </p>
-                                        </div>
-
-                                        {/* Bottom Decision Callout */}
-                                        <div className="mt-auto p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                            <div className="space-y-0.5">
-                                                <span className="text-xs font-black text-black uppercase tracking-wider block">
-                                                    Connection Decision
-                                                </span>
-                                                <span className="text-xs text-neutral-600 font-medium block">
-                                                    Choose whether to accept or decline {senderDisplayName}'s request.
-                                                </span>
+                                        {/* Network Context Note (Only shown when connection request is pending) */}
+                                        {!isConnAccepted && (
+                                            <div className="p-4 rounded-xl bg-[#FAF6EE]/60 border-2 border-black/20 text-xs font-medium text-neutral-700 leading-relaxed space-y-1">
+                                                <p className="font-bold text-black">
+                                                    Why connect on Orbix?
+                                                </p>
+                                                <p>
+                                                    Accepting this connection request adds{" "}
+                                                    <span className="font-black text-black">{senderDisplayName}</span> to
+                                                    your network, enabling shared progress tracking, mutual platform
+                                                    insights, and direct updates.
+                                                </p>
                                             </div>
-                                            <RelationshipActionButton
-                                                targetUserId={actorId}
-                                                targetUsername={senderUsername}
-                                                targetDisplayName={senderDisplayName}
-                                                initialState="incoming_pending"
-                                                size="md"
-                                            />
-                                        </div>
+                                        )}
+
+                                        {/* Bottom Action Footer: Decision for Pending requests, Profile Link for Connected */}
+                                        {isConnAccepted ? (
+                                            <div className="mt-auto p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                <div className="space-y-0.5">
+                                                    <span className="text-xs font-black text-black uppercase tracking-wider block">
+                                                        Network Connection
+                                                    </span>
+                                                    <span className="text-xs text-neutral-600 font-medium block">
+                                                        You are connected with {senderDisplayName}{senderUsername ? ` (@${senderUsername})` : ""} on Orbix.
+                                                    </span>
+                                                </div>
+                                                {senderUsername && (
+                                                    <Link
+                                                        to={`/profile/u/${encodeURIComponent(senderUsername)}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer self-start sm:self-auto"
+                                                    >
+                                                        <span>View Full Profile</span>
+                                                        <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    </Link>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <div className="mt-auto p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                                <div className="space-y-0.5">
+                                                    <span className="text-xs font-black text-black uppercase tracking-wider block">
+                                                        Connection Decision
+                                                    </span>
+                                                    <span className="text-xs text-neutral-600 font-medium block">
+                                                        Choose whether to accept or decline {senderDisplayName}'s request.
+                                                    </span>
+                                                </div>
+                                                <RelationshipActionButton
+                                                    targetUserId={actorId}
+                                                    targetUsername={senderUsername}
+                                                    targetDisplayName={senderDisplayName}
+                                                    initialState="incoming_pending"
+                                                    onStateChange={(newState) => handleRelationshipStateChange(activeItem.id, newState)}
+                                                    size="md"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             }

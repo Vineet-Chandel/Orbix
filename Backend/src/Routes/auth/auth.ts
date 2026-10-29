@@ -508,6 +508,30 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
         );
         safeUser.platforms = linksResult.rows || [];
 
+        // Enrich club status & verified club details if club account
+        if (user.accountType === "club" || (user as any).account_type === "club") {
+            try {
+                const verifiedClubRes = await query(
+                    `SELECT id, name, slug, category, college_name, logo_url, is_active FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                    [user.id]
+                );
+                if (verifiedClubRes.rows[0]) {
+                    safeUser.verifiedClub = verifiedClubRes.rows[0];
+                    safeUser.clubStatus = "approved";
+                } else {
+                    const reqRes = await query(
+                        `SELECT id, status, club_name, submitted_at FROM club_verification_requests WHERE auth_user_id = $1 ORDER BY submitted_at DESC LIMIT 1;`,
+                        [user.id]
+                    );
+                    safeUser.clubStatus = reqRes.rows[0]?.status || "pending";
+                    safeUser.clubName = reqRes.rows[0]?.club_name || null;
+                    safeUser.application = reqRes.rows[0] || null;
+                }
+            } catch (clubErr) {
+                console.warn("Notice: club signin enrichment warning:", clubErr);
+            }
+        }
+
         await resetSigninFailures({ email: validatedData.gmail, ip: req.ip || "unknown" });
 
         await userDetailsCache({ id: user.id, firstName: user.firstName, middleName: user.middleName, lastName: user.lastName, gmail: user.gmail, username: user.username, password_hash, termsAccepted: user.termsAccepted });
@@ -705,6 +729,30 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
             [user.username, user.gmail]
         );
         safeUser.platforms = linksResult.rows || [];
+
+        // Enrich club status & verified club details if club account
+        if (user.accountType === "club" || (user as any).account_type === "club") {
+            try {
+                const verifiedClubRes = await query(
+                    `SELECT id, name, slug, category, college_name, logo_url, is_active FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                    [user.id]
+                );
+                if (verifiedClubRes.rows[0]) {
+                    safeUser.verifiedClub = verifiedClubRes.rows[0];
+                    safeUser.clubStatus = "approved";
+                } else {
+                    const reqRes = await query(
+                        `SELECT id, status, club_name, submitted_at FROM club_verification_requests WHERE auth_user_id = $1 ORDER BY submitted_at DESC LIMIT 1;`,
+                        [user.id]
+                    );
+                    safeUser.clubStatus = reqRes.rows[0]?.status || "pending";
+                    safeUser.clubName = reqRes.rows[0]?.club_name || null;
+                    safeUser.application = reqRes.rows[0] || null;
+                }
+            } catch (clubErr) {
+                console.warn("Notice: club signin enrichment warning:", clubErr);
+            }
+        }
 
         await userDetailsCache({ ...user, id: user.id });
 

@@ -55,10 +55,16 @@ notificationsRouter.get("/", authenticate, async (req: Request, res: Response) =
                 u.orbix_score AS "senderOrbixScore",
                 u.total_solved AS "senderTotalSolved",
                 COALESCE(u.is_email_verified, false) AS "senderIsEmailVerified",
-                (COALESCE(u.is_email_verified, false) = true) AS "senderIsVerifiedCoder"
+                (COALESCE(u.is_email_verified, false) = true) AS "senderIsVerifiedCoder",
+                r.status AS "relStatus",
+                r.requested_by AS "relRequestedBy"
              FROM user_notifications n
              LEFT JOIN users u ON (n.actor_id IS NOT NULL AND u.id = n.actor_id)
                                OR (n.actor_id IS NULL AND n.metadata->>'username' IS NOT NULL AND LOWER(u.username) = LOWER(n.metadata->>'username'))
+             LEFT JOIN user_relationships r ON (n.relationship_id IS NOT NULL AND r.id = n.relationship_id)
+                                            OR (n.relationship_id IS NULL AND n.actor_id IS NOT NULL AND (
+                                                (r.user_low_id = LEAST(n.actor_id, COALESCE(n.recipient_id, n.user_id, $1)) AND r.user_high_id = GREATEST(n.actor_id, COALESCE(n.recipient_id, n.user_id, $1)))
+                                            ))
              WHERE (n.user_id = $1 OR LOWER(n.username) = $2 OR LOWER(n.username) = $3)
              ORDER BY n.created_at DESC
              LIMIT 50;`,
@@ -102,11 +108,55 @@ notificationsRouter.get("/", authenticate, async (req: Request, res: Response) =
                 meta.location = row.senderLocation || meta.location;
             }
 
+            let notifType = row.type;
+            let notifTitle = row.title;
+            let notifBody = row.body;
+
+            // Synchronize connection request notification status with authoritative user_relationships state
+            const isConnectionNotif =
+                notifType === "connection_request" ||
+                notifType === "connection_accepted" ||
+                (meta && (meta.notification_type === "connection_request" || meta.notification_type === "connection_accepted"));
+
+            if (isConnectionNotif) {
+                if (row.relStatus === "connected") {
+                    notifType = "connection_accepted";
+                    meta.relationshipStatus = "connected";
+                    if (row.type === "connection_request" || notifTitle === "New Connection Request") {
+                        notifTitle = "Connection Request Accepted";
+                        notifBody = `You are connected with ${meta.senderName || "developer"}.`;
+                        // Background auto-heal to update this stale record in database
+                        query(
+                            `UPDATE user_notifications
+                             SET notification_type = 'connection_accepted',
+                                 type = 'connection_accepted',
+                                 title = 'Connection Request Accepted',
+                                 body = $1,
+                                 metadata = jsonb_set(COALESCE(metadata, '{}'::jsonb), '{relationshipStatus}', '"connected"')
+                             WHERE id = $2 AND (notification_type = 'connection_request' OR type = 'connection_request');`,
+                            [notifBody, row.id]
+                        ).catch((e: any) => console.error("Auto-heal notification error:", e?.message));
+                    }
+                } else if (row.relStatus === "declined") {
+                    notifType = "connection_declined";
+                    meta.relationshipStatus = "declined";
+                    notifTitle = "Connection Request Declined";
+                } else if (row.relStatus === "cancelled") {
+                    notifType = "connection_cancelled";
+                    meta.relationshipStatus = "cancelled";
+                    notifTitle = "Connection Request Cancelled";
+                } else if (row.relStatus === "pending") {
+                    meta.relationshipStatus = "pending";
+                } else if (!row.relStatus) {
+                    meta.relationshipStatus = "none";
+                }
+            }
+
             return {
                 id: row.id,
-                title: row.title,
-                body: row.body,
-                type: row.type,
+                title: notifTitle,
+                body: notifBody,
+                type: notifType,
                 metadata: meta,
                 isRead: row.isRead,
                 readAt: row.readAt,

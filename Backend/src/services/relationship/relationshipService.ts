@@ -811,6 +811,26 @@ export async function acceptConnection(
             [rel.id]
         );
 
+        // Update recipient's notification row so refreshing the inbox reflects the accepted connection
+        await client.query(
+            `UPDATE user_notifications
+             SET notification_type = 'connection_accepted',
+                 type = 'connection_accepted',
+                 title = 'Connection Request Accepted',
+                 body = 'You accepted the connection request. You are now connected!',
+                 is_read = true,
+                 read_at = COALESCE(read_at, CURRENT_TIMESTAMP),
+                 metadata = jsonb_set(
+                     COALESCE(metadata, '{}'::jsonb),
+                     '{relationshipStatus}',
+                     '"connected"'
+                 )
+             WHERE (relationship_id = $1 OR (actor_id = $2 AND (recipient_id = $3 OR user_id = $3)))
+               AND (recipient_id = $3 OR user_id = $3)
+               AND (notification_type = 'connection_request' OR type = 'connection_request');`,
+            [rel.id, targetUserId, actorId]
+        );
+
         await client.query("COMMIT;");
 
         // Dispatch idempotent notification to requester
@@ -914,6 +934,26 @@ export async function declineConnection(
             [rel.id]
         );
 
+        // Update recipient's notification so it reflects the declined request
+        await client.query(
+            `UPDATE user_notifications
+             SET notification_type = 'connection_declined',
+                 type = 'connection_declined',
+                 title = 'Connection Request Declined',
+                 body = 'You declined the connection request.',
+                 is_read = true,
+                 read_at = COALESCE(read_at, CURRENT_TIMESTAMP),
+                 metadata = jsonb_set(
+                     COALESCE(metadata, '{}'::jsonb),
+                     '{relationshipStatus}',
+                     '"declined"'
+                 )
+             WHERE (relationship_id = $1 OR (actor_id = $2 AND (recipient_id = $3 OR user_id = $3)))
+               AND (recipient_id = $3 OR user_id = $3)
+               AND (notification_type = 'connection_request' OR type = 'connection_request');`,
+            [rel.id, targetUserId, actorId]
+        );
+
         await client.query("COMMIT;");
 
         relationshipEvents.logEvent("relationship_request_declined", {
@@ -993,6 +1033,15 @@ export async function cancelConnection(
                  updated_at = CURRENT_TIMESTAMP
              WHERE id = $1;`,
             [rel.id]
+        );
+
+        // Remove the pending connection request notification for the target user since it was cancelled
+        await client.query(
+            `DELETE FROM user_notifications
+             WHERE (relationship_id = $1 OR (actor_id = $2 AND (recipient_id = $3 OR user_id = $3)))
+               AND (recipient_id = $3 OR user_id = $3)
+               AND (notification_type = 'connection_request' OR type = 'connection_request');`,
+            [rel.id, actorId, targetUserId]
         );
 
         await client.query("COMMIT;");
