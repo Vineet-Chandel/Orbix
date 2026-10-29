@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import {
     LayoutDashboard,
+    Users,
+    CalendarDays,
     ShieldCheck,
     Edit3,
-    ExternalLink,
     Mail,
     LogOut,
     ChevronDown,
     X,
-    Copy,
-    Check,
 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
@@ -22,28 +21,35 @@ interface ClubSidebarProps {
         college_name: string;
         logo_url: string | null;
     };
-    activeTab: "overview" | "profile" | "events";
-    onTabChange: (tab: "overview" | "profile" | "events") => void;
+    activeSegment: "dashboard" | "team";
+    onSegmentChange: (segment: "dashboard" | "team") => void;
+    activeTab?: "overview" | "profile" | "events";
+    onTabChange?: (tab: "overview" | "profile" | "events") => void;
     isOpen: boolean;
     onClose: () => void;
     unreadInboxCount?: number;
+    teamPendingCount?: number;
+    eventsCount?: number;
     onOpenInbox: () => void;
     onSignOut: () => void;
 }
 
 export const ClubSidebar = ({
     club,
-    activeTab,
+    activeSegment,
+    onSegmentChange,
+    activeTab = "overview",
     onTabChange,
     isOpen = false,
     onClose,
     unreadInboxCount = 0,
+    teamPendingCount = 0,
+    eventsCount = 0,
     onOpenInbox,
     onSignOut,
 }: ClubSidebarProps) => {
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
-    const [copiedSlug, setCopiedSlug] = useState(false);
     const profileMenuRef = useRef<HTMLDivElement>(null);
 
     const isExpanded = isOpen || isHovered || isProfileMenuOpen;
@@ -75,15 +81,6 @@ export const ClubSidebar = ({
         };
     }, [isProfileMenuOpen]);
 
-    const handleCopyPublicLink = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        const clubHandle = club.clubUsername || club.slug;
-        const url = `${window.location.origin}/clubs/${clubHandle}`;
-        navigator.clipboard.writeText(url);
-        setCopiedSlug(true);
-        setTimeout(() => setCopiedSlug(false), 2000);
-    };
-
     const sidebarContent = (
         <aside
             onMouseEnter={() => setIsHovered(true)}
@@ -104,7 +101,8 @@ export const ClubSidebar = ({
                     <button
                         type="button"
                         onClick={() => {
-                            onTabChange("overview");
+                            onSegmentChange("dashboard");
+                            if (onTabChange) onTabChange("overview");
                             if (onClose) onClose();
                         }}
                         className={`flex items-center group cursor-pointer overflow-x-hidden ${
@@ -143,16 +141,17 @@ export const ClubSidebar = ({
                     )}
                 </div>
 
-                {/* Main Navigation Items — EXACTLY ONE ITEM: Dashboard */}
+                {/* Main Navigation Items: Exactly 2 primary segments - Dashboard and Team */}
                 <div className="pt-3.5 space-y-1.5 overflow-x-hidden">
+                    {/* Item 1: Dashboard */}
                     <button
                         type="button"
                         onClick={() => {
-                            onTabChange("overview");
+                            onSegmentChange("dashboard");
                             if (onClose) onClose();
                         }}
                         className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer overflow-x-hidden relative w-full ${
-                            activeTab === "overview"
+                            activeSegment === "dashboard"
                                 ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
@@ -161,7 +160,7 @@ export const ClubSidebar = ({
                         {/* Active vertical accent bar */}
                         <span
                             className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
-                                activeTab === "overview" && isExpanded
+                                activeSegment === "dashboard" && isExpanded
                                     ? "bg-[#a2ff86] opacity-100"
                                     : "bg-transparent opacity-0"
                             }`}
@@ -172,7 +171,7 @@ export const ClubSidebar = ({
                             <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
                                 <span
                                     className={`w-5 h-5 flex items-center justify-center transition-colors ${
-                                        activeTab === "overview"
+                                        activeSegment === "dashboard"
                                             ? "text-[#a2ff86]"
                                             : "text-neutral-700 group-hover:text-black"
                                     }`}
@@ -198,13 +197,74 @@ export const ClubSidebar = ({
                             {isExpanded && (
                                 <span
                                     className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${
-                                        activeTab === "overview"
+                                        activeSegment === "dashboard"
                                             ? "text-[#a2ff86] font-black"
                                             : "text-neutral-800 font-bold"
                                     }`}
                                 >
                                     Dashboard
                                 </span>
+                            )}
+                        </div>
+                    </button>
+
+                    {/* Item 2: Team */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onSegmentChange("team");
+                            if (onClose) onClose();
+                        }}
+                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer overflow-x-hidden relative w-full ${
+                            activeSegment === "team"
+                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
+                        }`}
+                        title={!isExpanded ? "Team" : undefined}
+                    >
+                        {/* Active vertical accent bar */}
+                        <span
+                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
+                                activeSegment === "team" && isExpanded
+                                    ? "bg-[#a2ff86] opacity-100"
+                                    : "bg-transparent opacity-0"
+                            }`}
+                        />
+
+                        <div className="flex items-center overflow-x-hidden w-full">
+                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                <Users
+                                    className={`w-5 h-5 transition-colors stroke-[2.2] ${
+                                        activeSegment === "team"
+                                            ? "text-[#a2ff86]"
+                                            : "text-neutral-700 group-hover:text-black"
+                                    }`}
+                                />
+                            </div>
+
+                            {isExpanded && (
+                                <div className="flex items-center justify-between flex-1 pr-2.5 overflow-x-hidden animate-fadeIn">
+                                    <span
+                                        className={`whitespace-nowrap truncate pl-0.5 ${
+                                            activeSegment === "team"
+                                                ? "text-[#a2ff86] font-black"
+                                                : "text-neutral-800 font-bold"
+                                        }`}
+                                    >
+                                        Team
+                                    </span>
+                                    {teamPendingCount !== undefined && teamPendingCount > 0 && (
+                                        <span
+                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black border border-black ${
+                                                activeSegment === "team"
+                                                    ? "bg-[#a2ff86] text-black"
+                                                    : "bg-[#FFE566] text-black shadow-[1px_1px_0px_#000]"
+                                            }`}
+                                        >
+                                            {teamPendingCount}
+                                        </span>
+                                    )}
+                                </div>
                             )}
                         </div>
                     </button>
@@ -316,7 +376,8 @@ export const ClubSidebar = ({
                             type="button"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
-                                onTabChange("overview");
+                                onSegmentChange("dashboard");
+                                if (onTabChange) onTabChange("overview");
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
@@ -328,7 +389,40 @@ export const ClubSidebar = ({
                             type="button"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
-                                onTabChange("profile");
+                                onSegmentChange("team");
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <Users className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                                <span className="truncate">Team Workspace</span>
+                            </div>
+                            {teamPendingCount !== undefined && teamPendingCount > 0 && (
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#FFE566] text-black border border-black min-w-[18px] text-center leading-none">
+                                    {teamPendingCount}
+                                </span>
+                            )}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onSegmentChange("dashboard");
+                                if (onTabChange) onTabChange("events");
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                        >
+                            <CalendarDays className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                            <span className="truncate">Events & Workshops</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onSegmentChange("dashboard");
+                                if (onTabChange) onTabChange("profile");
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
@@ -353,36 +447,6 @@ export const ClubSidebar = ({
                                     {unreadInboxCount}
                                 </span>
                             )}
-                        </button>
-
-                        <a
-                            href={`/clubs/${club.clubUsername || club.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left"
-                        >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                <ExternalLink className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                <span className="truncate">Public Club Page</span>
-                            </div>
-                            <span className="text-[10px] uppercase font-black text-emerald-600 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-400">
-                                Live
-                            </span>
-                        </a>
-
-                        <button
-                            type="button"
-                            onClick={handleCopyPublicLink}
-                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
-                        >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                                {copiedSlug ? (
-                                    <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                                ) : (
-                                    <Copy className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                                )}
-                                <span className="truncate">{copiedSlug ? "Link Copied!" : "Copy Public Link"}</span>
-                            </div>
                         </button>
 
                         <div className="my-1.5 h-0.5 bg-black/15" />

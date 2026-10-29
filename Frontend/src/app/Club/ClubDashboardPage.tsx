@@ -3,10 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {
     ShieldCheck,
     Calendar,
-    Globe,
-    ExternalLink,
-    Copy,
-    Check,
+    CalendarDays,
     Plus,
     Edit3,
     Trash2,
@@ -17,6 +14,11 @@ import {
     Building2,
     ChevronRight,
     Mail,
+    Bell,
+    ExternalLink,
+    CheckCircle2,
+    Ban,
+    FileText,
 } from "lucide-react";
 import { useAppDispatch, clearUser } from "../../store";
 import { useToast } from "../../context/ToastContext";
@@ -90,14 +92,13 @@ export default function ClubDashboardPage() {
 
     // Data States
     const [club, setClub] = useState<VerifiedClub | null>(null);
-    const [stats, setStats] = useState<ClubStats>({ upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
+    const [, setStats] = useState<ClubStats>({ upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
     const [events, setEvents] = useState<ClubEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Navigation & UI States
     const [activeTab, setActiveTab] = useState<"overview" | "profile" | "events">("overview");
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-    const [copiedSlug, setCopiedSlug] = useState(false);
 
     // Club Inbox & Moderation States
     const [isInboxModalOpen, setIsInboxModalOpen] = useState(false);
@@ -137,7 +138,7 @@ export default function ClubDashboardPage() {
         venueOrLocation: "",
         registrationUrl: "",
         coverImageUrl: "",
-        status: "published" as "draft" | "published",
+        status: "published" as "draft" | "published" | "cancelled",
     });
     const [isSavingEvent, setIsSavingEvent] = useState(false);
     const [eventFilter, setEventFilter] = useState<"all" | "published" | "draft" | "cancelled">("all");
@@ -211,7 +212,7 @@ export default function ClubDashboardPage() {
                     });
                 }
             }
-        } catch (err) {
+        } catch {
             // silent fail for badge sync
         }
     };
@@ -228,17 +229,6 @@ export default function ClubDashboardPage() {
             window.removeEventListener("focus", fetchInboxCounts);
         };
     }, []);
-
-    // Copy public club URL
-    const handleCopyPublicLink = () => {
-        if (!club) return;
-        const clubHandle = club.clubUsername || club.slug;
-        const url = `${window.location.origin}/clubs/${clubHandle}`;
-        navigator.clipboard.writeText(url);
-        setCopiedSlug(true);
-        toast.success("Public club profile link copied to clipboard!", { title: "Link Copied" });
-        setTimeout(() => setCopiedSlug(false), 2500);
-    };
 
     // Handle Profile Save
     const handleSaveProfile = async (e: React.FormEvent) => {
@@ -272,7 +262,7 @@ export default function ClubDashboardPage() {
                 throw new Error(data?.message || "Failed to update profile.");
             }
 
-            toast.success("Public club profile updated successfully!", { title: "Saved" });
+            toast.success("Club profile updated successfully!", { title: "Saved" });
             setClub(data.club);
         } catch (err: any) {
             console.error("Save profile error:", err);
@@ -280,6 +270,51 @@ export default function ClubDashboardPage() {
         } finally {
             setIsSavingProfile(false);
         }
+    };
+
+    // Open Event Create Modal
+    const openCreateEventModal = (initialStatus: "draft" | "published" = "published") => {
+        setEditingEventId(null);
+        setEventForm({
+            title: "",
+            summary: "",
+            description: "",
+            startsAt: "",
+            endsAt: "",
+            timezone: "Asia/Kolkata",
+            locationType: "in_person",
+            venueOrLocation: "",
+            registrationUrl: "",
+            coverImageUrl: "",
+            status: initialStatus,
+        });
+        setIsEventModalOpen(true);
+    };
+
+    // Open Event Edit Modal
+    const handleEditEvent = (ev: ClubEvent) => {
+        setEditingEventId(ev.id);
+        const formatForInput = (isoStr: string | null) => {
+            if (!isoStr) return "";
+            const d = new Date(isoStr);
+            const pad = (n: number) => (n < 10 ? `0${n}` : n);
+            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        };
+
+        setEventForm({
+            title: ev.title,
+            summary: ev.summary || "",
+            description: ev.description || "",
+            startsAt: formatForInput(ev.startsAt),
+            endsAt: formatForInput(ev.endsAt),
+            timezone: ev.timezone || "Asia/Kolkata",
+            locationType: ev.locationType || "in_person",
+            venueOrLocation: ev.venueOrLocation || "",
+            registrationUrl: ev.registrationUrl || "",
+            coverImageUrl: ev.coverImageUrl || "",
+            status: ev.status,
+        });
+        setIsEventModalOpen(true);
     };
 
     // Handle Event Save (Create or Edit)
@@ -339,32 +374,6 @@ export default function ClubDashboardPage() {
         }
     };
 
-    // Open Event Edit Modal
-    const handleEditEvent = (ev: ClubEvent) => {
-        setEditingEventId(ev.id);
-        const formatForInput = (isoStr: string | null) => {
-            if (!isoStr) return "";
-            const d = new Date(isoStr);
-            const pad = (n: number) => (n < 10 ? `0${n}` : n);
-            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        };
-
-        setEventForm({
-            title: ev.title,
-            summary: ev.summary || "",
-            description: ev.description || "",
-            startsAt: formatForInput(ev.startsAt),
-            endsAt: formatForInput(ev.endsAt),
-            timezone: ev.timezone || "Asia/Kolkata",
-            locationType: ev.locationType || "in_person",
-            venueOrLocation: ev.venueOrLocation || "",
-            registrationUrl: ev.registrationUrl || "",
-            coverImageUrl: ev.coverImageUrl || "",
-            status: ev.status === "draft" ? "draft" : "published",
-        });
-        setIsEventModalOpen(true);
-    };
-
     // Handle Delete Event
     const handleDeleteEvent = async (eventId: string) => {
         if (!confirm("Are you sure you want to permanently delete this event?")) return;
@@ -385,26 +394,46 @@ export default function ClubDashboardPage() {
         }
     };
 
-    // Handle Quick Toggle Status
-    const handleToggleEventStatus = async (ev: ClubEvent) => {
-        const newStatus = ev.status === "published" ? "draft" : "published";
+    // Handle Quick Status Changes (Publish, Draft, Cancel)
+    const handleSetEventStatus = async (ev: ClubEvent, nextStatus: "draft" | "published" | "cancelled") => {
         try {
             const res = await fetch(`/api/club/events/${ev.id}`, {
                 method: "PATCH",
                 credentials: "include",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: newStatus }),
+                body: JSON.stringify({ status: nextStatus }),
             });
             const data = await res.json().catch(() => null);
             if (!res.ok) throw new Error(data?.message || "Failed to change status.");
 
-            toast.success(`Event is now ${newStatus === "published" ? "published live" : "saved as draft"}.`);
+            const statusLabel =
+                nextStatus === "published"
+                    ? "published live"
+                    : nextStatus === "cancelled"
+                    ? "marked as cancelled"
+                    : "moved to draft";
+            toast.success(`Event is now ${statusLabel}.`, { title: "Status Updated" });
             fetchClubData();
         } catch (err: any) {
-            console.error("Toggle status error:", err);
-            toast.error(err.message || "Failed to update status.");
+            console.error("Update status error:", err);
+            toast.error(err.message || "Failed to update event status.", { title: "Error" });
         }
     };
+
+    // Event subsets
+    const publishedEvents = useMemo(() => events.filter((e) => e.status === "published"), [events]);
+    const draftEvents = useMemo(() => events.filter((e) => e.status === "draft"), [events]);
+    const cancelledEvents = useMemo(() => events.filter((e) => e.status === "cancelled"), [events]);
+    const upcomingEvents = useMemo(
+        () => publishedEvents.filter((e) => new Date(e.startsAt) >= new Date()),
+        [publishedEvents]
+    );
+
+    // Filtered Events for Events View
+    const filteredEvents = useMemo(() => {
+        if (eventFilter === "all") return events;
+        return events.filter((e) => e.status === eventFilter);
+    }, [events, eventFilter]);
 
     // Calculate Profile Completeness Percentage
     const profileCompleteness = useMemo(() => {
@@ -422,18 +451,12 @@ export default function ClubDashboardPage() {
     const handleSignOut = async () => {
         try {
             await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-        } catch (e) {
+        } catch {
             // ignore
         }
         dispatch(clearUser());
         navigate("/auth/signin", { replace: true });
     };
-
-    // Filtered Events
-    const filteredEvents = useMemo(() => {
-        if (eventFilter === "all") return events;
-        return events.filter((e) => e.status === eventFilter);
-    }, [events, eventFilter]);
 
     // Date formatting matching Personal Account ("Today, 29 October 2026")
     const formattedDate = new Intl.DateTimeFormat("en-US", {
@@ -447,7 +470,7 @@ export default function ClubDashboardPage() {
             <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center text-neutral-900 font-sans">
                 <div className="flex flex-col items-center gap-4 bg-white p-6 rounded-2xl border-2 border-black shadow-[4px_4px_0px_#000]">
                     <div className="w-10 h-10 border-4 border-black border-t-[#a2ff86] rounded-full animate-spin" />
-                    <p className="text-xs font-black tracking-wider uppercase">Loading Club Dashboard...</p>
+                    <p className="text-xs font-black tracking-wider uppercase">Loading Club Space...</p>
                 </div>
             </div>
         );
@@ -459,7 +482,7 @@ export default function ClubDashboardPage() {
 
     return (
         <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
-            {/* Club Sidebar — EXACT same layout & design language as Personal Account, containing ONLY Dashboard */}
+            {/* Club Sidebar — Dashboard, Events, and Manage Profile Navigation */}
             <ClubSidebar
                 club={club}
                 activeTab={activeTab}
@@ -467,6 +490,7 @@ export default function ClubDashboardPage() {
                 isOpen={isMobileSidebarOpen}
                 onClose={() => setIsMobileSidebarOpen(false)}
                 unreadInboxCount={inboxCounts.unreadCount}
+                eventsCount={events.length}
                 onOpenInbox={() => setIsInboxModalOpen(true)}
                 onSignOut={handleSignOut}
             />
@@ -474,12 +498,12 @@ export default function ClubDashboardPage() {
             {/* Main Content Area Container matching Personal Account */}
             <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
                 <section
-                    aria-label="Orbix Club Dashboard"
+                    aria-label="Orbix Club Space"
                     className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
                     <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
-                        {/* Dashboard Header Bar matching Personal Account */}
-                        <div className="pb-5 border-b-2 border-black/55 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        {/* Header Bar */}
+                        <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             {/* Left: Mobile Toggle & Welcome Greeting */}
                             <div className="space-y-1">
                                 <div className="flex items-center gap-3">
@@ -509,99 +533,30 @@ export default function ClubDashboardPage() {
                                 </div>
                             </div>
 
-                            {/* Right: Tab Switcher + Inbox Icon + View Public Page */}
-                            <div className="flex items-center gap-2.5 flex-wrap">
-                                {/* Segmented Tab Switcher */}
-                                <div className="inline-flex items-center p-1 rounded-xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveTab("overview")}
-                                        className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                                            activeTab === "overview"
-                                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                                : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
-                                        }`}
-                                    >
-                                        Overview
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveTab("profile")}
-                                        className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
-                                            activeTab === "profile"
-                                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                                : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
-                                        }`}
-                                    >
-                                        Manage Profile
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setActiveTab("events")}
-                                        className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
-                                            activeTab === "events"
-                                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
-                                                : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
-                                        }`}
-                                    >
-                                        <span>Events</span>
-                                        <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black border border-black ${
-                                            activeTab === "events" ? "bg-[#a2ff86] text-black" : "bg-neutral-100 text-black"
-                                        }`}>
-                                            {events.length}
-                                        </span>
-                                    </button>
-                                </div>
-
-                                {/* Club Inbox Button with Real-Time Unread Badge */}
+                            {/* Right: Club Notifications / Inbox Bell Button */}
+                            <div className="flex items-center gap-3">
                                 <button
                                     type="button"
                                     onClick={() => setIsInboxModalOpen(true)}
-                                    className="relative p-2 sm:px-3 sm:py-2 bg-white hover:bg-[#FFE566] text-black rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] font-black text-xs flex items-center gap-2 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    title="Open Club Inbox"
+                                    className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white hover:bg-[#FFE566] text-black border-2 border-black shadow-[3px_3px_0px_#000] transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
+                                    title={`Club Notifications & Inbox ${inboxCounts.unreadCount > 0 ? `(${inboxCounts.unreadCount} unread)` : ""}`}
+                                    aria-label="Club Notifications & Inbox"
                                 >
-                                    <Mail className="w-4 h-4 stroke-[2.2]" />
-                                    <span className="hidden sm:inline">Inbox</span>
+                                    <Bell className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2.3] transition-transform group-hover:rotate-6" />
                                     {inboxCounts.unreadCount > 0 && (
-                                        <span className="px-1.5 py-0.5 rounded-full bg-[#FF6B6B] text-black border border-black font-black text-[10px] leading-none min-w-[18px] text-center shadow-[1px_1px_0px_#000]">
-                                            {inboxCounts.unreadCount}
+                                        <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black leading-none text-black bg-[#FF6B6B] rounded-full border-2 border-black shadow-[1px_1px_0px_#000] animate-pulse">
+                                            {inboxCounts.unreadCount > 99 ? "99+" : inboxCounts.unreadCount}
                                         </span>
                                     )}
                                 </button>
-
-                                {/* Copy Public Link */}
-                                <button
-                                    type="button"
-                                    onClick={handleCopyPublicLink}
-                                    className="p-2 sm:px-3 sm:py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-all"
-                                    title="Copy public link"
-                                >
-                                    {copiedSlug ? (
-                                        <Check className="w-4 h-4 text-emerald-600" />
-                                    ) : (
-                                        <Copy className="w-4 h-4" />
-                                    )}
-                                    <span className="hidden md:inline">{copiedSlug ? "Copied" : "Copy Link"}</span>
-                                </button>
-
-                                {/* View Public Page */}
-                                <a
-                                    href={`/clubs/${club.clubUsername || club.slug}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer"
-                                >
-                                    <span>Public Page</span>
-                                    <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
-                                </a>
                             </div>
                         </div>
 
                         {/* TAB 1: OVERVIEW */}
                         {activeTab === "overview" && (
                             <div className="space-y-6">
-                                {/* Club Identity Hero Card */}
-                                <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden">
+                                {/* Club Identity Summary Card */}
+                                <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
                                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 justify-between">
                                         <div className="flex items-center gap-4">
                                             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl border-2 border-black bg-emerald-200 flex items-center justify-center font-black text-2xl shadow-[3px_3px_0px_#000] overflow-hidden shrink-0">
@@ -621,8 +576,8 @@ export default function ClubDashboardPage() {
                                                         Verified Club
                                                     </span>
                                                 </div>
-                                                <p className="text-xs sm:text-sm font-bold text-neutral-600 flex items-center gap-1.5 mt-1">
-                                                    <Building2 className="w-4 h-4 text-neutral-400" />
+                                                <p className="text-xs sm:text-sm font-bold text-neutral-600 flex items-center gap-1.5 mt-1 flex-wrap">
+                                                    <Building2 className="w-4 h-4 text-neutral-400 shrink-0" />
                                                     <span>{club.college_name}</span>
                                                     <span className="text-neutral-400">•</span>
                                                     <span>{club.college_city}, {club.college_state}</span>
@@ -630,98 +585,77 @@ export default function ClubDashboardPage() {
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setEditingEventId(null);
-                                                    setEventForm({
-                                                        title: "",
-                                                        summary: "",
-                                                        description: "",
-                                                        startsAt: "",
-                                                        endsAt: "",
-                                                        timezone: "Asia/Kolkata",
-                                                        locationType: "in_person",
-                                                        venueOrLocation: "",
-                                                        registrationUrl: "",
-                                                        coverImageUrl: "",
-                                                        status: "published",
-                                                    });
-                                                    setIsEventModalOpen(true);
-                                                }}
-                                                className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                            >
-                                                <Plus className="w-4 h-4 stroke-[2.5]" />
-                                                <span>+ Create Event</span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    {/* Public Link Bar */}
-                                    <div className="mt-6 pt-5 border-t-2 border-black/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-[#FAF6EE] p-4 rounded-xl border-2 border-black">
-                                        <div className="flex items-center gap-2 truncate text-xs font-mono font-bold text-neutral-700">
-                                            <Globe className="w-4 h-4 text-emerald-600 shrink-0" />
-                                            <span className="truncate">
-                                                {window.location.origin}/clubs/{club.clubUsername || club.slug}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <button
-                                                type="button"
-                                                onClick={handleCopyPublicLink}
-                                                className="px-3 py-1.5 rounded-lg bg-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-50 flex items-center gap-1.5 cursor-pointer"
-                                            >
-                                                {copiedSlug ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-                                                <span>{copiedSlug ? "Copied" : "Copy"}</span>
-                                            </button>
-                                            <a
-                                                href={`/clubs/${club.clubUsername || club.slug}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="px-3 py-1.5 rounded-lg bg-black text-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 flex items-center gap-1.5 cursor-pointer"
-                                            >
-                                                <span>Open Page</span>
-                                                <ExternalLink className="w-3 h-3" />
-                                            </a>
+                                        <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000]">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            <span>Active Chapter</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* 4-Card Quick Metrics Grid: Upcoming, Draft, Total, and Club Inbox */}
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {/* Card 1: Upcoming Events */}
-                                    <div className="p-5 rounded-2xl bg-emerald-100 border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between">
-                                        <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900">
-                                            Upcoming Events
-                                        </span>
+                                    {/* Card 1: Upcoming Events -> Click switches to events tab filtered to published */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveTab("events");
+                                            setEventFilter("published");
+                                        }}
+                                        className="p-5 rounded-2xl bg-emerald-100 hover:bg-emerald-200 border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between text-left transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[11px] font-black uppercase tracking-wider text-emerald-900">
+                                                Upcoming Events
+                                            </span>
+                                            <ChevronRight className="w-4 h-4 text-emerald-800 transition-transform group-hover:translate-x-0.5" />
+                                        </div>
                                         <div className="text-3xl font-black text-neutral-900 my-2">
-                                            {stats.upcoming_count}
+                                            {upcomingEvents.length}
                                         </div>
                                         <span className="text-[10px] font-bold text-emerald-800">Live for student registrations</span>
-                                    </div>
+                                    </button>
 
-                                    {/* Card 2: Draft Events */}
-                                    <div className="p-5 rounded-2xl bg-amber-100 border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between">
-                                        <span className="text-[11px] font-black uppercase tracking-wider text-amber-900">
-                                            Draft Events
-                                        </span>
+                                    {/* Card 2: Draft Events -> Click switches to events tab filtered to draft */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveTab("events");
+                                            setEventFilter("draft");
+                                        }}
+                                        className="p-5 rounded-2xl bg-amber-100 hover:bg-amber-200 border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between text-left transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[11px] font-black uppercase tracking-wider text-amber-900">
+                                                Draft Events
+                                            </span>
+                                            <ChevronRight className="w-4 h-4 text-amber-800 transition-transform group-hover:translate-x-0.5" />
+                                        </div>
                                         <div className="text-3xl font-black text-neutral-900 my-2">
-                                            {stats.draft_count}
+                                            {draftEvents.length}
                                         </div>
                                         <span className="text-[10px] font-bold text-amber-800">Unpublished drafts</span>
-                                    </div>
+                                    </button>
 
-                                    {/* Card 3: Total Events */}
-                                    <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between">
-                                        <span className="text-[11px] font-black uppercase tracking-wider text-neutral-600">
-                                            Total Events
-                                        </span>
+                                    {/* Card 3: Total Events -> Click switches to events tab */}
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setActiveTab("events");
+                                            setEventFilter("all");
+                                        }}
+                                        className="p-5 rounded-2xl bg-white hover:bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between text-left transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[11px] font-black uppercase tracking-wider text-neutral-600">
+                                                Total Events
+                                            </span>
+                                            <ChevronRight className="w-4 h-4 text-neutral-700 transition-transform group-hover:translate-x-0.5" />
+                                        </div>
                                         <div className="text-3xl font-black text-neutral-900 my-2">
-                                            {stats.total_count}
+                                            {events.length}
                                         </div>
                                         <span className="text-[10px] font-bold text-neutral-500">All registered sessions</span>
-                                    </div>
+                                    </button>
 
                                     {/* Card 4: Club Inbox & Inquiries */}
                                     <div className="p-5 rounded-2xl bg-[#E8F0FE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between">
@@ -759,7 +693,7 @@ export default function ClubDashboardPage() {
                                     <div className="flex-1 max-w-xl">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-xs font-black uppercase tracking-wider text-neutral-500">
-                                                Public Profile Completeness
+                                                Profile Completeness
                                             </span>
                                             <span className="font-black text-sm text-neutral-900">
                                                 {profileCompleteness}%
@@ -773,7 +707,7 @@ export default function ClubDashboardPage() {
                                         </div>
                                         <p className="text-xs text-neutral-600 font-medium mt-2">
                                             {profileCompleteness === 100
-                                                ? "Your club presence is fully complete and ready for public engagement."
+                                                ? "Your club details and descriptions are fully complete."
                                                 : "Add club logo, description, and website to maximize credibility."}
                                         </p>
                                     </div>
@@ -787,98 +721,43 @@ export default function ClubDashboardPage() {
                                     </button>
                                 </div>
 
-                                {/* Upcoming Events Summary Section */}
+                                {/* Institutional Accreditation Snapshot Card */}
                                 <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between flex-wrap gap-2">
                                         <div className="flex items-center gap-2">
-                                            <Calendar className="w-5 h-5 text-neutral-800" />
-                                            <h3 className="text-base font-black text-neutral-900">Upcoming Published Events</h3>
+                                            <ShieldCheck className="w-5 h-5 text-emerald-600" />
+                                            <h3 className="text-base font-black text-neutral-900">Collegiate Verification Record</h3>
                                         </div>
-                                        <button
-                                            type="button"
-                                            onClick={() => setActiveTab("events")}
-                                            className="text-xs font-black text-neutral-700 hover:text-black flex items-center gap-1 cursor-pointer"
-                                        >
-                                            <span>View All ({events.length})</span>
-                                            <ChevronRight className="w-3.5 h-3.5" />
-                                        </button>
+                                        <span className="text-xs font-bold text-neutral-500">
+                                            Verified {new Date(club.verified_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
+                                        </span>
                                     </div>
-
-                                    {events.filter((e) => e.status === "published" && new Date(e.startsAt) >= new Date()).length === 0 ? (
-                                        <div className="p-8 rounded-xl bg-[#FAF6EE] border-2 border-dashed border-black/30 text-center space-y-3">
-                                            <Calendar className="w-8 h-8 text-neutral-400 mx-auto" />
-                                            <p className="text-xs font-bold text-neutral-600">
-                                                No upcoming published events right now.
-                                            </p>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setEditingEventId(null);
-                                                    setIsEventModalOpen(true);
-                                                }}
-                                                className="px-4 py-2 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 cursor-pointer"
-                                            >
-                                                Schedule Next Event
-                                            </button>
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {events
-                                                .filter((e) => e.status === "published" && new Date(e.startsAt) >= new Date())
-                                                .slice(0, 4)
-                                                .map((ev) => (
-                                                    <div
-                                                        key={ev.id}
-                                                        className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex flex-col justify-between"
-                                                    >
-                                                        <div>
-                                                            <div className="flex items-center justify-between gap-2 mb-1.5">
-                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-200 border border-black">
-                                                                    Published
-                                                                </span>
-                                                                <span className="text-[11px] font-bold text-neutral-500">
-                                                                    {new Date(ev.startsAt).toLocaleDateString(undefined, {
-                                                                        month: "short",
-                                                                        day: "numeric",
-                                                                        hour: "2-digit",
-                                                                        minute: "2-digit",
-                                                                    })}
-                                                                </span>
-                                                            </div>
-                                                            <h4 className="font-black text-sm text-neutral-900 line-clamp-1">{ev.title}</h4>
-                                                            <p className="text-xs text-neutral-600 line-clamp-2 mt-1">
-                                                                {ev.summary || ev.description || "No description provided."}
-                                                            </p>
-                                                        </div>
-                                                        <div className="mt-3 pt-2.5 border-t border-black/10 flex items-center justify-between text-xs">
-                                                            <span className="font-bold text-neutral-600 flex items-center gap-1">
-                                                                <MapPin className="w-3.5 h-3.5 text-neutral-400" />
-                                                                {ev.venueOrLocation || (ev.locationType === "virtual" ? "Online" : "Campus Venue")}
-                                                            </span>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleEditEvent(ev)}
-                                                                className="font-black text-neutral-900 hover:underline cursor-pointer"
-                                                            >
-                                                                Edit
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                        </div>
-                                    )}
+                                    <p className="text-xs text-neutral-600 leading-relaxed font-medium">
+                                        This organization operates as an authorized campus chapter of <strong>{club.college_name}</strong>. Event scheduling, workshop administration, and student messaging follow institutional governance guidelines.
+                                    </p>
+                                    <div className="pt-2 flex flex-wrap items-center gap-3 text-xs font-bold text-neutral-700">
+                                        <span className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] border border-black/30">
+                                            Campus: {club.college_city}, {club.college_state}
+                                        </span>
+                                        <span className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] border border-black/30">
+                                            Category: {club.category}
+                                        </span>
+                                        <span className="px-2.5 py-1 rounded-lg bg-[#FAF6EE] border border-black/30">
+                                            Authority: Lead Student Representative
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* TAB 2: MANAGE PUBLIC PROFILE */}
+                        {/* TAB 2: MANAGE CLUB PROFILE */}
                         {activeTab === "profile" && (
                             <div className="space-y-6">
                                 <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
                                     <div className="mb-6 pb-4 border-b-2 border-black/10">
-                                        <h2 className="text-lg font-black text-neutral-900">Manage Public Profile</h2>
+                                        <h2 className="text-lg font-black text-neutral-900">Manage Club Profile</h2>
                                         <p className="text-xs font-bold text-neutral-500 mt-1">
-                                            Update your club's public narrative, logo, and links. All updates are live immediately on your public URL.
+                                            Update your club narrative, logo, and links. All updates take effect immediately.
                                         </p>
                                     </div>
 
@@ -900,7 +779,7 @@ export default function ClubDashboardPage() {
 
                                             <div>
                                                 <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                                                    Public Website URL
+                                                    Official Website URL
                                                 </label>
                                                 <input
                                                     type="url"
@@ -953,7 +832,7 @@ export default function ClubDashboardPage() {
 
                                         <div>
                                             <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                                                About Club (Narrative, Mission, Annual Activities)
+                                                About Club (Mission, History, Annual Activities)
                                             </label>
                                             <textarea
                                                 rows={5}
@@ -967,7 +846,7 @@ export default function ClubDashboardPage() {
                                         {/* Social Channels */}
                                         <div className="pt-4 border-t-2 border-black/10 space-y-4">
                                             <h3 className="text-xs font-black uppercase tracking-wider text-neutral-700">
-                                                Public Social Links
+                                                Social & Community Channels
                                             </h3>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                                                 <div>
@@ -1030,7 +909,7 @@ export default function ClubDashboardPage() {
                                                 className="px-6 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                             >
                                                 <Save className="w-4 h-4" />
-                                                <span>{isSavingProfile ? "Saving Profile..." : "Save Public Profile"}</span>
+                                                <span>{isSavingProfile ? "Saving Profile..." : "Save Club Profile"}</span>
                                             </button>
                                         </div>
                                     </form>
@@ -1038,79 +917,204 @@ export default function ClubDashboardPage() {
                             </div>
                         )}
 
-                        {/* TAB 3: EVENTS MANAGEMENT */}
+                        {/* TAB 3: DEDICATED EVENTS & WORKSHOPS MANAGEMENT */}
                         {activeTab === "events" && (
                             <div className="space-y-6">
-                                {/* Filter Bar & Create Button */}
-                                <div className="p-4 sm:p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row items-center justify-between gap-4">
-                                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                                        {(["all", "published", "draft", "cancelled"] as const).map((status) => (
-                                            <button
-                                                key={status}
-                                                type="button"
-                                                onClick={() => setEventFilter(status)}
-                                                className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
-                                                    eventFilter === status
-                                                        ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
-                                                        : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
-                                                }`}
-                                            >
-                                                {status}
-                                            </button>
-                                        ))}
+                                {/* Header Card with Title and Prominent + Create New Event Button */}
+                                <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <CalendarDays className="w-6 h-6 text-black" />
+                                            <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
+                                                Club Events & Workshops
+                                            </h2>
+                                        </div>
+                                        <p className="text-xs sm:text-sm font-bold text-neutral-600">
+                                            Manage your chapter's published sessions, drafts, cancelled meetups, and create new events.
+                                        </p>
                                     </div>
 
                                     <button
                                         type="button"
-                                        onClick={() => {
-                                            setEditingEventId(null);
-                                            setEventForm({
-                                                title: "",
-                                                summary: "",
-                                                description: "",
-                                                startsAt: "",
-                                                endsAt: "",
-                                                timezone: "Asia/Kolkata",
-                                                locationType: "in_person",
-                                                venueOrLocation: "",
-                                                registrationUrl: "",
-                                                coverImageUrl: "",
-                                                status: "published",
-                                            });
-                                            setIsEventModalOpen(true);
-                                        }}
-                                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                        onClick={() => openCreateEventModal("published")}
+                                        className="px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
                                     >
                                         <Plus className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Create New Event</span>
+                                        <span>+ Create New Event</span>
                                     </button>
+                                </div>
+
+                                {/* Quick Metric Summary Cards Row */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                    {/* Metric 1: Total */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setEventFilter("all")}
+                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
+                                            eventFilter === "all"
+                                                ? "bg-black text-[#a2ff86] shadow-[3px_3px_0px_#000]"
+                                                : "bg-white hover:bg-[#FAF6EE] text-neutral-900 shadow-[2px_2px_0px_#000]"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wider ${
+                                                eventFilter === "all" ? "text-neutral-300" : "text-neutral-500"
+                                            }`}>
+                                                Total Sessions
+                                            </span>
+                                            <Calendar className="w-4 h-4 opacity-70" />
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black mt-2">
+                                            {events.length}
+                                        </div>
+                                    </button>
+
+                                    {/* Metric 2: Published */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setEventFilter("published")}
+                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
+                                            eventFilter === "published"
+                                                ? "bg-emerald-300 text-black shadow-[3px_3px_0px_#000] font-black"
+                                                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-950 shadow-[2px_2px_0px_#000]"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-emerald-900">
+                                                Published
+                                            </span>
+                                            <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-neutral-900 mt-2">
+                                            {publishedEvents.length}
+                                        </div>
+                                    </button>
+
+                                    {/* Metric 3: Draft */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setEventFilter("draft")}
+                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
+                                            eventFilter === "draft"
+                                                ? "bg-amber-300 text-black shadow-[3px_3px_0px_#000] font-black"
+                                                : "bg-amber-50 hover:bg-amber-100 text-amber-950 shadow-[2px_2px_0px_#000]"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-900">
+                                                Drafts
+                                            </span>
+                                            <FileText className="w-4 h-4 text-amber-700" />
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-neutral-900 mt-2">
+                                            {draftEvents.length}
+                                        </div>
+                                    </button>
+
+                                    {/* Metric 4: Cancelled */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setEventFilter("cancelled")}
+                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
+                                            eventFilter === "cancelled"
+                                                ? "bg-rose-300 text-black shadow-[3px_3px_0px_#000] font-black"
+                                                : "bg-rose-50 hover:bg-rose-100 text-rose-950 shadow-[2px_2px_0px_#000]"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-rose-900">
+                                                Cancelled
+                                            </span>
+                                            <Ban className="w-4 h-4 text-rose-700" />
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-neutral-900 mt-2">
+                                            {cancelledEvents.length}
+                                        </div>
+                                    </button>
+                                </div>
+
+                                {/* Filter Pills Bar */}
+                                <div className="p-3 sm:p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => setEventFilter("all")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "all"
+                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            All ({events.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEventFilter("published")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "published"
+                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            Published ({publishedEvents.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEventFilter("draft")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "draft"
+                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            Drafts ({draftEvents.length})
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setEventFilter("cancelled")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "cancelled"
+                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            Cancelled ({cancelledEvents.length})
+                                        </button>
+                                    </div>
+
+                                    <span className="text-xs font-bold text-neutral-500">
+                                        Showing {filteredEvents.length} event{filteredEvents.length === 1 ? "" : "s"}
+                                    </span>
                                 </div>
 
                                 {/* Event Cards Grid */}
                                 {filteredEvents.length === 0 ? (
                                     <div className="p-12 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-center space-y-3">
                                         <Calendar className="w-10 h-10 text-neutral-400 mx-auto" />
-                                        <h3 className="font-black text-base text-neutral-800">No events found</h3>
+                                        <h3 className="font-black text-base text-neutral-800">
+                                            No {eventFilter !== "all" ? eventFilter : ""} events found
+                                        </h3>
                                         <p className="text-xs font-medium text-neutral-500 max-w-sm mx-auto">
-                                            Create workshops, hackathons, and guest speaker sessions to engage students on campus.
+                                            {eventFilter === "cancelled"
+                                                ? "No sessions have been cancelled."
+                                                : eventFilter === "draft"
+                                                ? "You have no events saved as drafts."
+                                                : "Create workshops, hackathons, and guest speaker sessions for your chapter."}
                                         </p>
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                setEditingEventId(null);
-                                                setIsEventModalOpen(true);
-                                            }}
+                                            onClick={() => openCreateEventModal("published")}
                                             className="mt-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 cursor-pointer"
                                         >
-                                            Create Event
+                                            + Create New Event
                                         </button>
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                         {filteredEvents.map((ev) => (
                                             <div
                                                 key={ev.id}
-                                                className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between"
+                                                className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between"
                                             >
                                                 <div>
                                                     <div className="flex items-center justify-between gap-2 mb-2">
@@ -1119,11 +1123,15 @@ export default function ClubDashboardPage() {
                                                                 ev.status === "published"
                                                                     ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
                                                                     : ev.status === "draft"
-                                                                    ? "bg-amber-200 text-black"
-                                                                    : "bg-rose-200 text-black"
+                                                                    ? "bg-amber-200 text-black shadow-[1px_1px_0px_#000]"
+                                                                    : "bg-rose-200 text-black shadow-[1px_1px_0px_#000]"
                                                             }`}
                                                         >
-                                                            {ev.status}
+                                                            {ev.status === "published"
+                                                                ? "Published"
+                                                                : ev.status === "draft"
+                                                                ? "Draft"
+                                                                : "Cancelled"}
                                                         </span>
                                                         <span className="text-xs font-bold text-neutral-500 flex items-center gap-1">
                                                             <Clock className="w-3.5 h-3.5" />
@@ -1137,17 +1145,17 @@ export default function ClubDashboardPage() {
                                                         </span>
                                                     </div>
 
-                                                    <h3 className="text-base font-black text-neutral-900 line-clamp-1">
+                                                    <h3 className="text-base sm:text-lg font-black text-neutral-900 line-clamp-1">
                                                         {ev.title}
                                                     </h3>
                                                     <p className="text-xs text-neutral-600 line-clamp-2 mt-1.5 leading-relaxed">
                                                         {ev.summary || ev.description || "No description provided."}
                                                     </p>
 
-                                                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-neutral-500 font-medium">
-                                                        <span className="flex items-center gap-1">
-                                                            <MapPin className="w-3.5 h-3.5" />
-                                                            {ev.venueOrLocation || (ev.locationType === "virtual" ? "Virtual (Online)" : "Campus")}
+                                                    <div className="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-neutral-600 font-medium">
+                                                        <span className="flex items-center gap-1 font-bold">
+                                                            <MapPin className="w-3.5 h-3.5 text-neutral-500" />
+                                                            {ev.venueOrLocation || (ev.locationType === "virtual" ? "Virtual (Online)" : ev.locationType === "hybrid" ? "Hybrid" : "Campus Hall")}
                                                         </span>
                                                         {ev.registrationUrl && (
                                                             <a
@@ -1156,7 +1164,7 @@ export default function ClubDashboardPage() {
                                                                 rel="noopener noreferrer"
                                                                 className="text-emerald-700 hover:underline flex items-center gap-1 font-bold"
                                                             >
-                                                                <span>Registration Link</span>
+                                                                <span>RSVP / Registration Link</span>
                                                                 <ExternalLink className="w-3 h-3" />
                                                             </a>
                                                         )}
@@ -1164,19 +1172,67 @@ export default function ClubDashboardPage() {
                                                 </div>
 
                                                 {/* Action Bar */}
-                                                <div className="mt-5 pt-3 border-t-2 border-black/10 flex items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleToggleEventStatus(ev)}
-                                                            className={`px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black shadow-[1px_1px_0px_#000] cursor-pointer ${
-                                                                ev.status === "published"
-                                                                    ? "bg-amber-100 hover:bg-amber-200 text-amber-900"
-                                                                    : "bg-emerald-200 hover:bg-emerald-300 text-emerald-900"
-                                                            }`}
-                                                        >
-                                                            {ev.status === "published" ? "Unpublish" : "Publish Live"}
-                                                        </button>
+                                                <div className="mt-5 pt-3.5 border-t-2 border-black/10 flex flex-wrap items-center justify-between gap-2">
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        {/* Status Toggles */}
+                                                        {ev.status === "published" && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSetEventStatus(ev, "draft")}
+                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-amber-100 hover:bg-amber-200 text-amber-950 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                                >
+                                                                    To Draft
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSetEventStatus(ev, "cancelled")}
+                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-rose-100 hover:bg-rose-200 text-rose-950 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                                >
+                                                                    Cancel Event
+                                                                </button>
+                                                            </>
+                                                        )}
+
+                                                        {ev.status === "draft" && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSetEventStatus(ev, "published")}
+                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-emerald-200 hover:bg-emerald-300 text-emerald-950 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                                >
+                                                                    Publish Live
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSetEventStatus(ev, "cancelled")}
+                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-rose-100 hover:bg-rose-200 text-rose-950 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                                >
+                                                                    Cancel Event
+                                                                </button>
+                                                            </>
+                                                        )}
+
+                                                        {ev.status === "cancelled" && (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSetEventStatus(ev, "draft")}
+                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-amber-100 hover:bg-amber-200 text-amber-950 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                                >
+                                                                    Restore to Draft
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleSetEventStatus(ev, "published")}
+                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-emerald-200 hover:bg-emerald-300 text-emerald-950 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                                >
+                                                                    Publish Live
+                                                                </button>
+                                                            </>
+                                                        )}
+
+                                                        {/* Edit Button */}
                                                         <button
                                                             type="button"
                                                             onClick={() => handleEditEvent(ev)}
@@ -1187,6 +1243,7 @@ export default function ClubDashboardPage() {
                                                         </button>
                                                     </div>
 
+                                                    {/* Delete Button */}
                                                     <button
                                                         type="button"
                                                         onClick={() => handleDeleteEvent(ev.id)}
@@ -1209,7 +1266,7 @@ export default function ClubDashboardPage() {
                 </section>
             </div>
 
-            {/* Club Inbox Modal for reading/replying to user inquiries and moderating (Mute / Block) */}
+            {/* Club Inbox Modal */}
             <ClubInboxModal
                 isOpen={isInboxModalOpen}
                 onClose={() => {
@@ -1231,7 +1288,7 @@ export default function ClubDashboardPage() {
                                     {editingEventId ? "Edit Event" : "Create New Club Event"}
                                 </h3>
                                 <p className="text-xs text-neutral-500 font-medium">
-                                    Announce workshops, hackathons, or student meetings.
+                                    Publish or draft workshops, hackathons, and chapter meetups.
                                 </p>
                             </div>
                             <button
@@ -1293,7 +1350,7 @@ export default function ClubDashboardPage() {
                                         value={eventForm.locationType}
                                         onChange={(val) => setEventForm({ ...eventForm, locationType: val as any })}
                                         options={[
-                                            { value: "in_person", label: "In-Person (On Campus)" },
+                                            { value: "in_person", label: "In-Person (Campus)" },
                                             { value: "virtual", label: "Virtual (Online Link)" },
                                             { value: "hybrid", label: "Hybrid" },
                                         ]}
@@ -1350,7 +1407,7 @@ export default function ClubDashboardPage() {
                                     type="text"
                                     value={eventForm.summary}
                                     onChange={(e) => setEventForm({ ...eventForm, summary: e.target.value })}
-                                    placeholder="A hands-on session covering smart contracts and decentralization..."
+                                    placeholder="A hands-on session covering problem solving techniques..."
                                     className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
                                 />
                             </div>
@@ -1376,8 +1433,9 @@ export default function ClubDashboardPage() {
                                     value={eventForm.status}
                                     onChange={(val) => setEventForm({ ...eventForm, status: val as any })}
                                     options={[
-                                        { value: "published", label: "Published (Visible on Public Page Immediately)" },
-                                        { value: "draft", label: "Draft (Saved only in Dashboard)" },
+                                        { value: "published", label: "Published (Live for Registrations)" },
+                                        { value: "draft", label: "Draft (Saved internally)" },
+                                        { value: "cancelled", label: "Cancelled (Session Cancelled)" },
                                     ]}
                                     size="sm"
                                     className="w-full"

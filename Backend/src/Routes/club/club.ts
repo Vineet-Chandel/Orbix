@@ -27,8 +27,12 @@ import {
     sendClubReply,
     checkClubMessageQuota,
 } from "../../services/club/clubInboxService.js";
+import clubTeamRouter from "./clubTeamRoutes.js";
 
 const clubRouter = express.Router();
+
+// Mount dedicated Club Team Management router (/api/club/team)
+clubRouter.use("/team", clubTeamRouter);
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
