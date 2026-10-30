@@ -8,7 +8,6 @@ import {
     Trash2,
     Clock,
     MapPin,
-    Save,
     X,
     Bell,
     ExternalLink,
@@ -31,6 +30,7 @@ import { ClubSidebar, type ClubTab } from "./ClubSidebar";
 import ClubInboxModal from "./ClubInboxModal";
 import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
 import type { TeamStats } from "./Team/types";
+import { ClubProfileManager } from "./Profile/ClubProfileManager";
 
 interface VerifiedClub {
     id: string;
@@ -176,22 +176,6 @@ export default function ClubDashboardPage() {
         totalCount: 0,
     });
 
-    // Profile Edit State
-    const [profileForm, setProfileForm] = useState({
-        shortDescription: "",
-        about: "",
-        logoUrl: "",
-        coverImageUrl: "",
-        websiteUrl: "",
-        publicEmail: "",
-        socialGithub: "",
-        socialLinkedin: "",
-        socialInstagram: "",
-        socialX: "",
-        socialDiscord: "",
-    });
-    const [isSavingProfile, setIsSavingProfile] = useState(false);
-
     // Event Modal State
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
     const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -237,23 +221,6 @@ export default function ClubDashboardPage() {
                 setClub(profileData.club);
                 setStats(profileData.stats || { upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
                 fetchTeamStats(profileData.club.id);
-
-                // Initialize Profile Form
-                const c = profileData.club;
-                const sl = c.social_links || {};
-                setProfileForm({
-                    shortDescription: c.short_description || "",
-                    about: c.about || "",
-                    logoUrl: c.logo_url || "",
-                    coverImageUrl: c.cover_image_url || "",
-                    websiteUrl: c.website_url || "",
-                    publicEmail: c.public_email || "",
-                    socialGithub: sl.github || "",
-                    socialLinkedin: sl.linkedin || "",
-                    socialInstagram: sl.instagram || "",
-                    socialX: sl.x || sl.twitter || "",
-                    socialDiscord: sl.discord || "",
-                });
             }
 
             if (eventsData.success && Array.isArray(eventsData.events)) {
@@ -298,48 +265,6 @@ export default function ClubDashboardPage() {
             window.removeEventListener("focus", fetchInboxCounts);
         };
     }, []);
-
-    // Handle Profile Save
-    const handleSaveProfile = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSavingProfile(true);
-
-        try {
-            const res = await fetch("/api/club/profile", {
-                method: "PATCH",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    shortDescription: profileForm.shortDescription,
-                    about: profileForm.about,
-                    logoUrl: profileForm.logoUrl || null,
-                    coverImageUrl: profileForm.coverImageUrl || null,
-                    websiteUrl: profileForm.websiteUrl || null,
-                    publicEmail: profileForm.publicEmail || null,
-                    socialLinks: {
-                        github: profileForm.socialGithub || undefined,
-                        linkedin: profileForm.socialLinkedin || undefined,
-                        instagram: profileForm.socialInstagram || undefined,
-                        x: profileForm.socialX || undefined,
-                        discord: profileForm.socialDiscord || undefined,
-                    },
-                }),
-            });
-
-            const data = await res.json().catch(() => null);
-            if (!res.ok) {
-                throw new Error(data?.message || "Failed to update profile.");
-            }
-
-            toast.success("Club profile updated successfully!", { title: "Saved" });
-            setClub(data.club);
-        } catch (err: any) {
-            console.error("Save profile error:", err);
-            toast.error(err.message || "Failed to update club profile.", { title: "Error" });
-        } finally {
-            setIsSavingProfile(false);
-        }
-    };
 
     // Open Event Create Modal
     const openCreateEventModal = (initialStatus: "draft" | "published" = "published") => {
@@ -733,169 +658,10 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: MANAGE CLUB PROFILE */}
                         {activeTab === "profile" && (
-                            <div className="space-y-6">
-                                <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
-                                    <div className="mb-6 pb-4 border-b-2 border-black/10">
-                                        <h2 className="text-lg font-black text-neutral-900">Manage Club Profile</h2>
-                                        <p className="text-xs font-bold text-neutral-500 mt-1">
-                                            Update your club narrative, logo, and links. All updates take effect immediately.
-                                        </p>
-                                    </div>
-
-                                    <form onSubmit={handleSaveProfile} className="space-y-6">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                            <div>
-                                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                                                    Short Description (Headline)
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    maxLength={250}
-                                                    value={profileForm.shortDescription}
-                                                    onChange={(e) => setProfileForm({ ...profileForm, shortDescription: e.target.value })}
-                                                    placeholder="e.g. Official coding and competitive programming club of ABC College"
-                                                    className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-black"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                                                    Official Website URL
-                                                </label>
-                                                <input
-                                                    type="url"
-                                                    value={profileForm.websiteUrl}
-                                                    onChange={(e) => setProfileForm({ ...profileForm, websiteUrl: e.target.value })}
-                                                    placeholder="https://myclub.edu or https://team-axonic.com"
-                                                    className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-black"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                                                    Logo Image URL
-                                                </label>
-                                                <input
-                                                    type="url"
-                                                    value={profileForm.logoUrl}
-                                                    onChange={(e) => setProfileForm({ ...profileForm, logoUrl: e.target.value })}
-                                                    placeholder="https://.../logo.png"
-                                                    className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-black"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                                                    Cover Banner URL
-                                                </label>
-                                                <input
-                                                    type="url"
-                                                    value={profileForm.coverImageUrl}
-                                                    onChange={(e) => setProfileForm({ ...profileForm, coverImageUrl: e.target.value })}
-                                                    placeholder="https://.../banner.jpg"
-                                                    className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-black"
-                                                />
-                                            </div>
-
-                                            <div>
-                                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                                                    Public Contact Email
-                                                </label>
-                                                <input
-                                                    type="email"
-                                                    value={profileForm.publicEmail}
-                                                    onChange={(e) => setProfileForm({ ...profileForm, publicEmail: e.target.value })}
-                                                    placeholder="contact@myclub.org"
-                                                    className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-black"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1.5">
-                                                About Club (Mission, History, Annual Activities)
-                                            </label>
-                                            <textarea
-                                                rows={5}
-                                                value={profileForm.about}
-                                                onChange={(e) => setProfileForm({ ...profileForm, about: e.target.value })}
-                                                placeholder="Write about your club history, flagship hackathons, weekly problem solving sessions, executive team, and student perks..."
-                                                className="w-full p-4 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium focus:outline-none focus:ring-2 focus:ring-black"
-                                            />
-                                        </div>
-
-                                        {/* Social Channels */}
-                                        <div className="pt-4 border-t-2 border-black/10 space-y-4">
-                                            <h3 className="text-xs font-black uppercase tracking-wider text-neutral-700">
-                                                Social & Community Channels
-                                            </h3>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                                <div>
-                                                    <label className="block text-[11px] font-bold text-neutral-600 mb-1">GitHub</label>
-                                                    <input
-                                                        type="url"
-                                                        value={profileForm.socialGithub}
-                                                        onChange={(e) => setProfileForm({ ...profileForm, socialGithub: e.target.value })}
-                                                        placeholder="https://github.com/myclub"
-                                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[11px] font-bold text-neutral-600 mb-1">LinkedIn</label>
-                                                    <input
-                                                        type="url"
-                                                        value={profileForm.socialLinkedin}
-                                                        onChange={(e) => setProfileForm({ ...profileForm, socialLinkedin: e.target.value })}
-                                                        placeholder="https://linkedin.com/company/myclub"
-                                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[11px] font-bold text-neutral-600 mb-1">Instagram</label>
-                                                    <input
-                                                        type="url"
-                                                        value={profileForm.socialInstagram}
-                                                        onChange={(e) => setProfileForm({ ...profileForm, socialInstagram: e.target.value })}
-                                                        placeholder="https://instagram.com/myclub"
-                                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[11px] font-bold text-neutral-600 mb-1">X (Twitter)</label>
-                                                    <input
-                                                        type="url"
-                                                        value={profileForm.socialX}
-                                                        onChange={(e) => setProfileForm({ ...profileForm, socialX: e.target.value })}
-                                                        placeholder="https://x.com/myclub"
-                                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs"
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-[11px] font-bold text-neutral-600 mb-1">Discord</label>
-                                                    <input
-                                                        type="url"
-                                                        value={profileForm.socialDiscord}
-                                                        onChange={(e) => setProfileForm({ ...profileForm, socialDiscord: e.target.value })}
-                                                        placeholder="https://discord.gg/..."
-                                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="pt-4 flex items-center justify-end">
-                                            <button
-                                                type="submit"
-                                                disabled={isSavingProfile}
-                                                className="px-6 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer disabled:opacity-50 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                            >
-                                                <Save className="w-4 h-4" />
-                                                <span>{isSavingProfile ? "Saving Profile..." : "Save Club Profile"}</span>
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
+                            <ClubProfileManager
+                                clubId={club.id}
+                                onProfileUpdated={fetchClubData}
+                            />
                         )}
 
                         {/* TAB: DASHBOARD OVERVIEW */}

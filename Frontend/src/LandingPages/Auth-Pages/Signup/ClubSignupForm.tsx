@@ -23,11 +23,11 @@ import {
     ArrowLeft,
     RotateCcw,
     AlertCircle,
+    LogIn,
+    UserPlus,
 } from "lucide-react";
 import { FormInput } from "../FormInput";
-import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
 import { UsernameRulesIndicator } from "../UsernameRulesIndicator";
-import { evaluatePassword } from "../passwordValidator";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, useAppSelector, setUser } from "../../../store";
 import { NeoSelect } from "../../../components/NeoSelect";
@@ -222,8 +222,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
     const sendingPhoneOtpRef = useRef(false);
     const [firebaseNotice, setFirebaseNotice] = useState<string | null>(null);
 
-    const passwordStrength = evaluatePassword(formData.password);
-
     // Synchronized verification state tied directly to the currently entered email & phone
     const normalizedCurrentEmail = formData.contactEmail.trim().toLowerCase();
     const parsedCurrentPhone = formatToE164(formData.contactPhone.trim());
@@ -374,20 +372,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             newErrors.username = "Username is required";
         } else if (!/^[a-z0-9._-]{3,20}$/.test(normalizedUsername)) {
             newErrors.username = "Must be 3-20 chars: lowercase, numbers, dot, _, or -";
-        }
-
-        // Password validation (only required for new unauthenticated account signups)
-        if (!isAuthenticated) {
-            if (!formData.password) {
-                newErrors.password = "Password is required";
-            } else if (!passwordStrength.isValid) {
-                newErrors.password = "Please satisfy all password conditions below";
-            }
-
-            // Password confirmation validation
-            if (formData.password !== formData.passwordConfirm) {
-                newErrors.passwordConfirm = "Passwords do not match";
-            }
         }
 
         // Legal acceptance validation
@@ -803,7 +787,6 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             clubSocialUrl: formData.clubSocialUrl.trim() || undefined,
 
             username: formData.username.trim().toLowerCase(),
-            password: formData.password,
 
             emailVerificationToken: emailVerificationToken || undefined,
             phoneVerificationToken: phoneVerificationToken || undefined,
@@ -817,11 +800,19 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             let response: Response | null = null;
             let resultData: any = null;
 
+            const token = localStorage.getItem("orbix_token");
+            const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (token) {
+                headers["Authorization"] = `Bearer ${token}`;
+            }
+
             for (const url of endpoints) {
                 try {
                     const res = await fetch(url, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers,
                         credentials: "include",
                         body: JSON.stringify(payload),
                     });
@@ -920,13 +911,76 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                     </button>
                                 </div>
                             ) : (
-                                <div className="p-3.5 sm:p-4 rounded-2xl bg-[#EFF6FF] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
-                                    <UserCheck className="w-5 h-5 text-blue-700 shrink-0" />
-                                    <p className="text-xs font-semibold text-neutral-800">
-                                        Signed in as <strong>@{authUser.username}</strong> ({authUser.gmail}). This club will be linked directly to your account.
-                                    </p>
+                                <div className="p-4 sm:p-5 rounded-3xl bg-[#FEF08A] border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full border-2 border-black overflow-hidden bg-white shrink-0">
+                                            <img
+                                                src={authUser.avatarUrl || "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png"}
+                                                alt="Avatar"
+                                                className="w-full h-full object-cover"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="text-xs font-black uppercase text-black flex items-center gap-1.5 flex-wrap">
+                                                <span>Submitting as: {authUser.firstName} {authUser.lastName}</span>
+                                                <span className="bg-black text-[#FEF08A] text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                                                    @{authUser.username}
+                                                </span>
+                                            </div>
+                                            <p className="text-[11px] font-semibold text-neutral-800 mt-0.5">
+                                                Verified Personal Account (<span className="font-mono">{authUser.gmail}</span>) • Linked as initial Club Registrar
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="self-start sm:self-center px-3 py-1 bg-black text-white text-[10px] font-black uppercase tracking-wider rounded-xl border border-black shrink-0 flex items-center gap-1">
+                                        <ShieldCheck className="w-3.5 h-3.5 text-[#FEF08A]" />
+                                        Personal Link Active
+                                    </div>
                                 </div>
                             )}
+                        </div>
+                    )}
+
+                    {!isAuthenticated && (
+                        <div className="p-5 sm:p-6 rounded-3xl bg-[#FEF08A] border-2 border-black shadow-[5px_5px_0px_#000] space-y-3.5 mb-2">
+                            <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-2xl bg-black text-[#FEF08A] flex items-center justify-center shrink-0 border-2 border-black">
+                                    <UserCheck className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm sm:text-base font-black uppercase text-black">
+                                        Personal Account Required to Register a Club
+                                    </h3>
+                                    <p className="text-xs font-semibold text-neutral-800 mt-1 leading-relaxed">
+                                        Orbix uses real personal accounts to verify club registrar leadership. Please sign in to your personal account or register one first. Your personal account will automatically become the initial Club Registrar.
+                                    </p>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                                <button
+                                    type="button"
+                                    onClick={() => navigate("/auth/signin?redirect=/auth/signup?tab=club")}
+                                    className="flex-1 py-2.5 px-4 bg-black text-white font-black text-xs uppercase tracking-wider rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 transition-all cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                    <LogIn className="w-4 h-4" />
+                                    Sign In to Personal Account
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (_onSwitchToPersonal) {
+                                            _onSwitchToPersonal();
+                                        } else {
+                                            navigate("/auth/signup?tab=personal");
+                                        }
+                                    }}
+                                    className="flex-1 py-2.5 px-4 bg-white text-black font-black text-xs uppercase tracking-wider rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#FAF6EE] transition-all cursor-pointer flex items-center justify-center gap-2"
+                                >
+                                    <UserPlus className="w-4 h-4" />
+                                    Create Personal Account
+                                </button>
+                            </div>
                         </div>
                     )}
 
@@ -1301,53 +1355,16 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                             />
                         </div>
 
-                        {isAuthenticated ? (
-                            <div className="p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black/20 flex items-center gap-3">
-                                <Lock className="w-5 h-5 text-neutral-600 shrink-0" />
-                                <p className="text-xs font-semibold text-neutral-700">
-                                    Linked to your signed-in account (<span className="font-bold text-black">{authUser?.gmail}</span>). You will use your existing account password to sign in.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
-                                {/* Password Input */}
-                                <div>
-                                    <FormInput
-                                        name="password"
-                                        isPassword
-                                        placeholder="Password"
-                                        hideLabel
-                                        value={formData.password}
-                                        onChange={(e) => {
-                                            setFormData({ ...formData, password: e.target.value });
-                                            if (errors.password) setErrors({ ...errors, password: "" });
-                                        }}
-                                        error={errors.password}
-                                        autoComplete="new-password"
-                                    />
-
-                                    <PasswordStrengthIndicator
-                                        result={passwordStrength}
-                                        hasInput={formData.password.length > 0}
-                                    />
-                                </div>
-
-                                {/* Confirm Password */}
-                                <FormInput
-                                    name="passwordConfirm"
-                                    isPassword
-                                    placeholder="Confirm Password"
-                                    hideLabel
-                                    value={formData.passwordConfirm}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, passwordConfirm: e.target.value });
-                                        if (errors.passwordConfirm) setErrors({ ...errors, passwordConfirm: "" });
-                                    }}
-                                    error={errors.passwordConfirm}
-                                    autoComplete="new-password"
-                                />
-                            </div>
-                        )}
+                        <div className="p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black/20 flex items-center gap-3">
+                            <Lock className="w-5 h-5 text-neutral-600 shrink-0" />
+                            <p className="text-xs font-semibold text-neutral-700">
+                                {isAuthenticated ? (
+                                    <>Linked to your personal Orbix account (<span className="font-bold text-black">{authUser?.gmail}</span>). As a security best practice, clubs never maintain separate personal login passwords.</>
+                                ) : (
+                                    <>Club registration links directly to your personal Orbix account. You will log in using your personal account credentials.</>
+                                )}
+                            </p>
+                        </div>
                     </div>
 
                     {/* SECTION E: LEGAL CONSENT */}
