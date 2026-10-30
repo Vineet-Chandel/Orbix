@@ -165,7 +165,7 @@ export class ClubProfileService {
                 c.created_at AS "createdAt",
                 c.updated_at AS "updatedAt",
                 u.username AS "linkedUsername",
-                u.display_name AS "linkedDisplayName",
+                COALESCE(NULLIF(TRIM(CONCAT(u.firstname, ' ', u.lastname)), ''), u.username) AS "linkedDisplayName",
                 u.avatar_url AS "linkedAvatarUrl"
              FROM club_coordinators c
              LEFT JOIN users u ON u.id = c.linked_user_id
@@ -1032,7 +1032,7 @@ export class ClubProfileService {
                 c.contact_email AS "contactEmail",
                 c.linkedin_url AS "linkedinUrl",
                 u.username AS "linkedUsername",
-                u.display_name AS "linkedDisplayName",
+                COALESCE(NULLIF(TRIM(CONCAT(u.firstname, ' ', u.lastname)), ''), u.username) AS "linkedDisplayName",
                 u.avatar_url AS "linkedAvatarUrl"
              FROM club_coordinators c
              LEFT JOIN users u ON u.id = c.linked_user_id
