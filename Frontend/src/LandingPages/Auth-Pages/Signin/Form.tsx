@@ -81,6 +81,19 @@ export default function SigninForm() {
     };
 
     const handleLoginSuccess = (resultData: any) => {
+        // Strict Account Isolation: Reject club accounts trying to use personal login
+        const isClub =
+            resultData?.user?.accountType === "club" ||
+            Boolean(resultData?.user?.verifiedClub) ||
+            (resultData?.user?.clubStatus && resultData?.user?.clubStatus !== "none");
+
+        if (isClub) {
+            toast.error("This account is a Club account. Please use the Club Login tab.", {
+                title: "Club Account Detected",
+            });
+            return;
+        }
+
         if (resultData?.token) {
             try {
                 localStorage.setItem("orbix_token", resultData.token);
@@ -91,17 +104,6 @@ export default function SigninForm() {
 
         if (resultData?.user) {
             dispatch(setUser(resultData.user));
-        }
-
-        if (resultData?.user?.accountType === "club") {
-            if (resultData?.user?.clubStatus === "approved" || resultData?.user?.verifiedClub) {
-                toast.success("Welcome back! Redirecting to dedicated club dashboard...", { title: "Signed In" });
-                navigate("/club/dashboard");
-                return;
-            }
-            toast.success("Welcome back! Redirecting to club verification status...", { title: "Signed In" });
-            navigate("/club/status");
-            return;
         }
 
         toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });
@@ -131,6 +133,7 @@ export default function SigninForm() {
                         body: JSON.stringify({
                             gmail: formData.gmail.trim().toLowerCase(),
                             password: formData.password,
+                            accountType: "personal",
                         }),
                     });
                     response = res;
@@ -146,7 +149,10 @@ export default function SigninForm() {
             }
 
             if (!response.ok) {
-                await toast.handleError(response, "Invalid credentials.");
+                const message = resultData?.message || "Invalid credentials.";
+                toast.error(message, {
+                    title: resultData?.code === "ACCOUNT_TYPE_MISMATCH" ? "Club Account Detected" : "Sign In Failed",
+                });
                 return;
             }
 
@@ -240,6 +246,7 @@ export default function SigninForm() {
                         body: JSON.stringify({
                             challengeToken,
                             otp: code,
+                            accountType: "personal",
                         }),
                     });
                     response = res;
@@ -255,7 +262,10 @@ export default function SigninForm() {
             }
 
             if (!response.ok) {
-                await toast.handleError(response, "Invalid or expired verification code.");
+                const message = resultData?.message || "Invalid or expired verification code.";
+                toast.error(message, {
+                    title: resultData?.code === "ACCOUNT_TYPE_MISMATCH" ? "Club Account Detected" : "Verification Failed",
+                });
                 return;
             }
 

@@ -460,6 +460,42 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             });
         }
 
+        // Strict Account Type Segregation Check: Personal Account vs Club Login
+        const requestedAccountType =
+            validatedData.accountType ||
+            req.body?.accountType ||
+            req.body?.loginMode ||
+            req.body?.expectedAccountType;
+
+        let isClubAccount = user.accountType === "club";
+        if (!isClubAccount) {
+            const clubCheck = await query(
+                `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                [user.id]
+            );
+            if (clubCheck.rows.length > 0) {
+                isClubAccount = true;
+            }
+        }
+
+        if (requestedAccountType === "personal" && isClubAccount) {
+            return res.status(403).json({
+                success: false,
+                code: "ACCOUNT_TYPE_MISMATCH",
+                accountType: "club",
+                message: "This account is a Club account. Please use the Club Login tab."
+            });
+        }
+
+        if (requestedAccountType === "club" && !isClubAccount) {
+            return res.status(403).json({
+                success: false,
+                code: "ACCOUNT_TYPE_MISMATCH",
+                accountType: "personal",
+                message: "This account is a Personal account. Please use the Personal Account tab."
+            });
+        }
+
         // Intercept login if Two-Factor Authentication is enabled on this account
         if (user.isTwoFactorEnabled) {
             const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
@@ -874,6 +910,37 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
             otp: String(otp).trim(),
             ipAddress: ip
         });
+
+        // Strict Account Type Segregation Check on 2FA Login
+        const requestedAccountType = req.body?.accountType || req.body?.loginMode || req.body?.expectedAccountType;
+        let isClubAccount = user.accountType === "club";
+        if (!isClubAccount) {
+            const clubCheck = await query(
+                `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                [user.id]
+            );
+            if (clubCheck.rows.length > 0) {
+                isClubAccount = true;
+            }
+        }
+
+        if (requestedAccountType === "personal" && isClubAccount) {
+            return res.status(403).json({
+                success: false,
+                code: "ACCOUNT_TYPE_MISMATCH",
+                accountType: "club",
+                message: "This account is a Club account. Please use the Club Login tab."
+            });
+        }
+
+        if (requestedAccountType === "club" && !isClubAccount) {
+            return res.status(403).json({
+                success: false,
+                code: "ACCOUNT_TYPE_MISMATCH",
+                accountType: "personal",
+                message: "This account is a Personal account. Please use the Personal Account tab."
+            });
+        }
 
         // Generate Access Token & Refresh Token
         const token = jwt.sign(

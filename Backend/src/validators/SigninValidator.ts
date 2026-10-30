@@ -36,10 +36,18 @@ const SigninValidator = (data: any) => {
         throw new ValidationError("Please enter a valid email address or username.");
     }
 
+    const requestedAccountType =
+        data.accountType === "club" || data.loginMode === "club"
+            ? ("club" as const)
+            : data.accountType === "personal" || data.loginMode === "personal"
+            ? ("personal" as const)
+            : undefined;
+
     return {
         gmail: normalizedGmail,
         password: password,
-        type: isEmail ? "gmail" : "username" as const
+        type: isEmail ? "gmail" : "username" as const,
+        accountType: requestedAccountType,
     };
 
 };

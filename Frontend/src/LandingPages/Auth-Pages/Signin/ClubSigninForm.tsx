@@ -75,6 +75,19 @@ export default function ClubSigninForm() {
     };
 
     const handleLoginSuccess = (resultData: any) => {
+        // Strict Account Isolation: Reject personal accounts trying to use club login
+        const isClub =
+            resultData?.user?.accountType === "club" ||
+            Boolean(resultData?.user?.verifiedClub) ||
+            (resultData?.user?.clubStatus && resultData?.user?.clubStatus !== "none");
+
+        if (!isClub) {
+            toast.error("This account is a Personal account. Please use the Personal Account tab.", {
+                title: "Personal Account Detected",
+            });
+            return;
+        }
+
         if (resultData?.token) {
             try {
                 localStorage.setItem("orbix_token", resultData.token);
@@ -88,21 +101,14 @@ export default function ClubSigninForm() {
         }
 
         // Route based on account type and club verification status
-        if (resultData?.user?.accountType === "club") {
-            if (resultData?.user?.clubStatus === "approved" || resultData?.user?.verifiedClub) {
-                toast.success("Welcome back! Redirecting to verified club dashboard...", { title: "Club Signed In" });
-                navigate("/club/dashboard");
-                return;
-            }
-
-            toast.info("Welcome back! Loading your club verification status...", { title: "Application Under Review" });
-            navigate("/club/status");
+        if (resultData?.user?.clubStatus === "approved" || resultData?.user?.verifiedClub) {
+            toast.success("Welcome back! Redirecting to verified club dashboard...", { title: "Club Signed In" });
+            navigate("/club/dashboard");
             return;
         }
 
-        // Graceful fallback if a developer signed in through club portal tab
-        toast.info("Signed in as a personal developer account. Redirecting to workspace...", { title: "Developer Account" });
-        navigate("/dashboard");
+        toast.info("Welcome back! Loading your club verification status...", { title: "Application Under Review" });
+        navigate("/club/status");
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -128,6 +134,7 @@ export default function ClubSigninForm() {
                         body: JSON.stringify({
                             gmail: formData.identity.trim().toLowerCase(),
                             password: formData.password,
+                            accountType: "club",
                         }),
                     });
                     response = res;
@@ -143,7 +150,10 @@ export default function ClubSigninForm() {
             }
 
             if (!response.ok) {
-                await toast.handleError(response, "Invalid club username/email or password.");
+                const message = resultData?.message || "Invalid club username/email or password.";
+                toast.error(message, {
+                    title: resultData?.code === "ACCOUNT_TYPE_MISMATCH" ? "Personal Account Detected" : "Club Login Failed",
+                });
                 return;
             }
 
@@ -232,6 +242,7 @@ export default function ClubSigninForm() {
                         body: JSON.stringify({
                             challengeToken,
                             otp: code,
+                            accountType: "club",
                         }),
                     });
                     response = res;
@@ -243,7 +254,10 @@ export default function ClubSigninForm() {
             }
 
             if (!response || !response.ok) {
-                await toast.handleError(response, "Invalid or expired verification code.");
+                const message = resultData?.message || "Invalid or expired verification code.";
+                toast.error(message, {
+                    title: resultData?.code === "ACCOUNT_TYPE_MISMATCH" ? "Personal Account Detected" : "Verification Failed",
+                });
                 return;
             }
 
