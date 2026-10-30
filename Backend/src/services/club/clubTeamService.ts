@@ -1,49 +1,4 @@
 import { query } from "../../database/client.js";
-import bcrypt from "bcrypt";
-import crypto from "crypto";
-
-const VAULT_ALGORITHM = "aes-256-gcm";
-const VAULT_IV_LENGTH = 12;
-
-function getVaultEncryptionKey(): Buffer {
-    const rawSecret = process.env.CREDENTIALS_ENCRYPTION_KEY || process.env.JWT_SECRET || "orbix-default-vault-secure-key-32";
-    return crypto.createHash("sha256").update(rawSecret).digest();
-}
-
-function encryptVaultSecret(plainText: string): string {
-    const iv = crypto.randomBytes(VAULT_IV_LENGTH);
-    const cipher = crypto.createCipheriv(VAULT_ALGORITHM, getVaultEncryptionKey(), iv);
-    let encrypted = cipher.update(plainText, "utf8", "hex");
-    encrypted += cipher.final("hex");
-    const tag = cipher.getAuthTag();
-    return `${iv.toString("hex")}:${tag.toString("hex")}:${encrypted}`;
-}
-
-function decryptVaultSecret(cipherTextWithMeta: string): string {
-    const parts = cipherTextWithMeta.split(":");
-    if (parts.length !== 3) {
-        throw new Error("Invalid encrypted format");
-    }
-    const [ivHex, tagHex, encryptedHex] = parts;
-    if (!ivHex || !tagHex || !encryptedHex) {
-        throw new Error("Invalid encrypted format");
-    }
-    const iv = Buffer.from(ivHex, "hex");
-    const tag = Buffer.from(tagHex, "hex");
-    const decipher = crypto.createDecipheriv(VAULT_ALGORITHM, getVaultEncryptionKey(), iv);
-    decipher.setAuthTag(tag);
-    let decrypted = decipher.update(encryptedHex, "hex", "utf8");
-    decrypted += decipher.final("utf8");
-    return decrypted;
-}
-
-function maskSecret(secret: string): string {
-    if (!secret) return "••••••••";
-    if (secret.length <= 8) return "••••••••";
-    const prefix = secret.slice(0, 4);
-    const suffix = secret.slice(-4);
-    return `${prefix}••••••••${suffix}`;
-}
 
 export interface ClubUserPermissions {
     clubId: string;
@@ -69,17 +24,15 @@ export class ClubTeamService {
         let clubRes;
         if (requestedClubId) {
             clubRes = await query(
-                `SELECT id, name, slug, auth_user_id, applicant_user_id, is_active FROM public.verified_clubs WHERE id = $1 LIMIT 1;`,
+                `SELECT id, name, slug, auth_user_id, is_active FROM public.verified_clubs WHERE id = $1 LIMIT 1;`,
                 [requestedClubId]
             );
         } else {
             clubRes = await query(
-                `SELECT vc.id, vc.name, vc.slug, vc.auth_user_id, vc.applicant_user_id, vc.is_active
+                `SELECT vc.id, vc.name, vc.slug, vc.auth_user_id, vc.is_active
                  FROM public.verified_clubs vc
                  WHERE vc.auth_user_id = $1
-                    OR vc.applicant_user_id = $1
                     OR vc.id IN (SELECT club_id FROM public.club_memberships WHERE user_id = $1 AND status = 'active')
-                 ORDER BY (CASE WHEN vc.auth_user_id = $1 OR vc.applicant_user_id = $1 THEN 0 ELSE 1 END), vc.created_at DESC
                  LIMIT 1;`,
                 [userId]
             );
@@ -91,7 +44,7 @@ export class ClubTeamService {
         }
 
         const clubId = club.id;
-        const isAuthOwner = club.auth_user_id === userId || club.applicant_user_id === userId;
+        const isAuthOwner = club.auth_user_id === userId;
 
         // 2. Fetch membership record
         const memRes = await query(
@@ -182,297 +135,12 @@ export class ClubTeamService {
             [clubId]
         );
 
-        // Query applicant info and onboarding status
-        const applicantInfoRes = await query(
-            `SELECT vc.auth_user_id, vc.applicant_user_id,
-                    u.id AS "userId", u.username, u.firstname, u.lastname,
-                    COALESCE(u.photo_url, u.avatar_url) AS "avatarUrl",
-                    EXISTS(
-                        SELECT 1 FROM public.club_memberships cm
-                        WHERE cm.club_id = vc.id AND cm.user_id = COALESCE(vc.applicant_user_id, vc.auth_user_id) AND cm.status = 'active'
-                    ) AS "isEnrolled"
-             FROM public.verified_clubs vc
-             JOIN public.users u ON u.id = COALESCE(vc.applicant_user_id, vc.auth_user_id)
-             WHERE vc.id = $1
-             LIMIT 1;`,
-            [clubId]
-        );
-
-        let isApplicant = false;
-        let isApplicantEnrolled = false;
-        let applicantProfile = null;
-
-        if (applicantInfoRes.rows[0]) {
-            const appInfo = applicantInfoRes.rows[0];
-            const applicantUserId = appInfo.applicant_user_id || appInfo.auth_user_id;
-            isApplicant = userId === applicantUserId;
-            isApplicantEnrolled = Boolean(appInfo.isEnrolled);
-            applicantProfile = {
-                id: appInfo.userId,
-                username: appInfo.username,
-                displayName: `${appInfo.firstname || ''} ${appInfo.lastname || ''}`.trim() || appInfo.username,
-                avatarUrl: appInfo.avatarUrl || "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png",
-            };
-        }
-
         return {
             totalMembers: membersCountRes.rows[0]?.count ?? 0,
             activeTeams: teamsCountRes.rows[0]?.count ?? 0,
             pendingInvitations: invitationsCountRes.rows[0]?.count ?? 0,
             teamLeads: teamLeadsCountRes.rows[0]?.count ?? 0,
             permissions: perms,
-            isApplicant,
-            isApplicantEnrolled,
-            applicantProfile,
-        };
-    }
-
-    /**
-     * Allows the verified club's applicant to self-enroll into the club's Team section
-     * as 'Club Registrar / Owner' (role 'owner', access_role 'owner', status 'active').
-     */
-    static async selfEnrollApplicant(clubId: string, userId: string) {
-        const clubRes = await query(
-            `SELECT id, name, auth_user_id, applicant_user_id FROM public.verified_clubs WHERE id = $1 LIMIT 1;`,
-            [clubId]
-        );
-        const club = clubRes.rows[0];
-        if (!club) {
-            const err: any = new Error("Club not found.");
-            err.statusCode = 404;
-            throw err;
-        }
-
-        const registrarUserId = club.applicant_user_id || club.auth_user_id;
-        if (registrarUserId !== userId) {
-            const err: any = new Error("Only the verified club applicant can perform self-enrolment as Club Registrar.");
-            err.statusCode = 403;
-            throw err;
-        }
-
-        const existingRes = await query(
-            `SELECT id, status FROM public.club_memberships WHERE club_id = $1 AND user_id = $2 LIMIT 1;`,
-            [clubId, userId]
-        );
-
-        let membershipId: string;
-        if (existingRes.rows[0]) {
-            await query(
-                `UPDATE public.club_memberships
-                 SET club_role = 'owner', access_role = 'owner', title = 'Club Registrar / Owner', status = 'active', updated_at = NOW()
-                 WHERE club_id = $1 AND user_id = $2;`,
-                [clubId, userId]
-            );
-            membershipId = existingRes.rows[0].id;
-        } else {
-            const insRes = await query(
-                `INSERT INTO public.club_memberships (
-                    club_id, user_id, club_role, access_role, title, status, joined_at, created_at, updated_at
-                ) VALUES ($1, $2, 'owner', 'owner', 'Club Registrar / Owner', 'active', NOW(), NOW(), NOW())
-                RETURNING id;`,
-                [clubId, userId]
-            );
-            membershipId = insRes.rows[0].id;
-        }
-
-        const userRes = await query(
-            `SELECT id, username, firstname, lastname, COALESCE(photo_url, avatar_url) AS "avatarUrl" FROM public.users WHERE id = $1 LIMIT 1;`,
-            [userId]
-        );
-        const user = userRes.rows[0];
-
-        return {
-            success: true,
-            membershipId,
-            message: "Successfully joined the club team as Club Registrar / Owner.",
-            profile: {
-                id: user?.id || userId,
-                username: user?.username || "",
-                displayName: user ? `${user.firstname || ''} ${user.lastname || ''}`.trim() || user.username : "Registrar",
-                avatarUrl: user?.avatarUrl || "https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png",
-                role: "owner",
-                title: "Club Registrar / Owner",
-            }
-        };
-    }
-
-    /**
-     * List all external credentials for a club. Secrets are masked.
-     * Restricted to club Owner or Admin.
-     */
-    static async listExternalCredentials(clubId: string, userId: string) {
-        const perms = await this.resolveUserClubPermissions(userId, clubId);
-        if (!perms || (!perms.isOwner && !perms.isAdmin)) {
-            const err: any = new Error("Access restricted: Only club Owner and Admin can access external credentials.");
-            err.statusCode = 403;
-            throw err;
-        }
-
-        const res = await query(
-            `SELECT 
-                c.id,
-                c.club_id AS "clubId",
-                c.service_name AS "serviceName",
-                c.account_identifier AS "accountIdentifier",
-                c.credential_type AS "credentialType",
-                c.description,
-                c.created_at AS "createdAt",
-                c.updated_at AS "updatedAt",
-                u_c.username AS "createdByUsername",
-                u_u.username AS "updatedByUsername"
-             FROM public.club_external_credentials c
-             LEFT JOIN public.users u_c ON u_c.id = c.created_by
-             LEFT JOIN public.users u_u ON u_u.id = c.updated_by
-             WHERE c.club_id = $1
-             ORDER BY c.created_at DESC;`,
-            [clubId]
-        );
-
-        return res.rows.map((row: any) => ({
-            ...row,
-            maskedSecret: "••••••••••••",
-        }));
-    }
-
-    /**
-     * Store a new external credential for a club. Secret is encrypted with AES-256-GCM.
-     * Restricted to club Owner or Admin.
-     * Rejects personal Orbix passwords.
-     */
-    static async createExternalCredential(params: {
-        clubId: string;
-        userId: string;
-        serviceName: string;
-        accountIdentifier?: string;
-        credentialType?: string;
-        secret: string;
-        description?: string;
-    }) {
-        const { clubId, userId, serviceName, accountIdentifier, credentialType = "api_key", secret, description } = params;
-
-        const perms = await this.resolveUserClubPermissions(userId, clubId);
-        if (!perms || (!perms.isOwner && !perms.isAdmin)) {
-            const err: any = new Error("Access restricted: Only club Owner and Admin can manage external credentials.");
-            err.statusCode = 403;
-            throw err;
-        }
-
-        if (!serviceName || typeof serviceName !== "string" || !serviceName.trim()) {
-            const err: any = new Error("Service name is required (e.g., Discord Bot, GitHub Org Token, Resend SMTP).");
-            err.statusCode = 400;
-            throw err;
-        }
-
-        if (!secret || typeof secret !== "string" || !secret.trim()) {
-            const err: any = new Error("Secret or token value is required.");
-            err.statusCode = 400;
-            throw err;
-        }
-
-        // Security check: Personal account passwords must NEVER be saved as club credentials
-        const userRes = await query(`SELECT password FROM public.users WHERE id = $1 LIMIT 1;`, [userId]);
-        if (userRes.rows[0]?.password) {
-            const matchesPersonalPassword = await bcrypt.compare(secret.trim(), userRes.rows[0].password);
-            if (matchesPersonalPassword) {
-                const err: any = new Error("Security Violation: You cannot store your personal Orbix password as a club external credential. Only external service tokens (API keys, webhooks, bot tokens, SMTP) are allowed.");
-                err.statusCode = 400;
-                throw err;
-            }
-        }
-
-        const validTypes = ["api_key", "service_account", "webhook", "smtp", "oauth_token", "other"];
-        const cleanType = validTypes.includes(credentialType) ? credentialType : "api_key";
-        const encryptedSecret = encryptVaultSecret(secret.trim());
-
-        const insRes = await query(
-            `INSERT INTO public.club_external_credentials (
-                club_id, service_name, account_identifier, credential_type, encrypted_secret, description, created_by, updated_by, created_at, updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $7, NOW(), NOW())
-            RETURNING id, club_id AS "clubId", service_name AS "serviceName", account_identifier AS "accountIdentifier", credential_type AS "credentialType", description, created_at AS "createdAt", updated_at AS "updatedAt";`,
-            [
-                clubId,
-                serviceName.trim(),
-                accountIdentifier ? accountIdentifier.trim() : null,
-                cleanType,
-                encryptedSecret,
-                description ? description.trim() : null,
-                userId,
-            ]
-        );
-
-        return {
-            ...insRes.rows[0],
-            maskedSecret: maskSecret(secret.trim()),
-        };
-    }
-
-    /**
-     * Reveal the plain-text secret of an external credential.
-     * Restricted to club Owner or Admin.
-     */
-    static async revealExternalCredential(clubId: string, credentialId: string, userId: string) {
-        const perms = await this.resolveUserClubPermissions(userId, clubId);
-        if (!perms || (!perms.isOwner && !perms.isAdmin)) {
-            const err: any = new Error("Access restricted: Only club Owner and Admin can reveal external credentials.");
-            err.statusCode = 403;
-            throw err;
-        }
-
-        const res = await query(
-            `SELECT id, service_name, account_identifier, encrypted_secret FROM public.club_external_credentials WHERE id = $1 AND club_id = $2 LIMIT 1;`,
-            [credentialId, clubId]
-        );
-
-        if (!res.rows[0]) {
-            const err: any = new Error("Credential not found.");
-            err.statusCode = 404;
-            throw err;
-        }
-
-        const row = res.rows[0];
-        let plainSecret = "";
-        try {
-            plainSecret = decryptVaultSecret(row.encrypted_secret);
-        } catch {
-            const err: any = new Error("Failed to decrypt stored credential secret.");
-            err.statusCode = 500;
-            throw err;
-        }
-
-        return {
-            id: row.id,
-            serviceName: row.service_name,
-            accountIdentifier: row.account_identifier,
-            secret: plainSecret,
-        };
-    }
-
-    /**
-     * Delete an external credential.
-     * Restricted to club Owner or Admin.
-     */
-    static async deleteExternalCredential(clubId: string, credentialId: string, userId: string) {
-        const perms = await this.resolveUserClubPermissions(userId, clubId);
-        if (!perms || (!perms.isOwner && !perms.isAdmin)) {
-            const err: any = new Error("Access restricted: Only club Owner and Admin can delete external credentials.");
-            err.statusCode = 403;
-            throw err;
-        }
-
-        const delRes = await query(
-            `DELETE FROM public.club_external_credentials WHERE id = $1 AND club_id = $2 RETURNING service_name;`,
-            [credentialId, clubId]
-        );
-
-        if (!delRes.rows[0]) {
-            const err: any = new Error("Credential not found.");
-            err.statusCode = 404;
-            throw err;
-        }
-
-        return {
-            success: true,
-            message: `External credential for "${delRes.rows[0].service_name}" deleted successfully.`,
         };
     }
 

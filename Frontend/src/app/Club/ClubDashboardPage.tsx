@@ -221,6 +221,23 @@ export default function ClubDashboardPage() {
                 setClub(profileData.club);
                 setStats(profileData.stats || { upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
                 fetchTeamStats(profileData.club.id);
+
+                // Initialize Profile Form
+                const c = profileData.club;
+                const sl = c.social_links || {};
+                setProfileForm({
+                    shortDescription: c.short_description || "",
+                    about: c.about || "",
+                    logoUrl: c.logo_url || "",
+                    coverImageUrl: c.cover_image_url || "",
+                    websiteUrl: c.website_url || "",
+                    publicEmail: c.public_email || "",
+                    socialGithub: sl.github || "",
+                    socialLinkedin: sl.linkedin || "",
+                    socialInstagram: sl.instagram || "",
+                    socialX: sl.x || sl.twitter || "",
+                    socialDiscord: sl.discord || "",
+                });
             }
 
             if (eventsData.success && Array.isArray(eventsData.events)) {
