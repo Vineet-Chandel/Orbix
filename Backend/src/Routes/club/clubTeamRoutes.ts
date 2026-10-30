@@ -412,4 +412,111 @@ clubTeamRouter.post("/invitations/:invitationId/decline", authenticate, async (r
     }
 });
 
+/**
+ * POST /api/club/team/self-enroll
+ * Verified applicant onboarding: Adds the actual personal account to the club team
+ * as "Club Registrar / Owner" with full administrative privileges.
+ */
+clubTeamRouter.post("/self-enroll", authenticate, async (req: Request, res: Response) => {
+    try {
+        const ctx = await resolveClubContext(req, res);
+        if (!ctx) return;
+
+        const result = await ClubTeamService.selfEnrollApplicant(ctx.clubId, ctx.userId);
+        return res.json(result);
+    } catch (err: any) {
+        console.error("POST /api/club/team/self-enroll error:", err);
+        return res.status(err.statusCode || 500).json({ success: false, message: err.message || "Failed to self-enroll as Club Registrar." });
+    }
+});
+
+/**
+ * GET /api/club/team/credentials
+ * List external credentials for the club (secrets masked by default).
+ * Restricted to club Owner / Admin.
+ */
+clubTeamRouter.get("/credentials", authenticate, async (req: Request, res: Response) => {
+    try {
+        const ctx = await resolveClubContext(req, res);
+        if (!ctx) return;
+
+        const credentials = await ClubTeamService.listExternalCredentials(ctx.clubId, ctx.userId);
+        return res.json({ success: true, credentials });
+    } catch (err: any) {
+        console.error("GET /api/club/team/credentials error:", err);
+        return res.status(err.statusCode || 500).json({ success: false, message: err.message || "Failed to list external credentials." });
+    }
+});
+
+/**
+ * POST /api/club/team/credentials
+ * Store a new club-owned external service credential (encrypted at rest with AES-256-GCM).
+ * Rejects personal account passwords.
+ * Restricted to club Owner / Admin.
+ */
+clubTeamRouter.post("/credentials", authenticate, async (req: Request, res: Response) => {
+    try {
+        const ctx = await resolveClubContext(req, res);
+        if (!ctx) return;
+
+        const { serviceName, accountIdentifier, credentialType, secret, description } = req.body;
+        const result = await ClubTeamService.createExternalCredential({
+            clubId: ctx.clubId,
+            userId: ctx.userId,
+            serviceName,
+            accountIdentifier,
+            credentialType,
+            secret,
+            description,
+        });
+
+        return res.status(201).json({
+            success: true,
+            credential: result,
+            message: `External credential for "${result.serviceName}" stored securely in vault.`,
+        });
+    } catch (err: any) {
+        console.error("POST /api/club/team/credentials error:", err);
+        return res.status(err.statusCode || 500).json({ success: false, message: err.message || "Failed to save external credential." });
+    }
+});
+
+/**
+ * GET /api/club/team/credentials/:credentialId/reveal
+ * Reveal the unmasked plain-text secret of an external credential.
+ * Restricted to club Owner / Admin.
+ */
+clubTeamRouter.get("/credentials/:credentialId/reveal", authenticate, async (req: Request, res: Response) => {
+    try {
+        const ctx = await resolveClubContext(req, res);
+        if (!ctx) return;
+
+        const credentialId = req.params.credentialId as string;
+        const result = await ClubTeamService.revealExternalCredential(ctx.clubId, credentialId, ctx.userId);
+        return res.json({ success: true, ...result });
+    } catch (err: any) {
+        console.error("GET /api/club/team/credentials/:id/reveal error:", err);
+        return res.status(err.statusCode || 500).json({ success: false, message: err.message || "Failed to reveal credential secret." });
+    }
+});
+
+/**
+ * DELETE /api/club/team/credentials/:credentialId
+ * Delete an external credential from the club vault.
+ * Restricted to club Owner / Admin.
+ */
+clubTeamRouter.delete("/credentials/:credentialId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const ctx = await resolveClubContext(req, res);
+        if (!ctx) return;
+
+        const credentialId = req.params.credentialId as string;
+        const result = await ClubTeamService.deleteExternalCredential(ctx.clubId, credentialId, ctx.userId);
+        return res.json(result);
+    } catch (err: any) {
+        console.error("DELETE /api/club/team/credentials/:id error:", err);
+        return res.status(err.statusCode || 500).json({ success: false, message: err.message || "Failed to delete credential." });
+    }
+});
+
 export default clubTeamRouter;

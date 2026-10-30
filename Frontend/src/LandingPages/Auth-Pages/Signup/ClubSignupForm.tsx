@@ -414,7 +414,13 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         const clean = value.trim();
         if (!clean) return true;
         try {
-            const res = await fetch(`/api/club/check-availability?${field}=${encodeURIComponent(clean)}`, {
+            let url = `/api/club/check-availability?${field}=${encodeURIComponent(clean)}`;
+            if (field === "username" && formData.contactEmail.trim()) {
+                url += `&email=${encodeURIComponent(formData.contactEmail.trim().toLowerCase())}`;
+            } else if (field === "email" && formData.username.trim()) {
+                url += `&username=${encodeURIComponent(formData.username.trim().toLowerCase())}`;
+            }
+            const res = await fetch(url, {
                 credentials: "include",
             });
             const data = await res.json().catch(() => null);
@@ -630,6 +636,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         setLoading(true);
         try {
             const checks: Promise<boolean>[] = [];
+            checks.push(checkAvailability("username", formData.username.trim().toLowerCase()));
             if (!isEmailMatch) {
                 checks.push(checkAvailability("email", emailNorm));
             }
@@ -1106,6 +1113,9 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 onBlur={() => {
                                     if (formData.contactEmail.trim()) {
                                         checkAvailability("email", formData.contactEmail);
+                                        if (formData.username.trim() && errors.username) {
+                                            checkAvailability("username", formData.username);
+                                        }
                                     }
                                 }}
                                 error={errors.contactEmail}

@@ -75,19 +75,6 @@ export default function ClubSigninForm() {
     };
 
     const handleLoginSuccess = (resultData: any) => {
-        // Strict Account Isolation: Reject personal accounts trying to use club login
-        const isClub =
-            resultData?.user?.accountType === "club" ||
-            Boolean(resultData?.user?.verifiedClub) ||
-            (resultData?.user?.clubStatus && resultData?.user?.clubStatus !== "none");
-
-        if (!isClub) {
-            toast.error("This account is a Personal account. Please use the Personal Account tab.", {
-                title: "Personal Account Detected",
-            });
-            return;
-        }
-
         if (resultData?.token) {
             try {
                 localStorage.setItem("orbix_token", resultData.token);
@@ -97,7 +84,10 @@ export default function ClubSigninForm() {
         }
 
         if (resultData?.user) {
-            dispatch(setUser(resultData.user));
+            dispatch(setUser({
+                ...resultData.user,
+                accountType: "club",
+            }));
         }
 
         // Route based on account type and club verification status
@@ -107,8 +97,15 @@ export default function ClubSigninForm() {
             return;
         }
 
-        toast.info("Welcome back! Loading your club verification status...", { title: "Application Under Review" });
-        navigate("/club/status");
+        if (resultData?.user?.clubStatus && resultData?.user?.clubStatus !== "none") {
+            toast.info("Welcome back! Loading your club verification status...", { title: "Application Under Review" });
+            navigate("/club/status");
+            return;
+        }
+
+        // Seamless onboarding: If account doesn't have an approved club or pending request yet
+        toast.info("Signed in! Let's get your club verified.", { title: "Club Setup" });
+        navigate("/auth/signup?tab=club");
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

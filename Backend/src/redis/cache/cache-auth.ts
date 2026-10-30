@@ -21,6 +21,7 @@ const CACHE_TTL = 24 * 60 * 60; // 1 day
 
 const userDetailsCache = async (user: IUserDetails) => {
     try {
+        if (!redis || redis.status !== "ready") return;
         if (!user || !user.gmail) return;
         const normalizedGmail = user.gmail.toLowerCase().trim();
         const key = `auth:user:gmail:${normalizedGmail}`;
@@ -43,19 +44,40 @@ const userDetailsCache = async (user: IUserDetails) => {
             dataToSet.password_hash = user.password_hash.trim();
         }
 
-        await redis.hset(key, dataToSet);
-        await redis.expire(key, CACHE_TTL);
+        const promises: Promise<any>[] = [
+            redis.hset(key, dataToSet),
+            redis.expire(key, CACHE_TTL),
+        ];
+
+        if (user.id) {
+            promises.push(redis.set(`auth:user:id:${user.id}`, normalizedGmail, "EX", CACHE_TTL));
+        }
+        if (user.username) {
+            promises.push(redis.set(`auth:user:username:${user.username.toLowerCase().trim()}`, normalizedGmail, "EX", CACHE_TTL));
+        }
+
+        await Promise.allSettled(promises);
     } catch (err: any) {
         console.warn("[Redis Cache] Failed to cache user details:", err?.message || err);
     }
 };
 
-const getUserDetailsCache = async (gmail: string): Promise<IUserDetails | null> => {
+const getUserDetailsCache = async (identifier: string): Promise<IUserDetails | null> => {
     try {
-        if (!gmail) return null;
-        const normalizedGmail = gmail.toLowerCase().trim();
-        const key = `auth:user:gmail:${normalizedGmail}`;
+        if (!redis || redis.status !== "ready") return null;
+        if (!identifier) return null;
+        const clean = identifier.toLowerCase().trim();
+        let targetGmail = clean;
 
+        if (!clean.includes("@")) {
+            // Identifier is username or UUID, look up email mapping first
+            const mappedEmail = (await redis.get(`auth:user:username:${clean}`)) || (await redis.get(`auth:user:id:${clean}`));
+            if (mappedEmail) {
+                targetGmail = mappedEmail.toLowerCase().trim();
+            }
+        }
+
+        const key = `auth:user:gmail:${targetGmail}`;
         const user = await redis.hgetall(key);
         if (!user || Object.keys(user).length === 0) {
             return null;
@@ -76,7 +98,7 @@ const getUserDetailsCache = async (gmail: string): Promise<IUserDetails | null> 
             firstname: firstName,
             middlename: middleName,
             lastname: lastName,
-            gmail: user.gmail || normalizedGmail,
+            gmail: user.gmail || targetGmail,
             username: user.username || "",
             password_hash: user.password_hash || "",
             termsAccepted,
@@ -90,13 +112,28 @@ const getUserDetailsCache = async (gmail: string): Promise<IUserDetails | null> 
     }
 };
 
-const deleteUserDetailsCache = async (gmail: string) => {
+const deleteUserDetailsCache = async (identifier: string) => {
     try {
-        if (!gmail) return;
-        const normalizedGmail = gmail.toLowerCase().trim();
-        const key = `auth:user:gmail:${normalizedGmail}`;
+        if (!redis || redis.status !== "ready") return;
+        if (!identifier) return;
+        const clean = identifier.toLowerCase().trim();
+        const promises: Promise<any>[] = [redis.del(`auth:user:gmail:${clean}`)];
 
-        await redis.del(key);
+        if (!clean.includes("@")) {
+            promises.push(redis.del(`auth:user:username:${clean}`));
+            promises.push(redis.del(`auth:user:id:${clean}`));
+        } else {
+            // Also attempt to clear username index if stored
+            const cachedUser = await redis.hgetall(`auth:user:gmail:${clean}`);
+            if (cachedUser?.username) {
+                promises.push(redis.del(`auth:user:username:${cachedUser.username.toLowerCase().trim()}`));
+            }
+            if (cachedUser?.id) {
+                promises.push(redis.del(`auth:user:id:${cachedUser.id}`));
+            }
+        }
+
+        await Promise.allSettled(promises);
     } catch (err: any) {
         console.warn("[Redis Cache] Failed to delete user details cache:", err?.message || err);
     }

@@ -265,6 +265,7 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
 
         const fullUser: any = {
             ...userRow,
+            accountType: (req.user as any)?.accountType || userRow.accountType || "personal",
             college,
             collegeUpdatedAt: userRow.collegeUpdatedAt,
             canChangeCollege: cooldownInfo.canChangeCollege,

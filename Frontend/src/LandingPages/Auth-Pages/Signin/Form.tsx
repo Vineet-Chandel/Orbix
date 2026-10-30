@@ -81,19 +81,6 @@ export default function SigninForm() {
     };
 
     const handleLoginSuccess = (resultData: any) => {
-        // Strict Account Isolation: Reject club accounts trying to use personal login
-        const isClub =
-            resultData?.user?.accountType === "club" ||
-            Boolean(resultData?.user?.verifiedClub) ||
-            (resultData?.user?.clubStatus && resultData?.user?.clubStatus !== "none");
-
-        if (isClub) {
-            toast.error("This account is a Club account. Please use the Club Login tab.", {
-                title: "Club Account Detected",
-            });
-            return;
-        }
-
         if (resultData?.token) {
             try {
                 localStorage.setItem("orbix_token", resultData.token);
@@ -103,7 +90,10 @@ export default function SigninForm() {
         }
 
         if (resultData?.user) {
-            dispatch(setUser(resultData.user));
+            dispatch(setUser({
+                ...resultData.user,
+                accountType: "personal",
+            }));
         }
 
         toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });
