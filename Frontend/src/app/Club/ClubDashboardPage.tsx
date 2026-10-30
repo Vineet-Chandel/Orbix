@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     Calendar,
     CalendarDays,
@@ -15,13 +15,22 @@ import {
     CheckCircle2,
     Ban,
     FileText,
+    Users,
+    ShieldCheck,
+    Copy,
+    Check,
+    ArrowRight,
+    Building2,
+    Mail,
 } from "lucide-react";
 import { useAppDispatch, clearUser } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { NeoSelect } from "../../components/NeoSelect";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
-import { ClubSidebar } from "./ClubSidebar";
+import { ClubSidebar, type ClubTab } from "./ClubSidebar";
 import ClubInboxModal from "./ClubInboxModal";
+import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
+import type { TeamStats } from "./Team/types";
 
 interface VerifiedClub {
     id: string;
@@ -92,9 +101,72 @@ export default function ClubDashboardPage() {
     const [events, setEvents] = useState<ClubEvent[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Navigation & UI States
-    const [activeTab, setActiveTab] = useState<"overview" | "profile" | "events">("overview");
+    // Navigation & URL Tab Sync
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabFromUrl = searchParams.get("tab") as ClubTab | null;
+    const initialTab: ClubTab = (tabFromUrl === "team" || tabFromUrl === "events" || tabFromUrl === "profile") ? tabFromUrl : "overview";
+    const [activeTab, setActiveTabState] = useState<ClubTab>(initialTab);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+    // Switch tab and sync with URL query param
+    const handleTabChange = (tab: ClubTab) => {
+        setActiveTabState(tab);
+        if (tab === "overview") {
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.delete("tab");
+                return next;
+            }, { replace: true });
+        } else {
+            setSearchParams((prev) => {
+                const next = new URLSearchParams(prev);
+                next.set("tab", tab);
+                return next;
+            }, { replace: true });
+        }
+    };
+
+    // Update activeTab when browser back/forward or deep-link changes
+    useEffect(() => {
+        const currentTab = searchParams.get("tab") as ClubTab | null;
+        if (currentTab === "team" || currentTab === "events" || currentTab === "profile") {
+            setActiveTabState(currentTab);
+        } else {
+            setActiveTabState("overview");
+        }
+    }, [searchParams]);
+
+    // Team Stats and Sidebar Badge States
+    const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
+    const [teamPendingCount, setTeamPendingCount] = useState<number>(0);
+    const [copiedLink, setCopiedLink] = useState(false);
+
+    const handleCopyPublicLink = () => {
+        if (!club?.slug) return;
+        const url = `${window.location.origin}/clubs/${club.slug}`;
+        navigator.clipboard.writeText(url);
+        setCopiedLink(true);
+        toast.success("Public club showcase link copied to clipboard!", { title: "Copied Link" });
+        setTimeout(() => setCopiedLink(false), 2000);
+    };
+
+    // Fetch team stats (counts & pending invitations)
+    const fetchTeamStats = async (clubId: string) => {
+        try {
+            const res = await fetch(`/api/club/team/stats?clubId=${clubId}`, { credentials: "include" });
+            if (res.ok) {
+                const data = await res.json();
+                if (data?.success) {
+                    setTeamStats(data);
+                    if (typeof data.pendingInvitations === "number") {
+                        setTeamPendingCount(data.pendingInvitations);
+                    }
+                }
+            }
+        } catch {
+            // silent fail for team badge sync
+        }
+    };
 
     // Club Inbox & Moderation States
     const [isInboxModalOpen, setIsInboxModalOpen] = useState(false);
@@ -164,6 +236,7 @@ export default function ClubDashboardPage() {
             if (profileData.success && profileData.club) {
                 setClub(profileData.club);
                 setStats(profileData.stats || { upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
+                fetchTeamStats(profileData.club.id);
 
                 // Initialize Profile Form
                 const c = profileData.club;
@@ -462,14 +535,15 @@ export default function ClubDashboardPage() {
 
     return (
         <div className="flex h-screen bg-white text-neutral-900 overflow-hidden font-sans">
-            {/* Club Sidebar — Dashboard, Events, and Manage Profile */}
+            {/* Club Sidebar — Dashboard, Team, Events, and Manage Profile */}
             <ClubSidebar
                 club={club}
                 activeTab={activeTab}
-                onTabChange={(tab) => setActiveTab(tab)}
+                onTabChange={handleTabChange}
                 isOpen={isMobileSidebarOpen}
                 onClose={() => setIsMobileSidebarOpen(false)}
                 unreadInboxCount={inboxCounts.unreadCount}
+                teamPendingCount={teamPendingCount}
                 eventsCount={events.length}
                 onOpenInbox={() => setIsInboxModalOpen(true)}
                 onSignOut={handleSignOut}
@@ -482,9 +556,9 @@ export default function ClubDashboardPage() {
                     className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
                     <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
-                        {/* Header Bar */}
+                        {/* Dynamic Header Bar tailored to each tab */}
                         <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            {/* Left: Mobile Toggle & Welcome Greeting */}
+                            {/* Left: Mobile Toggle & Tab-Specific Title & Badges */}
                             <div className="space-y-1">
                                 <div className="flex items-center gap-3">
                                     <button
@@ -499,26 +573,151 @@ export default function ClubDashboardPage() {
                                             <line x1="3" y1="18" x2="21" y2="18" />
                                         </svg>
                                     </button>
-                                    <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                                        Welcome, {club.name}!
-                                    </h1>
+
+                                    {activeTab === "overview" && (
+                                        <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                            Welcome, {club.name}!
+                                        </h1>
+                                    )}
+
+                                    {activeTab === "team" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Users className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Club Team & Organisation
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "events" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#38BDF8] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <CalendarDays className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Events & Workshops
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "profile" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Edit3 className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Manage Club Profile
+                                            </h1>
+                                        </div>
+                                    )}
                                 </div>
+
+                                {/* Dynamic Contextual Badges & Subtitle */}
                                 <div className="flex items-center gap-2 pt-0.5 flex-wrap">
-                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                        Today, {formattedDate}
-                                    </span>
-                                    <span className="text-xs font-bold text-neutral-700 hidden sm:inline">
-                                        · Verified Collegiate Club Space
-                                    </span>
+                                    {activeTab === "overview" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Today, {formattedDate}
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700 hidden sm:inline">
+                                                · Verified Collegiate Club Space
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-500 hidden md:inline">
+                                                · {club.college_name}
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "team" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Team Workspace
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Build your club's organisation, manage people, and assign departments
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "events" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#38BDF8] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Active Schedule
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · {events.length} Total Sessions · Manage published sessions, drafts, and meetups
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "profile" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Public Branding
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Club narrative, contact details, socials and public showcase
+                                            </span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
-                            {/* Right: Club Notifications / Inbox Bell Button */}
-                            <div className="flex items-center gap-3">
+                            {/* Right: Tab-Specific Primary Actions & Inbox Bell */}
+                            <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap">
+                                {activeTab === "overview" && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={handleCopyPublicLink}
+                                            className="px-3.5 py-2 rounded-xl bg-white hover:bg-[#FAF6EE] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+                                            title="Copy Public Link"
+                                        >
+                                            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                            <span>{copiedLink ? "Copied!" : "Copy Link"}</span>
+                                        </button>
+                                        <a
+                                            href={`/clubs/${club.slug}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="px-3.5 py-2 rounded-xl bg-black text-[#FFE566] hover:bg-neutral-900 border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <span>Public Page</span>
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                        </a>
+                                    </>
+                                )}
+
+                                {activeTab === "events" && (
+                                    <button
+                                        type="button"
+                                        onClick={() => openCreateEventModal("published")}
+                                        className="px-4 py-2 sm:py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                    >
+                                        <Plus className="w-4 h-4 stroke-[2.5]" />
+                                        <span>+ Create New Event</span>
+                                    </button>
+                                )}
+
+                                {activeTab === "profile" && (
+                                    <a
+                                        href={`/clubs/${club.slug}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    >
+                                        <span>View Public Page</span>
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                    </a>
+                                )}
+
+                                {/* Club Notifications / Inbox Bell Button */}
                                 <button
                                     type="button"
                                     onClick={() => setIsInboxModalOpen(true)}
-                                    className="relative flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white hover:bg-[#FFE566] text-black border-2 border-black shadow-[3px_3px_0px_#000] transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
+                                    className="relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white hover:bg-[#FFE566] text-black border-2 border-black shadow-[3px_3px_0px_#000] transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
                                     title={`Club Notifications & Inbox ${inboxCounts.unreadCount > 0 ? `(${inboxCounts.unreadCount} unread)` : ""}`}
                                     aria-label="Club Notifications & Inbox"
                                 >
@@ -699,8 +898,326 @@ export default function ClubDashboardPage() {
                             </div>
                         )}
 
-                        {/* TAB: CLUB EVENTS & WORKSHOPS (PRIMARY DASHBOARD WORKSPACE) */}
-                        {(activeTab === "overview" || activeTab === "events") && (
+                        {/* TAB: DASHBOARD OVERVIEW */}
+                        {activeTab === "overview" && (
+                            <div className="space-y-6">
+                                {/* Club Identity Hero Card */}
+                                <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                    <div className="flex items-start sm:items-center gap-4 min-w-0">
+                                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-black text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden flex items-center justify-center flex-shrink-0 font-black text-xl sm:text-2xl">
+                                            {club.logo_url ? (
+                                                <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <span>{club.name.slice(0, 2).toUpperCase()}</span>
+                                            )}
+                                        </div>
+                                        <div className="space-y-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight truncate">
+                                                    {club.name}
+                                                </h2>
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-950 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+                                                    <ShieldCheck className="w-3 h-3 text-emerald-700" />
+                                                    Verified Club
+                                                </span>
+                                                <span className="px-2 py-0.5 rounded-full bg-[#FFE566] text-black border border-black text-[10px] font-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                    {club.category || "Student Club"}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs sm:text-sm font-bold text-neutral-600 truncate">
+                                                {club.college_name} · {club.college_city}, {club.college_state}
+                                            </p>
+                                            <p className="text-xs text-neutral-700 font-medium line-clamp-2 pt-1 max-w-2xl leading-relaxed">
+                                                {club.short_description || "No headline description set yet. Click Manage Profile to add your club's mission, socials, and contact links."}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Links Pill Box */}
+                                    <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={handleCopyPublicLink}
+                                            className="px-4 py-2 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer"
+                                        >
+                                            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                            <span>{copiedLink ? "Link Copied!" : "Copy Public Link"}</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleTabChange("profile")}
+                                            className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer"
+                                        >
+                                            <Edit3 className="w-3.5 h-3.5" />
+                                            <span>Edit Club Profile</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Overview Metrics Grid */}
+                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                                    {/* Card 1: Upcoming Sessions */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleTabChange("events")}
+                                        className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-[#FAF6EE] border-2 border-black shadow-[4px_4px_0px_#000] text-left transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                                                Upcoming Sessions
+                                            </span>
+                                            <div className="w-8 h-8 rounded-lg bg-[#38BDF8] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000] group-hover:rotate-6 transition-transform">
+                                                <CalendarDays className="w-4 h-4 text-black stroke-[2.5]" />
+                                            </div>
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-black mt-2">
+                                            {publishedEvents.length}
+                                        </div>
+                                        <span className="text-[11px] text-neutral-600 font-bold mt-1 block">
+                                            {events.length} total event{events.length === 1 ? "" : "s"} scheduled
+                                        </span>
+                                    </button>
+
+                                    {/* Card 2: Active Teams */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleTabChange("team")}
+                                        className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-[#FAF6EE] border-2 border-black shadow-[4px_4px_0px_#000] text-left transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                                                Active Teams
+                                            </span>
+                                            <div className="w-8 h-8 rounded-lg bg-[#a2ff86] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000] group-hover:rotate-6 transition-transform">
+                                                <Building2 className="w-4 h-4 text-black stroke-[2.5]" />
+                                            </div>
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-black mt-2">
+                                            {teamStats?.activeTeams ?? 0}
+                                        </div>
+                                        <span className="text-[11px] text-neutral-600 font-bold mt-1 block">
+                                            Departments & divisions
+                                        </span>
+                                    </button>
+
+                                    {/* Card 3: Total Members */}
+                                    <button
+                                        type="button"
+                                        onClick={() => handleTabChange("team")}
+                                        className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-[#FAF6EE] border-2 border-black shadow-[4px_4px_0px_#000] text-left transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                                                Club Members
+                                            </span>
+                                            <div className="w-8 h-8 rounded-lg bg-[#FFE566] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000] group-hover:rotate-6 transition-transform">
+                                                <Users className="w-4 h-4 text-black stroke-[2.5]" />
+                                            </div>
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-black mt-2">
+                                            {teamStats?.totalMembers ?? 0}
+                                        </div>
+                                        <span className="text-[11px] text-neutral-600 font-bold mt-1 block">
+                                            {teamPendingCount} pending invite{teamPendingCount === 1 ? "" : "s"}
+                                        </span>
+                                    </button>
+
+                                    {/* Card 4: Club Inquiries / Inbox */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsInboxModalOpen(true)}
+                                        className="p-4 sm:p-5 rounded-2xl bg-white hover:bg-[#FAF6EE] border-2 border-black shadow-[4px_4px_0px_#000] text-left transition-all cursor-pointer group"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                                                Inbox & Inquiries
+                                            </span>
+                                            <div className="w-8 h-8 rounded-lg bg-[#FF80D7] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000] group-hover:rotate-6 transition-transform">
+                                                <Mail className="w-4 h-4 text-black stroke-[2.5]" />
+                                            </div>
+                                        </div>
+                                        <div className="text-2xl sm:text-3xl font-black text-black mt-2">
+                                            {inboxCounts.unreadCount}
+                                        </div>
+                                        <span className="text-[11px] text-neutral-600 font-bold mt-1 block">
+                                            {inboxCounts.totalCount} total developer message{inboxCounts.totalCount === 1 ? "" : "s"}
+                                        </span>
+                                    </button>
+                                </div>
+
+                                {/* Quick Management Hub Cards */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {/* Hub Card 1: Team Management */}
+                                    <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-4">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-9 h-9 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                                    <Users className="w-5 h-5 text-black stroke-[2.5]" />
+                                                </div>
+                                                <h3 className="text-base sm:text-lg font-black text-black">
+                                                    Team & Organisation Workspace
+                                                </h3>
+                                            </div>
+                                            <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
+                                                Build your club's organizational hierarchy, create departments (Technical, Design, PR, Operations), invite registered Orbix users by username, and appoint team leads.
+                                            </p>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleTabChange("team")}
+                                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] self-start"
+                                        >
+                                            <span>Open Team Workspace</span>
+                                            <ArrowRight className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+
+                                    {/* Hub Card 2: Events & Workshops */}
+                                    <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-4">
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-9 h-9 rounded-xl bg-[#38BDF8] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                                    <CalendarDays className="w-5 h-5 text-black stroke-[2.5]" />
+                                                </div>
+                                                <h3 className="text-base sm:text-lg font-black text-black">
+                                                    Events & Workshops Hub
+                                                </h3>
+                                            </div>
+                                            <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
+                                                Publish upcoming hackathons, tech talks, workshops, and manage draft agendas with location details, RSVP registration links, and live visibility.
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleTabChange("events")}
+                                                className="px-4 py-2.5 rounded-xl bg-black text-[#38BDF8] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                            >
+                                                <span>Manage All Events</span>
+                                                <ArrowRight className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => openCreateEventModal("published")}
+                                                className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black flex items-center justify-center gap-1.5 cursor-pointer"
+                                            >
+                                                <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>New Event</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Recent Events Preview */}
+                                <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="w-5 h-5 text-black" />
+                                            <h3 className="text-base font-black text-black">Recent & Upcoming Sessions</h3>
+                                        </div>
+                                        {events.length > 0 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handleTabChange("events")}
+                                                className="text-xs font-black text-black hover:underline flex items-center gap-1 cursor-pointer"
+                                            >
+                                                <span>View All ({events.length})</span>
+                                                <ArrowRight className="w-3 h-3" />
+                                            </button>
+                                        )}
+                                    </div>
+
+                                    {events.length === 0 ? (
+                                        <div className="py-8 text-center space-y-2">
+                                            <CalendarDays className="w-8 h-8 text-neutral-400 mx-auto" />
+                                            <p className="text-xs font-bold text-neutral-700">No events or workshops published yet.</p>
+                                            <p className="text-[11px] text-neutral-500 max-w-sm mx-auto">
+                                                Begin scheduling sessions, coding meetups, or hackathons for your chapter.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                onClick={() => openCreateEventModal("published")}
+                                                className="mt-2 px-4 py-2 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 cursor-pointer inline-flex items-center gap-1.5"
+                                            >
+                                                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                                                <span>Create First Event</span>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {events.slice(0, 3).map((ev) => (
+                                                <div
+                                                    key={ev.id}
+                                                    className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex flex-col justify-between space-y-2"
+                                                >
+                                                    <div>
+                                                        <div className="flex items-center justify-between gap-1.5 mb-1.5">
+                                                            <span
+                                                                className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-black ${
+                                                                    ev.status === "published"
+                                                                        ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
+                                                                        : ev.status === "draft"
+                                                                        ? "bg-amber-200 text-black shadow-[1px_1px_0px_#000]"
+                                                                        : "bg-rose-200 text-black shadow-[1px_1px_0px_#000]"
+                                                                }`}
+                                                            >
+                                                                {ev.status}
+                                                            </span>
+                                                            <span className="text-[10px] font-bold text-neutral-500 flex items-center gap-1">
+                                                                <Clock className="w-3 h-3" />
+                                                                {new Date(ev.startsAt).toLocaleDateString(undefined, {
+                                                                    month: "short",
+                                                                    day: "numeric",
+                                                                })}
+                                                            </span>
+                                                        </div>
+                                                        <h4 className="font-black text-sm text-black truncate">{ev.title}</h4>
+                                                        <p className="text-xs text-neutral-600 line-clamp-2 mt-1">
+                                                            {ev.summary || ev.description || "No description."}
+                                                        </p>
+                                                    </div>
+                                                    <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[11px] text-neutral-600">
+                                                        <span className="truncate font-bold flex items-center gap-1">
+                                                            <MapPin className="w-3 h-3 text-neutral-500" />
+                                                            {ev.venueOrLocation || "Campus"}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                handleTabChange("events");
+                                                                handleEditEvent(ev);
+                                                            }}
+                                                            className="font-black text-black hover:underline cursor-pointer"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB: CLUB TEAM & ORGANISATION */}
+                        {activeTab === "team" && (
+                            <ClubTeamWorkspace
+                                club={club}
+                                hideHeaderTitle={true}
+                                onOpenInbox={() => setIsInboxModalOpen(true)}
+                                onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                                onStatsLoaded={(stats: TeamStats) => {
+                                    setTeamStats(stats);
+                                    if (typeof stats.pendingInvitations === "number") {
+                                        setTeamPendingCount(stats.pendingInvitations);
+                                    }
+                                }}
+                            />
+                        )}
+
+                        {/* TAB: CLUB EVENTS & WORKSHOPS (EXCLUSIVELY FOR EVENTS TAB) */}
+                        {activeTab === "events" && (
                             <div className="space-y-6">
                                 {/* Header Card with Title and Prominent + Create New Event Button */}
                                 <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">

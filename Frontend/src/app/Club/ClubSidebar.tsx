@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
     LayoutDashboard,
+    Users,
     CalendarDays,
     ShieldCheck,
     Edit3,
@@ -11,6 +12,8 @@ import {
 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
+export type ClubTab = "overview" | "team" | "events" | "profile";
+
 interface ClubSidebarProps {
     club: {
         id: string;
@@ -20,11 +23,12 @@ interface ClubSidebarProps {
         college_name: string;
         logo_url: string | null;
     };
-    activeTab: "overview" | "profile" | "events";
-    onTabChange: (tab: "overview" | "profile" | "events") => void;
+    activeTab: ClubTab;
+    onTabChange: (tab: ClubTab) => void;
     isOpen: boolean;
     onClose: () => void;
     unreadInboxCount?: number;
+    teamPendingCount?: number;
     eventsCount?: number;
     onOpenInbox: () => void;
     onSignOut: () => void;
@@ -37,6 +41,7 @@ export const ClubSidebar = ({
     isOpen = false,
     onClose,
     unreadInboxCount = 0,
+    teamPendingCount = 0,
     eventsCount = 0,
     onOpenInbox,
     onSignOut,
@@ -133,7 +138,7 @@ export const ClubSidebar = ({
                     )}
                 </div>
 
-                {/* Main Navigation Items: Dashboard, Events, and Manage Profile */}
+                {/* Main Navigation Items: Dashboard, Team, Events, and Manage Profile */}
                 <div className="pt-3.5 space-y-1.5 overflow-x-hidden">
                     {/* Item 1: Dashboard Overview */}
                     <button
@@ -185,7 +190,68 @@ export const ClubSidebar = ({
                         </div>
                     </button>
 
-                    {/* Item 2: Events Section */}
+                    {/* Item 2: Team Management */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onTabChange("team");
+                            if (onClose) onClose();
+                        }}
+                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer overflow-x-hidden relative w-full ${
+                            activeTab === "team"
+                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
+                        }`}
+                        title={!isExpanded ? "Team" : undefined}
+                    >
+                        <span
+                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
+                                activeTab === "team" && isExpanded
+                                    ? "bg-[#a2ff86] opacity-100"
+                                    : "bg-transparent opacity-0"
+                            }`}
+                        />
+
+                        <div className="flex items-center overflow-x-hidden w-full">
+                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                <Users
+                                    className={`w-5 h-5 stroke-[2.2] flex-shrink-0 transition-colors ${
+                                        activeTab === "team"
+                                            ? "text-[#a2ff86]"
+                                            : "text-neutral-700 group-hover:text-black"
+                                    }`}
+                                />
+                            </div>
+
+                            {isExpanded && (
+                                <div className="flex items-center justify-between flex-1 pr-2.5 overflow-x-hidden animate-fadeIn">
+                                    <span
+                                        className={`whitespace-nowrap truncate pl-0.5 ${
+                                            activeTab === "team"
+                                                ? "text-[#a2ff86] font-black"
+                                                : "text-neutral-800 font-bold"
+                                        }`}
+                                    >
+                                        Team
+                                    </span>
+                                    {teamPendingCount !== undefined && teamPendingCount > 0 && (
+                                        <span
+                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black border border-black ${
+                                                activeTab === "team"
+                                                    ? "bg-[#a2ff86] text-black"
+                                                    : "bg-[#FFE566] text-black shadow-[1px_1px_0px_#000]"
+                                            }`}
+                                            title={`${teamPendingCount} pending invitations`}
+                                        >
+                                            {teamPendingCount}
+                                        </span>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </button>
+
+                    {/* Item 3: Events Section */}
                     <button
                         type="button"
                         onClick={() => {
@@ -245,7 +311,7 @@ export const ClubSidebar = ({
                         </div>
                     </button>
 
-                    {/* Item 3: Manage Profile */}
+                    {/* Item 4: Manage Profile */}
                     <button
                         type="button"
                         onClick={() => {
@@ -368,6 +434,25 @@ export const ClubSidebar = ({
                         >
                             <LayoutDashboard className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
                             <span className="truncate">Overview Dashboard</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onTabChange("team");
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <Users className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                                <span className="truncate">Team Workspace</span>
+                            </div>
+                            {teamPendingCount !== undefined && teamPendingCount > 0 && (
+                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                    {teamPendingCount}
+                                </span>
+                            )}
                         </button>
 
                         <button
