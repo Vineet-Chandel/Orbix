@@ -1,3 +1,4 @@
+import { BlogLikeButton } from '../ui/BlogLikeButton';
 import React from 'react';
 import { Menu, X, Sun, Moon, Search, Terminal } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -15,6 +16,8 @@ export function AppHeader({
   onNavigateHome = () => {},
   hoster = 'AWS SBG PSIT',
   blogName = 'AWS LAUNCHPAD 2026',
+  hosterSlug = 'aws-sbg-psit',
+  blogNameSlug = 'aws-launchpad-2026',
 }) {
   return (
     <header className="sticky top-0 z-40 h-14 w-full border-b-2 border-black dark:border-white bg-[#fbfbf9]/95 dark:bg-zinc-950/95 backdrop-blur-md shadow-[0_2px_0px_#000000] dark:shadow-[0_2px_0px_#ffffff]">
@@ -76,6 +79,13 @@ export function AppHeader({
 
         {/* Right Section: Mobile Search & Theme Toggle */}
         <div className="flex items-center gap-2">
+          {/* Publication Like Button */}
+          <BlogLikeButton
+            hoster={hosterSlug || hoster}
+            blogName={blogNameSlug || blogName}
+            variant="header"
+          />
+
           {/* Mobile Search Icon */}
           <motion.button
             type="button"

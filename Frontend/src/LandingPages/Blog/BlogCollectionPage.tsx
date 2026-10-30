@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import NavBar from '../NavBar/Landing';
 import { Terminal, ArrowRight, Layers, ShieldCheck, Flame } from 'lucide-react';
 import { OrbixLogo } from '../../components/OrbixLogo';
+import { BlogLikeButton } from './components/ui/BlogLikeButton';
 
 const CHAPTERS = [
     {
@@ -129,6 +130,7 @@ export default function BlogCollectionPage() {
                         >
                             <span>View Verification Checklist</span>
                         </Link>
+                        <BlogLikeButton hoster="aws-sbg-psit" blogName="aws-launchpad-2026" variant="card" />
                     </div>
 
                     {/* Chapter Directory Grid (Neo-Brutalist Cards) */}

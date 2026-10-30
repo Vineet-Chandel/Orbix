@@ -18,6 +18,7 @@ import {
 import { helpRouter } from './Routes/help/helpRoutes.js';
 import verificationRouter from './Routes/verification/verificationRoutes.js';
 import manageAccountsRouter from './Routes/account/manageAccountsRoutes.js';
+import blogRouter from './Routes/blog/blogRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import redis from './redis/client.js';
 
@@ -73,6 +74,8 @@ app.use('/api/account', manageAccountsRouter);
 app.use('/relationships', relationshipRouter);
 app.use('/blocks', blockRouter);
 app.use('/profile', profileRouter);
+app.use('/api/blogs', blogRouter);
+app.use('/api/blog', blogRouter);
 app.get('/', (req: Request, res: Response) => {
     res.send('Hello World!');
 });

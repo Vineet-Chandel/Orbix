@@ -80,6 +80,30 @@ export default function SigninForm() {
         return isValid;
     };
 
+    const resolvePostLoginRedirect = (): string => {
+        try {
+            const rawPending = sessionStorage.getItem("orbix_pending_like");
+            if (rawPending) {
+                const pending = JSON.parse(rawPending);
+                const returnUrl = pending?.returnUrl || "";
+                const isFresh = pending?.timestamp && Date.now() - pending.timestamp < 5 * 60 * 1000;
+                // Validate that returnUrl is a safe internal blog route (starts with /blog or /blogs)
+                if (isFresh && typeof returnUrl === "string" && (returnUrl.startsWith("/blog") || returnUrl.startsWith("/blogs"))) {
+                    return returnUrl;
+                }
+            }
+
+            const searchParams = new URLSearchParams(window.location.search);
+            const queryReturn = searchParams.get("returnUrl");
+            if (queryReturn && (queryReturn.startsWith("/blog") || queryReturn.startsWith("/blogs"))) {
+                return queryReturn;
+            }
+        } catch {
+            // Fallback safely
+        }
+        return "/dashboard";
+    };
+
     const handleLoginSuccess = (resultData: any) => {
         if (resultData?.token) {
             try {
@@ -96,8 +120,14 @@ export default function SigninForm() {
             }));
         }
 
-        toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });
-        navigate("/dashboard");
+        const destination = resolvePostLoginRedirect();
+        if (destination !== "/dashboard") {
+            toast.success("Welcome back! Returning to publication...", { title: "Signed In" });
+            navigate(destination);
+        } else {
+            toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });
+            navigate("/dashboard");
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
