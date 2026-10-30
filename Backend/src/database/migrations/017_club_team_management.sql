@@ -65,7 +65,10 @@ CREATE TABLE IF NOT EXISTS public.club_team_members (
 ALTER TABLE public.club_team_members ADD COLUMN IF NOT EXISTS club_membership_id UUID;
 ALTER TABLE public.club_team_members ADD COLUMN IF NOT EXISTS team_role VARCHAR(30) NOT NULL DEFAULT 'member';
 ALTER TABLE public.club_team_members ADD COLUMN IF NOT EXISTS team_title VARCHAR(100) NOT NULL DEFAULT 'Member';
+ALTER TABLE public.club_team_members ADD COLUMN IF NOT EXISTS position_title VARCHAR(100) NOT NULL DEFAULT 'Member';
 ALTER TABLE public.club_team_members ADD COLUMN IF NOT EXISTS status VARCHAR(30) NOT NULL DEFAULT 'active';
+UPDATE public.club_team_members SET position_title = team_title WHERE position_title IS NULL;
+UPDATE public.club_team_members SET team_title = position_title WHERE team_title IS NULL;
 
 -- 4. Ensure club_team_invitations table & columns
 CREATE TABLE IF NOT EXISTS public.club_team_invitations (

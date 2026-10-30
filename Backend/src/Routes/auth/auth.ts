@@ -397,8 +397,8 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             });
         }
 
-        // Always query authoritative database for credentials and full user profile
-        const Result = await query(
+        // 1. Query authoritative database for credentials and full user profile (by email or username)
+        let Result = await query(
             `SELECT
                 id,
                 firstname AS "firstName",
@@ -438,6 +438,71 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             LIMIT 1;`,
             [validatedData.gmail]
         );
+
+        // 2. If not matched directly on users, check verified_clubs (slug/public_email) or club_verification_requests (contact_email)
+        if (Result.rows.length === 0) {
+            const clubLookup = await query(
+                `SELECT auth_user_id FROM verified_clubs 
+                 WHERE LOWER(slug) = LOWER($1) OR LOWER(public_email) = LOWER($1)
+                 LIMIT 1;`,
+                [validatedData.gmail]
+            );
+            let targetUserId: string | null = clubLookup.rows[0]?.auth_user_id || null;
+
+            if (!targetUserId) {
+                const reqLookup = await query(
+                    `SELECT auth_user_id FROM club_verification_requests 
+                     WHERE LOWER(contact_email) = LOWER($1) OR LOWER(college_official_email) = LOWER($1)
+                     LIMIT 1;`,
+                    [validatedData.gmail]
+                );
+                targetUserId = reqLookup.rows[0]?.auth_user_id || null;
+            }
+
+            if (targetUserId) {
+                Result = await query(
+                    `SELECT
+                        id,
+                        firstname AS "firstName",
+                        middlename AS "middleName",
+                        lastname AS "lastName",
+                        email AS gmail,
+                        username,
+                        password AS password_hash,
+                        termsaccepted AS "termsAccepted",
+                        account_type AS "accountType",
+                        headline,
+                        bio,
+                        avatar_url AS "avatarUrl",
+                        photo_url AS "photoUrl",
+                        previous_photo_url AS "previousPhotoUrl",
+                        (previous_photo_url IS NOT NULL) AS "hasPreviousPhoto",
+                        cover_image_url AS "coverImageUrl",
+                        website,
+                        linkedin,
+                        github,
+                        custom_link AS "customLink",
+                        location,
+                        skills,
+                        links,
+                        is_open_to_work AS "isOpenToWork",
+                        is_hireable AS "isHireable",
+                        is_public AS "isPublic",
+                        COALESCE(is_email_verified, false) AS "isEmailVerified",
+                        email_verified_at AS "emailVerifiedAt",
+                        (COALESCE(is_email_verified, false) = true) AS "isVerifiedCoder",
+                        (COALESCE(is_email_verified, false) = true) AS "isVerified",
+                        COALESCE(is_two_factor_enabled, false) AS "isTwoFactorEnabled",
+                        two_factor_enabled_at AS "twoFactorEnabledAt",
+                        created_at AS "createdAt"
+                    FROM users
+                    WHERE id = $1
+                    LIMIT 1;`,
+                    [targetUserId]
+                );
+            }
+        }
+
         const user = Result.rows[0];
 
         if (!user || !user.password_hash) {
@@ -460,41 +525,14 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             });
         }
 
-        // Strict Account Type Segregation Check: Personal Account vs Club Login
+        // Context-aware Account Type resolution (seamless personal vs club login)
         const requestedAccountType =
             validatedData.accountType ||
             req.body?.accountType ||
             req.body?.loginMode ||
             req.body?.expectedAccountType;
 
-        let isClubAccount = user.accountType === "club";
-        if (!isClubAccount) {
-            const clubCheck = await query(
-                `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
-                [user.id]
-            );
-            if (clubCheck.rows.length > 0) {
-                isClubAccount = true;
-            }
-        }
-
-        if (requestedAccountType === "personal" && isClubAccount) {
-            return res.status(403).json({
-                success: false,
-                code: "ACCOUNT_TYPE_MISMATCH",
-                accountType: "club",
-                message: "This account is a Club account. Please use the Club Login tab."
-            });
-        }
-
-        if (requestedAccountType === "club" && !isClubAccount) {
-            return res.status(403).json({
-                success: false,
-                code: "ACCOUNT_TYPE_MISMATCH",
-                accountType: "personal",
-                message: "This account is a Personal account. Please use the Personal Account tab."
-            });
-        }
+        const effectiveAccountType = requestedAccountType === "club" ? "club" : "personal";
 
         // Intercept login if Two-Factor Authentication is enabled on this account
         if (user.isTwoFactorEnabled) {
@@ -513,6 +551,7 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             return res.status(200).json({
                 success: true,
                 requires2FA: true,
+                accountType: effectiveAccountType,
                 twoFactorChallengeToken: twoFactorResult.challengeToken,
                 maskedEmail: twoFactorResult.maskedEmail,
                 cooldownSeconds: twoFactorResult.cooldownSeconds,
@@ -520,12 +559,13 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             });
         }
 
-        // Generate Access Token & Refresh Token
+        // Generate Access Token & Refresh Token with context-aware accountType
         const token = jwt.sign(
             {
                 sub: user.id,
                 gmail: user.gmail,
-                username: user.username
+                username: user.username,
+                accountType: effectiveAccountType,
             },
             JWT_SECRET,
             {
@@ -540,6 +580,7 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
                 sub: user.id,
                 gmail: user.gmail,
                 username: user.username,
+                accountType: effectiveAccountType,
                 type: "refresh"
             },
             JWT_SECRET,
@@ -563,6 +604,7 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
 
         // Strip password_hash before returning user
         const { password_hash, ...safeUser }: any = user;
+        safeUser.accountType = effectiveAccountType;
         safeUser.links = parseLinks(safeUser.links, safeUser);
         safeUser.skills = Array.isArray(safeUser.skills) ? safeUser.skills : [];
 
@@ -725,12 +767,15 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
             });
         }
 
+        const refreshedAccountType = decoded?.accountType || user.accountType || "personal";
+
         // Generate fresh Access Token (8 hours) and fresh Refresh Token (7 days)
         const newAccessToken = jwt.sign(
             {
                 sub: user.id,
                 gmail: user.gmail,
-                username: user.username
+                username: user.username,
+                accountType: refreshedAccountType,
             },
             JWT_SECRET,
             {
@@ -745,6 +790,7 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
                 sub: user.id,
                 gmail: user.gmail,
                 username: user.username,
+                accountType: refreshedAccountType,
                 type: "refresh"
             },
             JWT_SECRET,
@@ -767,6 +813,7 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
         });
 
         const { password_hash, ...safeUser }: any = user;
+        safeUser.accountType = refreshedAccountType;
         safeUser.links = parseLinks(safeUser.links, safeUser);
         safeUser.skills = Array.isArray(safeUser.skills) ? safeUser.skills : [];
 
@@ -911,43 +958,17 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
             ipAddress: ip
         });
 
-        // Strict Account Type Segregation Check on 2FA Login
+        // Context-aware Account Type resolution on 2FA Login
         const requestedAccountType = req.body?.accountType || req.body?.loginMode || req.body?.expectedAccountType;
-        let isClubAccount = user.accountType === "club";
-        if (!isClubAccount) {
-            const clubCheck = await query(
-                `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
-                [user.id]
-            );
-            if (clubCheck.rows.length > 0) {
-                isClubAccount = true;
-            }
-        }
-
-        if (requestedAccountType === "personal" && isClubAccount) {
-            return res.status(403).json({
-                success: false,
-                code: "ACCOUNT_TYPE_MISMATCH",
-                accountType: "club",
-                message: "This account is a Club account. Please use the Club Login tab."
-            });
-        }
-
-        if (requestedAccountType === "club" && !isClubAccount) {
-            return res.status(403).json({
-                success: false,
-                code: "ACCOUNT_TYPE_MISMATCH",
-                accountType: "personal",
-                message: "This account is a Personal account. Please use the Personal Account tab."
-            });
-        }
+        const effectiveAccountType = requestedAccountType === "club" ? "club" : "personal";
 
         // Generate Access Token & Refresh Token
         const token = jwt.sign(
             {
                 sub: user.id,
                 gmail: user.gmail,
-                username: user.username
+                username: user.username,
+                accountType: effectiveAccountType,
             },
             JWT_SECRET,
             {
@@ -962,6 +983,7 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
                 sub: user.id,
                 gmail: user.gmail,
                 username: user.username,
+                accountType: effectiveAccountType,
                 type: "refresh"
             },
             JWT_SECRET,
@@ -984,6 +1006,7 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
         });
 
         const safeUser: any = { ...user };
+        safeUser.accountType = effectiveAccountType;
         safeUser.links = parseLinks(safeUser.links, safeUser);
         safeUser.skills = Array.isArray(safeUser.skills) ? safeUser.skills : [];
 

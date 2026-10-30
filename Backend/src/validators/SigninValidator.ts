@@ -7,12 +7,13 @@ const SigninValidator = (data: any) => {
         throw new ValidationError("Invalid request body.");
     }
 
-    if (typeof data.gmail !== "string" || typeof data.password !== "string") {
+    const rawIdentity = data.gmail ?? data.identity ?? data.username ?? data.email;
+    if (typeof rawIdentity !== "string" || typeof data.password !== "string") {
         throw new ValidationError("Identity and password must be valid strings.");
     }
 
     // 2. DoS Protection (Max Lengths)
-    if (data.gmail.length > 255) {
+    if (rawIdentity.length > 255) {
         throw new ValidationError("Identity is too long.");
     }
     if (data.password.length > 128) {
@@ -21,16 +22,16 @@ const SigninValidator = (data: any) => {
 
     const password = data.password; // Do not mutate password
 
-    // 3. Normalization
-    const normalizedGmail = data.gmail.trim().toLowerCase().replace(/\s/g, "");
+    // 3. Normalization: strip surrounding whitespace
+    const normalizedIdentity = rawIdentity.trim().toLowerCase().replace(/\s/g, "");
 
-    if (!normalizedGmail || !password) {
+    if (!normalizedIdentity || !password) {
         throw new ValidationError("Credentials cannot be empty.");
     }
 
-    // 4. Format Validation: Allow valid email OR valid username
-    const isEmail = validator.isEmail(normalizedGmail);
-    const isValidUsername = /^[a-z0-9._-]{2,30}$/.test(normalizedGmail);
+    // 4. Format Validation: Allow valid email OR valid username/slug
+    const isEmail = validator.isEmail(normalizedIdentity);
+    const isValidUsername = /^[a-z0-9._-]{2,60}$/.test(normalizedIdentity);
 
     if (!isEmail && !isValidUsername) {
         throw new ValidationError("Please enter a valid email address or username.");
@@ -44,12 +45,11 @@ const SigninValidator = (data: any) => {
             : undefined;
 
     return {
-        gmail: normalizedGmail,
+        gmail: normalizedIdentity,
         password: password,
-        type: isEmail ? "gmail" : "username" as const,
+        type: isEmail ? ("gmail" as const) : ("username" as const),
         accountType: requestedAccountType,
     };
-
 };
 
 export default SigninValidator;

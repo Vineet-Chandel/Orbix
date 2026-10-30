@@ -104,8 +104,8 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
             middleName: user.middleName || (user as any).middlename || "",
             lastName: user.lastName || (user as any).lastname || "",
             termsAccepted: user.termsAccepted ?? (user as any).termsaccepted ?? false,
-            accountType: user.accountType || (user as any).account_type || decoded?.accountType || "personal",
-            account_type: user.accountType || (user as any).account_type || decoded?.accountType || "personal",
+            accountType: decoded?.accountType || user.accountType || (user as any).account_type || "personal",
+            account_type: decoded?.accountType || user.accountType || (user as any).account_type || "personal",
         };
         return next();
     } catch (err) {
@@ -194,8 +194,8 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
                 middleName: user.middleName || (user as any).middlename || "",
                 lastName: user.lastName || (user as any).lastname || "",
                 termsAccepted: user.termsAccepted ?? (user as any).termsaccepted ?? false,
-                accountType: user.accountType || (user as any).account_type || "personal",
-                account_type: user.accountType || (user as any).account_type || "personal",
+                accountType: decoded?.accountType || user.accountType || (user as any).account_type || "personal",
+                account_type: decoded?.accountType || user.accountType || (user as any).account_type || "personal",
             };
         }
 

@@ -841,11 +841,17 @@ export class ClubTeamService {
 
         // 1. Resolve invited user
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(targetUsernameOrId);
-        const userRes = await query(
-            `SELECT id, username, firstname, lastname, email FROM public.users
-             WHERE ${isUuid ? "id = $1 OR" : ""} LOWER(username) = LOWER($2) LIMIT 1;`,
-            isUuid ? [targetUsernameOrId, targetUsernameOrId] : [targetUsernameOrId]
-        );
+        const userRes = isUuid
+            ? await query(
+                  `SELECT id, username, firstname, lastname, email FROM public.users
+                   WHERE id = $1 OR LOWER(username) = LOWER($2) LIMIT 1;`,
+                  [targetUsernameOrId, targetUsernameOrId]
+              )
+            : await query(
+                  `SELECT id, username, firstname, lastname, email FROM public.users
+                   WHERE LOWER(username) = LOWER($1) LIMIT 1;`,
+                  [targetUsernameOrId]
+              );
 
         const targetUser = userRes.rows[0];
         if (!targetUser) {
