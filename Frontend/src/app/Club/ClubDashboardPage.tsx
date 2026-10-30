@@ -476,7 +476,7 @@ export default function ClubDashboardPage() {
             />
 
             {/* Main Content Area Container matching Personal Account */}
-            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
+            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
                 <section
                     aria-label="Orbix Club Space"
                     className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"

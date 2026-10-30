@@ -155,8 +155,8 @@ export const fetchContestPerformance = createAsyncThunk<
             }
         }
 
-        // Invalidate old cache if it contained unconnected platforms
-        const hasUnconnectedInCache = existing?.platforms?.some((p) => !p.connected || p.status === "not_connected");
+        // Invalidate old cache if it contained unconnected or errored platforms
+        const hasUnconnectedInCache = existing?.platforms?.some((p) => !p.connected || p.status === "not_connected" || p.status === "error");
 
         if (existing && !force && !portalsMismatched && !hasUnconnectedInCache && now - lastFetched < 10 * 60 * 1000) {
             return existing;

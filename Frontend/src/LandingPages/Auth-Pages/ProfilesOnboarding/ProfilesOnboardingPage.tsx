@@ -647,7 +647,7 @@ export default function ProfilesOnboardingPage() {
             />
 
             {/* Right Main Content Workspace */}
-            <div className="flex-1 min-w-0 flex flex-col min-h-screen p-3 sm:p-4 lg:pl-0">
+            <div className="flex-1 min-w-0 flex flex-col min-h-screen p-2 sm:p-3 lg:p-3">
                 {/* Main Scrollable Content Card */}
                 <div className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between">
                     <div className="p-4 sm:p-6 lg:p-8 flex-1">

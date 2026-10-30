@@ -148,7 +148,7 @@ export default function Dashboard() {
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
+            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
                 {activeTab === "explore" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
                         <ExploreView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />

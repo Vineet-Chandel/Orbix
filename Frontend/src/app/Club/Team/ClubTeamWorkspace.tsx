@@ -32,9 +32,16 @@ interface ClubTeamWorkspaceProps {
     };
     onOpenInbox?: () => void;
     onOpenMobileSidebar?: () => void;
+    onStatsLoaded?: (stats: TeamStats) => void;
+    hideHeaderTitle?: boolean;
 }
 
-export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({ club, onOpenMobileSidebar }) => {
+export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
+    club,
+    onOpenMobileSidebar,
+    onStatsLoaded,
+    hideHeaderTitle = false,
+}) => {
     const toast = useToast();
 
     // Internal navigation tabs
@@ -76,7 +83,10 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({ club, onOp
             const membersData = await membersRes.json().catch(() => ({}));
             const invitationsData = await invitationsRes.json().catch(() => ({}));
 
-            if (statsData.success) setStats(statsData);
+            if (statsData.success) {
+                setStats(statsData);
+                if (onStatsLoaded) onStatsLoaded(statsData);
+            }
             if (teamsData.success && Array.isArray(teamsData.teams)) setTeams(teamsData.teams);
             if (membersData.success && Array.isArray(membersData.members)) setMembers(membersData.members);
             if (invitationsData.success && Array.isArray(invitationsData.invitations)) setInvitations(invitationsData.invitations);
@@ -171,63 +181,101 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({ club, onOp
     return (
         <div className="space-y-6">
             {/* Top Header matching Orbix Design Language */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b-2 border-black/15">
-                <div className="space-y-1">
-                    <div className="flex items-center gap-2.5">
-                        {onOpenMobileSidebar && (
+            {!hideHeaderTitle ? (
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b-2 border-black/15">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2.5">
+                            {onOpenMobileSidebar && (
+                                <button
+                                    type="button"
+                                    onClick={onOpenMobileSidebar}
+                                    className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer"
+                                    aria-label="Open sidebar"
+                                >
+                                    <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <line x1="3" y1="12" x2="21" y2="12" />
+                                        <line x1="3" y1="6" x2="21" y2="6" />
+                                        <line x1="3" y1="18" x2="21" y2="18" />
+                                    </svg>
+                                </button>
+                            )}
+                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                <Users className="w-4 h-4 stroke-[2.5]" />
+                            </div>
+                            <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                Team
+                            </h2>
+                            <span className="px-2 py-0.5 rounded-full bg-[#FFE566] text-black text-[11px] font-black border border-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                {perms?.userRole ? `Role: ${perms.userRole.replace("_", " ")}` : "Verified Club"}
+                            </span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                            Build your club's organisation, manage its people, and bring every department together.
+                        </p>
+                    </div>
+
+                    {/* Primary Actions (Permission Guarded) */}
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        {canManageTeams && (
                             <button
                                 type="button"
-                                onClick={onOpenMobileSidebar}
-                                className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer"
-                                aria-label="Open sidebar"
+                                onClick={() => setIsCreateTeamOpen(true)}
+                                className="px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                             >
-                                <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <line x1="3" y1="12" x2="21" y2="12" />
-                                    <line x1="3" y1="6" x2="21" y2="6" />
-                                    <line x1="3" y1="18" x2="21" y2="18" />
-                                </svg>
+                                <Plus className="w-4 h-4 stroke-[3]" />
+                                <span>Create Team</span>
                             </button>
                         )}
-                        <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
-                            <Users className="w-4 h-4 stroke-[2.5]" />
-                        </div>
-                        <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                            Team
-                        </h2>
-                        <span className="px-2 py-0.5 rounded-full bg-[#FFE566] text-black text-[11px] font-black border border-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+
+                        {canInvite && (
+                            <button
+                                type="button"
+                                onClick={() => setIsAddMemberOpen(true)}
+                                className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                            >
+                                <UserPlus className="w-4 h-4 stroke-[2.5]" />
+                                <span>Add Member</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+            ) : (
+                /* Compact Sub-bar when top header is provided by parent container */
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b-2 border-black/15">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#FFE566] text-black text-[11px] font-black border-2 border-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
                             {perms?.userRole ? `Role: ${perms.userRole.replace("_", " ")}` : "Verified Club"}
                         </span>
+                        <p className="text-xs sm:text-sm text-neutral-600 font-bold">
+                            Build your club's organisation, manage its people, and bring every department together.
+                        </p>
                     </div>
-                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                        Build your club's organisation, manage its people, and bring every department together.
-                    </p>
-                </div>
 
-                {/* Primary Actions (Permission Guarded) */}
-                <div className="flex items-center gap-2.5 flex-wrap">
-                    {canManageTeams && (
-                        <button
-                            type="button"
-                            onClick={() => setIsCreateTeamOpen(true)}
-                            className="px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                        >
-                            <Plus className="w-4 h-4 stroke-[3]" />
-                            <span>Create Team</span>
-                        </button>
-                    )}
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        {canManageTeams && (
+                            <button
+                                type="button"
+                                onClick={() => setIsCreateTeamOpen(true)}
+                                className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                            >
+                                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                                <span>Create Team</span>
+                            </button>
+                        )}
 
-                    {canInvite && (
-                        <button
-                            type="button"
-                            onClick={() => setIsAddMemberOpen(true)}
-                            className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                        >
-                            <UserPlus className="w-4 h-4 stroke-[2.5]" />
-                            <span>Add Member</span>
-                        </button>
-                    )}
+                        {canInvite && (
+                            <button
+                                type="button"
+                                onClick={() => setIsAddMemberOpen(true)}
+                                className="px-3.5 py-2 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                            >
+                                <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>Add Member</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Overview Statistics Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

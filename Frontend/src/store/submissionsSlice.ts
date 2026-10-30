@@ -97,6 +97,18 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
 
             if (hasMissing || hasRemoved) {
                 hasPortalMismatch = true;
+                // Invalidate local storage cache entry when platform count/handles differ
+                try {
+                    const raw = localStorage.getItem("orbix_unified_submissions");
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        delete parsed[effectiveUser];
+                        delete parsed[effectiveUser.toLowerCase()];
+                        localStorage.setItem("orbix_unified_submissions", JSON.stringify(parsed));
+                    }
+                } catch {
+                    // Safe fallback
+                }
             }
         }
 
@@ -137,7 +149,7 @@ export const fetchUnifiedSubmissions = createAsyncThunk<
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    if (data && data.success) {
+                    if (data && (data.success !== false) && (data.dailyMerged || data.platformBreakdown || data.totalSubmissions !== undefined)) {
                         return {
                             username: effectiveUser,
                             totalSubmissions: data.totalSubmissions || 0,

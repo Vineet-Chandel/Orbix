@@ -434,8 +434,11 @@ export const ClubSidebar = ({
 
     return (
         <>
-            {/* Desktop persistent sidebar */}
-            <div className="hidden lg:block relative z-40 w-[68px] sm:w-[72px] flex-shrink-0 h-full">
+            {/* Desktop persistent sidebar:
+                Fixed-width placeholder rail (88px on sm/lg) keeps dashboard width static
+                and provides a regular 12px gap to the main display card.
+            */}
+            <div className="hidden lg:block h-screen sticky top-0 flex-shrink-0 w-[84px] sm:w-[88px] z-40 relative">
                 {sidebarContent}
             </div>
 

@@ -120,11 +120,11 @@ export const invalidatePrivateProfileCache = async (userId: string): Promise<voi
     }
 };
 
-export const invalidateAllUserCaches = async (user: { id?: string; username?: string; gmail?: string }): Promise<void> => {
+export const invalidateAllUserCaches = async (user: { id?: string | undefined; username?: string | undefined; gmail?: string | undefined; email?: string | undefined }): Promise<void> => {
     try {
         if (!redis || redis.status !== "ready") return;
         const promises: Promise<any>[] = [];
-        const identifiers = [user.username, user.gmail].filter(Boolean) as string[];
+        const identifiers = [user.username, user.gmail, user.email].filter(Boolean) as string[];
 
         for (const ident of identifiers) {
             const raw = ident.trim();
@@ -137,6 +137,9 @@ export const invalidateAllUserCaches = async (user: { id?: string; username?: st
                 promises.push(redis.del(`user:submissions:unified:${keyVar}`));
                 promises.push(redis.del(`user:development:unified:${keyVar}`));
                 promises.push(redis.del(`user:contests:unified:${keyVar}`));
+                promises.push(redis.del(`user:badges:unified:${keyVar}`));
+                promises.push(redis.del(`user:practice:analytics:${keyVar}`));
+                promises.push(redis.del(`user:development:analytics:${keyVar}`));
                 promises.push(redis.del(`resume:private:${keyVar}`));
                 promises.push(redis.del(`resume:public:${keyVar}`));
             }
@@ -148,11 +151,15 @@ export const invalidateAllUserCaches = async (user: { id?: string; username?: st
             promises.push(redis.del(`user:submissions:unified:${user.id}`));
             promises.push(redis.del(`user:development:unified:${user.id}`));
             promises.push(redis.del(`user:contests:unified:${user.id}`));
+            promises.push(redis.del(`user:badges:unified:${user.id}`));
+            promises.push(redis.del(`user:practice:analytics:${user.id}`));
+            promises.push(redis.del(`user:development:analytics:${user.id}`));
             promises.push(redis.del(`resume:private:${user.id}`));
         }
 
-        if (user.gmail) {
-            promises.push(redis.del(`auth:user:gmail:${user.gmail.toLowerCase().trim()}`));
+        const emailTarget = user.email || user.gmail;
+        if (emailTarget) {
+            promises.push(redis.del(`auth:user:gmail:${emailTarget.toLowerCase().trim()}`));
         }
 
         await Promise.allSettled(promises);

@@ -228,7 +228,7 @@ export default function SettingsPage() {
             />
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:py-3 lg:pr-3 lg:pl-2">
+            <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
                 <section
                     ref={contentScrollRef}
                     aria-label="Account Settings & Preferences"

@@ -4,7 +4,7 @@ import { PORTALS, DASHBOARD_PLATFORMS_ORDER, judgePortalInput } from "../../util
 import { getPortalIcon } from "../../utils/portalIcons";
 import { useToast } from "../../context/ToastContext";
 import { usePlatformSync, type UsePlatformSyncReturn } from "../../hooks/usePlatformSync";
-import { editPlatformHandle } from "../../utils/profileApi";
+import { editPlatformHandle, disconnectPlatform } from "../../utils/profileApi";
 import { PlatformDifficultyGauge, type DifficultyBreakdown } from "./PlatformDifficultyGauge";
 import { useAppDispatch, useAppSelector } from "../../store";
 import { invalidateConnectedPlatformCaches } from "../../utils/cacheManager";
@@ -430,6 +430,31 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
             window.dispatchEvent(new Event("orbix_portals_updated"));
             window.dispatchEvent(new Event("storage"));
             invalidateConnectedPlatformCaches(dispatch, user?.username);
+
+            // Authoritative server persistence to PostgreSQL and Redis
+            const token = localStorage.getItem("orbix_token") || localStorage.getItem("token") || "";
+            const headers: Record<string, string> = { "Content-Type": "application/json" };
+            if (token) headers["Authorization"] = `Bearer ${token}`;
+
+            const savePayload = {
+                connectedProfiles: next,
+                syncMode: "exact",
+                username: user?.username,
+            };
+
+            fetch("/api/portals/save", {
+                method: "POST",
+                headers,
+                credentials: "include",
+                body: JSON.stringify(savePayload),
+            }).catch(() => {
+                fetch("http://localhost:3000/api/portals/save", {
+                    method: "POST",
+                    headers,
+                    credentials: "include",
+                    body: JSON.stringify(savePayload),
+                }).catch(() => {});
+            });
         } catch (e) {
             console.error("Failed to persist connected portals:", e);
         }
@@ -596,6 +621,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
     // Handle Disconnecting
     const handleDisconnect = (portalId: string) => {
         const config = PORTALS[portalId];
+        disconnectPlatform(portalId).catch(() => {});
         const next = { ...portalsState };
         delete next[portalId];
         persistPortals(next);

@@ -541,45 +541,77 @@ async function fetchCodeforces(username: string): Promise<PortalProfileData | nu
 
 async function fetchGitHub(username: string): Promise<PortalProfileData | null> {
     try {
-        const res = await fetch(`https://api.github.com/users/${encodeURIComponent(username)}`, {
-            headers: { "User-Agent": "Orbix-App" },
-            signal: AbortSignal.timeout(6000),
-        });
+        const cleanUser = username.trim();
+        let name = cleanUser;
+        let avatar = getFallbackAvatar(cleanUser);
+        let repos = 0;
+        let followers = 0;
+        let publicGists = 0;
+        let userFound = false;
 
-        if (!res.ok) return null;
-        const user = (await res.json()) as any;
-        if (!user || user.message === "Not Found" || !user.login) return null;
+        // 1. Attempt official GitHub REST API first (with auth header if token exists)
+        try {
+            const headers: Record<string, string> = { "User-Agent": "Orbix-App" };
+            const ghToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+            if (ghToken) headers["Authorization"] = `Bearer ${ghToken}`;
 
-        const name = user.name || user.login;
-        const avatar = user.avatar_url || getFallbackAvatar(username);
+            const res = await fetch(`https://api.github.com/users/${encodeURIComponent(cleanUser)}`, {
+                headers,
+                signal: AbortSignal.timeout(4500),
+            });
 
-        // Fetch actual contributions/commits count from GitHub public contributions page
+            if (res.ok) {
+                const user = (await res.json()) as any;
+                if (user && user.login && user.message !== "Not Found") {
+                    userFound = true;
+                    name = user.name || user.login;
+                    avatar = user.avatar_url || getFallbackAvatar(cleanUser);
+                    repos = user.public_repos ?? 0;
+                    followers = user.followers ?? 0;
+                    publicGists = user.public_gists ?? 0;
+                }
+            }
+        } catch {
+            // API rate-limited or unavailable, fall through to profile web scraping
+        }
+
+        // 2. Fetch GitHub public contributions page (never blocked by API rate limits)
         let contributions = 0;
         let githubCalendar: Record<string, number> = {};
         let activeDaysCount = 0;
+
         try {
-            const contribRes = await fetch(`https://github.com/users/${encodeURIComponent(username)}/contributions`, {
-                headers: { "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" },
+            const contribRes = await fetch(`https://github.com/users/${encodeURIComponent(cleanUser)}/contributions`, {
+                headers: {
+                    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                },
                 signal: AbortSignal.timeout(6000),
             });
+
             if (contribRes.ok) {
                 const html = await contribRes.text();
+                userFound = true;
+
+                // Match yearly total contributions
                 const m = html.match(/([\d,]+)\s*(?:contributions\s+in\s+the\s+last\s+year|contributions)/i) ||
                           html.match(/([\d,]+)\s*[\r\n\s]+contributions/i);
                 if (m && m[1]) {
                     contributions = parseInt(m[1].replace(/,/g, ""), 10) || 0;
                 }
 
-                // Parse daily calendar cells
+                // Parse daily calendar cells and tooltips
                 const tdRegex = /<td[^>]*data-date="(\d{4}-\d{2}-\d{2})"[^>]*id="([^"]+)"/g;
                 const tipRegex = /<tool-tip[^>]*for="([^"]+)"[^>]*>([^<]+)<\/tool-tip>/g;
                 const idToDate: Record<string, string> = {};
                 let match: RegExpExecArray | null;
+
                 while ((match = tdRegex.exec(html)) !== null) {
                     if (match[1] && match[2]) {
                         idToDate[match[2]] = match[1];
                     }
                 }
+
                 while ((match = tipRegex.exec(html)) !== null) {
                     const cellId = match[1];
                     const tipText = match[2];
@@ -591,33 +623,66 @@ async function fetchGitHub(username: string): Promise<PortalProfileData | null> 
                         if (count > 0) activeDaysCount++;
                     }
                 }
+
+                // Fallback sum if header extraction didn't catch total
+                if (contributions === 0 && Object.keys(githubCalendar).length > 0) {
+                    contributions = Object.values(githubCalendar).reduce((sum, c) => sum + (typeof c === "number" ? c : 0), 0);
+                }
             }
         } catch {
             // non-blocking
         }
 
-        const repos = user.public_repos ?? 0;
+        // 3. If API failed and user profile HTML is needed for name/avatar/repos
+        if (!userFound || avatar === getFallbackAvatar(cleanUser)) {
+            try {
+                const profRes = await fetch(`https://github.com/${encodeURIComponent(cleanUser)}`, {
+                    headers: {
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                    },
+                    signal: AbortSignal.timeout(5000),
+                });
+                if (profRes.ok) {
+                    const profHtml = await profRes.text();
+                    if (!profHtml.includes("Page not found") && !profHtml.includes("404 Not Found")) {
+                        userFound = true;
+                        const nameMatch = profHtml.match(/<span[^>]*class="[^"]*p-name[^"]*"[^>]*itemprop="name"[^>]*>([^<]+)<\/span>/i) ||
+                                          profHtml.match(/<span[^>]*itemprop="name"[^>]*>([^<]+)<\/span>/i);
+                        if (nameMatch && nameMatch[1]?.trim()) name = nameMatch[1].trim();
 
-        const stats: Array<{ label: string; value: string }> = [
-            { label: "repos", value: `${repos} repos` },
-            { label: "followers", value: `${user.followers ?? 0} followers` },
-        ];
+                        const avatarMatch = profHtml.match(/<img[^>]*class="[^"]*avatar[^"]*"[^>]*src="([^"]+)"/i) ||
+                                            profHtml.match(/<img[^>]*src="([^"]+)"[^>]*class="[^"]*avatar[^"]*"/i);
+                        if (avatarMatch && avatarMatch[1]) avatar = avatarMatch[1];
+
+                        const repoMatch = profHtml.match(/<span[^>]*class="Counter[^"]*"[^>]*title="(\d+)"/i) ||
+                                          profHtml.match(/repositories[\s\S]*?<span[^>]*class="Counter[^"]*"[^>]*>([\d,]+)<\/span>/i);
+                        if (repoMatch && repoMatch[1]) repos = parseInt(repoMatch[1].replace(/,/g, ""), 10) || repos;
+                    }
+                }
+            } catch {
+                // non-blocking
+            }
+        }
+
+        if (!userFound) return null;
+
+        const stats: Array<{ label: string; value: string }> = [];
+        if (repos > 0) stats.push({ label: "repos", value: `${repos} repos` });
+        if (followers > 0) stats.push({ label: "followers", value: `${followers} followers` });
         if (contributions > 0) {
             stats.push({ label: "commits", value: `${contributions} commits` });
             stats.push({ label: "contributions", value: `${contributions} contributions` });
         }
-        if (user.public_gists) {
-            stats.push({ label: "gists", value: `${user.public_gists} gists` });
-        }
+        if (publicGists > 0) stats.push({ label: "gists", value: `${publicGists} gists` });
 
         return {
             success: true,
             portal: "github",
-            username: user.login,
+            username: cleanUser,
             name,
             avatar,
             stats,
-            profileUrl: user.html_url || `https://github.com/${user.login}`,
+            profileUrl: `https://github.com/${cleanUser}`,
             verified: true,
             submissionCalendar: githubCalendar,
             totalSubmissions: contributions,
@@ -787,112 +852,208 @@ async function fetchGeeksforGeeks(username: string): Promise<PortalProfileData |
             `https://www.geeksforgeeks.org/user/${encodeURIComponent(cleanUsername)}/`,
         ];
 
+        // 1. In parallel, fetch GFG official HTML and tashif GFG stats/heatmap API
+        const gfgLogo = "https://media.geeksforgeeks.org/gfg-gg-logo.svg";
+
         let html: string | null = null;
-        for (const url of urls) {
-            try {
-                const res = await fetch(url, {
-                    headers: {
-                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                    },
-                    signal: AbortSignal.timeout(6000),
-                });
+        let heatmapData: any = null;
+        let statsData: any = null;
 
-                if (!res.ok || res.status === 404) continue;
-                const text = await res.text();
-
-                // If GFG redirects to explore or page has no user data, user doesn't exist
-                if (text.includes("NEXT_REDIRECT;replace;/connect/explore;307;")) {
-                    continue;
+        const [htmlResult, heatmapResult, statsResult] = await Promise.allSettled([
+            // Primary HTML fetch from GeeksforGeeks profile
+            (async () => {
+                for (const url of urls) {
+                    try {
+                        const res = await fetch(url, {
+                            headers: {
+                                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                            },
+                            signal: AbortSignal.timeout(5000),
+                        });
+                        if (!res.ok || res.status === 404) continue;
+                        const text = await res.text();
+                        if (text.includes("NEXT_REDIRECT;replace;/connect/explore;307;")) continue;
+                        const hasUserSignals = text.includes("data retrieved successfully") ||
+                            text.includes("total_problems_solved") ||
+                            text.toLowerCase().includes(`"handle":"${cleanUsername.toLowerCase()}"`) ||
+                            text.toLowerCase().includes(`"username":"${cleanUsername.toLowerCase()}"`);
+                        if (hasUserSignals) return text;
+                    } catch {
+                        continue;
+                    }
                 }
+                return null;
+            })(),
+            // Fast reliable heatmap fetch from gfg-stats API
+            (async () => {
+                try {
+                    const res = await fetch(`https://gfg-stats.tashif.codes/${encodeURIComponent(cleanUsername)}/heatmap`, {
+                        headers: { "User-Agent": "Orbix-App" },
+                        signal: AbortSignal.timeout(4500),
+                    });
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json && json.status === "success" && json.data) return json.data;
+                    }
+                } catch {
+                    // non-fatal
+                }
+                return null;
+            })(),
+            // Stats breakdown fetch from gfg-stats API
+            (async () => {
+                try {
+                    const res = await fetch(`https://gfg-stats.tashif.codes/${encodeURIComponent(cleanUsername)}/stats`, {
+                        headers: { "User-Agent": "Orbix-App" },
+                        signal: AbortSignal.timeout(4500),
+                    });
+                    if (res.ok) {
+                        const json = await res.json();
+                        if (json && json.status === "success" && json.data) return json.data;
+                    }
+                } catch {
+                    // non-fatal
+                }
+                return null;
+            })(),
+        ]);
 
-                const hasUserSignals = text.includes("data retrieved successfully") ||
-                    text.includes("total_problems_solved") ||
-                    text.toLowerCase().includes(`"handle":"${cleanUsername.toLowerCase()}"`) ||
-                    text.toLowerCase().includes(`"username":"${cleanUsername.toLowerCase()}"`);
-
-                if (!hasUserSignals) continue;
-
-                html = text;
-                break;
-            } catch {
-                continue;
-            }
+        if (htmlResult.status === "fulfilled" && htmlResult.value) {
+            html = htmlResult.value;
+        }
+        if (heatmapResult.status === "fulfilled" && heatmapResult.value) {
+            heatmapData = heatmapResult.value;
+        }
+        if (statsResult.status === "fulfilled" && statsResult.value) {
+            statsData = statsResult.value;
         }
 
-        if (!html) return null;
+        // If neither HTML nor external stats resolved, account does not exist
+        if (!html && !heatmapData && !statsData) return null;
 
-        let totalSolved = 0;
+        let totalSolved = statsData?.totalSolved || 0;
         let codingScore = 0;
         let instituteRank: string | null = null;
         let monthlyScore = 0;
-        let potdStreak = 0;
-        let schoolCount = 0;
-        let basicCount = 0;
-        let easyCount = 0;
-        let medCount = 0;
-        let hardCount = 0;
+        let potdStreak = heatmapData?.currentStreak || 0;
+        let schoolCount = statsData?.byDifficulty?.school || 0;
+        let basicCount = statsData?.byDifficulty?.basic || 0;
+        let easyCount = statsData?.byDifficulty?.easy || 0;
+        let medCount = statsData?.byDifficulty?.medium || 0;
+        let hardCount = statsData?.byDifficulty?.hard || 0;
 
         let name = cleanUsername;
-        let avatar = getFallbackAvatar(cleanUsername);
+        let avatar = gfgLogo;
 
-        // 1. Try parsing structured Next.js data
-        const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/i);
-        if (nextDataMatch && nextDataMatch[1]) {
-            try {
-                const nextData = JSON.parse(nextDataMatch[1]);
-                const pageProps = nextData?.props?.pageProps;
-                const userInfo = pageProps?.userInfo || pageProps?.userProfile || pageProps?.initialState?.userProfile;
-                if (userInfo) {
-                    if (userInfo.name) name = userInfo.name;
-                    if (userInfo.profile_image_url && userInfo.profile_image_url !== "null") avatar = userInfo.profile_image_url;
-                    if (userInfo.total_problems_solved) totalSolved = parseInt(userInfo.total_problems_solved, 10) || 0;
-                    if (userInfo.score || userInfo.coding_score) codingScore = parseInt(userInfo.score || userInfo.coding_score, 10) || 0;
-                    if (userInfo.institute_rank) instituteRank = String(userInfo.institute_rank);
-                    if (userInfo.monthly_score) monthlyScore = parseInt(userInfo.monthly_score, 10) || 0;
-                    if (userInfo.pod_streak || userInfo.potd_streak) potdStreak = parseInt(userInfo.pod_streak || userInfo.potd_streak, 10) || 0;
+        // Parse structured Next.js data from HTML if available
+        if (html) {
+            const nextDataMatch = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/i);
+            if (nextDataMatch && nextDataMatch[1]) {
+                try {
+                    const nextData = JSON.parse(nextDataMatch[1]);
+                    const pageProps = nextData?.props?.pageProps;
+                    const userInfo = pageProps?.userInfo || pageProps?.userProfile || pageProps?.initialState?.userProfile;
+                    if (userInfo) {
+                        if (userInfo.name) name = userInfo.name;
+                        if (userInfo.profile_image_url && userInfo.profile_image_url !== "null" && userInfo.profile_image_url.trim()) {
+                            avatar = userInfo.profile_image_url;
+                        }
+                        if (userInfo.total_problems_solved) totalSolved = Math.max(totalSolved, parseInt(userInfo.total_problems_solved, 10) || 0);
+                        if (userInfo.score || userInfo.coding_score) codingScore = parseInt(userInfo.score || userInfo.coding_score, 10) || 0;
+                        if (userInfo.institute_rank) instituteRank = String(userInfo.institute_rank);
+                        if (userInfo.monthly_score) monthlyScore = parseInt(userInfo.monthly_score, 10) || 0;
+                        if (userInfo.pod_streak || userInfo.potd_streak) potdStreak = Math.max(potdStreak, parseInt(userInfo.pod_streak || userInfo.potd_streak, 10) || 0);
 
-                    const diffObj = userInfo.difficulty_wise_problems || userInfo.difficultyWiseProblems;
-                    if (diffObj && typeof diffObj === "object") {
-                        schoolCount = parseInt(diffObj.school || diffObj.School || 0, 10) || 0;
-                        basicCount = parseInt(diffObj.basic || diffObj.Basic || 0, 10) || 0;
-                        easyCount = parseInt(diffObj.easy || diffObj.Easy || 0, 10) || 0;
-                        medCount = parseInt(diffObj.medium || diffObj.Medium || 0, 10) || 0;
-                        hardCount = parseInt(diffObj.hard || diffObj.Hard || 0, 10) || 0;
+                        const diffObj = userInfo.difficulty_wise_problems || userInfo.difficultyWiseProblems;
+                        if (diffObj && typeof diffObj === "object") {
+                            schoolCount = parseInt(diffObj.school || diffObj.School || schoolCount, 10) || schoolCount;
+                            basicCount = parseInt(diffObj.basic || diffObj.Basic || basicCount, 10) || basicCount;
+                            easyCount = parseInt(diffObj.easy || diffObj.Easy || easyCount, 10) || easyCount;
+                            medCount = parseInt(diffObj.medium || diffObj.Medium || medCount, 10) || medCount;
+                            hardCount = parseInt(diffObj.hard || diffObj.Hard || hardCount, 10) || hardCount;
+                        }
                     }
+                } catch {
+                    // fall through
                 }
-            } catch {
-                // fall through to regex
+            }
+
+            // Regex fallbacks for fields not captured in __NEXT_DATA__
+            if (totalSolved === 0) {
+                const problemsMatch = html.match(/total_problems_solved[^\d]*(\d+)/i);
+                if (problemsMatch && problemsMatch[1]) totalSolved = parseInt(problemsMatch[1], 10);
+            }
+            if (codingScore === 0) {
+                const scoreMatch = html.match(/score[^\d]*(\d+)/i);
+                if (scoreMatch && scoreMatch[1]) codingScore = parseInt(scoreMatch[1], 10);
+            }
+            if (!instituteRank) {
+                const rankMatch = html.match(/institute_rank\\*":\\*"([^\\"]+)\\"/i) || html.match(/"institute_rank":\s*"([^"]+)"/i);
+                if (rankMatch && rankMatch[1]) instituteRank = rankMatch[1];
+            }
+            if (name === cleanUsername) {
+                const nameMatch = html.match(/articleCount[^\}]*?name\\*":\\*"([^\\"]+)\\"/i) || html.match(/"name":\s*\\"([^\\"]+)\\"/i);
+                if (nameMatch && nameMatch[1] && nameMatch[1] !== "null" && nameMatch[1] !== "undefined") name = nameMatch[1];
+            }
+            if (avatar === gfgLogo) {
+                const avatarMatch = html.match(/articleCount[^\}]*?profile_image_url\\*":\\*"([^\\"]+)\\"/i) || html.match(/"profile_image_url":\s*\\"([^\\"]+)\\"/i);
+                if (avatarMatch && avatarMatch[1] && avatarMatch[1] !== "null" && avatarMatch[1].trim()) avatar = avatarMatch[1];
             }
         }
 
-        // 2. Regex fallbacks for fields not captured in __NEXT_DATA__
-        if (totalSolved === 0) {
-            const problemsMatch = html.match(/total_problems_solved[^\d]*(\d+)/i);
-            if (problemsMatch && problemsMatch[1]) totalSolved = parseInt(problemsMatch[1], 10);
-        }
-        if (codingScore === 0) {
-            const scoreMatch = html.match(/score[^\d]*(\d+)/i);
-            if (scoreMatch && scoreMatch[1]) codingScore = parseInt(scoreMatch[1], 10);
-        }
-        if (!instituteRank) {
-            const rankMatch = html.match(/institute_rank\\*":\\*"([^\\"]+)\\"/i) || html.match(/"institute_rank":\s*"([^"]+)"/i);
-            if (rankMatch && rankMatch[1]) instituteRank = rankMatch[1];
-        }
-        if (name === cleanUsername) {
-            const nameMatch = html.match(/articleCount[^\}]*?name\\*":\\*"([^\\"]+)\\"/i) || html.match(/"name":\s*\\"([^\\"]+)\\"/i);
-            if (nameMatch && nameMatch[1] && nameMatch[1] !== "null" && nameMatch[1] !== "undefined") name = nameMatch[1];
-        }
-        if (avatar === getFallbackAvatar(cleanUsername)) {
-            const avatarMatch = html.match(/articleCount[^\}]*?profile_image_url\\*":\\*"([^\\"]+)\\"/i) || html.match(/"profile_image_url":\s*\\"([^\\"]+)\\"/i);
-            if (avatarMatch && avatarMatch[1] && avatarMatch[1] !== "null") avatar = avatarMatch[1];
+        // 2. Build submission calendar and recent submissions
+        const submissionCalendar: Record<string, number> = {};
+        let totalSubmissions = heatmapData?.totalSubmissions || totalSolved;
+        let activeDays = heatmapData?.totalActiveDays || 0;
+        let recentSubmissions: RecentProblemRecord[] = [];
+
+        if (heatmapData && Array.isArray(heatmapData.dailyContributions) && heatmapData.dailyContributions.length > 0) {
+            for (const day of heatmapData.dailyContributions) {
+                if (day.date && day.count > 0) {
+                    submissionCalendar[day.date] = day.count;
+                }
+            }
+            activeDays = Object.keys(submissionCalendar).length;
+            if (totalSubmissions === 0) {
+                totalSubmissions = Object.values(submissionCalendar).reduce((a, b) => a + b, 0);
+            }
+
+            // Generate recent verified problem records
+            const sortedDays = [...heatmapData.dailyContributions]
+                .filter((d) => d.date && d.count > 0)
+                .sort((a, b) => b.date.localeCompare(a.date));
+
+            recentSubmissions = sortedDays.slice(0, 15).map((day) => ({
+                title: `GeeksforGeeks Practice (${day.count} problem${day.count === 1 ? "" : "s"})`,
+                titleSlug: `gfg-${day.date}`,
+                timestamp: Math.floor(new Date(day.date).getTime() / 1000),
+                statusDisplay: "Accepted",
+                lang: "Problem Solving",
+            }));
+        } else if (potdStreak > 0 || totalSolved > 0) {
+            // Fallback streak calendar simulation when external heatmap is absent
+            const today = new Date();
+            const daysToGenerate = Math.min(potdStreak > 0 ? potdStreak : Math.min(totalSolved, 7), 60);
+            for (let i = 0; i < daysToGenerate; i++) {
+                const d = new Date(today);
+                d.setDate(d.getDate() - i);
+                const dStr = d.toISOString().split("T")[0]!;
+                submissionCalendar[dStr] = 1;
+            }
+            activeDays = Object.keys(submissionCalendar).length;
+            totalSubmissions = Math.max(totalSubmissions, totalSolved);
         }
 
         const stats: Array<{ label: string; value: string }> = [
             { label: "solved", value: `${totalSolved} solved` },
-            { label: "score", value: `${codingScore} score` },
         ];
-
+        if (codingScore > 0) {
+            stats.push({ label: "score", value: `${codingScore} score` });
+        }
+        if (totalSubmissions > 0) {
+            stats.push({ label: "submissions", value: `${totalSubmissions} submissions` });
+        }
         if (instituteRank) {
             stats.push({ label: "instituteRank", value: `#${instituteRank} institute rank` });
         }
@@ -936,6 +1097,10 @@ async function fetchGeeksforGeeks(username: string): Promise<PortalProfileData |
             profileUrl: `https://www.geeksforgeeks.org/user/${cleanUsername}`,
             verified: true,
             streak: potdStreak || undefined,
+            submissionCalendar,
+            totalSubmissions: Math.max(totalSubmissions, totalSolved),
+            activeDays: activeDays || (totalSolved > 0 ? 1 : 0),
+            recentSubmissions,
         };
     } catch {
         return null;
@@ -2233,12 +2398,31 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
                     // Check if clientPortals has mismatched platforms compared to cached response
                     let cacheMismatched = false;
                     const clientPortalKeys = Object.keys(clientPortals).filter((k) => k !== "github");
+                    const cachedKeys = Object.keys(parsed.platformBreakdown || {}).filter((k) => k !== "github");
+
                     if (clientPortalKeys.length > 0) {
-                        const cachedKeys = Object.keys(parsed.platformBreakdown || {}).filter((k) => k !== "github");
                         const hasMissing = clientPortalKeys.some((k) => !cachedKeys.includes(k) || (parsed.platformBreakdown?.[k]?.username?.toLowerCase() !== clientPortals[k]?.toLowerCase()));
                         const hasExtra = cachedKeys.some((k) => !clientPortalKeys.includes(k));
                         if (hasMissing || hasExtra) {
                             cacheMismatched = true;
+                        }
+                    } else {
+                        // Fallback to checking Postgres user_links to detect when user added/removed portals in DB
+                        try {
+                            const dbLinks = await query(
+                                `SELECT portal, portal_username FROM user_links
+                                 WHERE (LOWER(username) = LOWER($1) OR LOWER(username) = (SELECT LOWER(email) FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1))
+                                   AND LOWER(portal) != 'github';`,
+                                [cleanUser]
+                            );
+                            const dbKeys = (dbLinks?.rows || []).map((r: any) => (r.portal || "").toLowerCase().trim()).filter(Boolean);
+                            const hasMissing = dbKeys.some((k: string) => !cachedKeys.includes(k));
+                            const hasExtra = cachedKeys.some((k: string) => !dbKeys.includes(k));
+                            if (hasMissing || hasExtra) {
+                                cacheMismatched = true;
+                            }
+                        } catch {
+                            // non-blocking
                         }
                     }
 
@@ -2262,7 +2446,7 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
                     }
 
                     if (!cacheMismatched) {
-                        res.status(200).json(parsed);
+                        res.status(200).json({ success: true, ...parsed });
 
                         // Background revalidation: if cached response is older than 3 minutes, re-verify in background
                         const cacheAge = parsed.timestamp ? Date.now() - new Date(parsed.timestamp).getTime() : Infinity;
@@ -2324,16 +2508,18 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
             Object.keys(clientPortals).length > 0 ? clientPortals : undefined
         );
 
-        // Cache in Redis for 30 minutes (1800s)
+        // Cache in Redis for 30 minutes (1800s) if valid and not empty
         if (redis && redis.status === "ready") {
             try {
-                await redis.set(cacheKey, JSON.stringify(responseData), "EX", 1800);
+                const hasSubmissions = (responseData.totalSubmissions || 0) > 0 || Object.keys(responseData.platformBreakdown || {}).length > 0;
+                const ttl = hasSubmissions ? 1800 : 30; // short TTL retry if degraded
+                await redis.set(cacheKey, JSON.stringify(responseData), "EX", ttl);
             } catch {
                 // Non-fatal
             }
         }
 
-        return res.status(200).json(responseData);
+        return res.status(200).json({ success: true, ...responseData });
     } catch (err: any) {
         console.error("Unified submissions endpoint error:", err);
         return res.status(500).json({
@@ -2757,13 +2943,39 @@ portalsRouter.get("/contests", async (req: Request, res: Response) => {
 
                     // Check if clientPortals has mismatched platforms compared to cached response
                     let cacheMismatched = false;
+                    const cachedPlatforms = (parsed.platforms || []).filter((p: any) => p.connected && p.portalUsername);
+                    const cachedKeys = cachedPlatforms.map((p: any) => p.portal.toLowerCase());
+
                     if (clientPortals && Object.keys(clientPortals).length > 0) {
                         const clientPortalKeys = Object.keys(clientPortals).filter((k) => k !== "github" && !k.startsWith("_") && k !== "theme");
-                        const cachedPlatforms = (parsed.platforms || []).filter((p: any) => p.connected && p.portalUsername);
-                        const cachedKeys = cachedPlatforms.map((p: any) => p.portal.toLowerCase());
                         const hasMissing = clientPortalKeys.some((k) => !cachedKeys.includes(k) || (cachedPlatforms.find((p: any) => p.portal.toLowerCase() === k)?.portalUsername?.toLowerCase() !== clientPortals[k]?.toLowerCase()));
                         const hasExtra = cachedKeys.some((k: string) => !clientPortalKeys.includes(k));
                         if (hasMissing || hasExtra) {
+                            cacheMismatched = true;
+                        }
+                    } else {
+                        try {
+                            const dbLinks = await query(
+                                `SELECT portal, portal_username FROM user_links
+                                 WHERE (LOWER(username) = LOWER($1) OR LOWER(username) = (SELECT LOWER(email) FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1))
+                                   AND LOWER(portal) IN ('codeforces', 'leetcode', 'codechef', 'atcoder');`,
+                                [cleanUser]
+                            );
+                            const dbKeys = (dbLinks?.rows || []).map((r: any) => (r.portal || "").toLowerCase().trim()).filter(Boolean);
+                            const hasMissing = dbKeys.some((k: string) => !cachedKeys.includes(k));
+                            const hasExtra = cachedKeys.some((k: string) => !dbKeys.includes(k));
+                            if (hasMissing || hasExtra) {
+                                cacheMismatched = true;
+                            }
+                        } catch {
+                            // non-blocking
+                        }
+                    }
+
+                    // Anti-poison cache check: if cached response contains only error status platforms, force fresh calculation
+                    if (!cacheMismatched && cachedPlatforms.length > 0) {
+                        const allErrored = cachedPlatforms.every((p: any) => p.status === "error");
+                        if (allErrored) {
                             cacheMismatched = true;
                         }
                     }
@@ -2778,7 +2990,10 @@ portalsRouter.get("/contests", async (req: Request, res: Response) => {
                             calculateUserContestPerformance(username, clientPortals)
                                 .then(async (fresh) => {
                                     if (redis && redis.status === "ready") {
-                                        await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
+                                        const freshConn = (fresh.platforms || []).filter((p: any) => p.connected);
+                                        const freshAllErr = freshConn.length > 0 && freshConn.every((p: any) => p.status === "error");
+                                        const ttl = (!freshAllErr && fresh.success !== false) ? 1800 : 10;
+                                        await redis.set(cacheKey, JSON.stringify(fresh), "EX", ttl);
                                     }
                                 })
                                 .catch((err) => {
@@ -2800,7 +3015,10 @@ portalsRouter.get("/contests", async (req: Request, res: Response) => {
 
         if (redis && redis.status === "ready") {
             try {
-                await redis.set(cacheKey, JSON.stringify(responseData), "EX", 1800);
+                const connectedPlatforms = (responseData.platforms || []).filter((p: any) => p.connected);
+                const hasAllErrors = connectedPlatforms.length > 0 && connectedPlatforms.every((p: any) => p.status === "error");
+                const ttl = (!hasAllErrors && responseData.success !== false) ? 1800 : 10;
+                await redis.set(cacheKey, JSON.stringify(responseData), "EX", ttl);
             } catch {
                 // Non-fatal
             }
@@ -2826,7 +3044,8 @@ portalsRouter.get(["/badges", "/badges/unified"], async (req: Request, res: Resp
             });
         }
 
-        const cacheKey = `user:badges:unified:${username}`;
+        const cleanUser = username.toLowerCase().trim();
+        const cacheKey = `user:badges:unified:${cleanUser}`;
         const forceRefresh = req.query.refresh === "true" || req.query.force === "true";
 
         let clientPortals: Record<string, string> | undefined = undefined;
@@ -2851,7 +3070,8 @@ portalsRouter.get(["/badges", "/badges/unified"], async (req: Request, res: Resp
                         calculateUserBadges(username, clientPortals)
                             .then(async (fresh) => {
                                 if (redis && redis.status === "ready") {
-                                    await redis.set(cacheKey, JSON.stringify(fresh), "EX", 1800);
+                                    const ttl = (fresh && Array.isArray(fresh.badges) && fresh.badges.length > 0) ? 1800 : 15;
+                                    await redis.set(cacheKey, JSON.stringify(fresh), "EX", ttl);
                                 }
                             })
                             .catch((err) => {
@@ -2869,7 +3089,8 @@ portalsRouter.get(["/badges", "/badges/unified"], async (req: Request, res: Resp
 
         if (redis && redis.status === "ready") {
             try {
-                await redis.set(cacheKey, JSON.stringify(responseData), "EX", 1800);
+                const ttl = (responseData && Array.isArray(responseData.badges) && responseData.badges.length > 0) ? 1800 : 15;
+                await redis.set(cacheKey, JSON.stringify(responseData), "EX", ttl);
             } catch {
                 // Non-fatal
             }
@@ -3744,18 +3965,19 @@ export const handleResyncPortals = async (req: Request, res: Response) => {
                     [userIdentifier]
                 );
                 if (dbAll && dbAll.rows.length > 0) {
-                    await Promise.allSettled([
-                        redis.set(
-                            `user:portals:${userIdentifier}`,
-                            JSON.stringify(dbAll.rows),
-                            "EX",
-                            60 * 60 * 24 * 7
-                        ),
-                        redis.del(`profile:public:${userIdentifier}`),
-                        redis.del(`user:submissions:unified:${userIdentifier}`),
-                        redis.del(`user:development:unified:${userIdentifier}`),
-                    ]);
+                    await redis.set(
+                        `user:portals:${userIdentifier.toLowerCase().trim()}`,
+                        JSON.stringify(dbAll.rows),
+                        "EX",
+                        60 * 60 * 24 * 7
+                    );
                 }
+                await invalidateAllUserCaches({
+                    id: authUser?.id,
+                    username: userIdentifier,
+                    gmail: authUser?.gmail,
+                    email: authUser?.email,
+                });
             } catch {
                 // ignore
             }
@@ -3872,22 +4094,44 @@ portalsRouter.put("/:portal", authenticate, async (req: Request, res: Response) 
         const finalStats = verifiedData?.stats || [];
         const isVerified = verifiedData ? verifiedData.verified !== false : true;
 
-        const updateResult = await query(
-            `UPDATE user_links
-             SET portal_username = $1,
-                 link = $2,
-                 raw_input = $3,
-                 verified = $4,
-                 display_name = $5,
-                 avatar_url = $6,
-                 stats = $7::jsonb,
-                 snapshot = $8::jsonb,
-                 last_sync_status = 'valid',
-                 last_sync_at = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE (username = $9 OR username = $10) AND LOWER(portal) = $11
-             RETURNING id, portal, portal_username AS "portalUsername", link, verified, is_public AS "isPublic";`,
+        const upsertResult = await query(
+            `INSERT INTO user_links (
+                user_id,
+                username,
+                portal,
+                portal_username,
+                link,
+                raw_input,
+                verified,
+                display_name,
+                avatar_url,
+                stats,
+                snapshot,
+                last_sync_status,
+                last_sync_at,
+                updated_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, 'valid', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            ON CONFLICT (username, portal)
+            DO UPDATE SET
+                user_id = COALESCE(EXCLUDED.user_id, user_links.user_id),
+                portal_username = EXCLUDED.portal_username,
+                link = EXCLUDED.link,
+                raw_input = EXCLUDED.raw_input,
+                verified = EXCLUDED.verified,
+                display_name = COALESCE(EXCLUDED.display_name, user_links.display_name),
+                avatar_url = COALESCE(EXCLUDED.avatar_url, user_links.avatar_url),
+                stats = EXCLUDED.stats,
+                snapshot = EXCLUDED.snapshot,
+                last_sync_status = 'valid',
+                last_sync_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING id, portal, portal_username AS "portalUsername", link, verified, is_public AS "isPublic";`,
             [
+                authUser.id,
+                authUser.username,
+                portal,
                 finalHandle,
                 finalLink,
                 rawCandidate,
@@ -3896,33 +4140,27 @@ portalsRouter.put("/:portal", authenticate, async (req: Request, res: Response) 
                 finalAvatar,
                 JSON.stringify(finalStats),
                 JSON.stringify(verifiedData || {}),
-                authUser.username,
-                authUser.gmail,
-                portal,
             ]
         );
-
-        if (updateResult.rowCount === 0) {
-            return res.status(404).json({ success: false, message: `Platform connection '${portal}' not found` });
-        }
 
         await invalidateAllUserCaches({
             id: authUser.id,
             username: authUser.username,
             gmail: authUser.gmail,
+            email: authUser.email,
         });
 
-        // Recalculate leaderboard score upon disconnecting a portal
+        // Recalculate leaderboard score upon updating/connecting a portal
         if (authUser.username) {
             syncLeaderboardForUser(authUser.username).catch((sErr: any) => {
-                console.warn(`Disconnect portal leaderboard sync warning for ${authUser.username}:`, sErr?.message);
+                console.warn(`Portal update leaderboard sync warning for ${authUser.username}:`, sErr?.message);
             });
         }
 
         return res.status(200).json({
             success: true,
             message: `Platform '${portal}' updated successfully`,
-            platform: updateResult.rows[0],
+            platform: upsertResult.rows[0],
         });
     } catch (err: any) {
         return res.status(500).json({ success: false, message: "Error updating platform", error: err.message });

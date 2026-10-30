@@ -128,21 +128,29 @@ export const CodingSubmissionsTable: React.FC<CodingSubmissionsTableProps> = ({
     }, [remoteData, clientAgg, activePortalsMap]);
 
     // Series of platforms sorted strictly from largest number of submissions to lowest
-    // ONLY display platforms that the user is currently connected to and count > 0
+    // Displays all practice platforms the user currently has connected
     const connectedPlatformsList = useMemo(() => {
-        return Object.values(platformBreakdown)
-            .filter((p) => {
-                if (p.portal === "github") return false;
-                const count = Math.max(p.submissions || 0, p.solved || 0);
-                return count > 0;
-            })
-            .sort((a, b) => {
-                const countA = Math.max(a.submissions || 0, a.solved || 0);
-                const countB = Math.max(b.submissions || 0, b.solved || 0);
-                if (countB !== countA) return countB - countA;
-                return a.portal.localeCompare(b.portal);
-            });
-    }, [platformBreakdown]);
+        const list = Object.values(platformBreakdown).filter((p) => p.portal !== "github");
+        // Ensure every currently connected platform in activePortalsMap is represented
+        for (const [portalKey, handle] of activePortalsMap.entries()) {
+            if (!list.some((p) => p.portal.toLowerCase() === portalKey)) {
+                list.push({
+                    name: portalKey.charAt(0).toUpperCase() + portalKey.slice(1),
+                    portal: portalKey,
+                    username: handle,
+                    solved: 0,
+                    submissions: 0,
+                    activeDays: 0,
+                });
+            }
+        }
+        return list.sort((a, b) => {
+            const countA = Math.max(a.submissions || 0, a.solved || 0);
+            const countB = Math.max(b.submissions || 0, b.solved || 0);
+            if (countB !== countA) return countB - countA;
+            return a.portal.localeCompare(b.portal);
+        });
+    }, [platformBreakdown, activePortalsMap]);
 
     // Reset selected portal back to "all" if the currently selected portal is no longer in the list
     useEffect(() => {

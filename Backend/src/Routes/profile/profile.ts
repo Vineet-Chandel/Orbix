@@ -1805,20 +1805,40 @@ profileRouter.put("/platforms/:portal", authenticate, async (req: Request, res: 
         const finalStats = verifiedData?.stats || [];
         const isVerified = verifiedData ? verifiedData.verified !== false : true;
 
-        const updateResult = await query(
-            `UPDATE user_links
-             SET portal_username = $1,
-                 link = $2,
-                 raw_input = $3,
-                 verified = $4,
-                 display_name = $5,
-                 avatar_url = $6,
-                 stats = $7::jsonb,
-                 last_sync_status = 'valid',
-                 last_sync_at = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP
-             WHERE (username = $8 OR username = $9) AND LOWER(portal) = $10
-             RETURNING
+        const upsertResult = await query(
+            `INSERT INTO user_links (
+                user_id,
+                username,
+                portal,
+                portal_username,
+                link,
+                raw_input,
+                verified,
+                display_name,
+                avatar_url,
+                stats,
+                snapshot,
+                last_sync_status,
+                last_sync_at,
+                updated_at
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, 'valid', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            ON CONFLICT (username, portal)
+            DO UPDATE SET
+                user_id = COALESCE(EXCLUDED.user_id, user_links.user_id),
+                portal_username = EXCLUDED.portal_username,
+                link = EXCLUDED.link,
+                raw_input = EXCLUDED.raw_input,
+                verified = EXCLUDED.verified,
+                display_name = COALESCE(EXCLUDED.display_name, user_links.display_name),
+                avatar_url = COALESCE(EXCLUDED.avatar_url, user_links.avatar_url),
+                stats = EXCLUDED.stats,
+                snapshot = EXCLUDED.snapshot,
+                last_sync_status = 'valid',
+                last_sync_at = CURRENT_TIMESTAMP,
+                updated_at = CURRENT_TIMESTAMP
+            RETURNING
                 id,
                 portal,
                 portal_username AS "portalUsername",
@@ -1831,6 +1851,9 @@ profileRouter.put("/platforms/:portal", authenticate, async (req: Request, res: 
                 last_sync_status AS "lastSyncStatus",
                 last_sync_at AS "lastSyncAt";`,
             [
+                authUser.id,
+                authUser.username,
+                portal,
                 finalHandle,
                 finalLink,
                 rawCandidate,
@@ -1838,29 +1861,22 @@ profileRouter.put("/platforms/:portal", authenticate, async (req: Request, res: 
                 finalDisplayName,
                 finalAvatar,
                 JSON.stringify(finalStats),
-                authUser.username,
-                authUser.gmail,
-                portal,
+                JSON.stringify(verifiedData || {}),
             ]
         );
 
-        if (updateResult.rowCount === 0) {
-            return res.status(404).json({
-                success: false,
-                message: `Platform connection '${portal}' not found`,
-            });
-        }
-
         // Invalidate Redis caches
         await invalidateAllUserCaches({
+            id: authUser.id,
             username: authUser.username,
             gmail: authUser.gmail,
+            email: authUser.email,
         });
 
         return res.status(200).json({
             success: true,
             message: `Platform '${portal}' updated successfully`,
-            platform: updateResult.rows[0],
+            platform: upsertResult.rows[0],
         });
     } catch (err: any) {
         console.error("Platform update error:", err);
