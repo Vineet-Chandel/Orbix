@@ -9,9 +9,7 @@ import {
     Mail,
     MapPin,
     ExternalLink,
-    Share2,
     CreditCard,
-    Check,
     ArrowRight,
     FileText,
     Download,
@@ -549,7 +547,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     const [isHireModalOpen, setIsHireModalOpen] = useState(false);
     const [isCardModalOpen, setIsCardModalOpen] = useState(false);
     const [isResumePreviewOpen, setIsResumePreviewOpen] = useState(false);
-    const [isCopied, setIsCopied] = useState(false);
     const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
 
     const handleBlockUser = async () => {
@@ -749,32 +746,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     );
     const allConnectedPlatforms = useMemo(() => getAllConnectedPlatforms(connectedPortals), [connectedPortals]);
     const githubStats = useMemo(() => extractGitHubStats(connectedPortals, userFallback), [connectedPortals, userFallback]);
-
-    const handleShareProfile = () => {
-        const url = window.location.href;
-        navigator.clipboard.writeText(url).then(
-            () => {
-                setIsCopied(true);
-                toast.success("Profile link copied to clipboard!", { title: "Copied" });
-                setTimeout(() => setIsCopied(false), 2000);
-            },
-            () => {
-                try {
-                    const input = document.createElement("input");
-                    input.value = url;
-                    document.body.appendChild(input);
-                    input.select();
-                    document.execCommand("copy");
-                    document.body.removeChild(input);
-                    setIsCopied(true);
-                    toast.success("Profile link copied to clipboard!", { title: "Copied" });
-                    setTimeout(() => setIsCopied(false), 2000);
-                } catch {
-                    toast.error("Failed to copy link", { title: "Error" });
-                }
-            }
-        );
-    };
 
     const displayLinks = useMemo(() => {
         let raw = profile?.links;
@@ -1636,39 +1607,20 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         </div>
                                     )}
 
-                                    {/* Dynamic Action Buttons: Share Profile & Get the card (Card hidden for visitors if private) */}
-                                    <div className={`grid ${profile.isPublic !== false || profile.isOwner ? "grid-cols-2" : "grid-cols-1"} gap-2.5 pt-1 pb-1`}>
-                                        <button
-                                            type="button"
-                                            onClick={handleShareProfile}
-                                            className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-black text-xs font-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
-                                            title="Copy public profile link to clipboard"
-                                        >
-                                            {isCopied ? (
-                                                <>
-                                                    <Check className="w-3.5 h-3.5 text-black stroke-[3] flex-shrink-0" />
-                                                    <span className="text-black font-black">Copied!</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Share2 className="w-3.5 h-3.5 text-black stroke-[2.5] flex-shrink-0" />
-                                                    <span className="truncate">Share Profile</span>
-                                                </>
-                                            )}
-                                        </button>
-
-                                        {(profile.isPublic !== false || profile.isOwner) && (
+                                    {/* Dynamic Action Buttons: Get the card (Card hidden for visitors if private) */}
+                                    {(profile.isPublic !== false || profile.isOwner) && (
+                                        <div className="pt-1 pb-1">
                                             <button
                                                 type="button"
                                                 onClick={() => setIsCardModalOpen(true)}
-                                                className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-black hover:bg-neutral-900 text-white text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                                className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl bg-black hover:bg-neutral-900 text-white text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
                                                 title="View and download LinkedIn and Instagram Story cards"
                                             >
                                                 <CreditCard className="w-3.5 h-3.5 text-white flex-shrink-0" />
                                                 <span className="truncate">Get the card</span>
                                             </button>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
 
                                     {/* Resume Button (Only visible if profile is Public) */}
                                     {profile.isPublic !== false && profile.resumeUrl && profile.isResumePublic !== false && (

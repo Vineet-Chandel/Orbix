@@ -20,7 +20,7 @@ interface CardCustomizerToolbarProps {
     isGitHubConnected: boolean;
     onDownload: () => void;
     isExporting: boolean;
-    onCopyLink: () => void;
+    onCopyLink?: () => void;
     connectedPlatformCount: number;
 
     // Dynamic Slot Customization Props
@@ -64,7 +64,7 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
     isGitHubConnected,
     onDownload,
     isExporting,
-    onCopyLink,
+    onCopyLink: _onCopyLink,
     connectedPlatformCount: _connectedPlatformCount,
     maxSlots,
     availablePlatforms,
@@ -577,17 +577,6 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                             <span>Download {face === "front" ? "Front" : "Back"} Card PNG</span>
                         </>
                     )}
-                </button>
-
-                <button
-                    type="button"
-                    onClick={onCopyLink}
-                    className="h-11 flex items-center justify-center gap-2 px-4 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer"
-                >
-                    <svg className="w-4 h-4 text-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
-                    <span>Copy Showcase URL</span>
                 </button>
             </div>
         </div>

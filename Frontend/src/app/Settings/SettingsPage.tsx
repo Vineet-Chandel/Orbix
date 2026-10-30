@@ -1,10 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import {
     Settings,
     Menu,
-    Eye,
-    ExternalLink,
     ArrowLeft,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector, updateUserProfile, clearUser } from "../../store";
@@ -260,20 +258,6 @@ export default function SettingsPage() {
                                         </p>
                                     </div>
                                 </div>
-
-                                {/* Top Action Pill */}
-                                {user?.username && (
-                                    <Link
-                                        to={`/profile/u/${encodeURIComponent(user.username)}`}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white hover:bg-[#FAF6EE] border-2 border-black text-black font-black text-xs shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer self-start sm:self-auto shrink-0"
-                                    >
-                                        <Eye className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Preview Public Showcase</span>
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                    </Link>
-                                )}
                             </div>
                         )}
 

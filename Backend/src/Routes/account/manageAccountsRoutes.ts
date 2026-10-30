@@ -429,6 +429,30 @@ manageAccountsRouter.post("/username/change/confirm", authenticate, async (req: 
 });
 
 /**
+ * POST /api/settings/manage-account/password/change
+ * Authenticated password update endpoint.
+ */
+manageAccountsRouter.post("/password/change", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized. Please log in." });
+        }
+
+        const { currentPassword, newPassword, confirmPassword } = req.body;
+        const { ClubSettingsService } = await import("../../services/club/clubSettingsService.js");
+        const result = await ClubSettingsService.changePassword(userId, currentPassword, newPassword, confirmPassword);
+        return res.status(200).json(result);
+    } catch (err: any) {
+        const statusCode = err.statusCode || 400;
+        return res.status(statusCode).json({
+            success: false,
+            message: err.message || "Failed to update password.",
+        });
+    }
+});
+
+/**
  * ============================================================================
  * DATA ARCHIVE & PORTABILITY ENDPOINTS (GDPR Article 20 / CCPA Compliance)
  * ============================================================================

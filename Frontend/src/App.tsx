@@ -119,6 +119,9 @@ const App = () => {
           {/* Club Verification, Dedicated Dashboard & Public Presence */}
           <Route path="/club/status" element={<ClubStatusPage />} />
           <Route path="/club/dashboard" element={<ClubDashboardPage />} />
+          <Route path="/club/clubs" element={<Navigate to="/club/dashboard?tab=clubs" replace />} />
+          <Route path="/club/other-clubs" element={<Navigate to="/club/dashboard?tab=clubs" replace />} />
+          <Route path="/club/settings" element={<Navigate to="/club/dashboard?tab=settings" replace />} />
           <Route path="/clubs/:slug" element={<PublicClubProfilePage />} />
           <Route path="/staff/club-reviews" element={<ClubReviewerQueuePage />} />
 

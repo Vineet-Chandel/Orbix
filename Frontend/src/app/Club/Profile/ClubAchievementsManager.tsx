@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import {
     Plus,
     Trophy,
@@ -6,12 +6,12 @@ import {
     Edit2,
     MoveUp,
     MoveDown,
-    UploadCloud,
     X,
     ExternalLink,
     Calendar,
     Loader2,
 } from "lucide-react";
+import { NeoImageDropzone } from "../../../components/NeoImageDropzone";
 import type { ClubAchievement } from "../../../utils/clubProfileApi";
 import {
     addAchievement,
@@ -55,7 +55,6 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const openAddModal = () => {
         setEditingAchievement(null);
@@ -79,10 +78,7 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
         setIsModalOpen(true);
     };
 
-    const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
+    const handlePhotoSelectFile = async (file: File) => {
         if (!file.type.startsWith("image/")) {
             toast.error("Please select a valid image file (PNG, JPG, WEBP).");
             return;
@@ -110,7 +106,6 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
         } finally {
             setIsUploadingPhoto(false);
             setUploadProgress(null);
-            if (fileInputRef.current) fileInputRef.current.value = "";
         }
     };
 
@@ -203,7 +198,7 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
                     <button
                         type="button"
                         onClick={openAddModal}
-                        className="px-3.5 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer self-start sm:self-auto transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                        className="px-3.5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer self-start sm:self-auto transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add Achievement</span>
@@ -347,55 +342,21 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
 
                         {/* Form */}
                         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto space-y-4">
-                            {/* Image / Trophy Upload Frame */}
-                            <div className="flex items-center gap-4 p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black">
-                                <div className="w-16 h-16 rounded-xl bg-white border-2 border-black overflow-hidden shrink-0 flex items-center justify-center text-xs font-black shadow-[1px_1px_0px_#000]">
-                                    {imageUrl ? (
-                                        <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <Trophy className="w-6 h-6 text-neutral-400" />
-                                    )}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <label className="block text-xs font-black text-black mb-1">Badge or Certificate Image</label>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="file"
-                                            ref={fileInputRef}
-                                            onChange={handlePhotoSelect}
-                                            accept="image/png,image/jpeg,image/webp"
-                                            className="hidden"
-                                        />
-                                        <button
-                                            type="button"
-                                            disabled={isUploadingPhoto}
-                                            onClick={() => fileInputRef.current?.click()}
-                                            className="px-3 py-1.5 rounded-lg bg-white text-black border border-black text-xs font-bold shadow-[1px_1px_0px_#000] hover:bg-neutral-50 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                        >
-                                            {isUploadingPhoto ? (
-                                                <>
-                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    <span>Uploading {uploadProgress !== null ? `${uploadProgress}%` : ""}</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <UploadCloud className="w-3.5 h-3.5" />
-                                                    <span>Upload Badge Image</span>
-                                                </>
-                                            )}
-                                        </button>
-                                        {imageUrl && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setImageUrl("")}
-                                                className="text-xs font-bold text-red-600 hover:underline cursor-pointer"
-                                            >
-                                                Remove
-                                            </button>
-                                        )}
-                                    </div>
-                                    <p className="text-[10px] text-neutral-500 mt-1">PNG, JPG or WEBP up to 5MB.</p>
-                                </div>
+                            {/* Image / Trophy Upload Dropzone */}
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
+                                    Badge or Certificate Image
+                                </label>
+                                <NeoImageDropzone
+                                    value={imageUrl}
+                                    onChange={handlePhotoSelectFile}
+                                    onRemove={() => setImageUrl("")}
+                                    isUploading={isUploadingPhoto}
+                                    uploadProgress={uploadProgress}
+                                    aspectRatio="square"
+                                    headline="Drag and drop achievement badge or certificate here"
+                                    subtext="or click anywhere in this block to browse your device"
+                                />
                             </div>
 
                             <div>
@@ -477,7 +438,7 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
-                                    className="px-5 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+                                    className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                 >
                                     {isSubmitting ? (
                                         <>

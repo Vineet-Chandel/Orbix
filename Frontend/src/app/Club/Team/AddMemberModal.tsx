@@ -10,6 +10,7 @@ import {
     Info,
 } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
+import { NeoSelect } from "../../../components/NeoSelect";
 import type { ClubTeam, UserSearchItem } from "./types";
 import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
 
@@ -340,18 +341,18 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                         <label className="block text-xs font-black uppercase tracking-wider text-black">
                             2. Department / Team
                         </label>
-                        <select
+                        <NeoSelect
                             value={selectedTeamId}
-                            onChange={(e) => setSelectedTeamId(e.target.value)}
-                            className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
-                        >
-                            <option value="">Club-Wide / Core Executive Board</option>
-                            {teams.filter((t) => !t.isArchived).map((t) => (
-                                <option key={t.id} value={t.id}>
-                                    {t.name} ({t.memberCount} members)
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setSelectedTeamId(val)}
+                            options={[
+                                { value: "", label: "Club-Wide / Core Executive Board" },
+                                ...teams.filter((t) => !t.isArchived).map((t) => ({
+                                    value: t.id,
+                                    label: `${t.name} (${t.memberCount} members)`,
+                                })),
+                            ]}
+                            size="sm"
+                        />
                         <p className="text-[11px] text-neutral-600 font-medium">
                             Choose whether the member is invited to a specific department or club-wide.
                         </p>
@@ -382,17 +383,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                                 required
                             />
                         ) : (
-                            <select
+                            <NeoSelect
                                 value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
-                            >
-                                {COMMON_TITLES.map((t) => (
-                                    <option key={t} value={t}>
-                                        {t}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => setTitle(val)}
+                                options={COMMON_TITLES.map((t) => ({ value: t, label: t }))}
+                                size="sm"
+                            />
                         )}
                         <p className="text-[11px] text-neutral-600 font-medium">
                             Human-readable role title for showcase profiles and club roster.
@@ -523,7 +519,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                         <button
                             type="submit"
                             disabled={!selectedUser || isSubmitting}
-                            className="px-5 py-2.5 rounded-xl bg-black border-2 border-black text-[#a2ff86] font-black text-xs uppercase tracking-wider shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-5 py-2.5 rounded-xl bg-[#a2ff86] border-2 border-black text-black font-black text-xs uppercase tracking-wider shadow-[3px_3px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                             {isSubmitting ? (
                                 <>

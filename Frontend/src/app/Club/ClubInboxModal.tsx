@@ -670,7 +670,7 @@ export default function ClubInboxModal({
                                     <button
                                         type="submit"
                                         disabled={sendingReply || !replyBody.trim()}
-                                        className="px-5 py-2.5 rounded-xl bg-black text-white hover:bg-neutral-800 disabled:bg-neutral-400 disabled:cursor-not-allowed border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-2 cursor-pointer self-end"
+                                        className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-2 cursor-pointer self-end transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                     >
                                         {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                                         <span className="hidden sm:inline">Reply</span>

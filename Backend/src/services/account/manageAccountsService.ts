@@ -813,10 +813,15 @@ export class ManageAccountsService {
                 [challenge.id]
             );
 
-            // 5f. Synchronize leaderboard entry verification
+            // 5f. Synchronize leaderboard entry verification & club public email
             await client.query(
                 `UPDATE leaderboard_entries SET is_verified = true WHERE user_id = $1;`,
                 [userId]
+            ).catch(() => {});
+
+            await client.query(
+                `UPDATE verified_clubs SET public_email = $1 WHERE auth_user_id = $2;`,
+                [newEmail, userId]
             ).catch(() => {});
 
             await client.query("COMMIT;");
@@ -1446,13 +1451,20 @@ export class ManageAccountsService {
             );
             const updatedUser = updateRes.rows[0];
 
-            // 3d. Update username reference on user_links
+            // 3d. Update username reference on user_links & club slug
             await client.query(
                 `UPDATE user_links
                  SET username = $1, updated_at = CURRENT_TIMESTAMP
                  WHERE user_id = $2;`,
                 [normalizedUsername, userId]
             );
+
+            await client.query(
+                `UPDATE verified_clubs
+                 SET slug = $1, updated_at = CURRENT_TIMESTAMP
+                 WHERE auth_user_id = $2;`,
+                [normalizedUsername, userId]
+            ).catch(() => {});
 
             // 3e. Record in audit history
             await client.query(
