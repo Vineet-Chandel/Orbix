@@ -1025,11 +1025,13 @@ async function fetchGeeksforGeeks(username: string): Promise<PortalProfileData |
                 .sort((a, b) => b.date.localeCompare(a.date));
 
             recentSubmissions = sortedDays.slice(0, 15).map((day) => ({
+                id: `gfg-${day.date}`,
                 title: `GeeksforGeeks Practice (${day.count} problem${day.count === 1 ? "" : "s"})`,
-                titleSlug: `gfg-${day.date}`,
+                portal: "geeksforgeeks",
+                platformName: "GeeksforGeeks",
                 timestamp: Math.floor(new Date(day.date).getTime() / 1000),
-                statusDisplay: "Accepted",
-                lang: "Problem Solving",
+                solvedAt: new Date(day.date).toISOString(),
+                url: `https://www.geeksforgeeks.org/user/${cleanUsername}/`,
             }));
         } else if (potdStreak > 0 || totalSolved > 0) {
             // Fallback streak calendar simulation when external heatmap is absent
@@ -2519,7 +2521,7 @@ portalsRouter.get("/submissions/unified", async (req: Request, res: Response) =>
             }
         }
 
-        return res.status(200).json({ success: true, ...responseData });
+        return res.status(200).json(responseData);
     } catch (err: any) {
         console.error("Unified submissions endpoint error:", err);
         return res.status(500).json({
