@@ -3,16 +3,17 @@ import {
     LayoutDashboard,
     Users,
     CalendarDays,
-    ShieldCheck,
     Edit3,
     Mail,
     LogOut,
     ChevronDown,
     X,
+    Settings,
+    Building2,
 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
-export type ClubTab = "overview" | "team" | "events" | "profile";
+export type ClubTab = "overview" | "team" | "events" | "profile" | "clubs" | "settings";
 
 interface ClubSidebarProps {
     club: {
@@ -138,7 +139,7 @@ export const ClubSidebar = ({
                     )}
                 </div>
 
-                {/* Main Navigation Items: Dashboard, Team, Events, and Manage Profile */}
+                {/* Main Navigation Items */}
                 <div className="pt-3.5 space-y-1.5 overflow-x-hidden">
                     {/* Item 1: Dashboard Overview */}
                     <button
@@ -154,7 +155,6 @@ export const ClubSidebar = ({
                         }`}
                         title={!isExpanded ? "Dashboard" : undefined}
                     >
-                        {/* Active vertical accent bar */}
                         <span
                             className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
                                 activeTab === "overview" && isExpanded
@@ -162,9 +162,7 @@ export const ClubSidebar = ({
                                     : "bg-transparent opacity-0"
                             }`}
                         />
-
                         <div className="flex items-center overflow-x-hidden w-full">
-                            {/* SVG Icon: DEAD-CENTER in 44px container */}
                             <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
                                 <LayoutDashboard
                                     className={`w-5 h-5 flex-shrink-0 transition-colors ${
@@ -174,8 +172,6 @@ export const ClubSidebar = ({
                                     }`}
                                 />
                             </div>
-
-                            {/* Text label only rendered when expanded */}
                             {isExpanded && (
                                 <span
                                     className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${
@@ -190,7 +186,7 @@ export const ClubSidebar = ({
                         </div>
                     </button>
 
-                    {/* Item 2: Team Management */}
+                    {/* Item 2: Team Workspace */}
                     <button
                         type="button"
                         onClick={() => {
@@ -202,7 +198,7 @@ export const ClubSidebar = ({
                                 ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
-                        title={!isExpanded ? "Team" : undefined}
+                        title={!isExpanded ? "Team Workspace" : undefined}
                     >
                         <span
                             className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
@@ -211,22 +207,20 @@ export const ClubSidebar = ({
                                     : "bg-transparent opacity-0"
                             }`}
                         />
-
                         <div className="flex items-center overflow-x-hidden w-full">
                             <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
                                 <Users
-                                    className={`w-5 h-5 stroke-[2.2] flex-shrink-0 transition-colors ${
+                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
                                         activeTab === "team"
                                             ? "text-[#a2ff86]"
                                             : "text-neutral-700 group-hover:text-black"
                                     }`}
                                 />
                             </div>
-
                             {isExpanded && (
-                                <div className="flex items-center justify-between flex-1 pr-2.5 overflow-x-hidden animate-fadeIn">
+                                <div className="flex items-center justify-between flex-1 min-w-0 pr-2">
                                     <span
-                                        className={`whitespace-nowrap truncate pl-0.5 ${
+                                        className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${
                                             activeTab === "team"
                                                 ? "text-[#a2ff86] font-black"
                                                 : "text-neutral-800 font-bold"
@@ -234,15 +228,8 @@ export const ClubSidebar = ({
                                     >
                                         Team
                                     </span>
-                                    {teamPendingCount !== undefined && teamPendingCount > 0 && (
-                                        <span
-                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black border border-black ${
-                                                activeTab === "team"
-                                                    ? "bg-[#a2ff86] text-black"
-                                                    : "bg-[#FFE566] text-black shadow-[1px_1px_0px_#000]"
-                                            }`}
-                                            title={`${teamPendingCount} pending invitations`}
-                                        >
+                                    {teamPendingCount > 0 && (
+                                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] flex-shrink-0 ml-2">
                                             {teamPendingCount}
                                         </span>
                                     )}
@@ -251,7 +238,7 @@ export const ClubSidebar = ({
                         </div>
                     </button>
 
-                    {/* Item 3: Events Section */}
+                    {/* Item 3: Events & Workshops */}
                     <button
                         type="button"
                         onClick={() => {
@@ -263,7 +250,7 @@ export const ClubSidebar = ({
                                 ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
-                        title={!isExpanded ? "Events" : undefined}
+                        title={!isExpanded ? "Events & Workshops" : undefined}
                     >
                         <span
                             className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
@@ -272,22 +259,20 @@ export const ClubSidebar = ({
                                     : "bg-transparent opacity-0"
                             }`}
                         />
-
                         <div className="flex items-center overflow-x-hidden w-full">
                             <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
                                 <CalendarDays
-                                    className={`w-5 h-5 transition-colors ${
+                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
                                         activeTab === "events"
                                             ? "text-[#a2ff86]"
                                             : "text-neutral-700 group-hover:text-black"
                                     }`}
                                 />
                             </div>
-
                             {isExpanded && (
-                                <div className="flex items-center justify-between flex-1 pr-2.5 overflow-x-hidden animate-fadeIn">
+                                <div className="flex items-center justify-between flex-1 min-w-0 pr-2">
                                     <span
-                                        className={`whitespace-nowrap truncate pl-0.5 ${
+                                        className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${
                                             activeTab === "events"
                                                 ? "text-[#a2ff86] font-black"
                                                 : "text-neutral-800 font-bold"
@@ -295,14 +280,8 @@ export const ClubSidebar = ({
                                     >
                                         Events
                                     </span>
-                                    {eventsCount !== undefined && eventsCount > 0 && (
-                                        <span
-                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black border border-black ${
-                                                activeTab === "events"
-                                                    ? "bg-[#a2ff86] text-black"
-                                                    : "bg-[#FFE566] text-black shadow-[1px_1px_0px_#000]"
-                                            }`}
-                                        >
+                                    {eventsCount > 0 && (
+                                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] flex-shrink-0 ml-2">
                                             {eventsCount}
                                         </span>
                                     )}
@@ -332,18 +311,16 @@ export const ClubSidebar = ({
                                     : "bg-transparent opacity-0"
                             }`}
                         />
-
                         <div className="flex items-center overflow-x-hidden w-full">
                             <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
                                 <Edit3
-                                    className={`w-5 h-5 transition-colors ${
+                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
                                         activeTab === "profile"
                                             ? "text-[#a2ff86]"
                                             : "text-neutral-700 group-hover:text-black"
                                     }`}
                                 />
                             </div>
-
                             {isExpanded && (
                                 <span
                                     className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${
@@ -353,6 +330,51 @@ export const ClubSidebar = ({
                                     }`}
                                 >
                                     Manage Profile
+                                </span>
+                            )}
+                        </div>
+                    </button>
+
+                    {/* Item 5: Other Clubs */}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            onTabChange("clubs");
+                            if (onClose) onClose();
+                        }}
+                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer overflow-x-hidden relative w-full ${
+                            activeTab === "clubs"
+                                ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
+                        }`}
+                        title={!isExpanded ? "Other Clubs" : undefined}
+                    >
+                        <span
+                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
+                                activeTab === "clubs" && isExpanded
+                                    ? "bg-[#a2ff86] opacity-100"
+                                    : "bg-transparent opacity-0"
+                            }`}
+                        />
+                        <div className="flex items-center overflow-x-hidden w-full">
+                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                <Building2
+                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                                        activeTab === "clubs"
+                                            ? "text-[#a2ff86]"
+                                            : "text-neutral-700 group-hover:text-black"
+                                    }`}
+                                />
+                            </div>
+                            {isExpanded && (
+                                <span
+                                    className={`whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 ${
+                                        activeTab === "clubs"
+                                            ? "text-[#a2ff86] font-black"
+                                            : "text-neutral-800 font-bold"
+                                    }`}
+                                >
+                                    Other Clubs
                                 </span>
                             )}
                         </div>
@@ -411,19 +433,8 @@ export const ClubSidebar = ({
                 {isProfileMenuOpen && (
                     <div
                         role="menu"
-                        className="absolute bottom-full left-0 mb-2 w-64 bg-[#FAF6EE] border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-2 z-50 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150"
+                        className="absolute bottom-full left-0 mb-2 w-64 bg-[#FAF6EE] border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-2 z-50 text-xs animate-in fade-in slide-in-from-bottom-2 duration-150 space-y-0.5"
                     >
-                        {/* Club Details Header in Popup */}
-                        <div className="px-3 py-2 border-b-2 border-black/15 mb-1.5 bg-white/80 rounded-xl">
-                            <p className="font-black text-black text-sm truncate flex items-center gap-1.5">
-                                <span>{club.name}</span>
-                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                            </p>
-                            <p className="text-[10px] font-bold text-neutral-600 truncate mt-0.5">
-                                {club.college_name}
-                            </p>
-                        </div>
-
                         <button
                             type="button"
                             onClick={() => {
@@ -461,10 +472,17 @@ export const ClubSidebar = ({
                                 setIsProfileMenuOpen(false);
                                 onTabChange("events");
                             }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
-                            <CalendarDays className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Events & Workshops</span>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <CalendarDays className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                                <span className="truncate">Events & Workshops</span>
+                            </div>
+                            {eventsCount !== undefined && eventsCount > 0 && (
+                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                    {eventsCount}
+                                </span>
+                            )}
                         </button>
 
                         <button
@@ -477,6 +495,18 @@ export const ClubSidebar = ({
                         >
                             <Edit3 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
                             <span className="truncate">Manage Profile</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onTabChange("clubs");
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                        >
+                            <Building2 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                            <span className="truncate">Other Clubs</span>
                         </button>
 
                         <button
@@ -496,6 +526,22 @@ export const ClubSidebar = ({
                                     {unreadInboxCount}
                                 </span>
                             )}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onTabChange("settings");
+                            }}
+                            className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold transition-colors text-left cursor-pointer ${
+                                activeTab === "settings"
+                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-800 hover:text-black hover:bg-black/5"
+                            }`}
+                        >
+                            <Settings className={`w-3.5 h-3.5 flex-shrink-0 ${activeTab === "settings" ? "text-[#a2ff86]" : "text-neutral-700"}`} />
+                            <span className="truncate">Settings</span>
                         </button>
 
                         <div className="my-1.5 h-0.5 bg-black/15" />

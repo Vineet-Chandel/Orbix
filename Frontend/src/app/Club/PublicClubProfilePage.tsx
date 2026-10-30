@@ -14,8 +14,6 @@ import {
     MapPin,
     ExternalLink,
     Clock,
-    Share2,
-    Check,
     AlertCircle,
     ArrowLeft,
     MessageSquare,
@@ -137,7 +135,6 @@ export default function PublicClubProfilePage() {
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
     const [isBlockedByClub, setIsBlockedByClub] = useState(false);
-    const [copiedShare, setCopiedShare] = useState(false);
     const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
     const [registeringEventId, setRegisteringEventId] = useState<string | null>(null);
     const [activeSection, setActiveSection] = useState<"about" | "coordinators" | "achievements" | "teams" | "events">("about");
@@ -184,13 +181,6 @@ export default function PublicClubProfilePage() {
 
         fetchClub();
     }, [slug]);
-
-    const handleShare = () => {
-        navigator.clipboard.writeText(window.location.href);
-        setCopiedShare(true);
-        toast.success("Public profile link copied to clipboard!");
-        setTimeout(() => setCopiedShare(false), 2000);
-    };
 
     const handleRegisterEvent = async (eventId: string) => {
         if (!user) {
@@ -304,15 +294,6 @@ export default function PublicClubProfilePage() {
                     </Link>
 
                     <div className="flex items-center gap-2.5">
-                        <button
-                            type="button"
-                            onClick={handleShare}
-                            className="px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
-                        >
-                            {copiedShare ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Share2 className="w-3.5 h-3.5" />}
-                            <span className="hidden sm:inline">{copiedShare ? "Copied" : "Share"}</span>
-                        </button>
-
                         <button
                             type="button"
                             onClick={() => setIsMessageModalOpen(true)}

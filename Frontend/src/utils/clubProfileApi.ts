@@ -359,3 +359,41 @@ export async function reorderAchievements(achievementIds: string[], clubId?: str
         throw new Error(data?.message || "Failed to reorder achievements.");
     }
 }
+
+export interface CollegeClubItem extends ClubProfileData {
+    memberCount: number;
+    eventsCount: number;
+    achievementsCount: number;
+    coordinatorsCount: number;
+    isCurrentClub: boolean;
+    coordinators: ClubCoordinator[];
+    achievements: ClubAchievement[];
+}
+
+export interface CollegeClubsResponse {
+    success: boolean;
+    collegeName: string;
+    collegeId: string | null;
+    totalClubs: number;
+    clubs: CollegeClubItem[];
+}
+
+export async function fetchCollegeClubs(options?: {
+    collegeId?: string;
+    collegeName?: string;
+    clubId?: string;
+}): Promise<CollegeClubsResponse> {
+    const params = new URLSearchParams();
+    if (options?.collegeId) params.set("collegeId", options.collegeId);
+    if (options?.collegeName) params.set("collegeName", options.collegeName);
+    if (options?.clubId) params.set("clubId", options.clubId);
+
+    const qs = params.toString();
+    const url = `/api/club/college-clubs${qs ? `?${qs}` : ""}`;
+    const res = await fetch(url, { credentials: "include" });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to retrieve college clubs.");
+    }
+    return data;
+}

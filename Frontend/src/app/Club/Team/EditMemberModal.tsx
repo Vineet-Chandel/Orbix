@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Shield } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
+import { NeoSelect } from "../../../components/NeoSelect";
 import type { ClubMember, ClubTeam } from "./types";
 import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
 
@@ -230,18 +231,19 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                                 <span>Club Owner / Primary Registrar (Protected)</span>
                             </div>
                         ) : (
-                            <select
+                            <NeoSelect
                                 value={clubRole}
-                                onChange={(e) => setClubRole(e.target.value as any)}
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
-                            >
-                                <option value="member">Club Member (Standard access)</option>
-                                <option value="team_lead">Team Lead (Department lead management)</option>
-                                {isCurrentUserOwner && (
-                                    <option value="admin">Club Admin (Full team management privileges)</option>
-                                )}
-                                <option value="advisor">Advisor / Faculty Coordinator (Read-only)</option>
-                            </select>
+                                onChange={(val) => setClubRole(val as any)}
+                                options={[
+                                    { value: "member", label: "Club Member (Standard access)" },
+                                    { value: "team_lead", label: "Team Lead (Department lead management)" },
+                                    ...(isCurrentUserOwner
+                                        ? [{ value: "admin", label: "Club Admin (Full team management privileges)" }]
+                                        : []),
+                                    { value: "advisor", label: "Advisor / Faculty Coordinator (Read-only)" },
+                                ]}
+                                size="sm"
+                            />
                         )}
                     </div>
 
@@ -263,7 +265,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     <button
                         type="submit"
                         disabled={isSaving}
-                        className="px-4 py-2 bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 cursor-pointer disabled:opacity-50"
+                        className="px-4 py-2 bg-[#a2ff86] text-black font-black text-xs uppercase tracking-wider rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] cursor-pointer disabled:opacity-50"
                     >
                         {isSaving ? "Saving..." : "Update Role & Title"}
                     </button>
@@ -314,27 +316,28 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                                 + Assign to Department
                             </span>
                             <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                                <select
+                                <NeoSelect
                                     value={assignTeamId}
-                                    onChange={(e) => setAssignTeamId(e.target.value)}
-                                    className="px-2.5 py-1.5 bg-white border border-black rounded-lg text-xs font-bold text-black"
-                                >
-                                    <option value="">Select Department...</option>
-                                    {unassignedTeams.map((t) => (
-                                        <option key={t.id} value={t.id}>
-                                            {t.name}
-                                        </option>
-                                    ))}
-                                </select>
-                                <select
+                                    onChange={(val) => setAssignTeamId(val)}
+                                    options={[
+                                        { value: "", label: "Select Department..." },
+                                        ...unassignedTeams.map((t) => ({
+                                            value: t.id,
+                                            label: t.name,
+                                        })),
+                                    ]}
+                                    size="sm"
+                                />
+                                <NeoSelect
                                     value={assignTeamRole}
-                                    onChange={(e) => setAssignTeamRole(e.target.value as any)}
-                                    className="px-2.5 py-1.5 bg-white border border-black rounded-lg text-xs font-bold text-black"
-                                >
-                                    <option value="member">Member</option>
-                                    <option value="co_lead">Co-Lead</option>
-                                    <option value="lead">Lead</option>
-                                </select>
+                                    onChange={(val) => setAssignTeamRole(val as any)}
+                                    options={[
+                                        { value: "member", label: "Member" },
+                                        { value: "co_lead", label: "Co-Lead" },
+                                        { value: "lead", label: "Lead" },
+                                    ]}
+                                    size="sm"
+                                />
                                 <input
                                     type="text"
                                     value={assignPositionTitle}
@@ -346,7 +349,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                                     type="button"
                                     onClick={handleAssignTeam}
                                     disabled={!assignTeamId || isAssigning}
-                                    className="px-3 py-1.5 bg-black text-[#a2ff86] rounded-lg font-black text-xs border border-black shadow-[1px_1px_0px_#000] hover:bg-neutral-900 cursor-pointer disabled:opacity-50"
+                                    className="px-3 py-1.5 bg-[#a2ff86] text-black rounded-lg font-black text-xs border border-black shadow-[1px_1px_0px_#000] hover:bg-[#8ee673] cursor-pointer disabled:opacity-50"
                                 >
                                     {isAssigning ? "Assigning..." : "Assign"}
                                 </button>

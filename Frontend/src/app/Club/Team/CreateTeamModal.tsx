@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X, Plus, Sparkles, Loader2 } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
+import { NeoSelect } from "../../../components/NeoSelect";
 import type { ClubMember, ClubTeam } from "./types";
 
 interface CreateTeamModalProps {
@@ -214,38 +215,38 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                             <label className="block text-xs font-black uppercase tracking-wider text-black">
                                 Department Lead <span className="text-neutral-500 font-normal lowercase">(optional)</span>
                             </label>
-                            <select
+                            <NeoSelect
                                 value={leadUserId}
-                                onChange={(e) => setLeadUserId(e.target.value)}
-                                className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
-                            >
-                                <option value="">Assign later</option>
-                                {members.map((m) => (
-                                    <option key={m.userId} value={m.userId}>
-                                        {m.displayName} (@{m.username})
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => setLeadUserId(val)}
+                                options={[
+                                    { value: "", label: "Assign later" },
+                                    ...members.map((m) => ({
+                                        value: m.userId,
+                                        label: `${m.displayName} (@${m.username})`,
+                                    })),
+                                ]}
+                                size="sm"
+                            />
                         </div>
 
                         <div className="space-y-1">
                             <label className="block text-xs font-black uppercase tracking-wider text-black">
                                 Co-Lead / Deputy <span className="text-neutral-500 font-normal lowercase">(optional)</span>
                             </label>
-                            <select
+                            <NeoSelect
                                 value={coLeadUserId}
-                                onChange={(e) => setCoLeadUserId(e.target.value)}
-                                className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
-                            >
-                                <option value="">Assign later</option>
-                                {members
-                                    .filter((m) => m.userId !== leadUserId)
-                                    .map((m) => (
-                                        <option key={m.userId} value={m.userId}>
-                                            {m.displayName} (@{m.username})
-                                        </option>
-                                    ))}
-                            </select>
+                                onChange={(val) => setCoLeadUserId(val)}
+                                options={[
+                                    { value: "", label: "Assign later" },
+                                    ...members
+                                        .filter((m) => m.userId !== leadUserId)
+                                        .map((m) => ({
+                                            value: m.userId,
+                                            label: `${m.displayName} (@${m.username})`,
+                                        })),
+                                ]}
+                                size="sm"
+                            />
                         </div>
                     </div>
 
@@ -261,7 +262,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                         <button
                             type="submit"
                             disabled={isSubmitting || name.trim().length < 2}
-                            className="px-5 py-2.5 rounded-xl bg-black border-2 border-black text-[#a2ff86] font-black text-xs uppercase tracking-wider shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            className="px-5 py-2.5 rounded-xl bg-[#a2ff86] border-2 border-black text-black font-black text-xs uppercase tracking-wider shadow-[3px_3px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                         >
                             {isSubmitting ? (
                                 <>

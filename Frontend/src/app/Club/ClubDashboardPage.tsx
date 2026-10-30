@@ -16,13 +16,12 @@ import {
     FileText,
     Users,
     ShieldCheck,
-    Copy,
-    Check,
     ArrowRight,
     Building2,
     Mail,
+    Settings,
 } from "lucide-react";
-import { useAppDispatch, clearUser } from "../../store";
+import { useAppDispatch, useAppSelector, clearUser, fetchClubProfile } from "../../store";
 import { useToast } from "../../context/ToastContext";
 import { NeoSelect } from "../../components/NeoSelect";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
@@ -31,6 +30,7 @@ import ClubInboxModal from "./ClubInboxModal";
 import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
 import type { TeamStats } from "./Team/types";
 import { ClubProfileManager } from "./Profile/ClubProfileManager";
+import { ClubSettingsView } from "./Settings/ClubSettingsView";
 
 interface VerifiedClub {
     id: string;
@@ -93,18 +93,35 @@ interface ClubEvent {
 export default function ClubDashboardPage() {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
+    const { user } = useAppSelector((state) => state.user);
     const toast = useToast();
 
-    // Data States
-    const [club, setClub] = useState<VerifiedClub | null>(null);
-    const [, setStats] = useState<ClubStats>({ upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
+    // Centralized Redux club state
+    const clubState = useAppSelector((state) => state.club);
+
+    // Data States (initialized immediately from Redux if already in memory)
+    const [club, setClub] = useState<VerifiedClub | null>(clubState.club as any);
+    const [, setStats] = useState<ClubStats>(clubState.stats || { upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
     const [events, setEvents] = useState<ClubEvent[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(!clubState.isInitialized);
+
+    // Synchronize local states with Redux club slice
+    useEffect(() => {
+        if (clubState.club) {
+            setClub(clubState.club as any);
+        }
+        if (clubState.stats) {
+            setStats(clubState.stats);
+        }
+        if (clubState.isInitialized) {
+            setLoading(false);
+        }
+    }, [clubState.club, clubState.stats, clubState.isInitialized]);
 
     // Navigation & URL Tab Sync
     const [searchParams, setSearchParams] = useSearchParams();
     const tabFromUrl = searchParams.get("tab") as ClubTab | null;
-    const initialTab: ClubTab = (tabFromUrl === "team" || tabFromUrl === "events" || tabFromUrl === "profile") ? tabFromUrl : "overview";
+    const initialTab: ClubTab = (tabFromUrl === "team" || tabFromUrl === "events" || tabFromUrl === "profile" || tabFromUrl === "settings") ? tabFromUrl : "overview";
     const [activeTab, setActiveTabState] = useState<ClubTab>(initialTab);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -129,7 +146,7 @@ export default function ClubDashboardPage() {
     // Update activeTab when browser back/forward or deep-link changes
     useEffect(() => {
         const currentTab = searchParams.get("tab") as ClubTab | null;
-        if (currentTab === "team" || currentTab === "events" || currentTab === "profile") {
+        if (currentTab === "team" || currentTab === "events" || currentTab === "profile" || currentTab === "settings") {
             setActiveTabState(currentTab);
         } else {
             setActiveTabState("overview");
@@ -139,16 +156,6 @@ export default function ClubDashboardPage() {
     // Team Stats and Sidebar Badge States
     const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
     const [teamPendingCount, setTeamPendingCount] = useState<number>(0);
-    const [copiedLink, setCopiedLink] = useState(false);
-
-    const handleCopyPublicLink = () => {
-        if (!club?.slug) return;
-        const url = `${window.location.origin}/clubs/${club.slug}`;
-        navigator.clipboard.writeText(url);
-        setCopiedLink(true);
-        toast.success("Public club showcase link copied to clipboard!", { title: "Copied Link" });
-        setTimeout(() => setCopiedLink(false), 2000);
-    };
 
     // Fetch team stats (counts & pending invitations)
     const fetchTeamStats = async (clubId: string) => {
@@ -195,53 +202,38 @@ export default function ClubDashboardPage() {
     const [isSavingEvent, setIsSavingEvent] = useState(false);
     const [eventFilter, setEventFilter] = useState<"all" | "published" | "draft" | "cancelled">("all");
 
-    // Fetch club profile and events
-    const fetchClubData = async () => {
+    // Fetch club profile and events (leveraging Redux and Redis caching)
+    const fetchClubData = async (force = false) => {
         try {
-            setLoading(true);
-            const [profileRes, eventsRes] = await Promise.all([
-                fetch("/api/club/profile", { credentials: "include" }),
-                fetch("/api/club/events", { credentials: "include" }),
+            if (!clubState.isInitialized || force) {
+                setLoading(true);
+            }
+            const [profileResult, eventsRes] = await Promise.allSettled([
+                dispatch(fetchClubProfile({ force })).unwrap(),
+                fetch("/api/club/events", { credentials: "include" }).then((r) => r.json()),
             ]);
 
-            if (profileRes.status === 401) {
-                navigate("/auth/signin", { replace: true });
-                return;
+            if (profileResult.status === "fulfilled") {
+                const profileData = profileResult.value;
+                if (profileData?.club) {
+                    setClub(profileData.club as any);
+                    setStats(profileData.stats || { upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
+                    fetchTeamStats(profileData.club.id);
+                }
+            } else {
+                const err: any = profileResult.reason;
+                if (typeof err === "string" && (err.includes("401") || err.toLowerCase().includes("unauthorized") || err.toLowerCase().includes("authentication required"))) {
+                    navigate("/auth/signin", { replace: true });
+                    return;
+                }
+                if (typeof err === "string" && (err.includes("404") || err.includes("403") || err.toLowerCase().includes("no verified club"))) {
+                    navigate("/clubs/status", { replace: true });
+                    return;
+                }
             }
 
-            if (profileRes.status === 403 || profileRes.status === 404) {
-                navigate("/clubs/status", { replace: true });
-                return;
-            }
-
-            const profileData = await profileRes.json();
-            const eventsData = await eventsRes.json().catch(() => ({}));
-
-            if (profileData.success && profileData.club) {
-                setClub(profileData.club);
-                setStats(profileData.stats || { upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
-                fetchTeamStats(profileData.club.id);
-
-                // Initialize Profile Form
-                const c = profileData.club;
-                const sl = c.social_links || {};
-                setProfileForm({
-                    shortDescription: c.short_description || "",
-                    about: c.about || "",
-                    logoUrl: c.logo_url || "",
-                    coverImageUrl: c.cover_image_url || "",
-                    websiteUrl: c.website_url || "",
-                    publicEmail: c.public_email || "",
-                    socialGithub: sl.github || "",
-                    socialLinkedin: sl.linkedin || "",
-                    socialInstagram: sl.instagram || "",
-                    socialX: sl.x || sl.twitter || "",
-                    socialDiscord: sl.discord || "",
-                });
-            }
-
-            if (eventsData.success && Array.isArray(eventsData.events)) {
-                setEvents(eventsData.events);
+            if (eventsRes.status === "fulfilled" && eventsRes.value?.success && Array.isArray(eventsRes.value.events)) {
+                setEvents(eventsRes.value.events);
             }
         } catch (err) {
             console.error("Failed to load club dashboard:", err);
@@ -554,6 +546,18 @@ export default function ClubDashboardPage() {
                                             </h1>
                                         </div>
                                     )}
+
+
+                                    {activeTab === "settings" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Settings className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Club Settings
+                                            </h1>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Dynamic Contextual Badges & Subtitle */}
@@ -604,55 +608,32 @@ export default function ClubDashboardPage() {
                                             </span>
                                         </>
                                     )}
+
+
+                                    {activeTab === "settings" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Settings & Preferences
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Organization credentials, collegiate verification & showcase privacy
+                                            </span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
 
                             {/* Right: Tab-Specific Primary Actions & Inbox Bell */}
                             <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap">
-                                {activeTab === "overview" && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            onClick={handleCopyPublicLink}
-                                            className="px-3.5 py-2 rounded-xl bg-white hover:bg-[#FAF6EE] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
-                                            title="Copy Public Link"
-                                        >
-                                            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                                            <span>{copiedLink ? "Copied!" : "Copy Link"}</span>
-                                        </button>
-                                        <a
-                                            href={`/clubs/${club.slug}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="px-3.5 py-2 rounded-xl bg-black text-[#FFE566] hover:bg-neutral-900 border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                        >
-                                            <span>Public Page</span>
-                                            <ExternalLink className="w-3.5 h-3.5" />
-                                        </a>
-                                    </>
-                                )}
-
                                 {activeTab === "events" && (
                                     <button
                                         type="button"
                                         onClick={() => openCreateEventModal("published")}
-                                        className="px-4 py-2 sm:py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                        className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
                                     >
                                         <Plus className="w-4 h-4 stroke-[2.5]" />
                                         <span>+ Create New Event</span>
                                     </button>
-                                )}
-
-                                {activeTab === "profile" && (
-                                    <a
-                                        href={`/clubs/${club.slug}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <span>View Public Page</span>
-                                        <ExternalLink className="w-3.5 h-3.5" />
-                                    </a>
                                 )}
 
                                 {/* Club Notifications / Inbox Bell Button */}
@@ -720,16 +701,8 @@ export default function ClubDashboardPage() {
                                     <div className="flex flex-col sm:flex-row md:flex-col gap-2 shrink-0">
                                         <button
                                             type="button"
-                                            onClick={handleCopyPublicLink}
-                                            className="px-4 py-2 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer"
-                                        >
-                                            {copiedLink ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                                            <span>{copiedLink ? "Link Copied!" : "Copy Public Link"}</span>
-                                        </button>
-                                        <button
-                                            type="button"
                                             onClick={() => handleTabChange("profile")}
-                                            className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer"
+                                            className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer"
                                         >
                                             <Edit3 className="w-3.5 h-3.5" />
                                             <span>Edit Club Profile</span>
@@ -848,7 +821,7 @@ export default function ClubDashboardPage() {
                                         <button
                                             type="button"
                                             onClick={() => handleTabChange("team")}
-                                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] self-start"
+                                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] self-start"
                                         >
                                             <span>Open Team Workspace</span>
                                             <ArrowRight className="w-3.5 h-3.5" />
@@ -920,7 +893,7 @@ export default function ClubDashboardPage() {
                                             <button
                                                 type="button"
                                                 onClick={() => openCreateEventModal("published")}
-                                                className="mt-2 px-4 py-2 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 cursor-pointer inline-flex items-center gap-1.5"
+                                                className="mt-2 px-4 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5"
                                             >
                                                 <Plus className="w-3.5 h-3.5 stroke-[3]" />
                                                 <span>Create First Event</span>
@@ -1019,7 +992,7 @@ export default function ClubDashboardPage() {
                                     <button
                                         type="button"
                                         onClick={() => openCreateEventModal("published")}
-                                        className="px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                        className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
                                     >
                                         <Plus className="w-4 h-4 stroke-[2.5]" />
                                         <span>+ Create New Event</span>
@@ -1186,7 +1159,7 @@ export default function ClubDashboardPage() {
                                         <button
                                             type="button"
                                             onClick={() => openCreateEventModal("published")}
-                                            className="mt-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 cursor-pointer"
+                                            className="mt-2 px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
                                         >
                                             + Create New Event
                                         </button>
@@ -1340,6 +1313,16 @@ export default function ClubDashboardPage() {
                                     </div>
                                 )}
                             </div>
+                        )}
+
+
+                        {/* TAB: CLUB SETTINGS & PREFERENCES */}
+                        {activeTab === "settings" && (
+                            <ClubSettingsView
+                                club={club}
+                                user={user}
+                                onSignOut={handleSignOut}
+                            />
                         )}
                     </div>
 
@@ -1536,7 +1519,7 @@ export default function ClubDashboardPage() {
                                 <button
                                     type="submit"
                                     disabled={isSavingEvent}
-                                    className="px-5 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50"
+                                    className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                 >
                                     {isSavingEvent ? "Saving..." : editingEventId ? "Update Event" : "Create Event"}
                                 </button>

@@ -14,6 +14,7 @@ import {
     Building2,
 } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
+import { NeoSelect } from "../../../components/NeoSelect";
 import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
 import type { ClubMember, ClubTeam, ClubInvitation, TeamStats } from "./types";
 import { AddMemberModal } from "./AddMemberModal";
@@ -451,7 +452,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                         <button
                                             type="button"
                                             onClick={() => setIsCreateTeamOpen(true)}
-                                            className="px-4 py-2 bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 cursor-pointer"
+                                            className="px-4 py-2 bg-[#a2ff86] text-black font-black text-xs uppercase tracking-wider rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] cursor-pointer"
                                         >
                                             + Create First Team
                                         </button>
@@ -609,7 +610,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setIsCreateTeamOpen(true)}
-                                className="px-3.5 py-2 bg-black text-[#a2ff86] rounded-xl border-2 border-black font-black text-xs uppercase tracking-wider shadow-[2px_2px_0px_#000] hover:bg-neutral-900 cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+                                className="px-3.5 py-2 bg-[#a2ff86] text-black rounded-xl border-2 border-black font-black text-xs uppercase tracking-wider shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
                             >
                                 <Plus className="w-3.5 h-3.5 stroke-[3]" />
                                 <span>New Department</span>
@@ -633,7 +634,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setIsCreateTeamOpen(true)}
-                                    className="px-5 py-2.5 bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 cursor-pointer"
+                                    className="px-5 py-2.5 bg-[#a2ff86] text-black font-black text-xs uppercase tracking-wider rounded-xl border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-[#8ee673] cursor-pointer"
                                 >
                                     + Create Department
                                 </button>
@@ -777,32 +778,33 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                         {/* Filters */}
                         <div className="flex items-center gap-2.5 flex-wrap">
                             {/* Team Filter */}
-                            <select
+                            <NeoSelect
                                 value={memberTeamFilter}
-                                onChange={(e) => setMemberTeamFilter(e.target.value)}
-                                className="px-3 py-2 bg-white border-2 border-black rounded-xl text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
-                            >
-                                <option value="all">All Departments</option>
-                                {teams.map((t) => (
-                                    <option key={t.id} value={t.id}>
-                                        {t.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => setMemberTeamFilter(val)}
+                                options={[
+                                    { value: "all", label: "All Departments" },
+                                    ...teams.map((t) => ({
+                                        value: t.id,
+                                        label: t.name,
+                                    })),
+                                ]}
+                                size="sm"
+                            />
 
                             {/* Role Filter */}
-                            <select
+                            <NeoSelect
                                 value={memberRoleFilter}
-                                onChange={(e) => setMemberRoleFilter(e.target.value)}
-                                className="px-3 py-2 bg-white border-2 border-black rounded-xl text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
-                            >
-                                <option value="all">All Roles</option>
-                                <option value="owner">Club Owner</option>
-                                <option value="admin">Club Admin</option>
-                                <option value="team_lead">Team Lead</option>
-                                <option value="member">Club Member</option>
-                                <option value="advisor">Advisor</option>
-                            </select>
+                                onChange={(val) => setMemberRoleFilter(val)}
+                                options={[
+                                    { value: "all", label: "All Roles" },
+                                    { value: "owner", label: "Club Owner" },
+                                    { value: "admin", label: "Club Admin" },
+                                    { value: "team_lead", label: "Team Lead" },
+                                    { value: "member", label: "Club Member" },
+                                    { value: "advisor", label: "Advisor" },
+                                ]}
+                                size="sm"
+                            />
                         </div>
                     </div>
 
@@ -960,7 +962,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setIsAddMemberOpen(true)}
-                                className="px-3.5 py-2 bg-black text-[#a2ff86] rounded-xl border-2 border-black font-black text-xs uppercase tracking-wider shadow-[2px_2px_0px_#000] hover:bg-neutral-900 cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
+                                className="px-3.5 py-2 bg-[#a2ff86] text-black rounded-xl border-2 border-black font-black text-xs uppercase tracking-wider shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] cursor-pointer flex items-center gap-1.5 self-start sm:self-auto"
                             >
                                 <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
                                 <span>Send Invitation</span>
@@ -1073,7 +1075,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                                         <button
                                                             type="button"
                                                             onClick={() => handleResendInvitation(inv.id)}
-                                                            className="px-2.5 py-1 rounded bg-black text-[#a2ff86] border border-black font-black text-[10px] cursor-pointer"
+                                                            className="px-2.5 py-1 rounded bg-[#a2ff86] text-black hover:bg-[#8ee673] border border-black font-black text-[10px] cursor-pointer"
                                                         >
                                                             Resend
                                                         </button>

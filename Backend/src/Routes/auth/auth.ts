@@ -1196,4 +1196,31 @@ const handleDisable2FA = async (req: Request, res: Response) => {
 authRouter.post('/auth/2fa/disable', authenticate, handleDisable2FA);
 authRouter.post('/2fa/disable', authenticate, handleDisable2FA);
 
+/**
+ * POST /api/auth/password/change & /api/password/change
+ * Unified password change endpoint for authenticated sessions.
+ */
+const handlePasswordChange = async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        const userId = authUser?.sub || authUser?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Authentication required" });
+        }
+
+        const { currentPassword, newPassword, confirmPassword } = req.body;
+        const { ClubSettingsService } = await import("../../services/club/clubSettingsService.js");
+        const result = await ClubSettingsService.changePassword(userId, currentPassword, newPassword, confirmPassword);
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to update password."
+        });
+    }
+};
+
+authRouter.post('/auth/password/change', authenticate, handlePasswordChange);
+authRouter.post('/password/change', authenticate, handlePasswordChange);
+
 export default authRouter;

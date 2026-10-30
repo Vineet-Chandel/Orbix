@@ -257,32 +257,9 @@ export class ClubProfileService {
             throw error;
         }
 
-        // Slug validation if supplied
-        let newSlug: string | undefined = undefined;
+        // Slug updates are blocked — username changes require a separate process
         if (payload.slug !== undefined) {
-            const cleanSlug = String(payload.slug).trim().toLowerCase();
-            if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(cleanSlug)) {
-                const error: any = new Error("Invalid username/slug format. Use lowercase letters, numbers, and single hyphens (no consecutive hyphens or spaces).");
-                error.statusCode = 400;
-                throw error;
-            }
-            if (cleanSlug.length < 2 || cleanSlug.length > 50) {
-                const error: any = new Error("Slug must be between 2 and 50 characters.");
-                error.statusCode = 400;
-                throw error;
-            }
-
-            // Check uniqueness against other verified clubs
-            const existingSlug = await query(
-                `SELECT id FROM verified_clubs WHERE LOWER(slug) = LOWER($1) AND id != $2 LIMIT 1;`,
-                [cleanSlug, clubId]
-            );
-            if (existingSlug.rows[0]) {
-                const error: any = new Error("This club username/slug is already taken by another club.");
-                error.statusCode = 409;
-                throw error;
-            }
-            newSlug = cleanSlug;
+            delete payload.slug; // Silently ignore slug changes from the profile update endpoint
         }
 
         // URL format validation helper
@@ -386,9 +363,6 @@ export class ClubProfileService {
         if (payload.name !== undefined && String(payload.name).trim().length >= 2) {
             addField("name", String(payload.name).trim());
         }
-        if (newSlug !== undefined) {
-            addField("slug", newSlug);
-        }
         if (payload.category !== undefined && String(payload.category).trim().length > 0) {
             addField("category", String(payload.category).trim());
         }
@@ -464,7 +438,7 @@ export class ClubProfileService {
         await query(sql, values);
 
         // Invalidate public profile cache
-        await invalidateClubProfileCache(currentClub.slug, newSlug ? [newSlug] : []);
+        await invalidateClubProfileCache(currentClub.slug, []);
 
         return await this.getFullClubProfile(userId, requestedClubId);
     }
@@ -1095,5 +1069,234 @@ export class ClubProfileService {
         }
 
         return responsePayload;
+    }
+
+    /**
+     * Retrieve all verified clubs belonging to the specified or caller's college.
+     * Reusable across Club Dashboard "Other Clubs" and Student Personal "Explore Clubs".
+     */
+    static async getCollegeClubs(
+        userId?: string | undefined,
+        options?: {
+            collegeId?: string | undefined;
+            collegeName?: string | undefined;
+            clubId?: string | undefined;
+        } | undefined
+    ) {
+        let collegeId = options?.collegeId;
+        let collegeName = options?.collegeName;
+        let callerClubId = options?.clubId;
+
+        // 1. If not explicitly provided and user is authenticated, determine their college and club context
+        if (userId) {
+            // Check if user has an active club workspace
+            if (!callerClubId) {
+                try {
+                    const perms = await ClubTeamService.resolveUserClubPermissions(userId, options?.clubId);
+                    if (perms?.clubId) {
+                        callerClubId = perms.clubId;
+                    }
+                } catch {
+                    // Not a club manager - proceed as normal student/user
+                }
+            }
+
+            if (callerClubId && (!collegeId || !collegeName)) {
+                const clubRes = await query(
+                    `SELECT college_id, college_name FROM verified_clubs WHERE id = $1 LIMIT 1;`,
+                    [callerClubId]
+                );
+                if (clubRes.rows.length > 0) {
+                    collegeId = collegeId || clubRes.rows[0].college_id;
+                    collegeName = collegeName || clubRes.rows[0].college_name;
+                }
+            }
+
+            // If still no college, check user's registered college in users table
+            if (!collegeId && !collegeName) {
+                const userRes = await query(
+                    `SELECT college, college_id FROM users WHERE id = $1 LIMIT 1;`,
+                    [userId]
+                );
+                if (userRes.rows.length > 0) {
+                    collegeName = userRes.rows[0].college || null;
+                    collegeId = userRes.rows[0].college_id || null;
+                }
+            }
+        }
+
+        // If no college could be resolved, return empty result gracefully
+        if (!collegeId && (!collegeName || !collegeName.trim())) {
+            return {
+                collegeName: collegeName || "Your College",
+                collegeId: collegeId || null,
+                totalClubs: 0,
+                clubs: [],
+            };
+        }
+
+        const cleanCollegeName = collegeName ? collegeName.trim() : null;
+
+        // 2. Query all verified clubs from this college
+        const clubsRes = await query(
+            `SELECT
+                vc.id,
+                vc.name,
+                COALESCE(u.username, vc.slug) AS slug,
+                u.username AS "clubUsername",
+                vc.category,
+                vc.college_id AS "collegeId",
+                vc.college_name AS "collegeName",
+                vc.college_city AS "collegeCity",
+                vc.college_state AS "collegeState",
+                vc.college_country AS "collegeCountry",
+                vc.short_description AS "shortDescription",
+                vc.about,
+                vc.mission,
+                vc.vision,
+                vc.logo_url AS "logoUrl",
+                vc.cover_image_url AS "coverImageUrl",
+                vc.website_url AS "websiteUrl",
+                vc.public_email AS "publicEmail",
+                vc.contact_phone AS "contactPhone",
+                vc.social_links AS "socialLinks",
+                vc.founded_year AS "foundedYear",
+                vc.operating_status AS "operatingStatus",
+                vc.focus_areas AS "focusAreas",
+                vc.recruitment_status AS "recruitmentStatus",
+                vc.recruitment_announcement AS "recruitmentAnnouncement",
+                vc.recruitment_url AS "recruitmentUrl",
+                vc.publication_status AS "publicationStatus",
+                vc.profile_visibility AS "profileVisibility",
+                vc.is_active AS "isActive",
+                vc.verified_at AS "verifiedAt",
+                vc.created_at AS "createdAt",
+                COALESCE(tm.member_count, 0) AS "memberCount",
+                COALESCE(ev.event_count, 0) AS "eventsCount",
+                COALESCE(ach.ach_count, 0) AS "achievementsCount",
+                COALESCE(cd.coord_count, 0) AS "coordinatorsCount"
+             FROM verified_clubs vc
+             LEFT JOIN users u ON u.id = vc.auth_user_id
+             LEFT JOIN (
+                 SELECT club_id, COUNT(*) AS member_count
+                 FROM club_team_members
+                 WHERE status = 'active'
+                 GROUP BY club_id
+             ) tm ON tm.club_id = vc.id
+             LEFT JOIN (
+                 SELECT club_id, COUNT(*) AS event_count
+                 FROM club_events
+                 WHERE status = 'published'
+                 GROUP BY club_id
+             ) ev ON ev.club_id = vc.id
+             LEFT JOIN (
+                 SELECT club_id, COUNT(*) AS ach_count
+                 FROM club_achievements
+                 GROUP BY club_id
+             ) ach ON ach.club_id = vc.id
+             LEFT JOIN (
+                 SELECT club_id, COUNT(*) AS coord_count
+                 FROM club_coordinators
+                 GROUP BY club_id
+             ) cd ON cd.club_id = vc.id
+             WHERE vc.is_active = true
+               AND (
+                   ($1::text IS NOT NULL AND vc.college_id = $1)
+                   OR
+                   ($2::text IS NOT NULL AND LOWER(TRIM(vc.college_name)) = LOWER(TRIM($2)))
+               )
+             ORDER BY
+                 CASE WHEN vc.id = $3 THEN 0 ELSE 1 END,
+                 vc.name ASC;`,
+            [collegeId || null, cleanCollegeName, callerClubId || null]
+        );
+
+        const rows = clubsRes.rows;
+        if (rows.length === 0) {
+            return {
+                collegeName: cleanCollegeName || "Your College",
+                collegeId: collegeId || null,
+                totalClubs: 0,
+                clubs: [],
+            };
+        }
+
+        const clubIds = rows.map((r: any) => r.id);
+
+        // Batch fetch primary coordinators for rich preview
+        const coordRes = await query(
+            `SELECT
+                c.id,
+                c.club_id AS "clubId",
+                c.name,
+                c.role,
+                c.department,
+                c.image_url AS "imageUrl",
+                c.is_primary AS "isPrimary",
+                c.contact_email AS "contactEmail",
+                c.linkedin_url AS "linkedinUrl",
+                u.username AS "linkedUsername",
+                u.avatar_url AS "linkedAvatarUrl"
+             FROM club_coordinators c
+             LEFT JOIN users u ON u.id = c.linked_user_id
+             WHERE c.club_id = ANY($1::text[])
+             ORDER BY c.display_order ASC, c.created_at ASC;`,
+            [clubIds]
+        );
+
+        // Group coordinators by clubId
+        const coordinatorsMap = new Map<string, any[]>();
+        for (const coord of coordRes.rows) {
+            if (!coordinatorsMap.has(coord.clubId)) {
+                coordinatorsMap.set(coord.clubId, []);
+            }
+            coordinatorsMap.get(coord.clubId)!.push(coord);
+        }
+
+        // Batch fetch top achievements for preview
+        const achRes = await query(
+            `SELECT
+                a.id,
+                a.club_id AS "clubId",
+                a.title,
+                a.description,
+                a.achievement_date AS "achievementDate",
+                a.issuer,
+                a.image_url AS "imageUrl",
+                a.external_link AS "externalLink"
+             FROM club_achievements a
+             WHERE a.club_id = ANY($1::text[])
+             ORDER BY a.display_order ASC, a.created_at ASC;`,
+            [clubIds]
+        );
+
+        const achievementsMap = new Map<string, any[]>();
+        for (const ach of achRes.rows) {
+            if (!achievementsMap.has(ach.clubId)) {
+                achievementsMap.set(ach.clubId, []);
+            }
+            achievementsMap.get(ach.clubId)!.push(ach);
+        }
+
+        const enrichedClubs = rows.map((c: any) => {
+            const isCurrent = Boolean(callerClubId && c.id === callerClubId);
+            return {
+                ...c,
+                memberCount: parseInt(c.memberCount, 10) || 0,
+                eventsCount: parseInt(c.eventsCount, 10) || 0,
+                achievementsCount: parseInt(c.achievementsCount, 10) || 0,
+                coordinatorsCount: parseInt(c.coordinatorsCount, 10) || 0,
+                isCurrentClub: isCurrent,
+                coordinators: coordinatorsMap.get(c.id) || [],
+                achievements: achievementsMap.get(c.id) || [],
+            };
+        });
+
+        return {
+            collegeName: rows[0]?.collegeName || cleanCollegeName || "Campus",
+            collegeId: rows[0]?.collegeId || collegeId || null,
+            totalClubs: enrichedClubs.length,
+            clubs: enrichedClubs,
+        };
     }
 }

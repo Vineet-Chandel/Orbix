@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
-    BadgeCheck,
     Bookmark,
     UserX,
     MessageSquare,
@@ -347,7 +346,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
     const [confirmPassword, setConfirmPassword] = useState("");
     const [isSavingPassword, setIsSavingPassword] = useState(false);
 
-    const handleSavePassword = (e: React.FormEvent) => {
+    const handleSavePassword = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!currentPassword || !newPassword) {
             toast.error("Please fill in both current and new password.", { title: "Password Error" });
@@ -362,13 +361,30 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             return;
         }
         setIsSavingPassword(true);
-        setTimeout(() => {
-            setIsSavingPassword(false);
+        try {
+            const res = await fetch("/api/settings/manage-account/password/change", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({
+                    currentPassword,
+                    newPassword,
+                    confirmPassword,
+                }),
+            });
+            const data = await res.json().catch(() => null);
+            if (!res.ok) {
+                throw new Error(data?.message || "Failed to update password.");
+            }
             setCurrentPassword("");
             setNewPassword("");
             setConfirmPassword("");
-            toast.success("Password updated successfully.", { title: "Security Updated" });
-        }, 600);
+            toast.success(data?.message || "Password updated successfully.", { title: "Security Updated" });
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to update password. Please check your current password.", { title: "Update Failed" });
+        } finally {
+            setIsSavingPassword(false);
+        }
     };
 
     const handleCopyInviteLink = () => {
@@ -422,73 +438,6 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                     <span>Manage Email in Account Center</span>
                                     <ExternalLink className="w-3.5 h-3.5" />
                                 </button>
-                            </div>
-                        </div>
-
-                        {/* Collegiate Enrollment & Identity */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="space-y-1">
-                                    <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[#FFE566] text-black text-xs font-black uppercase border border-black shadow-[1px_1px_0px_#000]">
-                                        <BadgeCheck className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>Collegiate Verification</span>
-                                    </div>
-                                    <h3 className="text-xl font-black text-black">
-                                        Verified Student & Developer Identity
-                                    </h3>
-                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                        Get your verified badge on Global & Campus leaderboards, confirm collegiate enrollment, and gain recruiter priority.
-                                    </p>
-                                </div>
-                                <span className={`px-3 py-1 rounded-xl text-xs font-black uppercase border-2 border-black shrink-0 shadow-[2px_2px_0px_#000] ${user?.college?.officialName ? "bg-[#a2ff86] text-black" : "bg-neutral-100 text-neutral-700"}`}>
-                                    {user?.college?.officialName ? "Enrolled" : "Not Linked"}
-                                </span>
-                            </div>
-
-                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-3">
-                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                    Current Affiliation
-                                </h4>
-                                <div className="text-xs font-bold text-neutral-800 space-y-1">
-                                    <p className="text-sm font-black text-black">
-                                        {user?.college?.officialName || "No verified college currently associated"}
-                                    </p>
-                                    <p className="text-neutral-500 font-medium">
-                                        {user?.college?.city && user?.college?.state
-                                            ? `${user.college.city}, ${user.college.state} • AISHE Verified`
-                                            : "Select your institution in Profile Details to initiate campus verification"}
-                                    </p>
-                                </div>
-                                <Link
-                                    to="/profile"
-                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-[#a2ff86] font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer"
-                                >
-                                    <span>Manage College in Profile</span>
-                                    <ExternalLink className="w-3.5 h-3.5" />
-                                </Link>
-                            </div>
-
-                            <div className="pt-2 border-t-2 border-black/10 space-y-2">
-                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                    Verified Badge Perks
-                                </h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                                    <div className="p-3.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
-                                        <span className="text-lg">🏅</span>
-                                        <p className="text-xs font-black text-black">Official Badge</p>
-                                        <p className="text-[11px] text-neutral-600 font-medium">Verified checkmark on cards & leaderboards.</p>
-                                    </div>
-                                    <div className="p-3.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
-                                        <span className="text-lg">🏫</span>
-                                        <p className="text-xs font-black text-black">Campus League</p>
-                                        <p className="text-[11px] text-neutral-600 font-medium">Rep your university in the College League.</p>
-                                    </div>
-                                    <div className="p-3.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
-                                        <span className="text-lg">💼</span>
-                                        <p className="text-xs font-black text-black">Recruiter Trust</p>
-                                        <p className="text-[11px] text-neutral-600 font-medium">Rank higher in verified talent searches.</p>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>

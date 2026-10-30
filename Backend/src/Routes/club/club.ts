@@ -29,6 +29,7 @@ import {
 } from "../../services/club/clubInboxService.js";
 import clubTeamRouter from "./clubTeamRoutes.js";
 import clubProfileRouter from "./clubProfileRoutes.js";
+import clubSettingsRouter from "./clubSettingsRoutes.js";
 import { ClubProfileService } from "../../services/club/clubProfileService.js";
 
 const clubRouter = express.Router();
@@ -38,6 +39,36 @@ clubRouter.use("/team", clubTeamRouter);
 
 // Mount dedicated Club Profile Management router (/api/club/profile)
 clubRouter.use("/profile", clubProfileRouter);
+
+// Mount dedicated Club Settings Management router (/api/club/settings)
+clubRouter.use("/settings", clubSettingsRouter);
+
+// GET /api/club/college-clubs - direct route for campus clubs listing
+clubRouter.get("/college-clubs", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const collegeId = (req.query.collegeId as string) || undefined;
+        const collegeName = (req.query.collegeName as string) || undefined;
+        const clubId = (req.query.clubId as string) || undefined;
+
+        const result = await ClubProfileService.getCollegeClubs(userId, {
+            collegeId,
+            collegeName,
+            clubId,
+        });
+
+        return res.json({
+            success: true,
+            ...result,
+        });
+    } catch (err: any) {
+        console.error("GET /api/club/college-clubs error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to retrieve college clubs.",
+        });
+    }
+});
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {

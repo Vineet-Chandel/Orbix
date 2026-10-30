@@ -32,6 +32,37 @@ clubProfileRouter.get("/", authenticate, async (req: Request, res: Response) => 
 });
 
 /**
+ * GET /api/club/profile/college-clubs
+ * Retrieve all verified clubs from the caller's college (or specified college).
+ * Supports both club managers checking peer clubs and personal explore mode.
+ */
+clubProfileRouter.get("/college-clubs", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const collegeId = (req.query.collegeId as string) || undefined;
+        const collegeName = (req.query.collegeName as string) || undefined;
+        const clubId = (req.query.clubId as string) || undefined;
+
+        const result = await ClubProfileService.getCollegeClubs(userId, {
+            collegeId,
+            collegeName,
+            clubId,
+        });
+
+        return res.json({
+            success: true,
+            ...result,
+        });
+    } catch (err: any) {
+        console.error("GET /api/club/profile/college-clubs error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to retrieve college clubs.",
+        });
+    }
+});
+
+/**
  * PATCH /api/club/profile
  * Updates club profile fields, branding, about story, focus areas, and publication visibility.
  */

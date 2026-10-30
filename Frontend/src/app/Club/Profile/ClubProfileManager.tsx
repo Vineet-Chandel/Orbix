@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
     Save,
-    ExternalLink,
     UploadCloud,
     Globe,
     Building2,
@@ -18,13 +17,12 @@ import {
     Layers,
     Loader2,
 } from "lucide-react";
-import type { ClubProfileData, ClubCoordinator, ClubAchievement } from "../../../utils/clubProfileApi";
+import type { ClubProfileData } from "../../../utils/clubProfileApi";
 import {
-    fetchClubFullProfile,
-    updateClubProfile,
     requestClubUploadSignature,
     uploadClubImageToCloudinary,
 } from "../../../utils/clubProfileApi";
+import { useAppDispatch, useAppSelector, fetchClubProfile, saveClubProfile } from "../../../store";
 import { useToast } from "../../../context/ToastContext";
 import { ClubMarkdownEditor } from "./ClubMarkdownEditor";
 import { ClubCoordinatorsManager } from "./ClubCoordinatorsManager";
@@ -62,16 +60,15 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
 }) => {
     const toast = useToast();
 
-    // Data states
-    const [loading, setLoading] = useState(true);
-    const [club, setClub] = useState<ClubProfileData | null>(null);
-    const [coordinators, setCoordinators] = useState<ClubCoordinator[]>([]);
-    const [achievements, setAchievements] = useState<ClubAchievement[]>([]);
-    const [permissions, setPermissions] = useState<any>(null);
-    const [completion, setCompletion] = useState<{ percentage: number; missingItems: string[] }>({
-        percentage: 0,
-        missingItems: [],
-    });
+    const dispatch = useAppDispatch();
+    const clubState = useAppSelector((state) => state.club);
+
+    // Derived data from centralized Redux store
+    const club = clubState.club;
+    const coordinators = clubState.coordinators;
+    const achievements = clubState.achievements;
+    const permissions = clubState.permissions;
+    const completion = clubState.completion;
 
     // Form fields state
     const [name, setName] = useState("");
@@ -116,90 +113,89 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
     const [logoUploadPercent, setLogoUploadPercent] = useState<number | null>(null);
     const [coverUploadPercent, setCoverUploadPercent] = useState<number | null>(null);
 
+    // Initial snapshot for change detection
+    const initialSnapshotRef = useRef<string>("");
     const logoInputRef = useRef<HTMLInputElement>(null);
     const coverInputRef = useRef<HTMLInputElement>(null);
 
-    // Initial snapshot for change detection
-    const initialSnapshotRef = useRef<string>("");
+    const populateFormFromClub = (c: ClubProfileData) => {
+        setName(c.name || "");
+        setSlug(c.slug || "");
+        setCategory(c.category || "Technical & Coding");
+        setShortDescription(c.shortDescription || "");
+        setAbout(c.about || "");
+        setMission(c.mission || "");
+        setVision(c.vision || "");
+        setFoundedYear(c.foundedYear ? String(c.foundedYear) : "");
+        setOperatingStatus(c.operatingStatus || "active");
+        setFocusAreas(Array.isArray(c.focusAreas) ? c.focusAreas : []);
 
-    const loadProfile = async () => {
+        setLogoUrl(c.logoUrl || "");
+        setCoverImageUrl(c.coverImageUrl || "");
+
+        setPublicEmail(c.publicEmail || "");
+        setContactPhone(c.contactPhone || "");
+        setWebsiteUrl(c.websiteUrl || "");
+
+        const s = c.socialLinks || {};
+        setSocialGithub(s.github || "");
+        setSocialLinkedin(s.linkedin || "");
+        setSocialInstagram(s.instagram || "");
+        setSocialX(s.x || (s as any).twitter || "");
+        setSocialDiscord(s.discord || "");
+        setSocialYoutube(s.youtube || "");
+
+        setRecruitmentStatus(c.recruitmentStatus || "closed");
+        setRecruitmentAnnouncement(c.recruitmentAnnouncement || "");
+        setRecruitmentUrl(c.recruitmentUrl || "");
+        setPublicationStatus(c.publicationStatus || "published");
+        setProfileVisibility(c.profileVisibility || "public");
+
+        initialSnapshotRef.current = JSON.stringify({
+            name: c.name || "",
+            slug: c.slug || "",
+            category: c.category || "Technical & Coding",
+            shortDescription: c.shortDescription || "",
+            about: c.about || "",
+            mission: c.mission || "",
+            vision: c.vision || "",
+            foundedYear: c.foundedYear ? String(c.foundedYear) : "",
+            operatingStatus: c.operatingStatus || "active",
+            focusAreas: Array.isArray(c.focusAreas) ? c.focusAreas : [],
+            logoUrl: c.logoUrl || "",
+            coverImageUrl: c.coverImageUrl || "",
+            publicEmail: c.publicEmail || "",
+            contactPhone: c.contactPhone || "",
+            websiteUrl: c.websiteUrl || "",
+            socialLinks: s,
+            recruitmentStatus: c.recruitmentStatus || "closed",
+            recruitmentAnnouncement: c.recruitmentAnnouncement || "",
+            recruitmentUrl: c.recruitmentUrl || "",
+            publicationStatus: c.publicationStatus || "published",
+            profileVisibility: c.profileVisibility || "public",
+        });
+    };
+
+    const loadProfile = async (force = false) => {
         try {
-            setLoading(true);
-            const data = await fetchClubFullProfile(clubId);
-            const c = data.club;
-            setClub(c);
-            setCoordinators(data.coordinators || []);
-            setAchievements(data.achievements || []);
-            setPermissions(data.permissions);
-            setCompletion(data.completion || { percentage: 0, missingItems: [] });
-
-            // Initialize form states
-            setName(c.name || "");
-            setSlug(c.slug || "");
-            setCategory(c.category || "Technical & Coding");
-            setShortDescription(c.shortDescription || "");
-            setAbout(c.about || "");
-            setMission(c.mission || "");
-            setVision(c.vision || "");
-            setFoundedYear(c.foundedYear ? String(c.foundedYear) : "");
-            setOperatingStatus(c.operatingStatus || "active");
-            setFocusAreas(Array.isArray(c.focusAreas) ? c.focusAreas : []);
-
-            setLogoUrl(c.logoUrl || "");
-            setCoverImageUrl(c.coverImageUrl || "");
-
-            setPublicEmail(c.publicEmail || "");
-            setContactPhone(c.contactPhone || "");
-            setWebsiteUrl(c.websiteUrl || "");
-
-            const s = c.socialLinks || {};
-            setSocialGithub(s.github || "");
-            setSocialLinkedin(s.linkedin || "");
-            setSocialInstagram(s.instagram || "");
-            setSocialX(s.x || s.twitter || "");
-            setSocialDiscord(s.discord || "");
-            setSocialYoutube(s.youtube || "");
-
-            setRecruitmentStatus(c.recruitmentStatus || "closed");
-            setRecruitmentAnnouncement(c.recruitmentAnnouncement || "");
-            setRecruitmentUrl(c.recruitmentUrl || "");
-            setPublicationStatus(c.publicationStatus || "published");
-            setProfileVisibility(c.profileVisibility || "public");
-
-            initialSnapshotRef.current = JSON.stringify({
-                name: c.name || "",
-                slug: c.slug || "",
-                category: c.category || "Technical & Coding",
-                shortDescription: c.shortDescription || "",
-                about: c.about || "",
-                mission: c.mission || "",
-                vision: c.vision || "",
-                foundedYear: c.foundedYear ? String(c.foundedYear) : "",
-                operatingStatus: c.operatingStatus || "active",
-                focusAreas: Array.isArray(c.focusAreas) ? c.focusAreas : [],
-                logoUrl: c.logoUrl || "",
-                coverImageUrl: c.coverImageUrl || "",
-                publicEmail: c.publicEmail || "",
-                contactPhone: c.contactPhone || "",
-                websiteUrl: c.websiteUrl || "",
-                socialLinks: s,
-                recruitmentStatus: c.recruitmentStatus || "closed",
-                recruitmentAnnouncement: c.recruitmentAnnouncement || "",
-                recruitmentUrl: c.recruitmentUrl || "",
-                publicationStatus: c.publicationStatus || "published",
-                profileVisibility: c.profileVisibility || "public",
-            });
+            const data = await dispatch(fetchClubProfile({ clubId, force })).unwrap();
+            if (data?.club) {
+                populateFormFromClub(data.club);
+            }
         } catch (err: any) {
             console.error("Load club profile error:", err);
-            toast.error(err.message || "Failed to load club profile.");
-        } finally {
-            setLoading(false);
+            toast.error(err || "Failed to load club profile.");
         }
     };
 
+    // Synchronize form with Redux store on mount or club change
     useEffect(() => {
-        loadProfile();
-    }, [clubId]);
+        if (clubState.isInitialized && clubState.club) {
+            populateFormFromClub(clubState.club);
+        } else {
+            loadProfile(false);
+        }
+    }, [clubId, clubState.isInitialized]);
 
     // Check if form has unsaved modifications
     const hasChanges = useMemo(() => {
@@ -385,32 +381,10 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                 profileVisibility,
             };
 
-            const updatedData = await updateClubProfile(payload, club.id);
-            setClub(updatedData.club);
-            setCompletion(updatedData.completion);
-            initialSnapshotRef.current = JSON.stringify({
-                name: updatedData.club.name,
-                slug: updatedData.club.slug,
-                category: updatedData.club.category,
-                shortDescription: updatedData.club.shortDescription || "",
-                about: updatedData.club.about || "",
-                mission: updatedData.club.mission || "",
-                vision: updatedData.club.vision || "",
-                foundedYear: updatedData.club.foundedYear ? String(updatedData.club.foundedYear) : "",
-                operatingStatus: updatedData.club.operatingStatus,
-                focusAreas: updatedData.club.focusAreas || [],
-                logoUrl: updatedData.club.logoUrl || "",
-                coverImageUrl: updatedData.club.coverImageUrl || "",
-                publicEmail: updatedData.club.publicEmail || "",
-                contactPhone: updatedData.club.contactPhone || "",
-                websiteUrl: updatedData.club.websiteUrl || "",
-                socialLinks: updatedData.club.socialLinks || {},
-                recruitmentStatus: updatedData.club.recruitmentStatus,
-                recruitmentAnnouncement: updatedData.club.recruitmentAnnouncement || "",
-                recruitmentUrl: updatedData.club.recruitmentUrl || "",
-                publicationStatus: updatedData.club.publicationStatus,
-                profileVisibility: updatedData.club.profileVisibility,
-            });
+            const updatedData = await dispatch(saveClubProfile({ payload, clubId: club.id })).unwrap();
+            if (updatedData?.club) {
+                populateFormFromClub(updatedData.club);
+            }
 
             toast.success("Club profile updated and published successfully!", {
                 title: "Profile Saved",
@@ -419,7 +393,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
             if (onProfileUpdated) onProfileUpdated();
         } catch (err: any) {
             console.error("Save profile error:", err);
-            toast.error(err.message || "Failed to update club profile.", {
+            toast.error(err || "Failed to update club profile.", {
                 title: "Update Error",
             });
         } finally {
@@ -427,7 +401,8 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
         }
     };
 
-    if (loading) {
+    const isGlobalLoading = clubState.loading && !clubState.isInitialized && !club;
+    if (isGlobalLoading) {
         return (
             <div className="p-12 text-center flex flex-col items-center justify-center space-y-3">
                 <Loader2 className="w-8 h-8 animate-spin text-black" />
@@ -479,20 +454,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                     <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                             <h2 className="text-lg sm:text-xl font-black text-black tracking-tight">{name || "Club Profile"}</h2>
-                            <span className="px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000]">
-                                Verified Chapter
-                            </span>
-                            <span
-                                className={`px-2 py-0.5 rounded-full border border-black text-[10px] font-black shadow-[1px_1px_0px_#000] ${
-                                    publicationStatus === "published"
-                                        ? "bg-black text-[#a2ff86]"
-                                        : publicationStatus === "draft"
-                                        ? "bg-[#FFE566] text-black"
-                                        : "bg-neutral-200 text-neutral-800"
-                                }`}
-                            >
-                                {publicationStatus === "published" ? "Live & Published" : publicationStatus === "draft" ? "Draft Mode" : "Hidden"}
-                            </span>
                         </div>
                         <p className="text-xs font-bold text-neutral-600 flex items-center gap-1.5 flex-wrap">
                             <span>{club.collegeName}</span>
@@ -519,57 +480,8 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                             />
                         </div>
                     </div>
-
-                    {/* Preview Button */}
-                    <a
-                        href={`/clubs/${slug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-3.5 py-2.5 rounded-xl bg-white text-black hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                    >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Public Preview</span>
-                    </a>
-
-                    {/* Save Changes Button */}
-                    {canManage && (
-                        <button
-                            type="button"
-                            onClick={() => handleSaveProfile()}
-                            disabled={isSaving || !hasChanges}
-                            className={`px-5 py-2.5 rounded-xl border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-1.5 transition-all ${
-                                hasChanges
-                                    ? "bg-black text-[#a2ff86] hover:bg-neutral-800 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                                    : "bg-neutral-100 text-neutral-400 cursor-not-allowed opacity-75"
-                            }`}
-                        >
-                            {isSaving ? (
-                                <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Saving...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-3.5 h-3.5" />
-                                    <span>{hasChanges ? "Save Changes" : "Saved"}</span>
-                                </>
-                            )}
-                        </button>
-                    )}
                 </div>
             </div>
-
-            {/* Missing items helper banner if incomplete */}
-            {completion.missingItems.length > 0 && (
-                <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-2.5">
-                    <Info className="w-4 h-4 text-black shrink-0" />
-                    <p className="text-xs font-bold text-neutral-800 flex-1">
-                        <span className="font-black text-black">Recommended for 100% showcase strength:</span>{" "}
-                        {completion.missingItems.slice(0, 3).join(", ")}
-                        {completion.missingItems.length > 3 && ` +${completion.missingItems.length - 3} more`}
-                    </p>
-                </div>
-            )}
 
             {/* ========================================================================= */}
             {/* HORIZONTAL SECTION NAVIGATION PILLS */}
@@ -1349,28 +1261,28 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                 </div>
             )}
 
-            {/* Bottom Save Bar (Sticky or bottom helper) */}
-            {hasChanges && (
-                <div className="p-4 rounded-xl bg-black text-white border-2 border-black shadow-[4px_4px_0px_#000] flex items-center justify-between gap-4 animate-in slide-in-from-bottom-2 duration-150">
-                    <div className="flex items-center gap-2 text-xs font-bold">
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#FFE566] animate-pulse" />
-                        <span>You have unsaved changes in your club profile.</span>
-                    </div>
+            {/* Centered Bottom Save Changes Button */}
+            {canManage && (
+                <div className="pt-6 pb-6 flex justify-center items-center">
                     <button
                         type="button"
                         onClick={() => handleSaveProfile()}
-                        disabled={isSaving}
-                        className="px-5 py-2 rounded-lg bg-[#a2ff86] text-black hover:bg-[#8ee675] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5"
+                        disabled={isSaving || !hasChanges}
+                        className={`px-8 py-3 rounded-xl border-2 border-black text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 transition-all ${
+                            hasChanges
+                                ? "bg-[#a2ff86] text-black hover:bg-[#8ee675] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                                : "bg-neutral-100 text-neutral-400 cursor-not-allowed opacity-75"
+                        }`}
                     >
                         {isSaving ? (
                             <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                <Loader2 className="w-4 h-4 animate-spin" />
                                 <span>Saving Changes...</span>
                             </>
                         ) : (
                             <>
-                                <Save className="w-3.5 h-3.5" />
-                                <span>Save Changes</span>
+                                <Save className="w-4 h-4" />
+                                <span>{hasChanges ? "Save Changes" : "Saved"}</span>
                             </>
                         )}
                     </button>

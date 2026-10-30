@@ -18,7 +18,7 @@ import {
     AlertTriangle,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
-import { useAppSelector, useAppDispatch, updateUserProfile } from "../../store";
+import { useAppDispatch, updateUserProfile } from "../../store";
 import {
     fetchResumeDetailsApi,
     reAnalyzeResumeApi,
@@ -45,7 +45,6 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
 }) => {
     const toast = useToast();
     const dispatch = useAppDispatch();
-    const user = useAppSelector((state) => state.user.user);
 
     // Resume Profile Data & Gemini Analysis Report
     const [resumeData, setResumeData] = useState<ResumeProfileData | null>(null);
@@ -341,19 +340,6 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                         offStatusText="Status: Private"
                                         ariaLabel="Toggle resume visibility on profile"
                                     />
-
-                                    {user?.username && (
-                                        <a
-                                            href={`/profile/u/${user.username}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#FAF6EE] text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all"
-                                            title="View your public developer profile"
-                                        >
-                                            <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
-                                            <span className="hidden sm:inline">View Profile</span>
-                                        </a>
-                                    )}
                                 </div>
                             </div>
 
