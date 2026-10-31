@@ -418,7 +418,7 @@ export const ProfileHeader = ({ isEmbedded, isDemo }: { isEmbedded?: boolean; is
                 <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-black font-black text-sm transition-transform duration-200 group-hover:scale-105">
                     <OrbixLogoMark className="w-full h-full text-black" />
                 </div>
-                <span className="font-extrabold text-neutral-950 text-2xl sm:text-3xl tracking-tight group-hover:text-black transition-colors">
+                <span className="font-black text-black text-2xl sm:text-3xl tracking-tight leading-none group-hover:text-black transition-colors">
                     Orbix
                 </span>
             </Link>

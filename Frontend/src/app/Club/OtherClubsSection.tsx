@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import {
     Search,
     Building2,
@@ -6,32 +7,48 @@ import {
     RefreshCw,
     X,
     AlertCircle,
+    Sparkles,
+    ExternalLink,
+    Edit3,
+    GraduationCap,
+    Check,
+    Copy,
+    Rocket,
 } from "lucide-react";
 import { fetchCollegeClubs, type CollegeClubItem } from "../../utils/clubProfileApi";
 import { ClubCard } from "../../components/ClubCard";
 import { ClubDetailModal } from "../../components/ClubDetailModal";
 import { NeoSelect } from "../../components/NeoSelect";
+import { useToast } from "../../context/ToastContext";
 
 interface OtherClubsSectionProps {
     currentClubId: string;
     currentClubSlug?: string;
     collegeId?: string;
     collegeName?: string;
+    currentClubData?: any;
     onNavigateToEditProfile?: () => void;
+    onNavigateToTab?: (tab: "overview" | "team" | "events" | "profile" | "settings") => void;
 }
 
 export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
     currentClubId,
+    currentClubSlug,
     collegeId,
     collegeName,
+    currentClubData,
     onNavigateToEditProfile,
 }) => {
+    const toast = useToast();
     const [clubs, setClubs] = useState<CollegeClubItem[]>([]);
-    const [resolvedCollegeName, setResolvedCollegeName] = useState<string>(collegeName || "");
+    const [resolvedCollegeName, setResolvedCollegeName] = useState<string>(
+        collegeName || currentClubData?.college_name || ""
+    );
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [copiedInvite, setCopiedInvite] = useState(false);
 
-    // Filters state
+    // Filters state for peer clubs
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("all");
     const [onlyRecruiting, setOnlyRecruiting] = useState<boolean>(false);
@@ -39,22 +56,100 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
     // Modal state for full expanded details
     const [selectedClubForModal, setSelectedClubForModal] = useState<CollegeClubItem | null>(null);
 
+    // Helper to synthesize a CollegeClubItem for the current club if missing from backend response
+    const buildSynthesizedSelf = (): CollegeClubItem | null => {
+        if (!currentClubData && !currentClubId) return null;
+        const d = currentClubData || {};
+        return {
+            id: currentClubId,
+            name: d.name || "Your Chapter",
+            slug: d.slug || currentClubSlug || "chapter",
+            clubUsername: d.clubUsername || d.slug || currentClubSlug,
+            category: d.category || "Organization",
+            collegeId: d.college_id || d.collegeId || collegeId,
+            collegeName: d.college_name || d.collegeName || resolvedCollegeName || collegeName || "Your College",
+            collegeCity: d.college_city || d.collegeCity || "",
+            collegeState: d.college_state || d.collegeState || "",
+            collegeCountry: d.college_country || d.collegeCountry || "India",
+            shortDescription: d.short_description || d.shortDescription || null,
+            about: d.about || null,
+            mission: d.mission || null,
+            vision: d.vision || null,
+            logoUrl: d.logo_url || d.logoUrl || null,
+            coverImageUrl: d.cover_image_url || d.coverImageUrl || null,
+            websiteUrl: d.website_url || d.websiteUrl || null,
+            publicEmail: d.public_email || d.publicEmail || null,
+            contactPhone: d.contact_phone || d.contactPhone || null,
+            socialLinks: d.social_links || d.socialLinks || {},
+            foundedYear: d.founded_year || d.foundedYear || null,
+            operatingStatus: "active",
+            focusAreas: d.focus_areas || d.focusAreas || [],
+            publicationStatus: "published",
+            profileVisibility: "public",
+            recruitmentStatus: d.recruitment_status || d.recruitmentStatus || "closed",
+            recruitmentAnnouncement: d.recruitment_announcement || d.recruitmentAnnouncement || null,
+            recruitmentUrl: d.recruitment_url || d.recruitmentUrl || null,
+            isActive: true,
+            verifiedAt: d.verified_at || d.verifiedAt || new Date().toISOString(),
+            createdAt: d.created_at || d.createdAt || new Date().toISOString(),
+            updatedAt: d.updated_at || d.updatedAt || new Date().toISOString(),
+            memberCount: 0,
+            eventsCount: 0,
+            achievementsCount: 0,
+            coordinatorsCount: 0,
+            isCurrentClub: true,
+            coordinators: [],
+            achievements: [],
+        };
+    };
+
     const loadClubs = async () => {
         setLoading(true);
         setError(null);
         try {
             const data = await fetchCollegeClubs({
                 collegeId,
-                collegeName,
+                collegeName: collegeName || resolvedCollegeName || currentClubData?.college_name,
                 clubId: currentClubId,
             });
-            setClubs(data.clubs || []);
-            if (data.collegeName) {
-                setResolvedCollegeName(data.collegeName);
+
+            const fetchedClubs: CollegeClubItem[] = Array.isArray(data.clubs) ? data.clubs : [];
+            const collegeFound = data.collegeName || collegeName || currentClubData?.college_name || "";
+            if (collegeFound) {
+                setResolvedCollegeName(collegeFound);
+            }
+
+            // Guarantee that the current club is ALWAYS part of the listing
+            const hasSelf = fetchedClubs.some(
+                (c) => c.id === currentClubId || c.isCurrentClub || (currentClubSlug && c.slug === currentClubSlug)
+            );
+
+            if (!hasSelf) {
+                const selfClubFallback = buildSynthesizedSelf();
+                if (selfClubFallback) {
+                    setClubs([selfClubFallback, ...fetchedClubs]);
+                } else {
+                    setClubs(fetchedClubs);
+                }
+            } else {
+                // Ensure isCurrentClub is explicitly true on the user's club item
+                const markedClubs = fetchedClubs.map((c) => {
+                    if (c.id === currentClubId || (currentClubSlug && c.slug === currentClubSlug)) {
+                        return { ...c, isCurrentClub: true };
+                    }
+                    return c;
+                });
+                setClubs(markedClubs);
             }
         } catch (err: any) {
             console.error("Failed to load college clubs:", err);
             setError(err.message || "Failed to load campus clubs.");
+
+            // Even on error, fallback to showing self so page is NEVER blank
+            const selfClubFallback = buildSynthesizedSelf();
+            if (selfClubFallback) {
+                setClubs([selfClubFallback]);
+            }
         } finally {
             setLoading(false);
         }
@@ -64,7 +159,22 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
         loadClubs();
     }, [currentClubId, collegeId, collegeName]);
 
-    // Unique categories extracted from available clubs
+    // Split clubs into self and peers
+    const selfClub = useMemo(() => {
+        return (
+            clubs.find(
+                (c) => c.id === currentClubId || c.isCurrentClub || (currentClubSlug && c.slug === currentClubSlug)
+            ) || buildSynthesizedSelf()
+        );
+    }, [clubs, currentClubId, currentClubSlug, currentClubData]);
+
+    const peerClubs = useMemo(() => {
+        return clubs.filter(
+            (c) => c.id !== currentClubId && !c.isCurrentClub && (!currentClubSlug || c.slug !== currentClubSlug)
+        );
+    }, [clubs, currentClubId, currentClubSlug]);
+
+    // Unique categories extracted from available peer clubs
     const availableCategories = useMemo(() => {
         const set = new Set<string>();
         clubs.forEach((c) => {
@@ -75,9 +185,9 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
         return Array.from(set);
     }, [clubs]);
 
-    // Filtered clubs
-    const filteredClubs = useMemo(() => {
-        return clubs.filter((c) => {
+    // Filtered peer clubs
+    const filteredPeerClubs = useMemo(() => {
+        return peerClubs.filter((c) => {
             // Search query matching
             if (searchQuery.trim()) {
                 const q = searchQuery.toLowerCase().trim();
@@ -108,40 +218,62 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
 
             return true;
         });
-    }, [clubs, searchQuery, selectedCategory, onlyRecruiting]);
+    }, [peerClubs, searchQuery, selectedCategory, onlyRecruiting]);
+
+    const displayCollegeName = resolvedCollegeName || collegeName || currentClubData?.college_name || "Your College Campus";
+
+    const handleCopyCampusInvite = () => {
+        const inviteUrl = `${window.location.origin}/auth/signup?ref=campus-invite&college=${encodeURIComponent(displayCollegeName)}`;
+        navigator.clipboard.writeText(inviteUrl);
+        setCopiedInvite(true);
+        toast.success("Campus invitation link copied! Share with presidents and leads of other clubs.", {
+            title: "Invite Link Copied",
+        });
+        setTimeout(() => setCopiedInvite(false), 2500);
+    };
 
     return (
         <div className="space-y-6">
             {/* Header Showcase Card */}
             <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-1.5 max-w-2xl">
+                <div className="space-y-2 max-w-2xl">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] text-black border border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] text-black border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
                             <Building2 className="w-3.5 h-3.5 stroke-[2.5]" />
                             Collegiate Directory
                         </span>
-                        {resolvedCollegeName && (
-                            <span className="text-xs sm:text-sm font-black text-black">
-                                {resolvedCollegeName}
+                        {displayCollegeName && (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-[#a2ff86] text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
+                                <GraduationCap className="w-3.5 h-3.5 stroke-[2.5]" />
+                                {displayCollegeName}
                             </span>
                         )}
                     </div>
                     <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
-                        Explore Campus Chapters & Peer Clubs
+                        Campus Chapters & Student Organizations
                     </h2>
                     <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
-                        Discover official student chapters across your college. Review peer initiatives, cross-collaborate on upcoming hackathons or workshops, and see how prospective recruits perceive your own chapter.
+                        Official directory of verified student organizations at <strong className="text-black">{displayCollegeName}</strong>. Explore peer initiatives, co-host inter-club events, and see how prospective recruits discover campus chapters.
                     </p>
                 </div>
 
-                {/* Right Quick Summary Badge */}
+                {/* Right Quick Summary Badges */}
                 <div className="flex items-center gap-3">
-                    <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center min-w-[120px]">
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center min-w-[95px] sm:min-w-[110px]">
                         <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
                             Campus Clubs
                         </span>
-                        <span className="text-2xl font-black text-black">
+                        <span className="text-xl sm:text-2xl font-black text-black">
                             {clubs.length}
+                        </span>
+                    </div>
+
+                    <div className="p-3.5 sm:p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center min-w-[95px] sm:min-w-[110px]">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                            Peer Clubs
+                        </span>
+                        <span className="text-xl sm:text-2xl font-black text-black">
+                            {peerClubs.length}
                         </span>
                     </div>
 
@@ -157,62 +289,48 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                 </div>
             </div>
 
-            {/* Filter & Search Bar */}
-            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-                {/* Search input */}
-                <div className="relative flex-1">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
-                    <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search clubs by name, domain (#AI, #Web3, #Design), or keywords..."
-                        className="w-full pl-10 pr-9 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-black"
-                    />
-                    {searchQuery && (
-                        <button
-                            type="button"
-                            onClick={() => setSearchQuery("")}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black cursor-pointer"
-                        >
-                            <X className="w-3.5 h-3.5" />
-                        </button>
-                    )}
-                </div>
+            {/* Smart Remarkness Banner: When No Other Clubs Are on Campus Yet */}
+            {!loading && peerClubs.length === 0 && (
+                <div className="p-5 sm:p-6 rounded-2xl bg-[#FFE566]/25 border-2 border-black shadow-[4px_4px_0px_#000] relative overflow-hidden">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 relative z-10">
+                        <div className="space-y-1.5 max-w-2xl">
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FFE566] border border-black text-[10px] sm:text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                <Rocket className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>Pioneer Chapter on Campus</span>
+                            </div>
+                            <h3 className="text-lg sm:text-xl font-black text-black tracking-tight">
+                                Your Chapter is Leading the Way at {displayCollegeName}!
+                            </h3>
+                            <p className="text-xs sm:text-sm text-neutral-800 font-medium leading-relaxed">
+                                Currently, no other student clubs from <strong className="text-black">{displayCollegeName}</strong> have registered on Orbix yet. Your club has exclusive campus visibility! Invite neighboring technical societies, cultural clubs, or council leads to join Orbix to co-host hackathons and cross-promote events.
+                            </p>
+                        </div>
 
-                {/* Category NeoSelect & Recruiting Toggle */}
-                <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-                    <div className="w-full sm:w-56">
-                        <NeoSelect
-                            value={selectedCategory}
-                            onChange={(val) => setSelectedCategory(val)}
-                            options={[
-                                { value: "all", label: "All Categories" },
-                                ...availableCategories.map((cat) => ({
-                                    value: cat,
-                                    label: cat,
-                                })),
-                            ]}
-                            size="sm"
-                            className="w-full"
-                            triggerClassName="h-9 font-bold bg-[#FAF6EE] text-xs border-2 border-black shadow-[1.5px_1.5px_0px_#000]"
-                        />
+                        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap shrink-0">
+                            <button
+                                type="button"
+                                onClick={handleCopyCampusInvite}
+                                className="px-3.5 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                            >
+                                {copiedInvite ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                                <span>{copiedInvite ? "Link Copied!" : "Invite Peer Clubs"}</span>
+                            </button>
+
+                            {selfClub && (
+                                <Link
+                                    to={`/clubs/${selfClub.slug}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-1.5 cursor-pointer"
+                                >
+                                    <span>Preview Public Page</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </Link>
+                            )}
+                        </div>
                     </div>
-
-                    <button
-                        type="button"
-                        onClick={() => setOnlyRecruiting((prev) => !prev)}
-                        className={`px-3 py-2 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-                            onlyRecruiting
-                                ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
-                                : "bg-[#FAF6EE] text-neutral-700 hover:text-black shadow-[1.5px_1.5px_0px_#000]"
-                        }`}
-                    >
-                        <Radio className={`w-3 h-3 ${onlyRecruiting ? "text-black stroke-[3]" : "text-neutral-400"}`} />
-                        <span>Recruiting Only</span>
-                    </button>
                 </div>
-            </div>
+            )}
 
             {/* Error Message if fetch fails */}
             {error && (
@@ -254,14 +372,174 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                 </div>
             )}
 
-            {/* Clubs Grid Showcase */}
-            {!loading && filteredClubs.length > 0 && (
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between px-1 text-xs font-bold text-neutral-600">
-                        <span>
-                            Showing <strong>{filteredClubs.length}</strong> of <strong>{clubs.length}</strong> campus chapter{clubs.length === 1 ? "" : "s"}
-                        </span>
-                        {(searchQuery || selectedCategory !== "all" || onlyRecruiting) && (
+            {/* Section 1: YOUR CLUB ON CAMPUS (Always Visible & Prominently Displayed) */}
+            {!loading && selfClub && (
+                <div className="space-y-3">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-[#FFE566] text-black border border-black text-[11px] font-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                <Sparkles className="w-3 h-3 fill-black stroke-none" />
+                                Your Chapter
+                            </span>
+                            <span className="text-xs sm:text-sm font-black text-black">
+                                How your club appears in the campus directory
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            {onNavigateToEditProfile && (
+                                <button
+                                    type="button"
+                                    onClick={onNavigateToEditProfile}
+                                    className="text-xs font-black text-black hover:underline cursor-pointer flex items-center gap-1"
+                                >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                    <span>Edit Profile</span>
+                                </button>
+                            )}
+                            <Link
+                                to={`/clubs/${selfClub.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xs font-black text-neutral-700 hover:text-black hover:underline cursor-pointer flex items-center gap-1"
+                            >
+                                <span>Public View</span>
+                                <ExternalLink className="w-3.5 h-3.5" />
+                            </Link>
+                        </div>
+                    </div>
+
+                    <div className="max-w-md sm:max-w-lg">
+                        <ClubCard
+                            club={selfClub}
+                            isCurrentClub={true}
+                            onSelect={(selected) => setSelectedClubForModal(selected)}
+                        />
+                    </div>
+                </div>
+            )}
+
+            {/* Section 2: PEER CAMPUS CLUBS */}
+            {!loading && (
+                <div className="space-y-4 pt-2">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="space-y-0.5">
+                            <h3 className="text-lg font-black text-black tracking-tight">
+                                Peer Chapters & Organizations ({peerClubs.length})
+                            </h3>
+                            <p className="text-xs font-medium text-neutral-600">
+                                Other active student societies registered at {displayCollegeName}
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Filter & Search Bar - only show if peer clubs exist */}
+                    {peerClubs.length > 0 && (
+                        <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                            {/* Search input */}
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-500" />
+                                <input
+                                    type="text"
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    placeholder="Search peer clubs by name, domain (#AI, #Web3, #Design), or keywords..."
+                                    className="w-full pl-10 pr-9 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-black"
+                                />
+                                {searchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setSearchQuery("")}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black cursor-pointer"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Category NeoSelect & Recruiting Toggle */}
+                            <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                                <div className="w-full sm:w-56">
+                                    <NeoSelect
+                                        value={selectedCategory}
+                                        onChange={(val) => setSelectedCategory(val)}
+                                        options={[
+                                            { value: "all", label: "All Categories" },
+                                            ...availableCategories.map((cat) => ({
+                                                value: cat,
+                                                label: cat,
+                                            })),
+                                        ]}
+                                        size="sm"
+                                        className="w-full"
+                                        triggerClassName="h-9 font-bold bg-[#FAF6EE] text-xs border-2 border-black shadow-[1.5px_1.5px_0px_#000]"
+                                    />
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setOnlyRecruiting((prev) => !prev)}
+                                    className={`px-3 py-2 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
+                                        onlyRecruiting
+                                            ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                            : "bg-[#FAF6EE] text-neutral-700 hover:text-black shadow-[1.5px_1.5px_0px_#000]"
+                                    }`}
+                                >
+                                    <Radio className={`w-3 h-3 ${onlyRecruiting ? "text-black stroke-[3]" : "text-neutral-400"}`} />
+                                    <span>Recruiting Only</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Filter stats bar */}
+                    {peerClubs.length > 0 && (
+                        <div className="flex items-center justify-between px-1 text-xs font-bold text-neutral-600">
+                            <span>
+                                Showing <strong>{filteredPeerClubs.length}</strong> of <strong>{peerClubs.length}</strong> peer chapter{peerClubs.length === 1 ? "" : "s"}
+                            </span>
+                            {(searchQuery || selectedCategory !== "all" || onlyRecruiting) && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setSearchQuery("");
+                                        setSelectedCategory("all");
+                                        setOnlyRecruiting(false);
+                                    }}
+                                    className="text-black font-black underline hover:no-underline cursor-pointer"
+                                >
+                                    Reset all filters
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Peer Clubs Grid */}
+                    {filteredPeerClubs.length > 0 && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+                            {filteredPeerClubs.map((clubItem) => (
+                                <ClubCard
+                                    key={clubItem.id}
+                                    club={clubItem}
+                                    isCurrentClub={false}
+                                    onSelect={(selected) => setSelectedClubForModal(selected)}
+                                />
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Empty Filter State (When peer clubs exist but search returned 0) */}
+                    {peerClubs.length > 0 && filteredPeerClubs.length === 0 && (
+                        <div className="p-8 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] text-center space-y-3 max-w-md mx-auto my-6">
+                            <div className="w-12 h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
+                                <Search className="w-6 h-6 text-black stroke-[2.2]" />
+                            </div>
+                            <h4 className="text-base font-black text-black">
+                                No peer clubs match your search
+                            </h4>
+                            <p className="text-xs text-neutral-600 font-medium">
+                                We couldn't find any peer clubs matching &ldquo;{searchQuery}&rdquo;. Try checking your spelling or clearing filters.
+                            </p>
                             <button
                                 type="button"
                                 onClick={() => {
@@ -269,55 +547,36 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                                     setSelectedCategory("all");
                                     setOnlyRecruiting(false);
                                 }}
-                                className="text-black font-black underline hover:no-underline cursor-pointer"
+                                className="px-3.5 py-1.5 rounded-xl bg-black text-[#a2ff86] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer"
                             >
-                                Reset all filters
+                                Clear Search Filters
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-                        {filteredClubs.map((clubItem) => (
-                            <ClubCard
-                                key={clubItem.id}
-                                club={clubItem}
-                                isCurrentClub={clubItem.id === currentClubId || clubItem.isCurrentClub}
-                                onSelect={(selected) => setSelectedClubForModal(selected)}
-                            />
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Empty State when no clubs match */}
-            {!loading && filteredClubs.length === 0 && (
-                <div className="p-10 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-center space-y-4 max-w-xl mx-auto my-8">
-                    <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
-                        <Building2 className="w-7 h-7 text-black stroke-[2.2]" />
-                    </div>
-                    <div className="space-y-1">
-                        <h3 className="text-lg font-black text-black">
-                            No campus clubs found
-                        </h3>
-                        <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                            {searchQuery || selectedCategory !== "all" || onlyRecruiting
-                                ? "No clubs match your current search query or active filters. Try adjusting your search keywords."
-                                : `No other verified student organizations have registered for ${resolvedCollegeName || "this institution"} yet.`}
-                        </p>
-                    </div>
-
-                    {(searchQuery || selectedCategory !== "all" || onlyRecruiting) && (
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSearchQuery("");
-                                setSelectedCategory("all");
-                                setOnlyRecruiting(false);
-                            }}
-                            className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer"
-                        >
-                            Clear All Filters
-                        </button>
+                    {/* When no other clubs exist on campus yet */}
+                    {peerClubs.length === 0 && (
+                        <div className="p-8 rounded-2xl bg-white border-2 border-dashed border-black/30 text-center space-y-3 max-w-lg mx-auto my-4">
+                            <div className="w-12 h-12 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
+                                <Building2 className="w-6 h-6 text-neutral-600 stroke-[2]" />
+                            </div>
+                            <div className="space-y-1">
+                                <h4 className="text-sm sm:text-base font-black text-black">
+                                    No other clubs from {displayCollegeName} yet
+                                </h4>
+                                <p className="text-xs text-neutral-500 font-medium max-w-md mx-auto">
+                                    When other student clubs at your college (IEEE, Coding Club, Cultural Society, Sports Council, etc.) register on Orbix, their profiles and events will show up right here.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleCopyCampusInvite}
+                                className="px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ebd04e] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5"
+                            >
+                                <Copy className="w-3.5 h-3.5" />
+                                <span>{copiedInvite ? "Invite Copied!" : "Share Campus Invite"}</span>
+                            </button>
+                        </div>
                     )}
                 </div>
             )}

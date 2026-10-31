@@ -352,13 +352,11 @@ export default function ClubStatusPage() {
                 <div className="flex items-center gap-3">
                     <Link
                         to="/"
-                        className="flex items-center gap-2 group"
+                        className="flex items-center gap-2.5 group hover:opacity-85 transition-opacity"
                         title="Orbix Home"
                     >
-                        <div className="w-8 h-8 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center p-1.5 shadow-[1.5px_1.5px_0px_#000] group-hover:scale-105 transition-transform flex-shrink-0">
-                            <OrbixLogo className="w-full h-full text-black" />
-                        </div>
-                        <span className="font-black text-lg tracking-tight text-black group-hover:text-neutral-700 transition-colors">
+                        <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                        <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none group-hover:text-neutral-700 transition-colors">
                             Orbix
                         </span>
                     </Link>

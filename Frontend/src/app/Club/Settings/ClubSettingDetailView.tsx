@@ -1144,13 +1144,11 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
             case "about":
                 return (
                     <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-6">
-                        <div className="flex items-center gap-4 border-b-2 border-black/15 pb-5">
-                            <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_#000] shrink-0">
-                                <OrbixLogo className="w-8 h-8 text-black" />
-                            </div>
+                        <div className="flex items-center gap-3.5 border-b-2 border-black/15 pb-5">
+                            <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black flex-shrink-0" />
                             <div className="space-y-0.5">
-                                <h3 className="text-2xl font-black text-black">Orbix for Student Organizations</h3>
-                                <p className="text-xs font-mono font-bold text-neutral-600">Version 2.4.0 (Build 2026.10)</p>
+                                <h3 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-none">Orbix for Student Organizations</h3>
+                                <p className="text-xs font-mono font-bold text-neutral-600 mt-1">Version 2.4.0 (Build 2026.10)</p>
                             </div>
                         </div>
 

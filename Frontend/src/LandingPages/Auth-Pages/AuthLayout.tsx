@@ -39,11 +39,11 @@ export const AuthLayout = ({
                 <div className="flex items-center mb-4 sm:mb-6">
                     <Link
                         to="/"
-                        className="group inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white text-black font-black text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                        className="group inline-flex items-center gap-2.5 text-black hover:opacity-80 transition-opacity cursor-pointer select-none"
                         title="Back to Orbix Homepage"
                     >
-                        <OrbixLogo className="w-4 h-4 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
-                        <span>Orbix</span>
+                        <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                        <span className="text-2xl sm:text-3xl font-black tracking-tight leading-none text-black">Orbix</span>
                     </Link>
                 </div>
 

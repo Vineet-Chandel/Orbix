@@ -379,12 +379,10 @@ export const ProfileCardStudio: React.FC<ProfileCardStudioProps> = ({
         <div className="rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-5 sm:p-6 flex flex-col space-y-5">
             {/* Studio Header */}
             <div className="flex items-center justify-between pb-4 border-b-2 border-black/10">
-                <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-[#FFE566] text-black border-2 border-black flex items-center justify-center p-1.5 shadow-[2px_2px_0px_#000] flex-shrink-0">
-                        <OrbixLogo className="w-full h-full text-black" />
-                    </div>
+                <div className="flex items-center gap-3">
+                    <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black flex-shrink-0" />
                     <div>
-                        <h2 className="text-base sm:text-lg font-black text-neutral-900 tracking-tight flex items-center gap-2">
+                        <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight leading-none flex items-center gap-2">
                             <span>Orbix Share Card Studio</span>
                         </h2>
                         <p className="text-xs text-neutral-600 font-medium">

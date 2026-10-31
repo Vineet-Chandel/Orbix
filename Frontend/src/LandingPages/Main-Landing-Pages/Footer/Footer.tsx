@@ -67,11 +67,9 @@ export const Footer: React.FC = () => {
                     {/* Brand Column (Spans 4 cols on Desktop) */}
                     <div className="lg:col-span-4 space-y-6">
                         {/* Logo & Title */}
-                        <Link to="/" className="inline-flex items-center gap-3 group">
-                            <div className="w-10 h-10 rounded-xl bg-black text-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center group-hover:scale-105 transition-transform">
-                                <OrbixLogo className="w-7 h-7 text-white" />
-                            </div>
-                            <span className="text-2xl font-black tracking-tight text-black">
+                        <Link to="/" className="inline-flex items-center gap-3 group hover:opacity-85 transition-opacity">
+                            <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                            <span className="text-3xl sm:text-4xl font-black tracking-tight text-black leading-none">
                                 Orbix
                             </span>
                         </Link>

@@ -1065,13 +1065,11 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                 return (
                     <div className="space-y-5">
                         <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center p-2 shadow-[2px_2px_0px_#000] flex-shrink-0">
-                                    <OrbixLogo className="w-full h-full text-black" />
-                                </div>
+                            <div className="flex items-center gap-3.5">
+                                <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black flex-shrink-0" />
                                 <div>
-                                    <h3 className="text-xl font-black text-black">Orbix Privacy Center</h3>
-                                    <p className="text-xs font-mono font-bold text-neutral-600">Zero telemetry selling • Developer First</p>
+                                    <h3 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-none">Orbix Privacy Center</h3>
+                                    <p className="text-xs font-mono font-bold text-neutral-600 mt-1">Zero telemetry selling • Developer First</p>
                                 </div>
                             </div>
                             <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
@@ -1145,13 +1143,11 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             case "about":
                 return (
                     <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center p-2 shadow-[2px_2px_0px_#000] flex-shrink-0">
-                                <OrbixLogo className="w-full h-full text-black" />
-                            </div>
+                        <div className="flex items-center gap-3.5">
+                            <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black flex-shrink-0" />
                             <div>
-                                <h3 className="text-xl font-black text-black">Orbix Platform</h3>
-                                <p className="text-xs font-mono font-bold text-neutral-600">v1.4.0 • Neo-Grotesque Edition</p>
+                                <h3 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-none">Orbix Platform</h3>
+                                <p className="text-xs font-mono font-bold text-neutral-600 mt-1">v1.4.0 • Neo-Grotesque Edition</p>
                             </div>
                         </div>
 

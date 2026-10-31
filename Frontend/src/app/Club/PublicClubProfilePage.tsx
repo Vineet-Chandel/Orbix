@@ -286,8 +286,8 @@ export default function PublicClubProfilePage() {
             <header className="sticky top-0 z-40 bg-[#FAF6EE]/95 backdrop-blur-md border-b-2 border-black">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
                     <Link to="/" className="flex items-center gap-2.5 hover:opacity-85 transition-opacity">
-                        <OrbixLogo className="w-7 h-7" />
-                        <span className="font-black text-lg tracking-tight text-black">Orbix</span>
+                        <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                        <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none">Orbix</span>
                         <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-[#FFE566] border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
                             Clubs Directory
                         </span>

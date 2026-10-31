@@ -1073,7 +1073,7 @@ export class ClubProfileService {
 
     /**
      * Retrieve all verified clubs belonging to the specified or caller's college.
-     * Reusable across Club Dashboard "Other Clubs" and Student Personal "Explore Clubs".
+     * Reusable across Club Dashboard "Campus Clubs" and Student Personal "Explore Clubs".
      */
     static async getCollegeClubs(
         userId?: string | undefined,
@@ -1088,20 +1088,20 @@ export class ClubProfileService {
         let callerClubId = options?.clubId;
 
         // 1. If not explicitly provided and user is authenticated, determine their college and club context
-        if (userId) {
-            // Check if user has an active club workspace
-            if (!callerClubId) {
-                try {
-                    const perms = await ClubTeamService.resolveUserClubPermissions(userId, options?.clubId);
-                    if (perms?.clubId) {
-                        callerClubId = perms.clubId;
-                    }
-                } catch {
-                    // Not a club manager - proceed as normal student/user
+        if (userId && !callerClubId) {
+            try {
+                const perms = await ClubTeamService.resolveUserClubPermissions(userId, options?.clubId);
+                if (perms?.clubId) {
+                    callerClubId = perms.clubId;
                 }
+            } catch {
+                // Not a club manager - proceed as normal student/user
             }
+        }
 
-            if (callerClubId && (!collegeId || !collegeName)) {
+        // 2. If callerClubId is available, resolve collegeId & collegeName directly from verified_clubs
+        if (callerClubId && (!collegeId || !collegeName)) {
+            try {
                 const clubRes = await query(
                     `SELECT college_id, college_name FROM verified_clubs WHERE id = $1 LIMIT 1;`,
                     [callerClubId]
@@ -1110,10 +1110,14 @@ export class ClubProfileService {
                     collegeId = collegeId || clubRes.rows[0].college_id;
                     collegeName = collegeName || clubRes.rows[0].college_name;
                 }
+            } catch {
+                // Ignore query error and fall back
             }
+        }
 
-            // If still no college, check user's registered college in users table
-            if (!collegeId && !collegeName) {
+        // 3. If still no college, check user's registered college in users table
+        if (userId && !collegeId && !collegeName) {
+            try {
                 const userRes = await query(
                     `SELECT college, college_id FROM users WHERE id = $1 LIMIT 1;`,
                     [userId]
@@ -1122,11 +1126,13 @@ export class ClubProfileService {
                     collegeName = userRes.rows[0].college || null;
                     collegeId = userRes.rows[0].college_id || null;
                 }
+            } catch {
+                // Ignore query error
             }
         }
 
-        // If no college could be resolved, return empty result gracefully
-        if (!collegeId && (!collegeName || !collegeName.trim())) {
+        // If no college could be resolved and no club context exists, return empty result gracefully
+        if (!collegeId && (!collegeName || !collegeName.trim()) && !callerClubId) {
             return {
                 collegeName: collegeName || "Your College",
                 collegeId: collegeId || null,
@@ -1137,7 +1143,7 @@ export class ClubProfileService {
 
         const cleanCollegeName = collegeName ? collegeName.trim() : null;
 
-        // 2. Query all verified clubs from this college
+        // 4. Query all verified clubs from this college (and ensure the caller club is always included)
         const clubsRes = await query(
             `SELECT
                 vc.id,
@@ -1199,23 +1205,29 @@ export class ClubProfileService {
                  FROM club_coordinators
                  GROUP BY club_id
              ) cd ON cd.club_id = vc.id
-             WHERE vc.is_active = true
+             WHERE (vc.is_active = true OR ($3::text IS NOT NULL AND vc.id::text = $3))
                AND (
-                   ($1::text IS NOT NULL AND vc.college_id = $1)
+                   ($3::text IS NOT NULL AND vc.id::text = $3)
+                   OR
+                   ($1::text IS NOT NULL AND vc.college_id::text = $1)
                    OR
                    ($2::text IS NOT NULL AND LOWER(TRIM(vc.college_name)) = LOWER(TRIM($2)))
                )
              ORDER BY
-                 CASE WHEN vc.id = $3 THEN 0 ELSE 1 END,
+                 CASE WHEN $3::text IS NOT NULL AND vc.id::text = $3 THEN 0 ELSE 1 END,
                  vc.name ASC;`,
             [collegeId || null, cleanCollegeName, callerClubId || null]
         );
 
         const rows = clubsRes.rows;
+        const currentClubRow = rows.find((r: any) => callerClubId && r.id === callerClubId);
+        const resolvedCollegeName = currentClubRow?.collegeName || cleanCollegeName || rows[0]?.collegeName || "Your College";
+        const resolvedCollegeId = currentClubRow?.collegeId || collegeId || rows[0]?.collegeId || null;
+
         if (rows.length === 0) {
             return {
-                collegeName: cleanCollegeName || "Your College",
-                collegeId: collegeId || null,
+                collegeName: resolvedCollegeName,
+                collegeId: resolvedCollegeId,
                 totalClubs: 0,
                 clubs: [],
             };
@@ -1293,8 +1305,8 @@ export class ClubProfileService {
         });
 
         return {
-            collegeName: rows[0]?.collegeName || cleanCollegeName || "Campus",
-            collegeId: rows[0]?.collegeId || collegeId || null,
+            collegeName: resolvedCollegeName,
+            collegeId: resolvedCollegeId,
             totalClubs: enrichedClubs.length,
             clubs: enrichedClubs,
         };

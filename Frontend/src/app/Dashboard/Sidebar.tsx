@@ -530,14 +530,14 @@ export const Sidebar = ({
                         title="Orbix — AI Powered Ecosystem"
                     >
                         {/* Pure Black Orbix Brand Star Logo (DEAD CENTER when collapsed) */}
-                        <div className="w-7 h-7 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                             <OrbixLogo className="w-full h-full text-black" />
                         </div>
 
                         {/* Title and Subtitle with overflow-x-hidden and whitespace-nowrap */}
                         {isExpanded && (
                             <div className="flex flex-col min-w-0 overflow-x-hidden animate-fadeIn">
-                                <span className="text-base font-black tracking-tight text-black leading-tight whitespace-nowrap truncate">
+                                <span className="text-2xl font-black tracking-tight text-black leading-tight whitespace-nowrap truncate">
                                     Orbix
                                 </span>
                                 <span className="text-[11px] font-bold text-neutral-600 whitespace-nowrap truncate">

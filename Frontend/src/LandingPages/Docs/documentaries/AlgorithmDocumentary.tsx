@@ -312,7 +312,7 @@ export const AlgorithmDocumentary: React.FC = () => {
     ];
 
     return (
-        <article className="space-y-12">
+        <article className="space-y-16 sm:space-y-24">
             {/* ========================================================================= */}
             {/* HERO HEADER: ORBIX SCORE ENGINE                                          */}
             {/* ========================================================================= */}
@@ -386,7 +386,7 @@ export const AlgorithmDocumentary: React.FC = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
                     {/* Global Leaderboard Card */}
                     <div className="p-6 rounded-3xl bg-white border-2 border-black shadow-[5px_5px_0px_#000] space-y-4 flex flex-col justify-between">
                         <div className="space-y-3">
@@ -477,11 +477,11 @@ export const AlgorithmDocumentary: React.FC = () => {
                     </span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 sm:gap-10">
                     {pillars.map((pillar, idx) => (
                         <div
                             key={idx}
-                            className="p-6 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 flex flex-col justify-between"
+                            className="p-7 sm:p-8 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-6 flex flex-col justify-between"
                         >
                             <div className="space-y-3">
                                 <div className="flex items-center justify-between gap-2">

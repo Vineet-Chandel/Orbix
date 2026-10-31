@@ -109,14 +109,14 @@ export const ClubSidebar = ({
                         title="Orbix — Empowering Dev Workflows"
                     >
                         {/* Pure Black Orbix Brand Star Logo (DEAD CENTER when collapsed) */}
-                        <div className="w-7 h-7 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                             <OrbixLogo className="w-full h-full text-black" />
                         </div>
 
                         {/* Title and Subtitle with overflow-x-hidden and whitespace-nowrap */}
                         {isExpanded && (
                             <div className="flex flex-col min-w-0 overflow-x-hidden text-left animate-fadeIn">
-                                <span className="text-base font-black tracking-tight text-black leading-tight whitespace-nowrap truncate">
+                                <span className="text-2xl font-black tracking-tight text-black leading-tight whitespace-nowrap truncate">
                                     Orbix
                                 </span>
                                 <span className="text-[11px] font-bold text-neutral-600 whitespace-nowrap truncate">
@@ -347,7 +347,7 @@ export const ClubSidebar = ({
                                 ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
-                        title={!isExpanded ? "Other Clubs" : undefined}
+                        title={!isExpanded ? "Campus Clubs" : undefined}
                     >
                         <span
                             className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
@@ -374,7 +374,7 @@ export const ClubSidebar = ({
                                             : "text-neutral-800 font-bold"
                                     }`}
                                 >
-                                    Other Clubs
+                                    Campus Clubs
                                 </span>
                             )}
                         </div>
@@ -506,7 +506,7 @@ export const ClubSidebar = ({
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
                             <Building2 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
-                            <span className="truncate">Other Clubs</span>
+                            <span className="truncate">Campus Clubs</span>
                         </button>
 
                         <button

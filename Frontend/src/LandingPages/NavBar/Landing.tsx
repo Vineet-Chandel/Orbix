@@ -178,13 +178,10 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                 {/* Brand Logo & Title */}
                 <Link
                     to="/"
-                    className="flex items-center gap-2.5 py-1 mr-1 group rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20"
+                    className="flex items-center gap-2.5 py-1 mr-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20 hover:opacity-85 transition-opacity"
                 >
-                    {/* Logo badge with circular backdrop */}
-                    <div className="w-8 h-8 rounded-full flex items-center justify-center shadow-xs transition-transform duration-200 group-hover:scale-105 text-neutral-950">
-                        <OrbixLogo className="w-7 h-7" />
-                    </div>
-                    <span className="font-semibold text-neutral-950 tracking-tight text-sm sm:text-base">
+                    <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                    <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none">
                         Orbix
                     </span>
                 </Link>

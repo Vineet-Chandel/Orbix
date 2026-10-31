@@ -168,15 +168,15 @@ export const ClubVerificationDocumentary: React.FC = () => {
     };
 
     return (
-        <article className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-12">
+        <article className="space-y-16 sm:space-y-24">
             {/* ========================================================================= */}
             {/* DOCUMENTARY HERO HEADER                                                   */}
             {/* ========================================================================= */}
-            <header className="space-y-5 pb-8 border-b-2 border-black/15">
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] text-black font-mono font-black text-xs border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
-                        <OrbixLogo className="w-3.5 h-3.5 text-black" />
-                        <span>Campus Trust Protocol</span>
+            <header className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-6">
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="inline-flex items-center gap-2 text-black font-black text-base sm:text-lg">
+                        <OrbixLogo className="w-5 h-5 text-black flex-shrink-0" />
+                        <span>Orbix Campus Trust Protocol</span>
                     </span>
                     <span className="text-xs font-mono font-bold text-neutral-500">
                         10 min read • Published for Public Transparency
@@ -223,7 +223,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                 </p>
 
                 {/* Account Isolation Notice Box */}
-                <div className="p-5 rounded-2xl bg-[#FFE566]/25 border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                <div className="p-6 rounded-2xl bg-[#FFE566]/20 border border-black/15 space-y-2.5">
                     <div className="flex items-center gap-2">
                         <Lock className="w-5 h-5 text-black stroke-[2.5]" />
                         <h3 className="text-sm sm:text-base font-black text-black">
@@ -254,9 +254,9 @@ export const ClubVerificationDocumentary: React.FC = () => {
                 </p>
 
                 {/* 5-Stage Interactive / Visual Timeline Breakdown */}
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-3.5 pt-2">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-5 pt-3">
                     {/* Stage 1 */}
-                    <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between space-y-2">
+                    <div className="p-5 rounded-2xl bg-white border border-black/15 shadow-[2px_2px_0px_#000] flex flex-col justify-between space-y-3">
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
                                 <span className="font-mono text-[10px] font-black text-neutral-500">01</span>
@@ -277,7 +277,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                     </div>
 
                     {/* Stage 2 */}
-                    <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between space-y-2">
+                    <div className="p-5 rounded-2xl bg-white border border-black/15 shadow-[2px_2px_0px_#000] flex flex-col justify-between space-y-3">
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
                                 <span className="font-mono text-[10px] font-black text-neutral-500">02</span>
@@ -298,7 +298,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                     </div>
 
                     {/* Stage 3 */}
-                    <div className="p-4 rounded-2xl bg-[#FFE566]/20 border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between space-y-2">
+                    <div className="p-5 rounded-2xl bg-[#FFE566]/20 border border-black/20 shadow-[2px_2px_0px_#000] flex flex-col justify-between space-y-3">
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
                                 <span className="font-mono text-[10px] font-black text-neutral-500">03</span>
@@ -319,7 +319,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                     </div>
 
                     {/* Stage 4 */}
-                    <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between space-y-2">
+                    <div className="p-5 rounded-2xl bg-white border border-black/15 shadow-[2px_2px_0px_#000] flex flex-col justify-between space-y-3">
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
                                 <span className="font-mono text-[10px] font-black text-neutral-500">04</span>
@@ -340,7 +340,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                     </div>
 
                     {/* Stage 5 */}
-                    <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col justify-between space-y-2">
+                    <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-400 shadow-[2px_2px_0px_#000] flex flex-col justify-between space-y-3">
                         <div>
                             <div className="flex items-center justify-between mb-1.5">
                                 <span className="font-mono text-[10px] font-black text-neutral-500">05</span>
@@ -384,9 +384,9 @@ export const ClubVerificationDocumentary: React.FC = () => {
                 </p>
 
                 {/* 4 Pillars Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 pt-3">
                     {/* Pillar 1 */}
-                    <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
+                    <div className="p-6 sm:p-7 rounded-2xl bg-white border border-black/15 shadow-[3px_3px_0px_#000] space-y-4">
                         <div className="flex items-center gap-2.5">
                             <span className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center font-black text-sm">
                                 1
@@ -404,7 +404,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                     </div>
 
                     {/* Pillar 2 */}
-                    <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
+                    <div className="p-6 sm:p-7 rounded-2xl bg-white border border-black/15 shadow-[3px_3px_0px_#000] space-y-4">
                         <div className="flex items-center gap-2.5">
                             <span className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center font-black text-sm">
                                 2
@@ -422,7 +422,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                     </div>
 
                     {/* Pillar 3 */}
-                    <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
+                    <div className="p-6 sm:p-7 rounded-2xl bg-white border border-black/15 shadow-[3px_3px_0px_#000] space-y-4">
                         <div className="flex items-center gap-2.5">
                             <span className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center font-black text-sm">
                                 3
@@ -440,7 +440,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                     </div>
 
                     {/* Pillar 4 */}
-                    <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
+                    <div className="p-6 sm:p-7 rounded-2xl bg-white border border-black/15 shadow-[3px_3px_0px_#000] space-y-4">
                         <div className="flex items-center gap-2.5">
                             <span className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center font-black text-sm">
                                 4
@@ -462,7 +462,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
             {/* ========================================================================= */}
             {/* SECTION 4: INTERACTIVE REVIEWER INSPECTOR SIMULATOR                      */}
             {/* ========================================================================= */}
-            <section className="space-y-6 rounded-3xl bg-[#FAF6EE] border-2 sm:border-[3px] border-black p-6 sm:p-8 shadow-[5px_5px_0px_#000]">
+            <section className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-8">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-black/15">
                     <div className="space-y-1">
                         <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-black text-[#FFE566] font-mono font-black text-xs">
@@ -515,10 +515,10 @@ export const ClubVerificationDocumentary: React.FC = () => {
                 </div>
 
                 {/* Simulation Inspector Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     {/* Left Panel: Submitted Application Evidence (7 cols) */}
                     <div className="lg:col-span-7 space-y-4">
-                        <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
+                        <div className="p-6 rounded-2xl bg-[#FAF6EE] border border-black/15 space-y-5">
                             <div className="flex items-start justify-between gap-2 border-b border-black/10 pb-3">
                                 <div>
                                     <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
@@ -543,8 +543,8 @@ export const ClubVerificationDocumentary: React.FC = () => {
                                 </span>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-medium">
-                                <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/10 space-y-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-medium">
+                                <div className="p-4 rounded-xl bg-white border border-black/10 space-y-1.5 shadow-sm">
                                     <div className="text-[10px] font-black uppercase text-neutral-500">Representative</div>
                                     <div className="font-bold text-black">{activeApp.repName}</div>
                                     <div className="text-neutral-600">{activeApp.repRole}</div>
@@ -554,7 +554,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/10 space-y-1">
+                                <div className="p-4 rounded-xl bg-white border border-black/10 space-y-1.5 shadow-sm">
                                     <div className="text-[10px] font-black uppercase text-neutral-500">College Credentials</div>
                                     <div className="font-mono text-[11px] font-bold text-black truncate flex items-center gap-1">
                                         <Globe className="w-3 h-3 text-sky-700" />
@@ -591,7 +591,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                             </div>
 
                             {/* Internal Reviewer Notes */}
-                            <div className="p-3.5 rounded-xl bg-amber-50 border border-black/15 text-xs space-y-1">
+                            <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-300 text-xs space-y-1.5">
                                 <div className="font-black text-[10px] uppercase tracking-wider text-amber-900 flex items-center gap-1">
                                     <Lock className="w-3 h-3" />
                                     <span>Staff Internal Audit Notes (Confidential)</span>
@@ -605,7 +605,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
 
                     {/* Right Panel: Reviewer Evaluation Gating Checklist (5 cols) */}
                     <div className="lg:col-span-5 space-y-4">
-                        <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
+                        <div className="p-6 rounded-2xl bg-[#FAF6EE] border border-black/15 space-y-5">
                             <div className="flex items-center justify-between border-b border-black/10 pb-2.5">
                                 <h4 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
                                     <ShieldCheck className="w-4 h-4 text-emerald-600" />
@@ -629,14 +629,14 @@ export const ClubVerificationDocumentary: React.FC = () => {
                                     options={COLLEGE_CONTACT_OPTIONS}
                                     size="sm"
                                     className="w-full"
-                                    triggerClassName="h-9 font-bold bg-[#FAF6EE] text-xs"
+                                    triggerClassName="h-10 font-bold bg-white text-xs"
                                     dropdownClassName="text-xs"
                                 />
                             </div>
 
                             {/* 3 Checkboxes */}
                             <div className="space-y-2.5 pt-1 text-xs font-bold select-none">
-                                <label className="flex items-center gap-2.5 p-2 rounded-xl bg-neutral-50 border border-black/15 cursor-pointer hover:bg-neutral-100">
+                                <label className="flex items-center gap-3 p-3.5 rounded-xl bg-white border border-black/10 hover:border-black/30 cursor-pointer hover:bg-white shadow-sm transition-all">
                                     <input
                                         type="checkbox"
                                         checked={clubExistence}
@@ -646,7 +646,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                                     <span>1. Club Existence Confirmed</span>
                                 </label>
 
-                                <label className="flex items-center gap-2.5 p-2 rounded-xl bg-neutral-50 border border-black/15 cursor-pointer hover:bg-neutral-100">
+                                <label className="flex items-center gap-3 p-3.5 rounded-xl bg-white border border-black/10 hover:border-black/30 cursor-pointer hover:bg-white shadow-sm transition-all">
                                     <input
                                         type="checkbox"
                                         checked={collegeAuth}
@@ -656,7 +656,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                                     <span>2. College Association Confirmed</span>
                                 </label>
 
-                                <label className="flex items-center gap-2.5 p-2 rounded-xl bg-neutral-50 border border-black/15 cursor-pointer hover:bg-neutral-100">
+                                <label className="flex items-center gap-3 p-3.5 rounded-xl bg-white border border-black/10 hover:border-black/30 cursor-pointer hover:bg-white shadow-sm transition-all">
                                     <input
                                         type="checkbox"
                                         checked={repAuthority}
@@ -837,8 +837,8 @@ export const ClubVerificationDocumentary: React.FC = () => {
                     To ensure expedited verification within 24–48 hours, club officers should ensure their application satisfies the following prerequisite artifacts:
                 </p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-start gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8">
+                    <div className="p-6 rounded-2xl bg-white border border-black/15 shadow-[2px_2px_0px_#000] flex items-start gap-4">
                         <div className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center shrink-0">
                             <FileCheck className="w-4 h-4 text-[#FFE566]" />
                         </div>
@@ -850,7 +850,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-start gap-3">
+                    <div className="p-6 rounded-2xl bg-white border border-black/15 shadow-[2px_2px_0px_#000] flex items-start gap-4">
                         <div className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center shrink-0">
                             <Globe className="w-4 h-4 text-[#FFE566]" />
                         </div>
@@ -862,7 +862,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-start gap-3">
+                    <div className="p-6 rounded-2xl bg-white border border-black/15 shadow-[2px_2px_0px_#000] flex items-start gap-4">
                         <div className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center shrink-0">
                             <Users className="w-4 h-4 text-[#FFE566]" />
                         </div>
@@ -874,7 +874,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-start gap-3">
+                    <div className="p-6 rounded-2xl bg-white border border-black/15 shadow-[2px_2px_0px_#000] flex items-start gap-4">
                         <div className="w-8 h-8 rounded-xl bg-black text-white flex items-center justify-center shrink-0">
                             <Phone className="w-4 h-4 text-[#FFE566]" />
                         </div>
@@ -888,7 +888,7 @@ export const ClubVerificationDocumentary: React.FC = () => {
                 </div>
 
                 {/* Call to action */}
-                <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[4px_4px_0px_#000]">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-8 sm:p-10 rounded-3xl bg-[#FFE566] border-2 border-black shadow-[4px_4px_0px_#000] mt-8">
                     <div className="space-y-1 text-center sm:text-left">
                         <h4 className="text-base sm:text-lg font-black text-black">Ready to verify your university club?</h4>
                         <p className="text-xs sm:text-sm font-medium text-neutral-800">

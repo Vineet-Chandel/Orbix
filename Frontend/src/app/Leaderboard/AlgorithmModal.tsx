@@ -119,13 +119,11 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
             >
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b-2 border-black bg-white">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-black text-[#a2ff86] rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center flex-shrink-0">
-                            <OrbixLogo className="w-6 h-6 text-[#a2ff86]" />
-                        </div>
+                    <div className="flex items-center gap-3.5">
+                        <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black flex-shrink-0" />
                         <div>
                             <div className="flex items-center gap-2 flex-wrap">
-                                <h2 className="text-xl sm:text-2xl font-black tracking-tight">Orbix Score Engine</h2>
+                                <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-none">Orbix Score Engine</h2>
                             </div>
                             <p className="text-xs sm:text-sm text-neutral-600 font-medium">
                                 Standard 0 to 10,000 Points • 6 Canonical Pillars • Diminishing Returns Architecture

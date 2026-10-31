@@ -31,6 +31,7 @@ import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
 import type { TeamStats } from "./Team/types";
 import { ClubProfileManager } from "./Profile/ClubProfileManager";
 import { ClubSettingsView } from "./Settings/ClubSettingsView";
+import { OtherClubsSection } from "./OtherClubsSection";
 
 interface VerifiedClub {
     id: string;
@@ -121,7 +122,7 @@ export default function ClubDashboardPage() {
     // Navigation & URL Tab Sync
     const [searchParams, setSearchParams] = useSearchParams();
     const tabFromUrl = searchParams.get("tab") as ClubTab | null;
-    const initialTab: ClubTab = (tabFromUrl === "team" || tabFromUrl === "events" || tabFromUrl === "profile" || tabFromUrl === "settings") ? tabFromUrl : "overview";
+    const initialTab: ClubTab = (tabFromUrl === "team" || tabFromUrl === "events" || tabFromUrl === "profile" || tabFromUrl === "settings" || tabFromUrl === "clubs") ? tabFromUrl : "overview";
     const [activeTab, setActiveTabState] = useState<ClubTab>(initialTab);
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
@@ -146,7 +147,7 @@ export default function ClubDashboardPage() {
     // Update activeTab when browser back/forward or deep-link changes
     useEffect(() => {
         const currentTab = searchParams.get("tab") as ClubTab | null;
-        if (currentTab === "team" || currentTab === "events" || currentTab === "profile" || currentTab === "settings") {
+        if (currentTab === "team" || currentTab === "events" || currentTab === "profile" || currentTab === "settings" || currentTab === "clubs") {
             setActiveTabState(currentTab);
         } else {
             setActiveTabState("overview");
@@ -548,6 +549,17 @@ export default function ClubDashboardPage() {
                                     )}
 
 
+                                    {activeTab === "clubs" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Building2 className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Campus Chapters & Directory
+                                            </h1>
+                                        </div>
+                                    )}
+
                                     {activeTab === "settings" && (
                                         <div className="flex items-center gap-2.5">
                                             <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
@@ -609,6 +621,21 @@ export default function ClubDashboardPage() {
                                         </>
                                     )}
 
+                                    {activeTab === "clubs" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Campus Directory
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Discover student chapters, cross-club collaborations & peer initiatives
+                                            </span>
+                                            {club.college_name && (
+                                                <span className="text-xs font-bold text-neutral-500 hidden md:inline">
+                                                    · {club.college_name}
+                                                </span>
+                                            )}
+                                        </>
+                                    )}
 
                                     {activeTab === "settings" && (
                                         <>
@@ -1315,6 +1342,19 @@ export default function ClubDashboardPage() {
                             </div>
                         )}
 
+
+                        {/* TAB: CAMPUS CLUBS & DIRECTORY */}
+                        {activeTab === "clubs" && (
+                            <OtherClubsSection
+                                currentClubId={club.id}
+                                currentClubSlug={club.slug}
+                                collegeId={(club as any).college_id || (club as any).collegeId}
+                                collegeName={club.college_name}
+                                currentClubData={club}
+                                onNavigateToEditProfile={() => handleTabChange("profile")}
+                                onNavigateToTab={handleTabChange}
+                            />
+                        )}
 
                         {/* TAB: CLUB SETTINGS & PREFERENCES */}
                         {activeTab === "settings" && (
