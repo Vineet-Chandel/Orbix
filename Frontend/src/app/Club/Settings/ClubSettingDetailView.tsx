@@ -34,6 +34,7 @@ import {
     sendClubEmailVerificationOtp,
     confirmClubEmailVerificationOtp,
 } from "../../../api/clubSettingsApi";
+import { submitFAQFeedback } from "../../../api/helpApi";
 import {
     fetchManageAccountsStatus,
     startEmailChange,
@@ -351,6 +352,17 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
     const [submittedTicketNumber, setSubmittedTicketNumber] = useState<string | null>(null);
     const [clubFaqSearch, setClubFaqSearch] = useState("");
     const [expandedClubFaqId, setExpandedClubFaqId] = useState<string | null>("advisor-change");
+    const [votedClubFaqs, setVotedClubFaqs] = useState<Record<string, boolean>>({});
+
+    const handleClubFaqFeedback = async (faqId: string, isHelpful: boolean) => {
+        setVotedClubFaqs((prev) => ({ ...prev, [faqId]: isHelpful }));
+        try {
+            await submitFAQFeedback(faqId, isHelpful);
+            toast.info("Thank you for your feedback!", { title: "Documentation Rating" });
+        } catch {
+            // non-blocking
+        }
+    };
 
     const CLUB_FAQS = [
         {
@@ -1275,8 +1287,36 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                                         </button>
 
                                                         {isExpanded && (
-                                                            <div className="p-3.5 pt-0 text-xs text-neutral-700 font-medium leading-relaxed border-t border-black/10 bg-[#FAF6EE]/20">
-                                                                {faq.answer}
+                                                            <div className="p-3.5 pt-0 text-xs text-neutral-700 font-medium leading-relaxed border-t border-black/10 bg-[#FAF6EE]/20 space-y-3">
+                                                                <p className="pt-2">{faq.answer}</p>
+                                                                <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[11px] text-neutral-600">
+                                                                    <span>Was this answer helpful?</span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {votedClubFaqs[faq.id] !== undefined ? (
+                                                                            <span className="font-bold text-black flex items-center gap-1">
+                                                                                <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                                                                                Thanks for your feedback!
+                                                                            </span>
+                                                                        ) : (
+                                                                            <>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleClubFaqFeedback(faq.id, true)}
+                                                                                    className="px-2.5 py-1 rounded-lg border border-black bg-white hover:bg-[#a2ff86] text-black font-bold cursor-pointer transition-colors"
+                                                                                >
+                                                                                    Yes
+                                                                                </button>
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => handleClubFaqFeedback(faq.id, false)}
+                                                                                    className="px-2.5 py-1 rounded-lg border border-black bg-white hover:bg-rose-100 text-black font-bold cursor-pointer transition-colors"
+                                                                                >
+                                                                                    No
+                                                                                </button>
+                                                                            </>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>

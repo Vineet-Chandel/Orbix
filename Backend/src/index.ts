@@ -18,6 +18,9 @@ import {
 import { helpRouter } from './Routes/help/helpRoutes.js';
 import verificationRouter from './Routes/verification/verificationRoutes.js';
 import manageAccountsRouter from './Routes/account/manageAccountsRoutes.js';
+import { accountGovernanceRouter } from './Routes/account/accountGovernanceRoutes.js';
+import { privacyRouter } from './Routes/account/privacyRoutes.js';
+import { platformRouter } from './Routes/platform/platformRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import redis from './redis/client.js';
 
@@ -69,7 +72,12 @@ app.use('/api/verification', verificationRouter);
 app.use('/api/settings/verification', verificationRouter);
 app.use('/api/settings/manage-account', manageAccountsRouter);
 app.use('/api/manage-account', manageAccountsRouter);
+app.use('/api/account/governance', accountGovernanceRouter);
+app.use('/api/account/privacy', privacyRouter);
+app.use('/api/privacy', privacyRouter);
 app.use('/api/account', manageAccountsRouter);
+app.use('/api/platform', platformRouter);
+app.use('/api/about', platformRouter);
 app.use('/relationships', relationshipRouter);
 app.use('/blocks', blockRouter);
 app.use('/profile', profileRouter);

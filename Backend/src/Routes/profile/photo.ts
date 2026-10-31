@@ -129,7 +129,6 @@ export const handleUploadSignature = async (req: Request, res: Response) => {
 
         // Parameters covered by the signature (omit separate folder param to prevent Cloudinary from duplicating the folder prefix)
         const paramsToSign: Record<string, any> = {
-            overwrite: true,
             public_id: publicId,
             timestamp,
         };

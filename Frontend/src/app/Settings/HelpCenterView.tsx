@@ -26,6 +26,7 @@ import {
     fetchHelpTicketDetail,
     sendTicketReply,
     fetchHelpFAQs,
+    submitFAQFeedback,
     extractClientSystemInfo,
     type HelpTicketCategory,
     type HelpTicketPriority,
@@ -179,6 +180,18 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
     const [faqs, setFaqs] = useState<FAQItem[]>(DEFAULT_FAQS);
     const [expandedFaqId, setExpandedFaqId] = useState<string | null>("sync-frequency");
     const [faqSearch, setFaqSearch] = useState("");
+    const [faqCategoryFilter, setFaqCategoryFilter] = useState<string>("all");
+    const [votedFaqs, setVotedFaqs] = useState<Record<string, boolean>>({});
+
+    const handleFaqFeedback = async (faqId: string, isHelpful: boolean) => {
+        setVotedFaqs((prev) => ({ ...prev, [faqId]: isHelpful }));
+        try {
+            await submitFAQFeedback(faqId, isHelpful);
+            toast.info("Thank you for your feedback!", { title: "Documentation Rating" });
+        } catch {
+            // non-blocking
+        }
+    };
 
     // Active category metadata
     const activeCatConfig = useMemo(
@@ -311,17 +324,21 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
         }
     };
 
-    // Filter FAQs by search
+    // Filter FAQs by search and category
     const filteredFaqs = useMemo(() => {
-        if (!faqSearch.trim()) return faqs;
+        let list = faqs;
+        if (faqCategoryFilter !== "all") {
+            list = list.filter((f) => f.category.toLowerCase().includes(faqCategoryFilter.toLowerCase()));
+        }
+        if (!faqSearch.trim()) return list;
         const q = faqSearch.toLowerCase();
-        return faqs.filter(
+        return list.filter(
             (f) =>
                 f.question.toLowerCase().includes(q) ||
                 f.answer.toLowerCase().includes(q) ||
                 f.category.toLowerCase().includes(q)
         );
-    }, [faqs, faqSearch]);
+    }, [faqs, faqSearch, faqCategoryFilter]);
 
     // Status badge style helper
     const renderStatusBadge = (status: HelpTicketStatus) => {
@@ -915,56 +932,119 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
                     {/* TAB 3: INSTANT FAQS & SOLUTIONS */}
                     {activeTab === "faqs" && (
                         <div className="space-y-4">
-                            {/* Search */}
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    value={faqSearch}
-                                    onChange={(e) => setFaqSearch(e.target.value)}
-                                    placeholder="Search answers (e.g. sync, college cooldown, score)..."
-                                    className="w-full px-4 py-2.5 bg-[#FAF6EE] text-black text-xs font-bold rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] focus:outline-none focus:ring-2 focus:ring-black placeholder:font-normal placeholder:text-neutral-500"
-                                />
+                            {/* Search and Category Filter */}
+                            <div className="space-y-3">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={faqSearch}
+                                        onChange={(e) => setFaqSearch(e.target.value)}
+                                        placeholder="Search answers (e.g. sync, college cooldown, score, resume)..."
+                                        className="w-full px-4 py-2.5 bg-[#FAF6EE] text-black text-xs font-bold rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] focus:outline-none focus:ring-2 focus:ring-black placeholder:font-normal placeholder:text-neutral-500"
+                                    />
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    {["all", "Platform Sync", "College", "Score", "Privacy", "Clubs"].map((cat) => {
+                                        const isSel = faqCategoryFilter === cat;
+                                        return (
+                                            <button
+                                                key={cat}
+                                                type="button"
+                                                onClick={() => setFaqCategoryFilter(cat)}
+                                                className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                                                    isSel
+                                                        ? "bg-[#FFE566] text-black border-black shadow-[1.5px_1.5px_0px_#000]"
+                                                        : "bg-white text-neutral-600 border-black/20 hover:border-black"
+                                                }`}
+                                            >
+                                                {cat === "all" ? "All Topics" : cat}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             {/* Accordion Questions */}
                             <div className="space-y-2.5">
-                                {filteredFaqs.map((faq) => {
-                                    const isExpanded = expandedFaqId === faq.id;
-                                    return (
-                                        <div
-                                            key={faq.id}
-                                            className="rounded-xl border-2 border-black bg-white shadow-[2px_2px_0px_#000] overflow-hidden"
-                                        >
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setExpandedFaqId(isExpanded ? null : faq.id)
-                                                }
-                                                className="w-full p-3.5 text-left flex items-center justify-between gap-3 cursor-pointer hover:bg-[#FAF6EE]/50 transition-colors"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded bg-[#FAF6EE] border border-black/30 text-neutral-700 shrink-0">
-                                                        {faq.category}
-                                                    </span>
-                                                    <span className="text-xs sm:text-sm font-black text-black">
-                                                        {faq.question}
-                                                    </span>
-                                                </div>
-                                                {isExpanded ? (
-                                                    <ChevronUp className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
-                                                ) : (
-                                                    <ChevronDown className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
-                                                )}
-                                            </button>
+                                {filteredFaqs.length === 0 ? (
+                                    <div className="p-8 text-center rounded-xl bg-white border-2 border-black space-y-2">
+                                        <p className="text-xs font-black text-black">No matching documentation found</p>
+                                        <p className="text-[11px] text-neutral-500">
+                                            Try searching with another keyword, or submit a direct ticket to our team.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    filteredFaqs.map((faq) => {
+                                        const isExpanded = expandedFaqId === faq.id;
+                                        const hasVoted = votedFaqs[faq.id] !== undefined;
 
-                                            {isExpanded && (
-                                                <div className="p-3.5 pt-0 text-xs text-neutral-700 font-medium leading-relaxed border-t border-black/10 bg-[#FAF6EE]/20">
-                                                    {faq.answer}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                        return (
+                                            <div
+                                                key={faq.id}
+                                                className="rounded-xl border-2 border-black bg-white shadow-[2px_2px_0px_#000] overflow-hidden"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setExpandedFaqId(isExpanded ? null : faq.id)
+                                                    }
+                                                    className="w-full p-3.5 text-left flex items-center justify-between gap-3 cursor-pointer hover:bg-[#FAF6EE]/50 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded bg-[#FAF6EE] border border-black/30 text-neutral-700 shrink-0">
+                                                            {faq.category}
+                                                        </span>
+                                                        <span className="text-xs sm:text-sm font-black text-black">
+                                                            {faq.question}
+                                                        </span>
+                                                    </div>
+                                                    {isExpanded ? (
+                                                        <ChevronUp className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
+                                                    ) : (
+                                                        <ChevronDown className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
+                                                    )}
+                                                </button>
+
+                                                {isExpanded && (
+                                                    <div className="p-3.5 pt-0 text-xs text-neutral-700 font-medium leading-relaxed border-t border-black/10 bg-[#FAF6EE]/20 space-y-3">
+                                                        <p className="pt-2">{faq.answer}</p>
+
+                                                        {/* Helpful Voting */}
+                                                        <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[11px] text-neutral-600">
+                                                            <span>Was this answer helpful?</span>
+                                                            <div className="flex items-center gap-2">
+                                                                {hasVoted ? (
+                                                                    <span className="font-bold text-black flex items-center gap-1">
+                                                                        <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                                                                        Thanks for your feedback!
+                                                                    </span>
+                                                                ) : (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleFaqFeedback(faq.id, true)}
+                                                                            className="px-2.5 py-1 rounded-lg border border-black bg-white hover:bg-[#a2ff86] text-black font-bold cursor-pointer transition-colors"
+                                                                        >
+                                                                            Yes
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleFaqFeedback(faq.id, false)}
+                                                                            className="px-2.5 py-1 rounded-lg border border-black bg-white hover:bg-rose-100 text-black font-bold cursor-pointer transition-colors"
+                                                                        >
+                                                                            No
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
 
                             {/* Contact Support Footer in FAQs */}

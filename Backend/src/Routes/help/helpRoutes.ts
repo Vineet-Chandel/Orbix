@@ -3,6 +3,7 @@ import express, { type Request, type Response } from "express";
 import validator from "validator";
 import { query } from "../../database/client.js";
 import { authenticate } from "../../middlewares/auth.middleware.js";
+import { requireSupportStaff } from "../../middlewares/staff.middleware.js";
 
 export const helpRouter = express.Router();
 
@@ -337,6 +338,9 @@ helpRouter.get("/tickets", authenticate, async (req: Request, res: Response) => 
 helpRouter.get("/tickets/:id", authenticate, async (req: Request, res: Response) => {
     try {
         const authUser = req.user;
+        if (!authUser) {
+            return res.status(401).json({ success: false, message: "Authentication required." });
+        }
         const { id } = req.params;
 
         const ticketRes = await query(
@@ -417,6 +421,9 @@ helpRouter.get("/tickets/:id", authenticate, async (req: Request, res: Response)
 helpRouter.post("/tickets/:id/messages", authenticate, async (req: Request, res: Response) => {
     try {
         const authUser = req.user;
+        if (!authUser) {
+            return res.status(401).json({ success: false, message: "Authentication required." });
+        }
         const { id } = req.params;
         const { message } = req.body;
 
@@ -497,47 +504,480 @@ helpRouter.post("/tickets/:id/messages", authenticate, async (req: Request, res:
 });
 
 /**
+ * Category metadata for frontend request submission and routing
+ */
+export const HELP_CATEGORIES_METADATA = [
+    {
+        id: "bug_report",
+        label: "Bug Report",
+        description: "Unexpected glitches, visual regressions, broken links, or API errors",
+        icon: "bug",
+    },
+    {
+        id: "sync_issue",
+        label: "Sync & Stats",
+        description: "Portal sync latency, missing problem counts, or contest rating discrepancies",
+        icon: "refresh",
+    },
+    {
+        id: "college_verification",
+        label: "College & Club",
+        description: "Campus affiliation, collegiate cooldown waivers, or student organization registration",
+        icon: "academic",
+    },
+    {
+        id: "feature_request",
+        label: "Feature Request",
+        description: "Platform capability suggestions, new portal integrations, or UI improvements",
+        icon: "lightbulb",
+    },
+    {
+        id: "general_inquiry",
+        label: "General Help",
+        description: "Account credentials, developer showcase, resume intelligence, and platform questions",
+        icon: "info",
+    },
+];
+
+/**
+ * GET /api/help/categories
+ * Returns canonical support ticket categories.
+ */
+helpRouter.get("/categories", (_req: Request, res: Response) => {
+    return res.json({
+        success: true,
+        categories: HELP_CATEGORIES_METADATA,
+    });
+});
+
+/**
+ * Fallback static FAQs if database table is empty
+ */
+const DEFAULT_FALLBACK_FAQS = [
+    {
+        id: "faq-sync-cadence",
+        category: "Platform Sync",
+        question: "How frequently does Orbix synchronize my competitive statistics?",
+        answer: "Orbix executes scheduled synchronization daily across all connected developer portals. You can also trigger an on-demand real-time refresh directly from your Profile or Onboarding hub.",
+        helpfulCount: 42,
+        unhelpfulCount: 1,
+    },
+    {
+        id: "faq-college-cooldown",
+        category: "College & Club",
+        question: "Why is my College Affiliation subject to a cooldown period?",
+        answer: "To protect inter-university leaderboard integrity and prevent opportunistic institution hopping during active contest rounds, college identity changes are bounded by a 72-hour verification cooldown.",
+        helpfulCount: 88,
+        unhelpfulCount: 3,
+    },
+    {
+        id: "faq-orbix-score-engine",
+        category: "Scoring Engine",
+        question: "What mathematical formula determines the calibrated Orbix Score?",
+        answer: "The Orbix Score (0–10,000) is a weighted deterministic benchmark evaluating aggregate algorithmic problem counts (40%), verified contest ratings across Codeforces/LeetCode/AtCoder (35%), active weekly streak consistency (15%), and genuine open-source pull requests (10%).",
+        helpfulCount: 115,
+        unhelpfulCount: 2,
+    },
+    {
+        id: "faq-resume-privacy",
+        category: "Privacy & Security",
+        question: "How does the Resume Intelligence engine process my uploaded documents?",
+        answer: "Uploaded resumes undergo strict AST-based fact provenance parsing in isolated sandbox workers. Extracted skills and project claims are benchmarked against your verified coding accounts. We never package, resell, or train public AI models on your private documents.",
+        helpfulCount: 64,
+        unhelpfulCount: 0,
+    },
+    {
+        id: "faq-club-governance",
+        category: "College & Club",
+        question: "What is required to obtain institutional verification for a student developer club?",
+        answer: "Student organizations must provide an official university domain URL or faculty advisor authorization. Verified chapters unlock curated member leaderboards, verified chapter badges, and priority campus hackathon support.",
+        helpfulCount: 39,
+        unhelpfulCount: 1,
+    },
+    {
+        id: "faq-private-mode",
+        category: "Privacy & Security",
+        question: "What changes occur when I switch my Developer Identity to Private?",
+        answer: "Switching to Private instantly de-indexes your public showcase URL, conceals your username from public leaderboards, and prevents direct unsolicited recruiter outreach.",
+        helpfulCount: 51,
+        unhelpfulCount: 2,
+    },
+];
+
+/**
  * GET /api/help/faqs
  * Production knowledge base / FAQs for instant self-help.
+ * Supports ?category= and ?q= search filtering from PostgreSQL database.
  */
-helpRouter.get("/faqs", (_req: Request, res: Response) => {
-    const faqs = [
-        {
-            id: "sync-frequency",
-            category: "Platform Sync",
-            question: "How often does Orbix refresh my platform stats (LeetCode, Codeforces, GitHub)?",
-            answer:
-                "Orbix triggers automatic daily syncs for all connected profiles. You can also trigger an instant live refresh by visiting your Developer Profile or Onboarding hub and clicking 'Sync'.",
-        },
-        {
-            id: "college-update-rule",
-            category: "College & Identity",
-            question: "Why is my College Name locked or on cooldown?",
-            answer:
-                "To ensure leaderboard integrity and prevent gaming college standings during contest seasons, college identity updates have a 3-day verification cooldown. You can change your college once every 3 days.",
-        },
-        {
-            id: "orbix-score",
-            category: "Orbix Score",
-            question: "How is the Orbix Score calculated?",
-            answer:
-                "Orbix Score is a weighted composite algorithm taking into account algorithm problem counts across platforms (40%), rated contest performance (35%), active weekly streak consistency (15%), and verified open-source GitHub contributions (10%).",
-        },
-        {
-            id: "club-verification",
-            category: "Clubs & Onboarding",
-            question: "What is required to verify a student developer club?",
-            answer:
-                "Clubs must submit institutional proof (official college portal link or faculty advisor contact). Once submitted, the Orbix verification queue reviews the request within 24-48 business hours.",
-        },
-        {
-            id: "private-profile",
-            category: "Privacy",
-            question: "What happens when I toggle my profile to Private?",
-            answer:
-                "A private profile hides your stats, contest history, and resume from public URLs and global explore searches. Only essential identity information (name and handle) remains visible to confirmed connections.",
-        },
-    ];
+helpRouter.get("/faqs", async (req: Request, res: Response) => {
+    try {
+        const { category, q } = req.query;
+        let sql = `SELECT id, category, question, answer, helpful_count, unhelpful_count, sort_order
+                   FROM help_faqs
+                   WHERE is_published = true`;
+        const params: any[] = [];
 
-    return res.json({ success: true, faqs });
+        if (category && typeof category === "string" && category !== "all") {
+            params.push(category.trim());
+            sql += ` AND LOWER(category) = LOWER($${params.length})`;
+        }
+
+        if (q && typeof q === "string" && q.trim()) {
+            params.push(`%${q.trim()}%`);
+            sql += ` AND (question ILIKE $${params.length} OR answer ILIKE $${params.length})`;
+        }
+
+        sql += ` ORDER BY sort_order ASC, created_at ASC;`;
+
+        const dbRes = await query(sql, params);
+
+        if (dbRes.rows && dbRes.rows.length > 0) {
+            const faqs = dbRes.rows.map((row) => ({
+                id: row.id,
+                category: row.category,
+                question: row.question,
+                answer: row.answer,
+                helpfulCount: Number(row.helpful_count || 0),
+                unhelpfulCount: Number(row.unhelpful_count || 0),
+                sortOrder: row.sort_order,
+            }));
+            return res.json({ success: true, count: faqs.length, faqs });
+        }
+
+        // Filter fallback if category/query provided
+        let filtered = DEFAULT_FALLBACK_FAQS;
+        if (category && typeof category === "string" && category !== "all") {
+            filtered = filtered.filter((f) => f.category.toLowerCase().includes(category.toLowerCase()));
+        }
+        if (q && typeof q === "string" && q.trim()) {
+            const search = q.toLowerCase();
+            filtered = filtered.filter(
+                (f) => f.question.toLowerCase().includes(search) || f.answer.toLowerCase().includes(search)
+            );
+        }
+
+        return res.json({ success: true, count: filtered.length, faqs: filtered });
+    } catch (err: any) {
+        console.warn("[Help] FAQ fetch warning, using defaults:", err?.message);
+        return res.json({ success: true, count: DEFAULT_FALLBACK_FAQS.length, faqs: DEFAULT_FALLBACK_FAQS });
+    }
+});
+
+/**
+ * POST /api/help/faqs/:id/feedback
+ * Submit helpful / unhelpful rating for an FAQ article.
+ */
+helpRouter.post("/faqs/:id/feedback", async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { isHelpful } = req.body;
+        const userId = req.user?.id || null;
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+
+        if (typeof isHelpful !== "boolean") {
+            return res.status(400).json({ success: false, message: "isHelpful must be a boolean." });
+        }
+
+        if (isHelpful) {
+            await query(`UPDATE help_faqs SET helpful_count = helpful_count + 1 WHERE id = $1;`, [id]);
+        } else {
+            await query(`UPDATE help_faqs SET unhelpful_count = unhelpful_count + 1 WHERE id = $1;`, [id]);
+        }
+
+        if (userId) {
+            try {
+                await query(
+                    `INSERT INTO help_faq_feedback (faq_id, user_id, is_helpful, user_ip)
+                     VALUES ($1, $2, $3, $4)
+                     ON CONFLICT (faq_id, user_id) DO UPDATE SET is_helpful = EXCLUDED.is_helpful;`,
+                    [id, userId, isHelpful, ip]
+                );
+            } catch {}
+        }
+
+        return res.json({
+            success: true,
+            message: "Feedback recorded. Thank you for helping us refine our documentation.",
+        });
+    } catch (err: any) {
+        console.error("[Help] FAQ feedback error:", err);
+        return res.status(500).json({ success: false, message: "Failed to record feedback." });
+    }
+});
+
+/**
+ * =========================================================================
+ * SUPPORT STAFF ADMINISTRATION ENDPOINTS (Restricted to authorized staff)
+ * =========================================================================
+ */
+
+/**
+ * GET /api/help/admin/tickets
+ * Support staff ticket queue with multi-filter and status counts.
+ */
+helpRouter.get("/admin/tickets", authenticate, requireSupportStaff, async (req: Request, res: Response) => {
+    try {
+        const { status, category, priority, search, limit = "50", offset = "0" } = req.query;
+
+        let sql = `SELECT
+                    t.id,
+                    t.ticket_number,
+                    t.user_id,
+                    t.username,
+                    t.contact_email,
+                    t.category,
+                    t.subject,
+                    t.description,
+                    t.priority,
+                    t.status,
+                    t.assigned_to,
+                    t.assigned_team,
+                    t.internal_notes,
+                    t.attachment_url,
+                    t.created_at,
+                    t.updated_at,
+                    t.last_response_at,
+                    t.resolved_at
+                   FROM help_tickets t
+                   WHERE 1=1`;
+        const params: any[] = [];
+
+        if (status && typeof status === "string" && status !== "all") {
+            params.push(status);
+            sql += ` AND t.status = $${params.length}`;
+        }
+
+        if (category && typeof category === "string" && category !== "all") {
+            params.push(category);
+            sql += ` AND t.category = $${params.length}`;
+        }
+
+        if (priority && typeof priority === "string" && priority !== "all") {
+            params.push(priority);
+            sql += ` AND t.priority = $${params.length}`;
+        }
+
+        if (search && typeof search === "string" && search.trim()) {
+            params.push(`%${search.trim()}%`);
+            sql += ` AND (t.ticket_number ILIKE $${params.length} OR t.subject ILIKE $${params.length} OR t.contact_email ILIKE $${params.length} OR t.username ILIKE $${params.length})`;
+        }
+
+        sql += ` ORDER BY t.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2};`;
+        params.push(Math.min(Number(limit) || 50, 100));
+        params.push(Number(offset) || 0);
+
+        const ticketsRes = await query(sql, params);
+
+        // Overall stats for the support dashboard
+        const statsRes = await query(`
+            SELECT
+                COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE status = 'open')::int AS open,
+                COUNT(*) FILTER (WHERE status = 'acknowledged')::int AS acknowledged,
+                COUNT(*) FILTER (WHERE status = 'in_progress' OR status = 'investigating')::int AS in_progress,
+                COUNT(*) FILTER (WHERE status = 'waiting_on_user')::int AS waiting_on_user,
+                COUNT(*) FILTER (WHERE status = 'resolved')::int AS resolved,
+                COUNT(*) FILTER (WHERE status = 'closed')::int AS closed
+            FROM help_tickets;
+        `);
+
+        return res.json({
+            success: true,
+            stats: statsRes.rows[0] || {},
+            tickets: ticketsRes.rows,
+        });
+    } catch (err: any) {
+        console.error("[Help Admin] List tickets error:", err);
+        return res.status(500).json({ success: false, message: "Failed to list support tickets." });
+    }
+});
+
+/**
+ * PATCH /api/help/admin/tickets/:id
+ * Support staff ticket status, assignment, and internal notes update.
+ */
+helpRouter.patch("/admin/tickets/:id", authenticate, requireSupportStaff, async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { status, priority, assignedTo, assignedTeam, internalNotes, resolutionNote } = req.body;
+        const staffUser = req.user;
+
+        const ticketCheck = await query(`SELECT * FROM help_tickets WHERE id = $1 LIMIT 1;`, [id]);
+        if (!ticketCheck.rows[0]) {
+            return res.status(404).json({ success: false, message: "Ticket not found." });
+        }
+
+        const validStatuses = [
+            "open",
+            "acknowledged",
+            "in_progress",
+            "investigating",
+            "waiting_on_user",
+            "resolved",
+            "closed",
+        ];
+
+        let isResolved = false;
+        if (status && !validStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: `Invalid status: ${status}` });
+        }
+        if (status === "resolved" || status === "closed") {
+            isResolved = true;
+        }
+
+        await query(
+            `UPDATE help_tickets
+             SET
+                status = COALESCE($1, status),
+                priority = COALESCE($2, priority),
+                assigned_to = COALESCE($3, assigned_to),
+                assigned_team = COALESCE($4, assigned_team),
+                internal_notes = COALESCE($5, internal_notes),
+                resolution_note = COALESCE($6, resolution_note),
+                resolved_at = CASE WHEN $7 = true AND resolved_at IS NULL THEN NOW() ELSE resolved_at END,
+                updated_at = NOW()
+             WHERE id = $8;`,
+            [
+                status || null,
+                priority || null,
+                assignedTo !== undefined ? assignedTo : null,
+                assignedTeam !== undefined ? assignedTeam : null,
+                internalNotes !== undefined ? internalNotes : null,
+                resolutionNote !== undefined ? resolutionNote : null,
+                isResolved,
+                id,
+            ]
+        );
+
+        // Notify user if ticket was resolved or waiting on user
+        if (status === "resolved" || status === "waiting_on_user") {
+            const ticket = ticketCheck.rows[0];
+            try {
+                await query(
+                    `INSERT INTO user_notifications (
+                        user_id,
+                        username,
+                        recipient_id,
+                        title,
+                        body,
+                        type,
+                        notification_type,
+                        metadata,
+                        is_read,
+                        is_user_initiated,
+                        delivery_status,
+                        created_at
+                    ) VALUES ($1, $2, $3, $4, $5, 'help_ticket', 'ticket_status_updated', $6, false, false, 'delivered', NOW());`,
+                    [
+                        ticket.user_id,
+                        ticket.username,
+                        ticket.user_id,
+                        `Ticket ${ticket.ticket_number} Updated`,
+                        `Your support ticket status is now: ${status.replace("_", " ").toUpperCase()}`,
+                        JSON.stringify({ ticketId: ticket.id, status, updatedBy: staffUser?.username || "Staff" }),
+                    ]
+                );
+            } catch {}
+        }
+
+        return res.json({
+            success: true,
+            message: "Support ticket updated successfully.",
+        });
+    } catch (err: any) {
+        console.error("[Help Admin] Update ticket error:", err);
+        return res.status(500).json({ success: false, message: "Failed to update ticket." });
+    }
+});
+
+/**
+ * POST /api/help/admin/tickets/:id/reply
+ * Post official support reply from support staff.
+ */
+helpRouter.post("/admin/tickets/:id/reply", authenticate, requireSupportStaff, async (req: Request, res: Response) => {
+    try {
+        const { id } = req.params;
+        const { message, statusUpdate } = req.body;
+        const staffUser = req.user;
+
+        const cleanMessage = String(message || "").trim();
+        if (!cleanMessage) {
+            return res.status(400).json({ success: false, message: "Reply message cannot be empty." });
+        }
+
+        const ticketCheck = await query(`SELECT * FROM help_tickets WHERE id = $1 LIMIT 1;`, [id]);
+        if (!ticketCheck.rows[0]) {
+            return res.status(404).json({ success: false, message: "Ticket not found." });
+        }
+        const ticket = ticketCheck.rows[0];
+
+        // Insert reply as support message
+        const replyRes = await query(
+            `INSERT INTO help_ticket_messages (
+                ticket_id,
+                sender_id,
+                sender_type,
+                sender_name,
+                message,
+                created_at
+            ) VALUES ($1, $2, 'support', $3, $4, NOW())
+            RETURNING *;`,
+            [
+                id,
+                staffUser?.id || null,
+                staffUser?.username || "Orbix Engineering Support",
+                cleanMessage,
+            ]
+        );
+
+        // Update ticket last_response_at and optionally status
+        const nextStatus = statusUpdate || "waiting_on_user";
+        await query(
+            `UPDATE help_tickets
+             SET status = $1,
+                 last_response_at = NOW(),
+                 updated_at = NOW()
+             WHERE id = $2;`,
+            [nextStatus, id]
+        );
+
+        // Dispatch notification to ticket owner
+        if (ticket.user_id) {
+            try {
+                await query(
+                    `INSERT INTO user_notifications (
+                        user_id,
+                        username,
+                        recipient_id,
+                        title,
+                        body,
+                        type,
+                        notification_type,
+                        metadata,
+                        is_read,
+                        is_user_initiated,
+                        delivery_status,
+                        created_at
+                    ) VALUES ($1, $2, $3, $4, $5, 'help_ticket', 'ticket_reply_received', $6, false, false, 'delivered', NOW());`,
+                    [
+                        ticket.user_id,
+                        ticket.username,
+                        ticket.user_id,
+                        `New response on ticket ${ticket.ticket_number}`,
+                        cleanMessage.slice(0, 100),
+                        JSON.stringify({ ticketId: ticket.id, replyId: replyRes.rows[0].id }),
+                    ]
+                );
+            } catch {}
+        }
+
+        return res.status(201).json({
+            success: true,
+            message: "Support response posted successfully.",
+            reply: replyRes.rows[0],
+        });
+    } catch (err: any) {
+        console.error("[Help Admin] Reply error:", err);
+        return res.status(500).json({ success: false, message: "Failed to post support response." });
+    }
 });

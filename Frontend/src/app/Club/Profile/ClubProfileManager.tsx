@@ -16,6 +16,10 @@ import {
     Check,
     Layers,
     Loader2,
+    ShieldCheck,
+    CheckCircle2,
+    Trash2,
+    RefreshCw,
 } from "lucide-react";
 import type { ClubProfileData } from "../../../utils/clubProfileApi";
 import {
@@ -112,6 +116,8 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
     const [isUploadingCover, setIsUploadingCover] = useState(false);
     const [logoUploadPercent, setLogoUploadPercent] = useState<number | null>(null);
     const [coverUploadPercent, setCoverUploadPercent] = useState<number | null>(null);
+    const [isDraggingLogo, setIsDraggingLogo] = useState(false);
+    const [isDraggingCover, setIsDraggingCover] = useState(false);
 
     // Initial snapshot for change detection
     const initialSnapshotRef = useRef<string>("");
@@ -261,12 +267,16 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
     ]);
 
     // Direct Cloudinary upload for Club Logo
-    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
+    const uploadLogoFile = async (file: File) => {
         if (!file || !club) return;
 
         if (!file.type.startsWith("image/")) {
-            toast.error("Please select an image file (PNG, JPG, WEBP).");
+            toast.error("Please select a valid image file (PNG, JPG, WEBP).");
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("Logo file size must be under 5 MB.");
             return;
         }
 
@@ -280,7 +290,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
             });
 
             setLogoUrl(res.secureUrl);
-            toast.success("Club logo uploaded! Click 'Save Changes' to apply.");
+            toast.success("Club logo uploaded! Click 'Save Changes' at bottom to apply.");
         } catch (err: any) {
             console.error("Upload error:", err);
             toast.error(err.message || "Failed to upload logo.");
@@ -291,13 +301,22 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
         }
     };
 
-    // Direct Cloudinary upload for Club Cover Banner
-    const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
+        if (file) uploadLogoFile(file);
+    };
+
+    // Direct Cloudinary upload for Club Cover Banner
+    const uploadCoverFile = async (file: File) => {
         if (!file || !club) return;
 
         if (!file.type.startsWith("image/")) {
-            toast.error("Please select an image file (PNG, JPG, WEBP).");
+            toast.error("Please select a valid image file (PNG, JPG, WEBP).");
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error("Header banner file size must be under 5 MB.");
             return;
         }
 
@@ -311,7 +330,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
             });
 
             setCoverImageUrl(res.secureUrl);
-            toast.success("Header banner uploaded! Click 'Save Changes' to apply.");
+            toast.success("Header banner uploaded! Click 'Save Changes' at bottom to apply.");
         } catch (err: any) {
             console.error("Upload error:", err);
             toast.error(err.message || "Failed to upload header banner.");
@@ -320,6 +339,11 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
             setCoverUploadPercent(null);
             if (coverInputRef.current) coverInputRef.current.value = "";
         }
+    };
+
+    const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) uploadCoverFile(file);
     };
 
     // Add Focus Area tag
@@ -658,117 +682,316 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
 
             {/* SECTION 2: BRANDING & MEDIA */}
             {activeSection === "branding" && (
-                <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-6">
-                    <div className="pb-4 border-b border-black/10">
-                        <h3 className="text-base font-black text-black">Branding & Media Assets</h3>
-                        <p className="text-xs font-medium text-neutral-600 mt-0.5">
-                            Upload your official chapter logo and custom header banner directly via secure Cloudinary storage.
-                        </p>
-                    </div>
+                <div className="space-y-6">
+                    {/* Hidden File Inputs */}
+                    <input
+                        type="file"
+                        ref={logoInputRef}
+                        onChange={handleLogoUpload}
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                    />
+                    <input
+                        type="file"
+                        ref={coverInputRef}
+                        onChange={handleCoverUpload}
+                        accept="image/png,image/jpeg,image/webp"
+                        className="hidden"
+                    />
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                        {/* Club Official Logo */}
-                        <div className="p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black space-y-4">
-                            <h4 className="text-xs font-black uppercase tracking-wider text-black">Club Logo (Square / Circular)</h4>
-                            <div className="flex items-center gap-4">
-                                <div className="w-20 h-20 rounded-2xl bg-white border-2 border-black overflow-hidden shrink-0 flex items-center justify-center font-black text-base shadow-[2px_2px_0px_#000]">
-                                    {logoUrl ? (
-                                        <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className="text-neutral-400">No Logo</span>
-                                    )}
+                    {/* CARD 1: CLUB OFFICIAL LOGO */}
+                    <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-5">
+                        {/* Header Row */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-black/10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                    <UploadCloud className="w-6 h-6 text-black stroke-[2.5]" />
                                 </div>
-                                <div className="space-y-2 flex-1">
-                                    <input
-                                        type="file"
-                                        ref={logoInputRef}
-                                        onChange={handleLogoUpload}
-                                        accept="image/png,image/jpeg,image/webp"
-                                        className="hidden"
-                                    />
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            disabled={isUploadingLogo}
-                                            onClick={() => logoInputRef.current?.click()}
-                                            className="px-3 py-1.5 rounded-lg bg-black text-[#a2ff86] border border-black text-xs font-black shadow-[1px_1px_0px_#000] hover:bg-neutral-800 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                        >
-                                            {isUploadingLogo ? (
-                                                <>
-                                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    <span>Uploading {logoUploadPercent !== null ? `${logoUploadPercent}%` : ""}</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <UploadCloud className="w-3.5 h-3.5" />
-                                                    <span>Upload Logo</span>
-                                                </>
-                                            )}
-                                        </button>
-                                        {logoUrl && (
-                                            <button
-                                                type="button"
-                                                onClick={() => setLogoUrl("")}
-                                                className="px-2.5 py-1.5 rounded-lg bg-white text-red-600 border border-black text-xs font-bold hover:bg-red-50 cursor-pointer"
-                                            >
-                                                Remove
-                                            </button>
-                                        )}
-                                    </div>
-                                    <p className="text-[10px] text-neutral-500">Recommended: 400x400 PNG or WEBP with transparent background.</p>
+                                <div>
+                                    <h3 className="text-lg sm:text-xl font-black text-black">
+                                        Upload Club Official Logo
+                                    </h3>
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                                        Upload your official square or circular logo to represent your club across student directories.
+                                    </p>
                                 </div>
                             </div>
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black uppercase bg-[#FAF6EE] text-neutral-800 border-2 border-black shadow-[1.5px_1.5px_0px_#000] self-start sm:self-center">
+                                Max 5 MB
+                            </span>
                         </div>
 
-                        {/* Club Header Banner */}
-                        <div className="p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black space-y-4">
-                            <h4 className="text-xs font-black uppercase tracking-wider text-black">Header Showcase Banner</h4>
-                            <div className="space-y-3">
-                                <div className="w-full h-24 rounded-xl bg-white border-2 border-black overflow-hidden relative shadow-[2px_2px_0px_#000] flex items-center justify-center">
-                                    {coverImageUrl ? (
-                                        <img src={coverImageUrl} alt="Banner" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className="text-xs font-bold text-neutral-400">Default Geometric Banner</span>
+                        {/* Drag & Drop Area */}
+                        <div
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsDraggingLogo(false);
+                                if (!isUploadingLogo && e.dataTransfer.files?.[0]) {
+                                    uploadLogoFile(e.dataTransfer.files[0]);
+                                }
+                            }}
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!isUploadingLogo) setIsDraggingLogo(true);
+                            }}
+                            onDragLeave={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsDraggingLogo(false);
+                            }}
+                            onClick={() => !isUploadingLogo && logoInputRef.current?.click()}
+                            className={`p-6 sm:p-8 border-2 border-dashed rounded-2xl text-center space-y-4 cursor-pointer transition-all ${
+                                isDraggingLogo
+                                    ? "bg-[#a2ff86]/20 border-black ring-2 ring-black scale-[0.99]"
+                                    : logoUrl
+                                    ? "bg-[#FAF6EE] border-black shadow-[2px_2px_0px_#000]"
+                                    : "bg-[#FAF6EE]/60 border-black/35 hover:border-black hover:bg-[#FAF6EE]"
+                            }`}
+                        >
+                            {isUploadingLogo ? (
+                                /* Uploading State */
+                                <div className="space-y-3 py-3">
+                                    <div className="w-14 h-14 rounded-2xl bg-[#a2ff86] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
+                                        <Loader2 className="w-7 h-7 text-black stroke-[2.5] animate-spin" />
+                                    </div>
+                                    <div className="space-y-1 max-w-sm mx-auto">
+                                        <p className="text-sm font-black text-black">
+                                            Uploading logo to Cloudinary...
+                                        </p>
+                                        <p className="text-xs text-neutral-600 font-bold">
+                                            {logoUploadPercent !== null ? `${logoUploadPercent}% completed` : "Processing..."}
+                                        </p>
+                                    </div>
+                                    {logoUploadPercent !== null && (
+                                        <div className="w-48 max-w-full mx-auto bg-white h-2.5 rounded-full border border-black overflow-hidden shadow-inner">
+                                            <div
+                                                className="bg-[#a2ff86] h-full transition-all duration-200"
+                                                style={{ width: `${logoUploadPercent}%` }}
+                                            />
+                                        </div>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="file"
-                                        ref={coverInputRef}
-                                        onChange={handleCoverUpload}
-                                        accept="image/png,image/jpeg,image/webp"
-                                        className="hidden"
-                                    />
-                                    <button
-                                        type="button"
-                                        disabled={isUploadingCover}
-                                        onClick={() => coverInputRef.current?.click()}
-                                        className="px-3 py-1.5 rounded-lg bg-black text-[#a2ff86] border border-black text-xs font-black shadow-[1px_1px_0px_#000] hover:bg-neutral-800 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                                    >
-                                        {isUploadingCover ? (
-                                            <>
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                <span>Uploading {coverUploadPercent !== null ? `${coverUploadPercent}%` : ""}</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <UploadCloud className="w-3.5 h-3.5" />
-                                                <span>Upload Banner</span>
-                                            </>
-                                        )}
-                                    </button>
-                                    {coverImageUrl && (
+                            ) : logoUrl ? (
+                                /* Selected / Uploaded State */
+                                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                                    <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-white border-2 border-black overflow-hidden relative shadow-[3px_3px_0px_#000] flex items-center justify-center mx-auto">
+                                        <img src={logoUrl} alt="Club Logo" className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-black text-xs font-bold text-neutral-800 shadow-[1px_1px_0px_#000]">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Club official logo active & uploaded</span>
+                                    </div>
+                                    <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                                        <button
+                                            type="button"
+                                            onClick={() => logoInputRef.current?.click()}
+                                            className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <span>Change Logo</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setLogoUrl("")}
+                                            className="px-3.5 py-2 rounded-xl bg-white text-rose-600 hover:bg-rose-50 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <span>Remove</span>
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-neutral-500 font-medium">
+                                        Or drag and drop a new logo file over this block to replace it
+                                    </p>
+                                </div>
+                            ) : (
+                                /* Empty Dropzone State */
+                                <div className="space-y-3">
+                                    <div className="w-14 h-14 rounded-2xl bg-white border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000] hover:scale-105 transition-transform">
+                                        <UploadCloud className="w-7 h-7 text-black stroke-[2.5]" />
+                                    </div>
+                                    <div className="space-y-1 max-w-md mx-auto">
+                                        <p className="text-sm sm:text-base font-black text-black">
+                                            Drag and drop your logo file here
+                                        </p>
+                                        <p className="text-xs text-neutral-600 font-medium">
+                                            or click anywhere in this block to browse your device
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-neutral-600">
+                                        <span className="px-2 py-0.5 rounded bg-white border border-black/20 shadow-[1px_1px_0px_#000] font-mono">.PNG</span>
+                                        <span className="px-2 py-0.5 rounded bg-white border border-black/20 shadow-[1px_1px_0px_#000] font-mono">.JPG</span>
+                                        <span className="px-2 py-0.5 rounded bg-white border border-black/20 shadow-[1px_1px_0px_#000] font-mono">.WEBP</span>
+                                        <span>• Up to 5 MB</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Action Bar */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                            <p className="text-xs text-neutral-600 font-medium flex items-center gap-1.5">
+                                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <span>Securely processed and stored via Cloudinary storage</span>
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => logoInputRef.current?.click()}
+                                disabled={isUploadingLogo}
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs sm:text-sm font-black uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <UploadCloud className="w-4 h-4 stroke-[2.5]" />
+                                <span>BROWSE & UPLOAD LOGO</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* CARD 2: HEADER SHOWCASE BANNER */}
+                    <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-5">
+                        {/* Header Row */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-black/10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[2px_2px_0px_#000]">
+                                    <UploadCloud className="w-6 h-6 text-black stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg sm:text-xl font-black text-black">
+                                        Upload Header Showcase Banner
+                                    </h3>
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                                        Upload your high-resolution custom chapter banner (3:1 wide ratio recommended).
+                                    </p>
+                                </div>
+                            </div>
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black uppercase bg-[#FAF6EE] text-neutral-800 border-2 border-black shadow-[1.5px_1.5px_0px_#000] self-start sm:self-center">
+                                Max 5 MB
+                            </span>
+                        </div>
+
+                        {/* Drag & Drop Area */}
+                        <div
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsDraggingCover(false);
+                                if (!isUploadingCover && e.dataTransfer.files?.[0]) {
+                                    uploadCoverFile(e.dataTransfer.files[0]);
+                                }
+                            }}
+                            onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                if (!isUploadingCover) setIsDraggingCover(true);
+                            }}
+                            onDragLeave={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setIsDraggingCover(false);
+                            }}
+                            onClick={() => !isUploadingCover && coverInputRef.current?.click()}
+                            className={`p-6 sm:p-8 border-2 border-dashed rounded-2xl text-center space-y-4 cursor-pointer transition-all ${
+                                isDraggingCover
+                                    ? "bg-[#a2ff86]/20 border-black ring-2 ring-black scale-[0.99]"
+                                    : coverImageUrl
+                                    ? "bg-[#FAF6EE] border-black shadow-[2px_2px_0px_#000]"
+                                    : "bg-[#FAF6EE]/60 border-black/35 hover:border-black hover:bg-[#FAF6EE]"
+                            }`}
+                        >
+                            {isUploadingCover ? (
+                                /* Uploading State */
+                                <div className="space-y-3 py-3">
+                                    <div className="w-14 h-14 rounded-2xl bg-[#a2ff86] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
+                                        <Loader2 className="w-7 h-7 text-black stroke-[2.5] animate-spin" />
+                                    </div>
+                                    <div className="space-y-1 max-w-sm mx-auto">
+                                        <p className="text-sm font-black text-black">
+                                            Uploading banner to Cloudinary...
+                                        </p>
+                                        <p className="text-xs text-neutral-600 font-bold">
+                                            {coverUploadPercent !== null ? `${coverUploadPercent}% completed` : "Processing..."}
+                                        </p>
+                                    </div>
+                                    {coverUploadPercent !== null && (
+                                        <div className="w-48 max-w-full mx-auto bg-white h-2.5 rounded-full border border-black overflow-hidden shadow-inner">
+                                            <div
+                                                className="bg-[#a2ff86] h-full transition-all duration-200"
+                                                style={{ width: `${coverUploadPercent}%` }}
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            ) : coverImageUrl ? (
+                                /* Selected / Uploaded State */
+                                <div className="space-y-3" onClick={(e) => e.stopPropagation()}>
+                                    <div className="w-full h-36 sm:h-48 rounded-2xl bg-white border-2 border-black overflow-hidden relative shadow-[3px_3px_0px_#000] flex items-center justify-center">
+                                        <img src={coverImageUrl} alt="Header Banner" className="w-full h-full object-cover" />
+                                    </div>
+                                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border border-black text-xs font-bold text-neutral-800 shadow-[1px_1px_0px_#000]">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Header showcase banner active & uploaded</span>
+                                    </div>
+                                    <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                                        <button
+                                            type="button"
+                                            onClick={() => coverInputRef.current?.click()}
+                                            className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <RefreshCw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <span>Change Banner</span>
+                                        </button>
                                         <button
                                             type="button"
                                             onClick={() => setCoverImageUrl("")}
-                                            className="px-2.5 py-1.5 rounded-lg bg-white text-red-600 border border-black text-xs font-bold hover:bg-red-50 cursor-pointer"
+                                            className="px-3.5 py-2 rounded-xl bg-white text-rose-600 hover:bg-rose-50 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                         >
-                                            Reset to Default
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <span>Reset to Default</span>
                                         </button>
-                                    )}
+                                    </div>
+                                    <p className="text-[10px] text-neutral-500 font-medium">
+                                        Or drag and drop a new banner image over this block to replace it
+                                    </p>
                                 </div>
-                                <p className="text-[10px] text-neutral-500">Recommended: 1200x400 JPG or WEBP (3:1 ratio).</p>
-                            </div>
+                            ) : (
+                                /* Empty Dropzone State */
+                                <div className="space-y-3">
+                                    <div className="w-14 h-14 rounded-2xl bg-white border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000] hover:scale-105 transition-transform">
+                                        <UploadCloud className="w-7 h-7 text-black stroke-[2.5]" />
+                                    </div>
+                                    <div className="space-y-1 max-w-md mx-auto">
+                                        <p className="text-sm sm:text-base font-black text-black">
+                                            Drag and drop your banner image here
+                                        </p>
+                                        <p className="text-xs text-neutral-600 font-medium">
+                                            or click anywhere in this block to browse your device
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center justify-center gap-2 text-[11px] font-bold text-neutral-600">
+                                        <span className="px-2 py-0.5 rounded bg-white border border-black/20 shadow-[1px_1px_0px_#000] font-mono">.PNG</span>
+                                        <span className="px-2 py-0.5 rounded bg-white border border-black/20 shadow-[1px_1px_0px_#000] font-mono">.JPG</span>
+                                        <span className="px-2 py-0.5 rounded bg-white border border-black/20 shadow-[1px_1px_0px_#000] font-mono">.WEBP</span>
+                                        <span>• Up to 5 MB</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Action Bar */}
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
+                            <p className="text-xs text-neutral-600 font-medium flex items-center gap-1.5">
+                                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <span>Securely processed and stored via Cloudinary storage</span>
+                            </p>
+                            <button
+                                type="button"
+                                onClick={() => coverInputRef.current?.click()}
+                                disabled={isUploadingCover}
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs sm:text-sm font-black uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <UploadCloud className="w-4 h-4 stroke-[2.5]" />
+                                <span>BROWSE & UPLOAD BANNER</span>
+                            </button>
                         </div>
                     </div>
                 </div>

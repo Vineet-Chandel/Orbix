@@ -13,10 +13,28 @@ export type HelpTicketPriority = "low" | "normal" | "high" | "urgent";
 
 export type HelpTicketStatus =
     | "open"
+    | "acknowledged"
+    | "in_progress"
     | "investigating"
     | "waiting_on_user"
     | "resolved"
     | "closed";
+
+export interface HelpCategoryItem {
+    id: HelpTicketCategory;
+    label: string;
+    description: string;
+    icon: string;
+}
+
+export interface FAQItem {
+    id: string;
+    category: string;
+    question: string;
+    answer: string;
+    helpfulCount?: number;
+    unhelpfulCount?: number;
+}
 
 export interface SystemDiagnosticInfo {
     browser: string;
@@ -56,13 +74,6 @@ export interface HelpTicketMessage {
 export interface HelpTicketDetail extends HelpTicketItem {
     systemInfo?: Record<string, any>;
     messages: HelpTicketMessage[];
-}
-
-export interface FAQItem {
-    id: string;
-    category: string;
-    question: string;
-    answer: string;
 }
 
 export interface CreateTicketPayload {
@@ -208,13 +219,48 @@ export async function sendTicketReply(
 }
 
 /**
- * Fetch knowledge base FAQs
+ * Fetch canonical help categories
  */
-export async function fetchHelpFAQs(): Promise<{
+export async function fetchHelpCategories(): Promise<{
+    success: boolean;
+    categories: HelpCategoryItem[];
+}> {
+    const res = await fetch(`${API_BASE}/help/categories`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+        throw new Error(data.message || `Failed to fetch categories (${res.status})`);
+    }
+
+    return data;
+}
+
+/**
+ * Fetch knowledge base FAQs with optional category and search query filters
+ */
+export async function fetchHelpFAQs(params?: {
+    category?: string;
+    q?: string;
+}): Promise<{
     success: boolean;
     faqs: FAQItem[];
 }> {
-    const res = await fetch(`${API_BASE}/help/faqs`, {
+    const searchParams = new URLSearchParams();
+    if (params?.category && params.category !== "all") {
+        searchParams.append("category", params.category);
+    }
+    if (params?.q) {
+        searchParams.append("q", params.q);
+    }
+
+    const queryStr = searchParams.toString();
+    const url = `${API_BASE}/help/faqs${queryStr ? `?${queryStr}` : ""}`;
+
+    const res = await fetch(url, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -223,6 +269,31 @@ export async function fetchHelpFAQs(): Promise<{
     const data = await res.json();
     if (!res.ok) {
         throw new Error(data.message || `Failed to fetch FAQs (${res.status})`);
+    }
+
+    return data;
+}
+
+/**
+ * Submit helpful / not helpful rating for an FAQ article
+ */
+export async function submitFAQFeedback(
+    faqId: string,
+    isHelpful: boolean
+): Promise<{
+    success: boolean;
+    message: string;
+}> {
+    const res = await fetch(`${API_BASE}/help/faqs/${encodeURIComponent(faqId)}/feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ isHelpful }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) {
+        throw new Error(data.message || `Failed to submit feedback (${res.status})`);
     }
 
     return data;

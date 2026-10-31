@@ -483,7 +483,6 @@ export class ClubProfileService {
         const publicId = `${folder}/${type}_${timestamp}_${randomHex}`;
 
         const paramsToSign: Record<string, any> = {
-            overwrite: true,
             public_id: publicId,
             timestamp,
         };

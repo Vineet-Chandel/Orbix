@@ -41,6 +41,15 @@ import { OrbixLogo } from "../../components/OrbixLogo";
 import type { ConnectedUserItem } from "../../api/relationshipApi";
 import { HelpCenterView } from "./HelpCenterView";
 import { ManageAccountView } from "./ManageAccountView";
+import {
+    fetchAccountGovernanceStatus,
+    fetchPrivacyPreferences,
+    updatePrivacyPreferences,
+    fetchPlatformAboutMetadata,
+    type GovernanceStatusResponse,
+    type PlatformAboutMetadata,
+    type PrivacyPreferences,
+} from "../../api/settingsGovernanceApi";
 
 interface SettingDetailViewProps {
     viewKey: SettingsViewKey;
@@ -342,6 +351,50 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
     const [recruiterMessages, setRecruiterMessages] = useState(true);
     const [weeklyDigest, setWeeklyDigest] = useState(false);
     const [telemetryEnabled, setTelemetryEnabled] = useState(false);
+    const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
+
+    // Dynamic settings governance & platform metadata
+    const [governanceData, setGovernanceData] = useState<GovernanceStatusResponse | null>(null);
+    const [isLoadingGovernance, setIsLoadingGovernance] = useState(false);
+    const [, setPrivacyPrefs] = useState<PrivacyPreferences | null>(null);
+    const [platformMetadata, setPlatformMetadata] = useState<PlatformAboutMetadata | null>(null);
+
+    useEffect(() => {
+        if (viewKey === "account-status") {
+            setIsLoadingGovernance(true);
+            fetchAccountGovernanceStatus()
+                .then((data) => setGovernanceData(data))
+                .catch((err) => console.warn("[Governance] Fetch status warning:", err?.message))
+                .finally(() => setIsLoadingGovernance(false));
+        } else if (viewKey === "privacy-center") {
+            fetchPrivacyPreferences()
+                .then((data) => {
+                    setPrivacyPrefs(data.preferences);
+                    if (typeof data.preferences.anonymousTelemetry === "boolean") {
+                        setTelemetryEnabled(data.preferences.anonymousTelemetry);
+                    }
+                })
+                .catch((err) => console.warn("[Privacy] Fetch prefs warning:", err?.message));
+        } else if (viewKey === "about") {
+            fetchPlatformAboutMetadata()
+                .then((data) => setPlatformMetadata(data))
+                .catch((err) => console.warn("[Platform] Fetch metadata warning:", err?.message));
+        }
+    }, [viewKey]);
+
+    const handleToggleTelemetry = async (val: boolean) => {
+        setTelemetryEnabled(val);
+        setIsUpdatingPrivacy(true);
+        try {
+            await updatePrivacyPreferences({ anonymousTelemetry: val });
+            toast.info(val ? "Anonymous telemetry enabled. Thank you!" : "Anonymous telemetry disabled.");
+        } catch (err: any) {
+            setTelemetryEnabled(!val); // revert on error
+            toast.error(err.message || "Failed to save privacy preference.");
+        } finally {
+            setIsUpdatingPrivacy(false);
+        }
+    };
 
     // Password fields
     const [currentPassword, setCurrentPassword] = useState("");
@@ -1161,17 +1214,17 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
                             <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="space-y-0.5">
-                                    <p className="text-xs font-black text-black">Anonymous Diagnostics & Performance Telemetry</p>
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-xs font-black text-black">Anonymous Diagnostics & Performance Telemetry</p>
+                                        {isUpdatingPrivacy && <Loader2 className="w-3.5 h-3.5 text-neutral-500 animate-spin" />}
+                                    </div>
                                     <p className="text-[11px] text-neutral-600 font-medium">
                                         Help optimize Orbix by sharing anonymous latency and client crash logs. No personal data, handles, or source code are ever recorded.
                                     </p>
                                 </div>
                                 <NeoToggle
                                     checked={telemetryEnabled}
-                                    onChange={(v) => {
-                                        setTelemetryEnabled(v);
-                                        toast.info(v ? "Anonymous telemetry enabled. Thank you!" : "Anonymous telemetry disabled.");
-                                    }}
+                                    onChange={handleToggleTelemetry}
                                     ariaLabel="Toggle telemetry"
                                 />
                             </div>
@@ -1193,9 +1246,41 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                     </div>
                 );
 
-            case "account-status":
+            case "account-status": {
+                const standing = governanceData?.standing;
+                const statusType = standing?.status || "good";
+                const activeStrikes = standing?.conduct?.activeStrikes ?? 0;
+                const connectedPortals = standing?.syncHealth?.connectedPlatformsCount ?? 16;
+                const safeguard = standing?.collegiateSafeguard;
+                const activeRestrictions = governanceData?.activeRestrictions || [];
+
                 return (
                     <div className="space-y-6">
+                        {/* Active Restrictions Banner if any */}
+                        {activeRestrictions.length > 0 && (
+                            <div className="p-5 rounded-2xl bg-rose-50 border-2 border-black shadow-[4px_4px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2 text-rose-700">
+                                    <UserX className="w-5 h-5 stroke-[2.5]" />
+                                    <h4 className="text-sm font-black uppercase tracking-wider">
+                                        Active Account Restriction
+                                    </h4>
+                                </div>
+                                {activeRestrictions.map((r, idx) => (
+                                    <div key={idx} className="text-xs text-neutral-700 space-y-1">
+                                        <p className="font-bold">
+                                            Restriction: <span className="font-mono text-black">{r.restrictionType}</span>
+                                        </p>
+                                        <p className="font-medium">{r.reason}</p>
+                                        {r.expiresAt && (
+                                            <p className="text-[11px] font-mono text-neutral-500">
+                                                Expires: {new Date(r.expiresAt).toLocaleDateString()}
+                                            </p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
                         {/* Standing Hero */}
                         <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-black/10 pb-5">
@@ -1204,10 +1289,27 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                         <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight">
                                             Account Standing
                                         </h3>
-                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
-                                            <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                            <span>Good Standing</span>
-                                        </span>
+                                        {isLoadingGovernance ? (
+                                            <Loader2 className="w-4 h-4 text-neutral-500 animate-spin" />
+                                        ) : statusType === "good" ? (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
+                                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Good Standing</span>
+                                            </span>
+                                        ) : statusType === "cooldown" ? (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
+                                                <RefreshCw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Cooldown Active</span>
+                                            </span>
+                                        ) : statusType === "warning" || statusType === "probation" ? (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
+                                                <span>Under Review</span>
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-200 text-rose-900 text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
+                                                <span>Restricted</span>
+                                            </span>
+                                        )}
                                     </div>
                                     <p className="text-xs sm:text-sm text-neutral-600 font-medium">
                                         Overall platform health, security status, and developer privileges.
@@ -1229,12 +1331,12 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                     <span className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
                                         Community Conduct
                                     </span>
-                                    <p className="text-sm font-black text-emerald-700 flex items-center gap-1.5">
+                                    <p className={`text-sm font-black flex items-center gap-1.5 ${activeStrikes === 0 ? "text-emerald-700" : "text-amber-700"}`}>
                                         <Check className="w-4 h-4 stroke-[3]" />
-                                        100% Compliant
+                                        {activeStrikes === 0 ? "100% Compliant" : `${activeStrikes} Active Strike${activeStrikes > 1 ? "s" : ""}`}
                                     </p>
                                     <p className="text-[11px] text-neutral-600 font-medium">
-                                        Zero active moderation warnings or strikes
+                                        {activeStrikes === 0 ? "Zero active moderation warnings or strikes" : "Conduct under administrative review"}
                                     </p>
                                 </div>
 
@@ -1244,10 +1346,10 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                     </span>
                                     <p className="text-sm font-black text-black flex items-center gap-1.5">
                                         <RefreshCw className="w-4 h-4 stroke-[2.5] text-sky-600" />
-                                        Active & Healthy
+                                        {standing?.syncHealth?.status === "healthy" || !standing ? "Active & Healthy" : "Partial Sync"}
                                     </p>
                                     <p className="text-[11px] text-neutral-600 font-medium">
-                                        Automatic daily sync across 16 supported portals
+                                        Automatic daily sync across {connectedPortals} supported portal{connectedPortals !== 1 ? "s" : ""}
                                     </p>
                                 </div>
 
@@ -1257,10 +1359,12 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                     </span>
                                     <p className="text-sm font-black text-black flex items-center gap-1.5">
                                         <ShieldCheck className="w-4 h-4 stroke-[2.5] text-emerald-600" />
-                                        {twoFactorEnabled ? "2FA Enabled" : "Standard Protection"}
+                                        {standing?.securityLevel?.level || (twoFactorEnabled ? "2FA Enabled" : "Standard Protection")}
                                     </p>
                                     <p className="text-[11px] text-neutral-600 font-medium">
-                                        {twoFactorEnabled ? "Two-factor authentication active" : "Verified email credential"}
+                                        {standing?.securityLevel?.twoFactorActive || twoFactorEnabled
+                                            ? "Two-factor authentication active"
+                                            : "Verified email credential"}
                                     </p>
                                 </div>
                             </div>
@@ -1277,9 +1381,12 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                     <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
                                         Global & College Leaderboards
                                     </p>
-                                    <p className="text-base font-black text-black">Eligible & Ranked</p>
+                                    <p className="text-base font-black text-black">
+                                        {governanceData?.capabilities?.leaderboards?.label || "Eligible & Ranked"}
+                                    </p>
                                     <p className="text-[11px] text-neutral-600 font-medium">
-                                        Real-time percentile ranking, tier badges, and college standings
+                                        {governanceData?.capabilities?.leaderboards?.description ||
+                                            "Real-time percentile ranking, tier badges, and college standings"}
                                     </p>
                                 </div>
 
@@ -1287,9 +1394,12 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                     <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
                                         Developer Showcase & Card Studio
                                     </p>
-                                    <p className="text-base font-black text-black">Full Access</p>
+                                    <p className="text-base font-black text-black">
+                                        {governanceData?.capabilities?.cardStudio?.label || "Full Access"}
+                                    </p>
                                     <p className="text-[11px] text-neutral-600 font-medium">
-                                        Custom public URL, interactive 3D card export, and SVG profile embeds
+                                        {governanceData?.capabilities?.cardStudio?.description ||
+                                            "Custom public URL, interactive 3D card export, and SVG profile embeds"}
                                     </p>
                                 </div>
 
@@ -1297,9 +1407,12 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                     <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
                                         Resume Intelligence Engine
                                     </p>
-                                    <p className="text-base font-black text-black">Unlimited Audits</p>
+                                    <p className="text-base font-black text-black">
+                                        {governanceData?.capabilities?.resumeIntelligence?.label || "Unlimited Audits"}
+                                    </p>
                                     <p className="text-[11px] text-neutral-600 font-medium">
-                                        7-dimension deterministic ATS scoring & fact provenance extraction
+                                        {governanceData?.capabilities?.resumeIntelligence?.description ||
+                                            "7-dimension deterministic ATS scoring & fact provenance extraction"}
                                     </p>
                                 </div>
 
@@ -1307,9 +1420,12 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                     <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
                                         Platform Sync Rate
                                     </p>
-                                    <p className="text-base font-black text-black">Automated + Live Refresh</p>
+                                    <p className="text-base font-black text-black">
+                                        {governanceData?.capabilities?.syncCadence?.label || "Automated + Live Refresh"}
+                                    </p>
                                     <p className="text-[11px] text-neutral-600 font-medium">
-                                        Daily background updates plus manual on-demand synchronization
+                                        {governanceData?.capabilities?.syncCadence?.description ||
+                                            "Daily background updates plus manual on-demand synchronization"}
                                     </p>
                                 </div>
                             </div>
@@ -1319,16 +1435,28 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                         <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-start gap-3">
                             <GraduationCap className="w-5 h-5 text-black shrink-0 mt-0.5" />
                             <div className="space-y-0.5 text-xs">
-                                <p className="font-black text-black">Collegiate Fair-Play Safeguard</p>
+                                <p className="font-black text-black">
+                                    {safeguard?.isOnCooldown ? "Collegiate Verification Cooldown Active" : "Collegiate Fair-Play Safeguard"}
+                                </p>
                                 <p className="text-neutral-600 font-medium leading-relaxed">
-                                    To protect seasonal leaderboard integrity and university rankings, college affiliation changes are subject to a 3-day verification cooldown. Anti-cheat algorithmic bounding ensures all contest milestones remain genuine.
+                                    {safeguard?.isOnCooldown
+                                        ? `Your college affiliation change is subject to a 72-hour integrity cooldown. Approximately ${safeguard.remainingCooldownHours} hour(s) remaining. Anti-cheat algorithmic bounding ensures all contest milestones remain genuine.`
+                                        : "To protect seasonal leaderboard integrity and university rankings, college affiliation changes are subject to a 3-day verification cooldown. Anti-cheat algorithmic bounding ensures all contest milestones remain genuine."}
                                 </p>
                             </div>
                         </div>
                     </div>
                 );
+            }
 
-            case "about":
+            case "about": {
+                const p = platformMetadata?.platform;
+                const versionString = p
+                    ? `Version ${p.version} (${p.edition} • Build ${p.buildNumber})`
+                    : "Version 2.4.0 (Titan Edition • Build 2026.10)";
+                const channelLabel = p?.channel ? `${p.channel.toUpperCase()} RELEASE` : "OFFICIAL RELEASE";
+                const supportedPortalsCount = platformMetadata?.ecosystemStats?.supportedPortals || 16;
+
                 return (
                     <div className="space-y-6">
                         {/* Hero Card */}
@@ -1343,12 +1471,12 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                             Orbix Platform
                                         </h3>
                                         <p className="text-xs font-mono font-bold text-neutral-600 mt-1">
-                                            Version 2.4.0 (Titan Edition • Build 2026.10)
+                                            {versionString}
                                         </p>
                                     </div>
                                 </div>
                                 <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] self-start sm:self-auto">
-                                    Official Release
+                                    {channelLabel}
                                 </span>
                             </div>
 
@@ -1377,7 +1505,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                             <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
                                 <div className="flex items-center gap-2">
                                     <span className="w-2.5 h-2.5 rounded-full bg-[#FFE566] border border-black inline-block" />
-                                    <h4 className="text-sm font-black text-black">16 Connected Developer Portals</h4>
+                                    <h4 className="text-sm font-black text-black">{supportedPortalsCount} Connected Developer Portals</h4>
                                 </div>
                                 <p className="text-xs text-neutral-600 font-medium leading-relaxed">
                                     Native multi-platform synchronization across LeetCode, Codeforces, GitHub, CodeChef, AtCoder, HackerRank, GeeksforGeeks, Kaggle, and other genuine engineering portals.
@@ -1451,6 +1579,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                         </div>
                     </div>
                 );
+            }
 
             default:
                 return null;
