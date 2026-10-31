@@ -95,6 +95,58 @@ const CATEGORIES: CategoryOption[] = [
     },
 ];
 
+const DEFAULT_FAQS: FAQItem[] = [
+    {
+        id: "sync-frequency",
+        category: "Platform Sync",
+        question: "How often does Orbix refresh my platform stats (LeetCode, Codeforces, GitHub)?",
+        answer:
+            "Orbix triggers automatic daily syncs for all connected profiles. You can also trigger an instant live refresh at any time by visiting your Developer Profile or Onboarding hub and clicking 'Sync'.",
+    },
+    {
+        id: "college-update-rule",
+        category: "College & Identity",
+        question: "Why is my College Name locked or on cooldown?",
+        answer:
+            "To ensure leaderboard integrity and prevent gaming college standings during contest seasons, college identity updates have a 3-day verification cooldown. You can change your college once every 3 days.",
+    },
+    {
+        id: "orbix-score",
+        category: "Orbix Score",
+        question: "How is the Orbix Score calculated across competitive platforms?",
+        answer:
+            "Orbix Score is a calibrated 0 to 10,000 composite algorithm that mathematically weights algorithmic problem counts across platforms (40%), rated contest performance (35%), active weekly streak consistency (15%), and verified open-source GitHub contributions (10%). Diminishing returns curves ensure fair benchmarking across all coding platforms.",
+    },
+    {
+        id: "private-profile",
+        category: "Privacy",
+        question: "What happens when I toggle my profile to Private?",
+        answer:
+            "A private profile immediately de-indexes your stats, contest rating history, and resume from public URLs and global explore searches. Only essential identity information (name and handle) remains visible to confirmed connections.",
+    },
+    {
+        id: "resume-audit",
+        category: "Resume Intelligence",
+        question: "How does the Resume Intelligence engine evaluate my resume?",
+        answer:
+            "The Orbix Resume Intelligence engine uses deterministic multi-stage AST parsing to evaluate resumes across 7 distinct dimensions: ATS Compatibility, Quantification & Metrics, Technical Depth, Action-Oriented Language, Brevity, Section Architecture, and Verifiable Project Provenance.",
+    },
+    {
+        id: "club-verification",
+        category: "Clubs & Chapters",
+        question: "What is required to verify a student developer club?",
+        answer:
+            "Clubs submit collegiate proof (such as an official college portal link or faculty advisor contact). Once submitted, the Orbix verification queue reviews the request under the 4-Pillar Reviewer Standard within 24 to 48 business hours.",
+    },
+    {
+        id: "card-studio",
+        category: "Developer Card",
+        question: "How can I export my verified developer card or embed my live badge?",
+        answer:
+            "Visit the Card Studio on your profile page to customize themes, download high-resolution PNG/SVG assets, or copy the auto-updating Markdown badge snippet for your GitHub README.",
+    },
+];
+
 export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
     const toast = useToast();
 
@@ -123,8 +175,8 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
     const [replyText, setReplyText] = useState("");
     const [isSendingReply, setIsSendingReply] = useState(false);
 
-    // FAQs state
-    const [faqs, setFaqs] = useState<FAQItem[]>([]);
+    // FAQs state (initialized with rich default answers)
+    const [faqs, setFaqs] = useState<FAQItem[]>(DEFAULT_FAQS);
     const [expandedFaqId, setExpandedFaqId] = useState<string | null>("sync-frequency");
     const [faqSearch, setFaqSearch] = useState("");
 
@@ -147,11 +199,17 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
         }
     }, []);
 
-    // Fetch FAQs
+    // Fetch FAQs from API with fallback to DEFAULT_FAQS
     useEffect(() => {
         fetchHelpFAQs()
-            .then((data) => setFaqs(data.faqs || []))
-            .catch(() => {});
+            .then((data) => {
+                if (data?.faqs && data.faqs.length > 0) {
+                    setFaqs(data.faqs);
+                }
+            })
+            .catch(() => {
+                // Preserves DEFAULT_FAQS smoothly
+            });
     }, []);
 
     useEffect(() => {

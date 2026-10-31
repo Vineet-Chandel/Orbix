@@ -20,6 +20,9 @@ import {
     MapPin,
     X,
     RefreshCw,
+    FileText,
+    Check,
+    Globe,
 } from "lucide-react";
 import type { SettingsViewKey } from "./types";
 import { useToast } from "../../context/ToastContext";
@@ -1063,43 +1066,126 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
             case "privacy-center":
                 return (
-                    <div className="space-y-5">
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="flex items-center gap-3.5">
-                                <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black flex-shrink-0" />
-                                <div>
-                                    <h3 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-none">Orbix Privacy Center</h3>
-                                    <p className="text-xs font-mono font-bold text-neutral-600 mt-1">Zero telemetry selling • Developer First</p>
-                                </div>
-                            </div>
-                            <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
-                                We believe developer data belongs to developers. Orbix never sells your code, submissions, or contact details to third-party data brokers.
-                            </p>
-
-                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-0.5">
-                                        <p className="text-xs font-black text-black">Anonymous Telemetry</p>
-                                        <p className="text-[11px] text-neutral-600 font-medium">Help improve Orbix by sharing anonymous performance telemetry.</p>
+                    <div className="space-y-6">
+                        {/* Hero Header */}
+                        <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-black/10 pb-5">
+                                <div className="flex items-center gap-3.5">
+                                    <div className="w-12 h-12 rounded-2xl bg-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                        <ShieldCheck className="w-6 h-6 text-black stroke-[2.5]" />
                                     </div>
-                                    <NeoToggle
-                                        checked={telemetryEnabled}
-                                        onChange={(v) => {
-                                            setTelemetryEnabled(v);
-                                            toast.info(`Telemetry preferences updated.`);
-                                        }}
-                                        ariaLabel="Toggle telemetry"
-                                    />
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight">
+                                                Orbix Privacy Center
+                                            </h3>
+                                            <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-black text-[#a2ff86] text-[10px] font-black uppercase font-mono tracking-wider">
+                                                Developer First
+                                            </span>
+                                        </div>
+                                        <p className="text-xs font-mono font-bold text-neutral-600 mt-1">
+                                            Zero telemetry selling • Complete data ownership • Encrypted transmission
+                                        </p>
+                                    </div>
                                 </div>
+                                <Link
+                                    to="/docs/public-vs-private-profile"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] self-start sm:self-auto cursor-pointer"
+                                >
+                                    <span>Privacy Architecture Docs</span>
+                                    <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </Link>
                             </div>
 
-                            <div className="pt-2">
+                            <p className="text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed">
+                                At Orbix, we believe developer data belongs strictly to developers. Your competitive metrics, problem solutions, open-source repositories, and resume documents are used exclusively to build your verified engineering identity and power community leaderboards. We never monetize, package, or sell your personal data.
+                            </p>
+                        </div>
+
+                        {/* Four Core Privacy Pillars */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-amber-200 border-2 border-black flex items-center justify-center shrink-0">
+                                        <Lock className="w-4 h-4 text-black stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-sm font-black text-black">Zero Commercial Reselling</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Orbix will never sell your contact credentials, profile analytics, or coding activity to third-party advertisers, data aggregators, or unsolicited recruiter lists.
+                                </p>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-sky-200 border-2 border-black flex items-center justify-center shrink-0">
+                                        <Globe className="w-4 h-4 text-black stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-sm font-black text-black">Public vs. Private Gating</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Switching your account to Private immediately de-indexes your public showcase, masks leaderboard rankings, and blocks direct recruiter inquiries with zero latency.
+                                </p>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-200 border-2 border-black flex items-center justify-center shrink-0">
+                                        <FileText className="w-4 h-4 text-black stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-sm font-black text-black">Resume Fact Confidentiality</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Resumes uploaded for ATS audit are processed securely with deterministic fact provenance. Extracted details remain private until you explicitly choose to publish them.
+                                </p>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-purple-200 border-2 border-black flex items-center justify-center shrink-0">
+                                        <RefreshCw className="w-4 h-4 text-black stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-sm font-black text-black">Data Portability & Erasure</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    You retain total ownership over your data. Request an export of all synced achievements, or initiate complete, permanent account deletion from Manage Account.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Interactive Privacy Preferences & Quick Navigation */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <h4 className="text-sm font-black uppercase tracking-wider text-black">
+                                Privacy Preferences & Profile Controls
+                            </h4>
+
+                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="space-y-0.5">
+                                    <p className="text-xs font-black text-black">Anonymous Diagnostics & Performance Telemetry</p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Help optimize Orbix by sharing anonymous latency and client crash logs. No personal data, handles, or source code are ever recorded.
+                                    </p>
+                                </div>
+                                <NeoToggle
+                                    checked={telemetryEnabled}
+                                    onChange={(v) => {
+                                        setTelemetryEnabled(v);
+                                        toast.info(v ? "Anonymous telemetry enabled. Thank you!" : "Anonymous telemetry disabled.");
+                                    }}
+                                    ariaLabel="Toggle telemetry"
+                                />
+                            </div>
+
+                            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t-2 border-black/10">
+                                <p className="text-xs text-neutral-600 font-medium">
+                                    Looking to hide your profile, manage visibility flags, or adjust recruiter contact permissions?
+                                </p>
                                 <button
                                     type="button"
                                     onClick={() => onSelectView("account-privacy")}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer"
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer shrink-0"
                                 >
-                                    <span>Open Profile Privacy Controls</span>
+                                    <span>Profile Privacy Controls</span>
                                     <ExternalLink className="w-3.5 h-3.5" />
                                 </button>
                             </div>
@@ -1109,32 +1195,134 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
             case "account-status":
                 return (
-                    <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="space-y-1">
-                                <h3 className="text-xl font-black text-black">Account Standing</h3>
-                                <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                    Current health status of your Orbix developer account.
-                                </p>
+                    <div className="space-y-6">
+                        {/* Standing Hero */}
+                        <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-black/10 pb-5">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight">
+                                            Account Standing
+                                        </h3>
+                                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
+                                            <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <span>Good Standing</span>
+                                        </span>
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                                        Overall platform health, security status, and developer privileges.
+                                    </p>
+                                </div>
+                                <div className="text-left sm:text-right">
+                                    <span className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500 block">
+                                        Developer ID
+                                    </span>
+                                    <span className="text-xs font-black text-black font-mono">
+                                        @{user?.username || "developer"}
+                                    </span>
+                                </div>
                             </div>
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
-                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Good Standing</span>
-                            </span>
+
+                            {/* Trust & Health Indicators */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Community Conduct
+                                    </span>
+                                    <p className="text-sm font-black text-emerald-700 flex items-center gap-1.5">
+                                        <Check className="w-4 h-4 stroke-[3]" />
+                                        100% Compliant
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Zero active moderation warnings or strikes
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Platform Sync Status
+                                    </span>
+                                    <p className="text-sm font-black text-black flex items-center gap-1.5">
+                                        <RefreshCw className="w-4 h-4 stroke-[2.5] text-sky-600" />
+                                        Active & Healthy
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Automatic daily sync across 16 supported portals
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Account Security
+                                    </span>
+                                    <p className="text-sm font-black text-black flex items-center gap-1.5">
+                                        <ShieldCheck className="w-4 h-4 stroke-[2.5] text-emerald-600" />
+                                        {twoFactorEnabled ? "2FA Enabled" : "Standard Protection"}
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        {twoFactorEnabled ? "Two-factor authentication active" : "Verified email credential"}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-2 text-xs font-bold text-neutral-700">
-                            <div className="flex items-center justify-between">
-                                <span>Community Guidelines:</span>
-                                <span className="text-[#008f39]">100% Compliant</span>
+                        {/* Entitlements & Capabilities */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <h4 className="text-sm font-black uppercase tracking-wider text-black">
+                                Platform Capabilities & Quotas
+                            </h4>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Global & College Leaderboards
+                                    </p>
+                                    <p className="text-base font-black text-black">Eligible & Ranked</p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Real-time percentile ranking, tier badges, and college standings
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Developer Showcase & Card Studio
+                                    </p>
+                                    <p className="text-base font-black text-black">Full Access</p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Custom public URL, interactive 3D card export, and SVG profile embeds
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Resume Intelligence Engine
+                                    </p>
+                                    <p className="text-base font-black text-black">Unlimited Audits</p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        7-dimension deterministic ATS scoring & fact provenance extraction
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Platform Sync Rate
+                                    </p>
+                                    <p className="text-base font-black text-black">Automated + Live Refresh</p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Daily background updates plus manual on-demand synchronization
+                                    </p>
+                                </div>
                             </div>
-                            <div className="flex items-center justify-between">
-                                <span>API Rate Limits:</span>
-                                <span>5,000 requests / hour</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span>External Sync Queues:</span>
-                                <span className="text-[#008f39]">Healthy</span>
+                        </div>
+
+                        {/* Leaderboard Integrity Safeguard Notice */}
+                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-start gap-3">
+                            <GraduationCap className="w-5 h-5 text-black shrink-0 mt-0.5" />
+                            <div className="space-y-0.5 text-xs">
+                                <p className="font-black text-black">Collegiate Fair-Play Safeguard</p>
+                                <p className="text-neutral-600 font-medium leading-relaxed">
+                                    To protect seasonal leaderboard integrity and university rankings, college affiliation changes are subject to a 3-day verification cooldown. Anti-cheat algorithmic bounding ensures all contest milestones remain genuine.
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -1142,31 +1330,123 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
             case "about":
                 return (
-                    <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
-                        <div className="flex items-center gap-3.5">
-                            <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black flex-shrink-0" />
-                            <div>
-                                <h3 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-none">Orbix Platform</h3>
-                                <p className="text-xs font-mono font-bold text-neutral-600 mt-1">v1.4.0 • Neo-Grotesque Edition</p>
+                    <div className="space-y-6">
+                        {/* Hero Card */}
+                        <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-black/10 pb-5">
+                                <div className="flex items-center gap-3.5">
+                                    <div className="w-12 h-12 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                        <OrbixLogo className="w-7 h-7 text-black" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-none">
+                                            Orbix Platform
+                                        </h3>
+                                        <p className="text-xs font-mono font-bold text-neutral-600 mt-1">
+                                            Version 2.4.0 (Titan Edition • Build 2026.10)
+                                        </p>
+                                    </div>
+                                </div>
+                                <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] self-start sm:self-auto">
+                                    Official Release
+                                </span>
+                            </div>
+
+                            <div className="space-y-3 text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed">
+                                <p>
+                                    Orbix is the unified developer identity and competitive analytics ecosystem designed for software engineers, student clubs, and tech hiring teams worldwide.
+                                </p>
+                                <p>
+                                    In an era where developer talent is fragmented across dozens of coding portals, contest hubs, and code repositories, Orbix provides a single, mathematically verified proof of work. Through deterministic benchmarking, transparent skill provenance, and collegiate community infrastructure, Orbix transforms individual practice into tangible engineering credibility.
+                                </p>
                             </div>
                         </div>
 
-                        <p className="text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed max-w-xl">
-                            Orbix is the unified developer identity and competitive analytics platform built for coders, student clubs, and tech hiring teams worldwide.
-                        </p>
+                        {/* Four Canonical Pillars */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black inline-block" />
+                                    <h4 className="text-sm font-black text-black">Deterministic Scoring Engine</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    A calibrated 0 to 10,000 Orbix Score evaluating algorithmic problem solving, contest ratings, active streaks, and verified open-source contributions with anti-cheat bounding.
+                                </p>
+                            </div>
 
-                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1.5 text-xs font-bold text-neutral-700">
-                            <div className="flex items-center justify-between">
-                                <span>Frontend Engine:</span>
-                                <span>React 19 • Vite • Tailwind</span>
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#FFE566] border border-black inline-block" />
+                                    <h4 className="text-sm font-black text-black">16 Connected Developer Portals</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Native multi-platform synchronization across LeetCode, Codeforces, GitHub, CodeChef, AtCoder, HackerRank, GeeksforGeeks, Kaggle, and other genuine engineering portals.
+                                </p>
                             </div>
-                            <div className="flex items-center justify-between">
-                                <span>Backend Infrastructure:</span>
-                                <span>Node • Express • PostgreSQL • Redis</span>
+
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-sky-300 border border-black inline-block" />
+                                    <h4 className="text-sm font-black text-black">Collegiate Leaderboard Network</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Inter-university rankings and dedicated governance infrastructure for student chapters, coding societies, and campus hackathons nationwide.
+                                </p>
                             </div>
-                            <div className="flex items-center justify-between">
-                                <span>License:</span>
-                                <span>Proprietary © {new Date().getFullYear()} Orbix Inc.</span>
+
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-rose-300 border border-black inline-block" />
+                                    <h4 className="text-sm font-black text-black">Resume Intelligence & Fact Provenance</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Multi-stage AST parsing, deterministic 7-dimension ATS scoring, and explicit skill verification connecting resume claims with verified coding data.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Documentation, Legal & Credits */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <h4 className="text-sm font-black uppercase tracking-wider text-black">
+                                Platform Architecture & Documentation
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold">
+                                <Link
+                                    to="/docs/orbix-score-algorithm"
+                                    className="p-3 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black flex items-center justify-between shadow-[2px_2px_0px_#000] text-black"
+                                >
+                                    <span>Scoring Algorithm</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </Link>
+                                <Link
+                                    to="/docs/supported-platform-registry"
+                                    className="p-3 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black flex items-center justify-between shadow-[2px_2px_0px_#000] text-black"
+                                >
+                                    <span>Platform Registry</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </Link>
+                                <Link
+                                    to="/docs/public-vs-private-profile"
+                                    className="p-3 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black flex items-center justify-between shadow-[2px_2px_0px_#000] text-black"
+                                >
+                                    <span>Privacy Controls</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </Link>
+                            </div>
+
+                            <div className="pt-4 border-t-2 border-black/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-neutral-600 font-medium">
+                                <div className="flex flex-wrap items-center gap-3 font-bold text-black">
+                                    <Link to="/docs" className="hover:underline">Documentation</Link>
+                                    <span>•</span>
+                                    <Link to="/events" className="hover:underline">Events Calendar</Link>
+                                    <span>•</span>
+                                    <Link to="/leaderboard" className="hover:underline">Leaderboard</Link>
+                                    <span>•</span>
+                                    <Link to="/blogs" className="hover:underline">Engineering Blog</Link>
+                                </div>
+                                <span className="font-mono text-[11px] text-neutral-500">
+                                    Proprietary © {new Date().getFullYear()} Orbix Inc. All rights reserved.
+                                </span>
                             </div>
                         </div>
                     </div>
