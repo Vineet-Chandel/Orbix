@@ -374,6 +374,9 @@ export interface CollegeClubsResponse {
     success: boolean;
     collegeName: string;
     collegeId: string | null;
+    collegeCity?: string | null;
+    collegeState?: string | null;
+    collegeAisheCode?: string | null;
     totalClubs: number;
     clubs: CollegeClubItem[];
 }

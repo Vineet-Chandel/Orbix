@@ -299,9 +299,7 @@ export default function Dashboard() {
                                     </div>
 
                                     {/* Notification Bell */}
-                                    <div className="p-1 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center">
-                                        <NotificationBell variant="light" />
-                                    </div>
+                                    <NotificationBell variant="neo" />
                                 </div>
                             </div>
 

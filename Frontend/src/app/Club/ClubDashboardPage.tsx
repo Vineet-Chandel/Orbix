@@ -669,13 +669,13 @@ export default function ClubDashboardPage() {
                                 <button
                                     type="button"
                                     onClick={() => setIsInboxModalOpen(true)}
-                                    className="relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white hover:bg-[#FFE566] text-black border-2 border-black shadow-[3px_3px_0px_#000] transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
+                                    className="relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white hover:bg-[#FFE566]/20 text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] hover:shadow-[3.5px_3.5px_0px_#000] transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px] select-none"
                                     title={`Club Notifications & Inbox ${inboxCounts.unreadCount > 0 ? `(${inboxCounts.unreadCount} unread)` : ""}`}
                                     aria-label="Club Notifications & Inbox"
                                 >
-                                    <Bell className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2.3] transition-transform group-hover:rotate-6" />
+                                    <Bell className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[2.2] transition-transform duration-200 group-hover:rotate-12" />
                                     {inboxCounts.unreadCount > 0 && (
-                                        <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black leading-none text-black bg-[#FF6B6B] rounded-full border-2 border-black shadow-[1px_1px_0px_#000] animate-pulse">
+                                        <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black leading-none text-black bg-[#FFE566] rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] pointer-events-none select-none">
                                             {inboxCounts.unreadCount > 99 ? "99+" : inboxCounts.unreadCount}
                                         </span>
                                     )}

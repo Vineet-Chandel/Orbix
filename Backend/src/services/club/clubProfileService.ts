@@ -1160,15 +1160,45 @@ export class ClubProfileService {
         }
 
         // 3. If still no college, check user's registered college in users table
-        if (userId && !collegeId && !collegeName) {
+        if (userId && (!collegeId || !collegeName)) {
             try {
                 const userRes = await query(
                     `SELECT college, college_id FROM users WHERE id = $1 LIMIT 1;`,
                     [userId]
                 );
                 if (userRes.rows.length > 0) {
-                    collegeName = userRes.rows[0].college || null;
-                    collegeId = userRes.rows[0].college_id || null;
+                    collegeName = collegeName || userRes.rows[0].college || null;
+                    collegeId = collegeId || userRes.rows[0].college_id || null;
+                }
+            } catch {
+                // Ignore query error
+            }
+        }
+
+        // If collegeId exists but collegeName is missing, resolve official name from institutions table
+        if (collegeId && (!collegeName || !collegeName.trim())) {
+            try {
+                const instRes = await query(
+                    `SELECT official_name FROM institutions WHERE id = $1 LIMIT 1;`,
+                    [collegeId]
+                );
+                if (instRes.rows.length > 0 && instRes.rows[0].official_name) {
+                    collegeName = instRes.rows[0].official_name;
+                }
+            } catch {
+                // Ignore query error
+            }
+        }
+
+        // If collegeName exists but collegeId is missing, resolve id from institutions table
+        if (collegeName && !collegeId) {
+            try {
+                const instRes = await query(
+                    `SELECT id FROM institutions WHERE LOWER(TRIM(official_name)) = LOWER(TRIM($1)) LIMIT 1;`,
+                    [collegeName]
+                );
+                if (instRes.rows.length > 0) {
+                    collegeId = instRes.rows[0].id;
                 }
             } catch {
                 // Ignore query error
@@ -1268,10 +1298,32 @@ export class ClubProfileService {
         const resolvedCollegeName = currentClubRow?.collegeName || cleanCollegeName || rows[0]?.collegeName || "Your College";
         const resolvedCollegeId = currentClubRow?.collegeId || collegeId || rows[0]?.collegeId || null;
 
+        let collegeCity: string | null = null;
+        let collegeState: string | null = null;
+        let collegeAisheCode: string | null = null;
+        if (resolvedCollegeId) {
+            try {
+                const instRes = await query(
+                    `SELECT city, state, aishe_code FROM institutions WHERE id = $1 LIMIT 1;`,
+                    [resolvedCollegeId]
+                );
+                if (instRes.rows.length > 0) {
+                    collegeCity = instRes.rows[0].city || null;
+                    collegeState = instRes.rows[0].state || null;
+                    collegeAisheCode = instRes.rows[0].aishe_code || null;
+                }
+            } catch {
+                // Ignore query error
+            }
+        }
+
         if (rows.length === 0) {
             return {
                 collegeName: resolvedCollegeName,
                 collegeId: resolvedCollegeId,
+                collegeCity,
+                collegeState,
+                collegeAisheCode,
                 totalClubs: 0,
                 clubs: [],
             };
@@ -1351,6 +1403,9 @@ export class ClubProfileService {
         return {
             collegeName: resolvedCollegeName,
             collegeId: resolvedCollegeId,
+            collegeCity,
+            collegeState,
+            collegeAisheCode,
             totalClubs: enrichedClubs.length,
             clubs: enrichedClubs,
         };

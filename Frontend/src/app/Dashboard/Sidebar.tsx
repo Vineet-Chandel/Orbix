@@ -274,19 +274,6 @@ export const Sidebar = ({
             path: "/leaderboard",
         },
         {
-            id: "connect-platform" as SidebarTab,
-            label: "Connect Platform",
-            badge: brokenPortalsCount > 0 ? `${brokenPortalsCount} broken` : connectedPortalsCount > 0 ? `${connectedPortalsCount}` : undefined,
-            badgeVariant: brokenPortalsCount > 0 ? ("danger" as const) : ("default" as const),
-            icon: (
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                </svg>
-            ),
-            path: "/onboarding",
-        },
-        {
             id: "resume" as SidebarTab,
             label: "Resume",
             icon: (
@@ -940,12 +927,24 @@ export const Sidebar = ({
                                 setIsProfileMenuOpen(false);
                                 handleItemClick("connect-platform");
                             }}
-                            className="flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors"
+                            className="flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors"
                         >
-                            <svg className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                            </svg>
-                            <span className="truncate">Connected Platforms ({connectedPortalsCount})</span>
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <svg className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                                </svg>
+                                <span className="truncate">Connected Platforms</span>
+                            </div>
+                            {brokenPortalsCount > 0 ? (
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#FF6B6B] text-black border border-black min-w-[18px] text-center leading-none">
+                                    {brokenPortalsCount} broken
+                                </span>
+                            ) : connectedPortalsCount > 0 ? (
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#a2ff86] text-black border border-black min-w-[18px] text-center leading-none">
+                                    {connectedPortalsCount}
+                                </span>
+                            ) : null}
                         </Link>
 
                         <Link
