@@ -54,7 +54,7 @@ export const SettingsHub: React.FC<SettingsHubProps> = ({
         {
             id: "your-activity" as SettingsViewKey,
             title: "Your activity",
-            description: "Time spent, interactions, history, and search logs",
+            description: "Where you're logged in, active device sessions & security history",
             icon: <Activity className="w-5 h-5 text-black stroke-[2.5]" />,
             iconBg: "bg-[#a2ff86]",
         },

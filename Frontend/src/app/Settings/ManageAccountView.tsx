@@ -53,9 +53,10 @@ import {
 interface ManageAccountViewProps {
     user: any;
     onBack?: () => void;
+    onRefreshStatus?: () => void;
 }
 
-export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBack: _onBack }) => {
+export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBack: _onBack, onRefreshStatus }) => {
     const toast = useToast();
     const dispatch = useAppDispatch();
 
@@ -474,6 +475,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                 }
                 toast.success("Email address updated and verified successfully! ✓", { title: "Email Changed" });
                 await loadStatus(false);
+                if (onRefreshStatus) onRefreshStatus();
             }
         } catch (err: any) {
             toast.error(err.message || "Code verification failed.");
@@ -578,6 +580,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             }));
             toast.success("Your primary email has been cryptographically verified! ✓", { title: "Email Verified" });
             await loadStatus(false);
+            if (onRefreshStatus) onRefreshStatus();
         } catch (err: any) {
             toast.error(err.message || "Email verification failed.");
         } finally {
@@ -657,6 +660,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                 title: "Username Changed",
             });
             await loadStatus(false);
+            if (onRefreshStatus) onRefreshStatus();
         } catch (err: any) {
             toast.error(err.message || "Failed to update username.");
         } finally {

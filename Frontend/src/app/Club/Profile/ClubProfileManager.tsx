@@ -159,7 +159,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
 
         initialSnapshotRef.current = JSON.stringify({
             name: c.name || "",
-            slug: c.slug || "",
             category: c.category || "Technical & Coding",
             shortDescription: c.shortDescription || "",
             about: c.about || "",
@@ -208,7 +207,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
         if (!initialSnapshotRef.current) return false;
         const current = JSON.stringify({
             name,
-            slug,
             category,
             shortDescription,
             about,
@@ -239,7 +237,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
         return current !== initialSnapshotRef.current;
     }, [
         name,
-        slug,
         category,
         shortDescription,
         about,
@@ -290,7 +287,17 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
             });
 
             setLogoUrl(res.secureUrl);
-            toast.success("Club logo uploaded! Click 'Save Changes' at bottom to apply.");
+
+            // Immediately auto-persist to database & Redux
+            const updated = await dispatch(saveClubProfile({ payload: { logoUrl: res.secureUrl }, clubId: club.id })).unwrap();
+            if (updated?.club) {
+                populateFormFromClub(updated.club);
+            }
+
+            toast.success("Club official logo uploaded and saved successfully!", {
+                title: "Logo Saved",
+            });
+            if (onProfileUpdated) onProfileUpdated();
         } catch (err: any) {
             console.error("Upload error:", err);
             toast.error(err.message || "Failed to upload logo.");
@@ -304,6 +311,24 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
     const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) uploadLogoFile(file);
+    };
+
+    const handleRemoveLogo = async () => {
+        if (!club) return;
+        try {
+            setIsUploadingLogo(true);
+            setLogoUrl("");
+            const updated = await dispatch(saveClubProfile({ payload: { logoUrl: null }, clubId: club.id })).unwrap();
+            if (updated?.club) {
+                populateFormFromClub(updated.club);
+            }
+            toast.success("Club official logo removed.");
+            if (onProfileUpdated) onProfileUpdated();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to remove logo.");
+        } finally {
+            setIsUploadingLogo(false);
+        }
     };
 
     // Direct Cloudinary upload for Club Cover Banner
@@ -330,7 +355,17 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
             });
 
             setCoverImageUrl(res.secureUrl);
-            toast.success("Header banner uploaded! Click 'Save Changes' at bottom to apply.");
+
+            // Immediately auto-persist to database & Redux
+            const updated = await dispatch(saveClubProfile({ payload: { coverImageUrl: res.secureUrl }, clubId: club.id })).unwrap();
+            if (updated?.club) {
+                populateFormFromClub(updated.club);
+            }
+
+            toast.success("Header showcase banner uploaded and saved successfully!", {
+                title: "Banner Saved",
+            });
+            if (onProfileUpdated) onProfileUpdated();
         } catch (err: any) {
             console.error("Upload error:", err);
             toast.error(err.message || "Failed to upload header banner.");
@@ -344,6 +379,24 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
     const handleCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) uploadCoverFile(file);
+    };
+
+    const handleResetCover = async () => {
+        if (!club) return;
+        try {
+            setIsUploadingCover(true);
+            setCoverImageUrl("");
+            const updated = await dispatch(saveClubProfile({ payload: { coverImageUrl: null }, clubId: club.id })).unwrap();
+            if (updated?.club) {
+                populateFormFromClub(updated.club);
+            }
+            toast.success("Header banner reset to default.");
+            if (onProfileUpdated) onProfileUpdated();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to reset header banner.");
+        } finally {
+            setIsUploadingCover(false);
+        }
     };
 
     // Add Focus Area tag
@@ -376,7 +429,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
 
             const payload: Record<string, any> = {
                 name: name.trim(),
-                slug: slug.trim().toLowerCase(),
                 category: category.trim(),
                 shortDescription: shortDescription.trim() || null,
                 about: about.trim() || null,
@@ -556,7 +608,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div>
+                        <div className="md:col-span-2">
                             <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
                                 Official Club Name *
                             </label>
@@ -568,28 +620,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                                 placeholder="e.g. Google Developer Student Club"
                                 className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden"
                             />
-                        </div>
-
-                        <div>
-                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
-                                Club Username / Public Slug *
-                            </label>
-                            <div className="relative flex items-center">
-                                <span className="absolute left-3 text-xs font-mono font-bold text-neutral-500">
-                                    orbix.in/clubs/
-                                </span>
-                                <input
-                                    type="text"
-                                    required
-                                    value={slug}
-                                    onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
-                                    placeholder="gdsc-aec"
-                                    className="w-full pl-28 pr-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-mono font-bold text-black focus:bg-white focus:outline-hidden"
-                                />
-                            </div>
-                            <span className="text-[10px] text-neutral-500 mt-1 block">
-                                Lowercase alphanumeric with hyphens. Used in public sharing URLs.
-                            </span>
                         </div>
 
                         <div>
@@ -794,7 +824,8 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setLogoUrl("")}
+                                            onClick={handleRemoveLogo}
+                                            disabled={isUploadingLogo}
                                             className="px-3.5 py-2 rounded-xl bg-white text-rose-600 hover:bg-rose-50 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
@@ -835,15 +866,17 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                                 <span>Securely processed and stored via Cloudinary storage</span>
                             </p>
-                            <button
-                                type="button"
-                                onClick={() => logoInputRef.current?.click()}
-                                disabled={isUploadingLogo}
-                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs sm:text-sm font-black uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <UploadCloud className="w-4 h-4 stroke-[2.5]" />
-                                <span>BROWSE & UPLOAD LOGO</span>
-                            </button>
+                            {!logoUrl && (
+                                <button
+                                    type="button"
+                                    onClick={() => logoInputRef.current?.click()}
+                                    disabled={isUploadingLogo}
+                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs sm:text-sm font-black uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <UploadCloud className="w-4 h-4 stroke-[2.5]" />
+                                    <span>BROWSE & UPLOAD LOGO</span>
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -942,7 +975,8 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => setCoverImageUrl("")}
+                                            onClick={handleResetCover}
+                                            disabled={isUploadingCover}
                                             className="px-3.5 py-2 rounded-xl bg-white text-rose-600 hover:bg-rose-50 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
@@ -983,15 +1017,17 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                                 <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
                                 <span>Securely processed and stored via Cloudinary storage</span>
                             </p>
-                            <button
-                                type="button"
-                                onClick={() => coverInputRef.current?.click()}
-                                disabled={isUploadingCover}
-                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs sm:text-sm font-black uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                <UploadCloud className="w-4 h-4 stroke-[2.5]" />
-                                <span>BROWSE & UPLOAD BANNER</span>
-                            </button>
+                            {!coverImageUrl && (
+                                <button
+                                    type="button"
+                                    onClick={() => coverInputRef.current?.click()}
+                                    disabled={isUploadingCover}
+                                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#FFE566] hover:bg-[#ffe043] text-black text-xs sm:text-sm font-black uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <UploadCloud className="w-4 h-4 stroke-[2.5]" />
+                                    <span>BROWSE & UPLOAD BANNER</span>
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

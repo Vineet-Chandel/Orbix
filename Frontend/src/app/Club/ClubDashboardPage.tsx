@@ -47,7 +47,9 @@ interface VerifiedClub {
     short_description: string | null;
     about: string | null;
     logo_url: string | null;
+    logoUrl?: string | null;
     cover_image_url: string | null;
+    coverImageUrl?: string | null;
     website_url: string | null;
     public_email: string | null;
     social_links: {
@@ -696,8 +698,8 @@ export default function ClubDashboardPage() {
                                 <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-6">
                                     <div className="flex items-start sm:items-center gap-4 min-w-0">
                                         <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-black text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden flex items-center justify-center flex-shrink-0 font-black text-xl sm:text-2xl">
-                                            {club.logo_url ? (
-                                                <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover" />
+                                            {club.logo_url || club.logoUrl ? (
+                                                <img src={club.logo_url || club.logoUrl || ""} alt={club.name} className="w-full h-full object-cover" />
                                             ) : (
                                                 <span>{club.name.slice(0, 2).toUpperCase()}</span>
                                             )}

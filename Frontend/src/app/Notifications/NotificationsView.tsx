@@ -22,11 +22,24 @@ import {
     Code2,
     ExternalLink,
     ShieldCheck,
+    ShieldAlert,
+    Laptop,
+    Monitor,
+    Smartphone,
+    Tablet,
+    Radio,
+    CheckCheck,
+    KeyRound,
+    AlertTriangle,
+    LifeBuoy,
 } from "lucide-react";
+import { useToast } from "../../context/ToastContext";
+import { terminateSession } from "../../api/sessionActivityApi";
 import { useAppSelector } from "../../store";
 import {
     fetchNotifications,
     deleteNotification,
+    markNotificationsAsRead,
     type UserNotification,
 } from "../../utils/profileApi";
 import { RelationshipActionButton } from "../../components/RelationshipActionButton";
@@ -65,6 +78,7 @@ function formatFullDateTime(dateString: string): string {
 }
 
 export const NotificationsView: React.FC = () => {
+    const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
     const [searchParams, setSearchParams] = useSearchParams();
     const queryId = searchParams.get("id");
@@ -73,11 +87,16 @@ export const NotificationsView: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [filter, setFilter] = useState<"all" | "requests" | "inquiries" | "unread">("all");
+    const [filter, setFilter] = useState<"all" | "requests" | "security" | "teams" | "inquiries" | "unread">("all");
     const [searchQuery, setSearchQuery] = useState("");
     const [copiedField, setCopiedField] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [actingInvitationId, setActingInvitationId] = useState<string | null>(null);
+
+    // Interactive security session termination from inbox
+    const [terminatedSessionIds, setTerminatedSessionIds] = useState<Set<string>>(new Set());
+    const [isTerminatingSession, setIsTerminatingSession] = useState<string | null>(null);
+    const [isMarkingAllRead, setIsMarkingAllRead] = useState<boolean>(false);
 
     // Load notifications with automatic read marking
     const loadNotifications = useCallback(
@@ -156,6 +175,94 @@ export const NotificationsView: React.FC = () => {
         navigator.clipboard.writeText(text);
         setCopiedField(fieldKey);
         setTimeout(() => setCopiedField(null), 2000);
+    };
+
+    // Mark all notifications as read
+    const handleMarkAllAsRead = async () => {
+        setIsMarkingAllRead(true);
+        try {
+            await markNotificationsAsRead();
+            setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new Event("orbix_notifications_updated"));
+            }
+            toast.success("All notifications marked as read.");
+        } catch {
+            toast.error("Failed to mark notifications as read.");
+        } finally {
+            setIsMarkingAllRead(false);
+        }
+    };
+
+    // Terminate session remotely directly from security notification
+    const handleTerminateSessionFromInbox = async (sessionId: string, deviceName: string) => {
+        if (!sessionId) return;
+        setIsTerminatingSession(sessionId);
+        try {
+            await terminateSession(sessionId);
+            setTerminatedSessionIds((prev) => new Set(prev).add(sessionId));
+            toast.warning(`Session on ${deviceName || "device"} terminated immediately.`, {
+                title: "Remote Logout Executed",
+            });
+        } catch (err: any) {
+            toast.error(err?.message || "Failed to terminate session.");
+        } finally {
+            setIsTerminatingSession(null);
+        }
+    };
+
+    // Helper functions for notification types
+    const isSecurityAlert = useCallback((item: UserNotification): boolean => {
+        const type = (item.type || "").toLowerCase();
+        const notifType = ((item as any).notification_type || "").toLowerCase();
+        const title = (item.title || "").toLowerCase();
+        return (
+            type === "security_alert" ||
+            notifType === "new_device_login" ||
+            notifType === "security_alert" ||
+            notifType.includes("session") ||
+            notifType.includes("password") ||
+            title.includes("login detected") ||
+            title.includes("security alert") ||
+            title.includes("password changed") ||
+            title.includes("device login")
+        );
+    }, []);
+
+    const isHelpTicket = useCallback((item: UserNotification): boolean => {
+        const type = (item.type || "").toLowerCase();
+        const notifType = ((item as any).notification_type || "").toLowerCase();
+        const title = (item.title || "").toLowerCase();
+        return (
+            type === "help_ticket" ||
+            notifType.includes("help_ticket") ||
+            title.includes("help ticket") ||
+            Boolean(item.metadata?.ticketNumber || item.metadata?.ticketId)
+        );
+    }, []);
+
+    const isAccountGovernance = useCallback((item: UserNotification): boolean => {
+        const notifType = ((item as any).notification_type || "").toLowerCase();
+        const type = (item.type || "").toLowerCase();
+        return (
+            notifType === "account_deletion" ||
+            notifType === "privacy_update" ||
+            type === "governance"
+        );
+    }, []);
+
+    const renderDeviceIcon = (deviceStr: string, className = "w-4 h-4") => {
+        const d = (deviceStr || "").toLowerCase();
+        if (d.includes("iphone") || d.includes("android") || d.includes("mobile")) {
+            return <Smartphone className={className} />;
+        }
+        if (d.includes("ipad") || d.includes("tablet")) {
+            return <Tablet className={className} />;
+        }
+        if (d.includes("mac") || d.includes("windows") || d.includes("laptop")) {
+            return <Laptop className={className} />;
+        }
+        return <Monitor className={className} />;
     };
 
     // Helper functions for relationship-aware notifications
@@ -339,8 +446,11 @@ export const NotificationsView: React.FC = () => {
             const isHire =
                 item.type === "hire_inquiry" ||
                 (item as any).notification_type === "hire_inquiry";
+            const isSec = isSecurityAlert(item);
 
             if (filter === "requests" && !isConnReq && !isPendingTeam) return false;
+            if (filter === "security" && !isSec) return false;
+            if (filter === "teams" && !isTeamInv) return false;
             if (filter === "inquiries" && !isHire) return false;
             if (filter === "unread" && item.isRead) return false;
 
@@ -367,6 +477,10 @@ export const NotificationsView: React.FC = () => {
             const body = (meta.fullMessage || item.body || "").toLowerCase();
             const commEmail = (meta.communicationEmail || "").toLowerCase();
             const college = (senderProfile.college || meta.college || "").toLowerCase();
+            const deviceName = (meta.deviceName || "").toLowerCase();
+            const location = (meta.location || "").toLowerCase();
+            const title = (item.title || "").toLowerCase();
+            const ticketNum = (meta.ticketNumber || "").toLowerCase();
 
             return (
                 senderName.includes(q) ||
@@ -377,16 +491,21 @@ export const NotificationsView: React.FC = () => {
                 positionTitle.includes(q) ||
                 body.includes(q) ||
                 commEmail.includes(q) ||
-                college.includes(q)
+                college.includes(q) ||
+                deviceName.includes(q) ||
+                location.includes(q) ||
+                title.includes(q) ||
+                ticketNum.includes(q)
             );
         });
-    }, [notifications, filter, searchQuery, isPendingConnectionRequest, isClubTeamInvitation]);
+    }, [notifications, filter, searchQuery, isPendingConnectionRequest, isClubTeamInvitation, isSecurityAlert]);
 
     const activeItem = useMemo(() => {
         return notifications.find((n) => n.id === selectedId) || filteredNotifications[0] || null;
     }, [notifications, selectedId, filteredNotifications]);
 
     const totalCount = notifications.length;
+    const unreadCount = notifications.filter((n) => !n.isRead).length;
     const requestsCount = notifications.filter((item) => {
         return (
             isPendingConnectionRequest(item) ||
@@ -394,6 +513,8 @@ export const NotificationsView: React.FC = () => {
                 (item.metadata?.invitationStatus === "pending" || !item.metadata?.invitationStatus))
         );
     }).length;
+    const securityCount = notifications.filter((n) => isSecurityAlert(n)).length;
+    const teamInvCount = notifications.filter((n) => isClubTeamInvitation(n)).length;
     const inquiryCount = notifications.filter(
         (n) => n.type === "hire_inquiry" || (n as any).notification_type === "hire_inquiry"
     ).length;
@@ -408,19 +529,38 @@ export const NotificationsView: React.FC = () => {
                         <span className="text-xs font-mono font-black px-2.5 py-0.5 rounded-md bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]">
                             {totalCount}
                         </span>
+                        {unreadCount > 0 && (
+                            <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-md bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse" />
+                                <span>{unreadCount} Unread</span>
+                            </span>
+                        )}
                     </h2>
                     <p className="text-xs sm:text-sm text-neutral-600 font-medium mt-1">
-                        Connection requests, developer interactions, and direct opportunities
+                        Connection requests, security alerts, developer interactions, and direct opportunities
                     </p>
                 </div>
 
                 {/* Quick actions */}
-                <div className="flex items-center gap-2 self-start sm:self-auto">
+                <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                    {unreadCount > 0 && (
+                        <button
+                            type="button"
+                            onClick={handleMarkAllAsRead}
+                            disabled={isMarkingAllRead}
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-[#FAF6EE] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer disabled:opacity-50"
+                            title="Mark all notifications as read"
+                        >
+                            <CheckCheck className={`w-3.5 h-3.5 text-black stroke-[2.5] ${isMarkingAllRead ? "animate-pulse" : ""}`} />
+                            <span>{isMarkingAllRead ? "Marking..." : "Mark All Read"}</span>
+                        </button>
+                    )}
+
                     <button
                         type="button"
                         onClick={() => loadNotifications(true)}
                         disabled={refreshing}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FAF6EE] hover:bg-[#FFE566] active:translate-x-0.5 active:translate-y-0.5 text-xs font-black text-black border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer disabled:opacity-50"
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FAF6EE] hover:bg-[#FFE566] active:translate-x-0.5 active:translate-y-0.5 text-xs font-black text-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] transition-all cursor-pointer disabled:opacity-50"
                         title="Refresh inbox"
                     >
                         <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
@@ -471,6 +611,32 @@ export const NotificationsView: React.FC = () => {
                             >
                                 Requests ({requestsCount})
                             </button>
+                            {securityCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFilter("security")}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                        filter === "security"
+                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                    }`}
+                                >
+                                    Security ({securityCount})
+                                </button>
+                            )}
+                            {teamInvCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFilter("teams")}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                        filter === "teams"
+                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                    }`}
+                                >
+                                    Teams ({teamInvCount})
+                                </button>
+                            )}
                             {inquiryCount > 0 && (
                                 <button
                                     type="button"
@@ -482,6 +648,19 @@ export const NotificationsView: React.FC = () => {
                                     }`}
                                 >
                                     Recruiter ({inquiryCount})
+                                </button>
+                            )}
+                            {unreadCount > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => setFilter("unread")}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                        filter === "unread"
+                                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                            : "bg-white text-black hover:bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000]"
+                                    }`}
+                                >
+                                    Unread ({unreadCount})
                                 </button>
                             )}
                         </div>
@@ -514,6 +693,9 @@ export const NotificationsView: React.FC = () => {
                                 const isHire =
                                     item.type === "hire_inquiry" ||
                                     (item as any).notification_type === "hire_inquiry";
+                                const isSecurity = isSecurityAlert(item);
+                                const isHelp = isHelpTicket(item);
+                                const isGov = isAccountGovernance(item);
 
                                 const meta = item.metadata || {};
                                 const senderProfile = meta.senderProfile || {};
@@ -522,9 +704,16 @@ export const NotificationsView: React.FC = () => {
                                 const isPendingTeamInv = isTeamInv && invStatus === "pending";
                                 const isAcceptedTeamInv = isTeamInv && invStatus === "accepted";
                                 const isDeclinedTeamInv = isTeamInv && invStatus === "declined";
+                                const isTerminatedSession = isSecurity && meta.sessionId && terminatedSessionIds.has(meta.sessionId);
 
                                 const senderDisplayName =
-                                    isTeamInv
+                                    isSecurity
+                                        ? (item.title || "Security Alert")
+                                        : isHelp
+                                        ? (item.title || "Help Support Ticket")
+                                        : isGov
+                                        ? (item.title || "Account Governance")
+                                        : isTeamInv
                                         ? (meta.clubName || "Club Team Invitation")
                                         : (senderProfile.displayName ||
                                            meta.displayName ||
@@ -539,7 +728,11 @@ export const NotificationsView: React.FC = () => {
                                            DEFAULT_AVATAR_URL);
 
                                 const senderUsername =
-                                    isTeamInv
+                                    isSecurity
+                                        ? (meta.deviceName ? `${meta.deviceName} · ${meta.location || "Location unavailable"}` : "")
+                                        : isHelp
+                                        ? (meta.ticketNumber ? `Ticket ${meta.ticketNumber}` : "")
+                                        : isTeamInv
                                         ? (meta.positionTitle ? `${meta.positionTitle}${meta.teamName ? ` · ${meta.teamName}` : ""}` : "")
                                         : (senderProfile.username ||
                                            meta.username ||
@@ -558,32 +751,57 @@ export const NotificationsView: React.FC = () => {
                                         }`}
                                     >
                                         <div className="flex items-start gap-3">
-                                            {/* Sender Avatar Thumbnail */}
-                                            <div className="relative w-10 h-10 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] overflow-hidden shrink-0 mt-0.5">
-                                                <img
-                                                    src={senderAvatar}
-                                                    alt={senderDisplayName}
-                                                    onError={(e) => {
-                                                        (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
-                                                    }}
-                                                    className="w-full h-full object-cover"
-                                                />
-                                                {isConnReq && (
-                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#a2ff86] border border-black flex items-center justify-center">
-                                                        <UserPlus className="w-2.5 h-2.5 text-black stroke-[3]" />
-                                                    </div>
-                                                )}
-                                                {isConnAccepted && (
-                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#a2ff86] border border-black flex items-center justify-center">
-                                                        <UserCheck className="w-2.5 h-2.5 text-black stroke-[3]" />
-                                                    </div>
-                                                )}
-                                                {isTeamInv && (
-                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black text-[#a2ff86] border border-black flex items-center justify-center">
-                                                        <Users className="w-2.5 h-2.5 stroke-[2.5]" />
-                                                    </div>
-                                                )}
-                                            </div>
+                                            {/* Thumbnail Icon / Avatar */}
+                                            {isSecurity ? (
+                                                <div className={`relative w-10 h-10 rounded-xl border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 mt-0.5 ${
+                                                    isTerminatedSession ? "bg-neutral-200 text-neutral-600" : "bg-amber-100 text-amber-900"
+                                                }`}>
+                                                    {renderDeviceIcon(meta.deviceName || meta.browser || "", "w-5 h-5 stroke-[2.2]")}
+                                                    {!item.isRead && (
+                                                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 border border-black animate-pulse" />
+                                                    )}
+                                                </div>
+                                            ) : isHelp ? (
+                                                <div className="relative w-10 h-10 rounded-xl bg-sky-100 text-sky-900 border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 mt-0.5">
+                                                    <LifeBuoy className="w-5 h-5 stroke-[2.2]" />
+                                                    {!item.isRead && (
+                                                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-sky-500 border border-black animate-pulse" />
+                                                    )}
+                                                </div>
+                                            ) : isGov ? (
+                                                <div className="relative w-10 h-10 rounded-xl bg-rose-100 text-rose-900 border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 mt-0.5">
+                                                    <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
+                                                </div>
+                                            ) : (
+                                                <div className="relative w-10 h-10 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] overflow-hidden shrink-0 mt-0.5">
+                                                    <img
+                                                        src={senderAvatar}
+                                                        alt={senderDisplayName}
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).src = DEFAULT_AVATAR_URL;
+                                                        }}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                    {isConnReq && (
+                                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#a2ff86] border border-black flex items-center justify-center">
+                                                            <UserPlus className="w-2.5 h-2.5 text-black stroke-[3]" />
+                                                        </div>
+                                                    )}
+                                                    {isConnAccepted && (
+                                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#a2ff86] border border-black flex items-center justify-center">
+                                                            <UserCheck className="w-2.5 h-2.5 text-black stroke-[3]" />
+                                                        </div>
+                                                    )}
+                                                    {isTeamInv && (
+                                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-black text-[#a2ff86] border border-black flex items-center justify-center">
+                                                            <Users className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                        </div>
+                                                    )}
+                                                    {!item.isRead && (
+                                                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-black" />
+                                                    )}
+                                                </div>
+                                            )}
 
                                             {/* Sender & Preview */}
                                             <div className="min-w-0 flex-1">
@@ -592,7 +810,29 @@ export const NotificationsView: React.FC = () => {
                                                         {senderDisplayName}
                                                     </span>
 
-                                                    {/* Badges without misleading 'Company' tags */}
+                                                    {/* Contextual Type Badges */}
+                                                    {isSecurity && (
+                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1 ${
+                                                            isTerminatedSession ? "bg-neutral-200 text-neutral-700" : "bg-[#FFE566] text-black"
+                                                        }`}>
+                                                            <ShieldAlert className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                            <span>{isTerminatedSession ? "Terminated" : "Security Alert"}</span>
+                                                        </span>
+                                                    )}
+
+                                                    {isHelp && (
+                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-sky-200 text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
+                                                            <LifeBuoy className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                            <span>Support Ticket</span>
+                                                        </span>
+                                                    )}
+
+                                                    {isGov && (
+                                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-rose-200 text-black border border-black shadow-[1px_1px_0px_#000]">
+                                                            Governance
+                                                        </span>
+                                                    )}
+
                                                     {isConnReq && (
                                                         <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
                                                             Connection Request
@@ -633,10 +873,10 @@ export const NotificationsView: React.FC = () => {
                                                     )}
                                                 </div>
 
-                                                {/* Handle and snippet */}
+                                                {/* Handle / device signature and snippet */}
                                                 {senderUsername && (
                                                     <span className="text-[11px] font-mono font-bold text-neutral-500 block truncate">
-                                                        {isTeamInv ? senderUsername : `@${senderUsername}`}
+                                                        {isTeamInv || isSecurity || isHelp || isGov ? senderUsername : `@${senderUsername}`}
                                                     </span>
                                                 )}
 
@@ -1283,6 +1523,382 @@ export const NotificationsView: React.FC = () => {
                                                 />
                                             </div>
                                         )}
+                                    </div>
+                                );
+                            }
+
+                            // -------------------------------------------------------------
+                            // CASE S: SECURITY ALERTS & NEW DEVICE LOGINS
+                            // -------------------------------------------------------------
+                            if (isSecurityAlert(activeItem)) {
+                                const deviceName = meta.deviceName || meta.device || "Personal Computer";
+                                const browser = meta.browser || "Web Browser";
+                                const os = meta.os || meta.operatingSystem || "Operating System";
+                                const location = meta.location || meta.locationSummary || "Location unavailable";
+                                const sessionId = meta.sessionId || "";
+                                const isTerminated = Boolean(sessionId && terminatedSessionIds.has(sessionId));
+                                const isTerminating = isTerminatingSession === sessionId;
+
+                                return (
+                                    <div className="flex-1 flex flex-col p-5 sm:p-6 space-y-5 animate-fadeIn">
+                                        {/* Detail Top Header */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b-2 border-black/10">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                {/* Device / Security Icon */}
+                                                <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center ${
+                                                    isTerminated ? "bg-neutral-200 text-neutral-700" : "bg-amber-100 text-amber-900"
+                                                }`}>
+                                                    <ShieldAlert className="w-8 h-8 stroke-[2.2]" />
+                                                </div>
+
+                                                <div className="min-w-0 space-y-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h3 className="text-lg sm:text-xl font-black text-black tracking-tight truncate">
+                                                            {activeItem.title || `New Login: ${deviceName}`}
+                                                        </h3>
+                                                        <span className={`inline-flex items-center gap-1.5 text-[11px] font-black px-2.5 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000] shrink-0 ${
+                                                            isTerminated
+                                                                ? "bg-neutral-200 text-neutral-800"
+                                                                : "bg-[#FFE566] text-black"
+                                                        }`}>
+                                                            <span className={`w-2 h-2 rounded-full ${isTerminated ? "bg-neutral-500" : "bg-amber-600 animate-pulse"}`} />
+                                                            <span>{isTerminated ? "Session Terminated" : "Security Alert"}</span>
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                                                        <span className="font-bold text-neutral-600 flex items-center gap-1">
+                                                            <MapPin className="w-3.5 h-3.5 text-neutral-400" />
+                                                            <span>{location}</span>
+                                                        </span>
+                                                        <span className="text-neutral-400">•</span>
+                                                        <span className="text-neutral-500 font-mono font-bold text-[11px]">
+                                                            Received {formatFullDateTime(activeItem.createdAt)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Quick Actions Top Right */}
+                                            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                                                <Link
+                                                    to={`/settings?view=your-activity${sessionId ? `&sessionId=${sessionId}` : ""}`}
+                                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] text-xs font-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer"
+                                                >
+                                                    <span>Your Activity</span>
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </Link>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDelete(e, activeItem.id)}
+                                                    disabled={deletingId === activeItem.id}
+                                                    className="p-2 rounded-xl border-2 border-black bg-white text-black hover:text-rose-600 hover:bg-rose-50 shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
+                                                    title="Delete notification"
+                                                >
+                                                    {deletingId === activeItem.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                    ) : (
+                                                        <Trash2 className="w-4 h-4 stroke-[2]" />
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* 4 Diagnostic Info Cards */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                                        Device & Platform
+                                                    </span>
+                                                    {renderDeviceIcon(deviceName || browser, "w-3.5 h-3.5 text-black stroke-[2.5]")}
+                                                </div>
+                                                <p className="text-sm font-black text-black">{deviceName}</p>
+                                                <p className="text-xs font-bold text-neutral-600 truncate">{browser} on {os}</p>
+                                            </div>
+
+                                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                                        Approximate Location
+                                                    </span>
+                                                    <MapPin className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                                                </div>
+                                                <p className="text-sm font-black text-black truncate">{location}</p>
+                                                <p className="text-xs font-bold text-neutral-600">IP Geolocation</p>
+                                            </div>
+
+                                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                                        Session State
+                                                    </span>
+                                                    <Radio className={`w-3.5 h-3.5 ${isTerminated ? "text-neutral-400" : "text-emerald-600 animate-pulse"} stroke-[2.5]`} />
+                                                </div>
+                                                <p className="text-sm font-black text-black flex items-center gap-1.5">
+                                                    <span className={`w-2 h-2 rounded-full ${isTerminated ? "bg-rose-500" : "bg-emerald-500"}`} />
+                                                    <span>{isTerminated ? "Terminated Remotely" : "Active Device Session"}</span>
+                                                </p>
+                                                <p className="text-xs font-bold text-neutral-600">
+                                                    {isTerminated ? "Access revoked" : "Authorized token active"}
+                                                </p>
+                                            </div>
+
+                                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                                        Authentication Protocol
+                                                    </span>
+                                                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                                                </div>
+                                                <p className="text-sm font-black text-black">Canonical SSO</p>
+                                                <p className="text-xs font-bold text-emerald-700">Protected Identity</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Security Advisory Notice Card */}
+                                        <div className="rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] p-5 space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                <ShieldAlert className="w-4 h-4 text-amber-700 stroke-[2.5]" />
+                                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                                    Authentication Context & Advisory
+                                                </h4>
+                                            </div>
+                                            <p className="text-sm font-medium leading-relaxed text-black whitespace-pre-wrap select-text">
+                                                {activeItem.body}
+                                            </p>
+                                            <p className="text-xs text-neutral-600 font-medium leading-relaxed pt-1">
+                                                Orbix detected a sign-in from a new device signature. If this was you, you can safely dismiss this notification. If you do not recognize this device or location, terminate this session immediately to invalidate all session tokens and prevent unauthorized access.
+                                            </p>
+                                        </div>
+
+                                        {/* Direct Interactive Security Action Buttons */}
+                                        <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t-2 border-black/10">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <Link
+                                                    to={`/settings?view=your-activity${sessionId ? `&sessionId=${sessionId}` : ""}`}
+                                                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#FFE566] hover:bg-[#ffd93d] text-black text-xs font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                                >
+                                                    <Laptop className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    <span>Inspect In Your Activity</span>
+                                                    <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                </Link>
+
+                                                <Link
+                                                    to="/settings?view=password-security"
+                                                    className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-white hover:bg-[#FAF6EE] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] transition-all cursor-pointer"
+                                                >
+                                                    <KeyRound className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    <span>Change Password</span>
+                                                </Link>
+                                            </div>
+
+                                            {sessionId && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleTerminateSessionFromInbox(sessionId, deviceName)}
+                                                    disabled={isTerminated || isTerminating}
+                                                    className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black border-2 border-black transition-all cursor-pointer ${
+                                                        isTerminated
+                                                            ? "bg-neutral-200 text-neutral-600 border-neutral-400 cursor-not-allowed shadow-none"
+                                                            : "bg-rose-500 hover:bg-rose-600 text-white shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px]"
+                                                    }`}
+                                                >
+                                                    {isTerminating ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : isTerminated ? (
+                                                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                                    ) : (
+                                                        <AlertTriangle className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    )}
+                                                    <span>
+                                                        {isTerminated
+                                                            ? "Session Terminated Remotely"
+                                                            : isTerminating
+                                                            ? "Terminating..."
+                                                            : "This Wasn't Me — Terminate Session"}
+                                                    </span>
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            // -------------------------------------------------------------
+                            // CASE H: HELP TICKETS & SUPPORT RESPONSES
+                            // -------------------------------------------------------------
+                            if (isHelpTicket(activeItem)) {
+                                const ticketNumber = meta.ticketNumber || "";
+                                const category = meta.category || "General Platform Inquiry";
+                                const priority = meta.priority || "Normal";
+
+                                return (
+                                    <div className="flex-1 flex flex-col p-5 sm:p-6 space-y-5 animate-fadeIn">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b-2 border-black/10">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-sky-100 border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center text-sky-900">
+                                                    <LifeBuoy className="w-8 h-8 stroke-[2.2]" />
+                                                </div>
+
+                                                <div className="min-w-0 space-y-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h3 className="text-lg sm:text-xl font-black text-black tracking-tight truncate">
+                                                            {activeItem.title}
+                                                        </h3>
+                                                        {ticketNumber && (
+                                                            <span className="inline-flex items-center gap-1 text-[11px] font-mono font-black px-2.5 py-0.5 rounded-full bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000] shrink-0">
+                                                                <span>{ticketNumber}</span>
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    <p className="text-xs text-neutral-500 font-mono font-bold">
+                                                        Received {formatFullDateTime(activeItem.createdAt)}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                                                <Link
+                                                    to="/settings?view=help"
+                                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                                >
+                                                    <span>Help Center</span>
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </Link>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDelete(e, activeItem.id)}
+                                                    disabled={deletingId === activeItem.id}
+                                                    className="p-2 rounded-xl border-2 border-black bg-white text-black hover:text-rose-600 hover:bg-rose-50 shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
+                                                    title="Delete notification"
+                                                >
+                                                    {deletingId === activeItem.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                    ) : (
+                                                        <Trash2 className="w-4 h-4 stroke-[2]" />
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Ticket Details Grid */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                                    Ticket ID
+                                                </span>
+                                                <p className="text-sm font-mono font-black text-black">{ticketNumber || "Ticket Received"}</p>
+                                            </div>
+
+                                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                                    Category
+                                                </span>
+                                                <p className="text-sm font-black text-black capitalize">{category}</p>
+                                            </div>
+
+                                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
+                                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                                    Priority
+                                                </span>
+                                                <p className="text-sm font-black text-black capitalize">{priority}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Message Content */}
+                                        <div className="rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] p-5 text-black leading-relaxed space-y-2">
+                                            <h4 className="text-xs font-black uppercase tracking-wider text-neutral-600">
+                                                Support Details
+                                            </h4>
+                                            <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap select-text">
+                                                {activeItem.body}
+                                            </p>
+                                        </div>
+
+                                        {/* Action Bar */}
+                                        <div className="pt-2 flex items-center justify-start border-t-2 border-black/10">
+                                            <Link
+                                                to="/settings?view=help"
+                                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#FFE566] hover:bg-[#ffd93d] text-black text-xs font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                            >
+                                                <LifeBuoy className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>View In Help Center</span>
+                                                <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            </Link>
+                                        </div>
+                                    </div>
+                                );
+                            }
+
+                            // -------------------------------------------------------------
+                            // CASE G: ACCOUNT GOVERNANCE & PRIVACY NOTIFICATIONS
+                            // -------------------------------------------------------------
+                            if (isAccountGovernance(activeItem)) {
+                                return (
+                                    <div className="flex-1 flex flex-col p-5 sm:p-6 space-y-5 animate-fadeIn">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b-2 border-black/10">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-rose-100 border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center text-rose-900">
+                                                    <AlertTriangle className="w-8 h-8 stroke-[2.2]" />
+                                                </div>
+
+                                                <div className="min-w-0 space-y-1">
+                                                    <h3 className="text-lg sm:text-xl font-black text-black tracking-tight truncate">
+                                                        {activeItem.title}
+                                                    </h3>
+                                                    <p className="text-xs text-neutral-500 font-mono font-bold">
+                                                        Received {formatFullDateTime(activeItem.createdAt)}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                                                <Link
+                                                    to="/settings?view=privacy-center"
+                                                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                                >
+                                                    <span>Privacy Center</span>
+                                                    <ExternalLink className="w-3.5 h-3.5" />
+                                                </Link>
+
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDelete(e, activeItem.id)}
+                                                    disabled={deletingId === activeItem.id}
+                                                    className="p-2 rounded-xl border-2 border-black bg-white text-black hover:text-rose-600 hover:bg-rose-50 shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
+                                                    title="Delete notification"
+                                                >
+                                                    {deletingId === activeItem.id ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                    ) : (
+                                                        <Trash2 className="w-4 h-4 stroke-[2]" />
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        <div className="rounded-2xl bg-rose-50 border-2 border-black shadow-[2px_2px_0px_#000] p-5 text-black leading-relaxed space-y-2">
+                                            <h4 className="text-xs font-black uppercase tracking-wider text-rose-900">
+                                                Governance Advisory
+                                            </h4>
+                                            <p className="text-sm font-medium leading-relaxed whitespace-pre-wrap select-text">
+                                                {activeItem.body}
+                                            </p>
+                                        </div>
+
+                                        <div className="pt-2 flex items-center justify-start border-t-2 border-black/10">
+                                            <Link
+                                                to="/settings?view=privacy-center"
+                                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer"
+                                            >
+                                                <span>Manage In Privacy Center</span>
+                                                <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            </Link>
+                                        </div>
                                     </div>
                                 );
                             }

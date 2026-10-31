@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
+    ArrowRight,
     ShieldCheck,
     CheckCircle2,
     Laptop,
@@ -10,7 +11,6 @@ import {
     AlertCircle,
     ExternalLink,
     Check,
-    Download,
     LifeBuoy,
     HelpCircle,
     Lock,
@@ -35,15 +35,8 @@ import {
     confirmClubEmailVerificationOtp,
 } from "../../../api/clubSettingsApi";
 import { submitFAQFeedback } from "../../../api/helpApi";
-import {
-    fetchManageAccountsStatus,
-    startEmailChange,
-    authorizeOldEmail,
-    verifyNewEmail,
-    checkUsernameAvailability,
-    confirmUsernameChange,
-    type ManageAccountsStatus,
-} from "../../../api/manageAccountApi";
+import { ManageAccountView } from "../../Settings/ManageAccountView";
+import { ClubYourActivityView } from "./ClubYourActivityView";
 
 interface ClubSettingDetailViewProps {
     viewKey: ClubSettingsViewKey;
@@ -173,169 +166,6 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
             toast.error(err?.message || "Invalid or expired verification code.", { title: "Verification Failed" });
         } finally {
             setIsConfirmingVerifyOtp(false);
-        }
-    };
-
-    // -------------------------------------------------------------------------
-    // MANAGE ACCOUNT (EMAIL & SLUG / HANDLE WORKFLOW)
-    // -------------------------------------------------------------------------
-    const [manageStatus, setManageStatus] = useState<ManageAccountsStatus | null>(null);
-
-    // Email change state
-    const [isEmailChangeModalOpen, setIsEmailChangeModalOpen] = useState(false);
-    const [newEmailInput, setNewEmailInput] = useState("");
-    const [emailChangeStage, setEmailChangeStage] = useState<"input" | "old_otp" | "new_otp">("input");
-    const [emailChangeOpId, setEmailChangeOpId] = useState("");
-    const [emailChangeOtpDigits, setEmailChangeOtpDigits] = useState("");
-    const [isEmailChangeSubmitting, setIsEmailChangeSubmitting] = useState(false);
-
-    // Slug / Handle change state
-    const [isSlugModalOpen, setIsSlugModalOpen] = useState(false);
-    const [newSlugInput, setNewSlugInput] = useState("");
-    const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
-    const [slugCheckMessage, setSlugCheckMessage] = useState("");
-    const [slugPassword, setSlugPassword] = useState("");
-    const [isSubmittingSlug, setIsSubmittingSlug] = useState(false);
-
-    const loadManageStatus = async () => {
-        try {
-            const data = await fetchManageAccountsStatus();
-            setManageStatus(data);
-        } catch {
-            // ignore
-        }
-    };
-
-    useEffect(() => {
-        if (viewKey === "manage-account") {
-            loadManageStatus();
-        }
-    }, [viewKey]);
-
-    // Handle check slug debounce
-    useEffect(() => {
-        if (!newSlugInput.trim()) {
-            setSlugAvailable(null);
-            setSlugCheckMessage("");
-            return;
-        }
-
-        const normalized = newSlugInput.trim().toLowerCase();
-        if (normalized === club.slug.toLowerCase()) {
-            setSlugAvailable(false);
-            setSlugCheckMessage("This is already your current organization handle.");
-            return;
-        }
-
-        const timer = setTimeout(async () => {
-            try {
-                const res = await checkUsernameAvailability(normalized);
-                setSlugAvailable(res.available);
-                setSlugCheckMessage(res.reason || (res.available ? "Handle is available!" : "Handle is unavailable."));
-            } catch {
-                setSlugAvailable(false);
-                setSlugCheckMessage("Failed to check handle availability.");
-            }
-        }, 350);
-
-        return () => clearTimeout(timer);
-    }, [newSlugInput, club.slug]);
-
-    const handleStartEmailChange = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newEmailInput.trim()) {
-            toast.error("Please enter a new email address.", { title: "Email Required" });
-            return;
-        }
-
-        setIsEmailChangeSubmitting(true);
-        try {
-            const res = await startEmailChange(newEmailInput.trim());
-            setEmailChangeOpId(res.operationId || "");
-            setEmailChangeStage("old_otp");
-            setEmailChangeOtpDigits("");
-            toast.info(`Authorization code sent to your current email (${user?.gmail || club.public_email}).`, {
-                title: "Step 1: Authorize Current Email",
-            });
-        } catch (err: any) {
-            toast.error(err?.message || "Failed to start email change.", { title: "Error" });
-        } finally {
-            setIsEmailChangeSubmitting(false);
-        }
-    };
-
-    const handleAuthorizeOldEmail = async () => {
-        const otp = emailChangeOtpDigits.trim();
-        if (otp.length !== 6) {
-            toast.error("Please enter the complete 6-digit code.", { title: "Code Required" });
-            return;
-        }
-
-        setIsEmailChangeSubmitting(true);
-        try {
-            await authorizeOldEmail(emailChangeOpId, otp);
-            setEmailChangeStage("new_otp");
-            setEmailChangeOtpDigits("");
-            toast.success(`Current email authorized! Verification code sent to ${newEmailInput}.`, {
-                title: "Step 2: Verify New Email",
-            });
-        } catch (err: any) {
-            toast.error(err?.message || "Invalid authorization code.", { title: "Authorization Failed" });
-        } finally {
-            setIsEmailChangeSubmitting(false);
-        }
-    };
-
-    const handleVerifyNewEmail = async () => {
-        const otp = emailChangeOtpDigits.trim();
-        if (otp.length !== 6) {
-            toast.error("Please enter the complete 6-digit code.", { title: "Code Required" });
-            return;
-        }
-
-        setIsEmailChangeSubmitting(true);
-        try {
-            const res = await verifyNewEmail(emailChangeOpId, otp);
-            toast.success(res?.message || "Club primary email updated successfully!", { title: "Email Changed" });
-            setIsEmailChangeModalOpen(false);
-            setNewEmailInput("");
-            setEmailChangeStage("input");
-            loadManageStatus();
-            if (onRefreshStatus) onRefreshStatus();
-        } catch (err: any) {
-            toast.error(err?.message || "Failed to verify new email.", { title: "Verification Failed" });
-        } finally {
-            setIsEmailChangeSubmitting(false);
-        }
-    };
-
-    const handleConfirmSlugChange = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newSlugInput.trim() || !slugAvailable) {
-            toast.error("Please enter a valid, available club handle.", { title: "Invalid Handle" });
-            return;
-        }
-        if (!slugPassword) {
-            toast.error("Please enter your current administrative password to confirm.", { title: "Password Required" });
-            return;
-        }
-
-        setIsSubmittingSlug(true);
-        try {
-            const res = await confirmUsernameChange({
-                newUsername: newSlugInput.trim().toLowerCase(),
-                currentPassword: slugPassword,
-            });
-            toast.success(res?.message || "Club handle updated successfully!", { title: "Handle Changed" });
-            setIsSlugModalOpen(false);
-            setNewSlugInput("");
-            setSlugPassword("");
-            loadManageStatus();
-            if (onRefreshStatus) onRefreshStatus();
-        } catch (err: any) {
-            toast.error(err?.message || "Failed to update club handle.", { title: "Update Failed" });
-        } finally {
-            setIsSubmittingSlug(false);
         }
     };
 
@@ -707,20 +537,47 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                             />
                         </div>
 
-                        {/* Active Sessions Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
-                            <div className="flex items-center gap-2">
-                                <Laptop className="w-4 h-4 text-black stroke-[2.5]" />
-                                <h3 className="text-base font-black text-black">Active Administrative Sessions</h3>
-                            </div>
-                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-between gap-4">
-                                <div className="space-y-0.5">
-                                    <p className="text-xs font-black text-black">This Device (Current Session)</p>
-                                    <p className="text-[11px] text-neutral-600 font-medium">Browser administrative session • Active now</p>
+                        {/* Active Sessions & Team Activity Portal Card */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-9 h-9 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000]">
+                                        <Laptop className="w-5 h-5 text-black stroke-[2.5]" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-black text-black">Active Administrative Sessions & Audit</h3>
+                                        <p className="text-xs text-neutral-600 font-medium">
+                                            Institutional audit trail, active team devices, and club workspace access
+                                        </p>
+                                    </div>
                                 </div>
-                                <span className="px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black">
-                                    Active
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black self-start sm:self-auto">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-pulse" />
+                                    <span>Team Audit Active</span>
                                 </span>
+                            </div>
+
+                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-xs font-black text-black">Club Governance & Access Logs</p>
+                                        <span className="px-2 py-0.5 rounded-md bg-white border border-black text-[10px] font-bold text-neutral-800">
+                                            Role-Based Audit
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Inspect team members currently accessing this club dashboard, their hardware fingerprints, approximate locations, and access times.
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => onSelectView("your-activity")}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffd93d] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer shrink-0"
+                                >
+                                    <span>Inspect Team Activity</span>
+                                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -731,289 +588,11 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
             // -----------------------------------------------------------------
             case "manage-account":
                 return (
-                    <div className="space-y-6">
-                        {/* Club Email Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="space-y-1">
-                                    <h3 className="text-lg font-black text-black">Primary Club Email</h3>
-                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                        Used for account sign-in, security alerts, and event administration.
-                                    </p>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsEmailChangeModalOpen(true);
-                                        setEmailChangeStage("input");
-                                        setNewEmailInput("");
-                                    }}
-                                    className="px-4 py-2 rounded-xl bg-white hover:bg-[#FAF6EE] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] transition-all cursor-pointer shrink-0"
-                                >
-                                    Change Email
-                                </button>
-                            </div>
-
-                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-between gap-4">
-                                <div className="space-y-0.5 min-w-0">
-                                    <p className="text-xs font-mono font-bold text-black truncate">
-                                        {user?.gmail || club.public_email || "No email configured"}
-                                    </p>
-                                    <p className="text-[11px] text-neutral-600 font-medium">
-                                        Monthly changes remaining: {manageStatus?.monthlyLimits?.email?.remaining ?? 2} / 2
-                                    </p>
-                                </div>
-                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border border-black ${
-                                    isEmailVerified ? "bg-[#a2ff86] text-black" : "bg-amber-100 text-amber-900"
-                                }`}>
-                                    {isEmailVerified ? "Verified" : "Unverified"}
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Club Handle / Slug Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="space-y-1">
-                                    <h3 className="text-lg font-black text-black">Club Handle & Public Slug</h3>
-                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                        Your public URL will be: <code className="bg-neutral-100 px-1 py-0.5 rounded text-black font-mono font-bold">orbix.dev/clubs/{club.slug}</code>
-                                    </p>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setIsSlugModalOpen(true);
-                                        setNewSlugInput(club.slug);
-                                        setSlugPassword("");
-                                    }}
-                                    className="px-4 py-2 rounded-xl bg-white hover:bg-[#FAF6EE] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] transition-all cursor-pointer shrink-0"
-                                >
-                                    Change Handle
-                                </button>
-                            </div>
-
-                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-between gap-4">
-                                <div className="space-y-0.5 min-w-0">
-                                    <p className="text-xs font-mono font-bold text-black">
-                                        @{club.slug}
-                                    </p>
-                                    <p className="text-[11px] text-neutral-600 font-medium">
-                                        Monthly changes remaining: {manageStatus?.monthlyLimits?.username?.remaining ?? 2} / 2
-                                    </p>
-                                </div>
-                                <Link
-                                    to={`/clubs/${club.slug}`}
-                                    target="_blank"
-                                    className="text-xs font-black text-black hover:underline flex items-center gap-1"
-                                >
-                                    <span>Preview URL</span>
-                                    <ExternalLink className="w-3 h-3" />
-                                </Link>
-                            </div>
-                        </div>
-
-                        {/* Club Data Archive Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="space-y-1">
-                                    <h3 className="text-lg font-black text-black">Download Organization Archive</h3>
-                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                        Export all organization records including coordinators, achievements, events, and member rosters in JSON format.
-                                    </p>
-                                </div>
-
-                                <a
-                                    href="/api/club/settings/data-archive"
-                                    download
-                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer shrink-0"
-                                >
-                                    <Download className="w-4 h-4 stroke-[2.5]" />
-                                    <span>Export JSON</span>
-                                </a>
-                            </div>
-                        </div>
-
-                        {/* EMAIL CHANGE MODAL */}
-                        {isEmailChangeModalOpen && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-                                <div className="w-full max-w-md bg-[#FAF6EE] border-2 sm:border-[3px] border-black rounded-3xl p-6 shadow-[6px_6px_0px_#000] space-y-5">
-                                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/15">
-                                        <h3 className="text-lg font-black text-black">Change Club Email</h3>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsEmailChangeModalOpen(false)}
-                                            className="text-neutral-500 hover:text-black font-black text-sm"
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
-
-                                    {emailChangeStage === "input" && (
-                                        <form onSubmit={handleStartEmailChange} className="space-y-4">
-                                            <p className="text-xs text-neutral-600 font-medium">
-                                                A single-use 6-digit authorization code will first be sent to your current address (<strong>{user?.gmail || club.public_email}</strong>) to confirm this request.
-                                            </p>
-                                            <div>
-                                                <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                                    New Primary Email Address
-                                                </label>
-                                                <input
-                                                    type="email"
-                                                    value={newEmailInput}
-                                                    onChange={(e) => setNewEmailInput(e.target.value)}
-                                                    placeholder="club.new@university.edu"
-                                                    className="w-full h-10 px-3 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none"
-                                                    required
-                                                />
-                                            </div>
-                                            <div className="flex items-center justify-end gap-3 pt-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setIsEmailChangeModalOpen(false)}
-                                                    className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black font-black text-xs border-2 border-black"
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    type="submit"
-                                                    disabled={isEmailChangeSubmitting || !newEmailInput.trim()}
-                                                    className="px-5 py-2 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] disabled:opacity-50"
-                                                >
-                                                    {isEmailChangeSubmitting ? "Sending Code..." : "Continue"}
-                                                </button>
-                                            </div>
-                                        </form>
-                                    )}
-
-                                    {emailChangeStage === "old_otp" && (
-                                        <div className="space-y-4">
-                                            <p className="text-xs text-neutral-600 font-medium">
-                                                Step 1 of 2: Enter the 6-digit code sent to your current email (<strong>{user?.gmail || club.public_email}</strong>).
-                                            </p>
-                                            <OtpSegmentedInput
-                                                value={emailChangeOtpDigits}
-                                                onChange={setEmailChangeOtpDigits}
-                                                disabled={isEmailChangeSubmitting}
-                                            />
-                                            <div className="flex items-center justify-end gap-3 pt-2">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setEmailChangeStage("input")}
-                                                    className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black font-black text-xs border-2 border-black"
-                                                >
-                                                    Back
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    disabled={isEmailChangeSubmitting || emailChangeOtpDigits.trim().length !== 6}
-                                                    onClick={handleAuthorizeOldEmail}
-                                                    className="px-5 py-2 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] disabled:opacity-50"
-                                                >
-                                                    {isEmailChangeSubmitting ? "Authorizing..." : "Authorize Old Email"}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {emailChangeStage === "new_otp" && (
-                                        <div className="space-y-4">
-                                            <p className="text-xs text-neutral-600 font-medium">
-                                                Step 2 of 2: Enter the 6-digit code sent to your NEW email (<strong>{newEmailInput}</strong>) to commit the change.
-                                            </p>
-                                            <OtpSegmentedInput
-                                                value={emailChangeOtpDigits}
-                                                onChange={setEmailChangeOtpDigits}
-                                                disabled={isEmailChangeSubmitting}
-                                            />
-                                            <div className="flex items-center justify-end gap-3 pt-2">
-                                                <button
-                                                    type="button"
-                                                    disabled={isEmailChangeSubmitting || emailChangeOtpDigits.trim().length !== 6}
-                                                    onClick={handleVerifyNewEmail}
-                                                    className="px-5 py-2 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] disabled:opacity-50"
-                                                >
-                                                    {isEmailChangeSubmitting ? "Committing..." : "Verify & Commit"}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* SLUG / HANDLE CHANGE MODAL */}
-                        {isSlugModalOpen && (
-                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn">
-                                <div className="w-full max-w-md bg-[#FAF6EE] border-2 sm:border-[3px] border-black rounded-3xl p-6 shadow-[6px_6px_0px_#000] space-y-5">
-                                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/15">
-                                        <h3 className="text-lg font-black text-black">Change Club Handle</h3>
-                                        <button
-                                            type="button"
-                                            onClick={() => setIsSlugModalOpen(false)}
-                                            className="text-neutral-500 hover:text-black font-black text-sm"
-                                        >
-                                            ✕
-                                        </button>
-                                    </div>
-
-                                    <form onSubmit={handleConfirmSlugChange} className="space-y-4">
-                                        <div>
-                                            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                                New Organization Slug
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={newSlugInput}
-                                                onChange={(e) => setNewSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
-                                                placeholder="aws-student-chapter"
-                                                className="w-full h-10 px-3 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none font-mono"
-                                                required
-                                            />
-                                            {slugCheckMessage && (
-                                                <p className={`text-[11px] font-bold mt-1.5 ${slugAvailable ? "text-emerald-700" : "text-rose-700"}`}>
-                                                    {slugCheckMessage}
-                                                </p>
-                                            )}
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                                Current Administrative Password
-                                            </label>
-                                            <input
-                                                type="password"
-                                                value={slugPassword}
-                                                onChange={(e) => setSlugPassword(e.target.value)}
-                                                placeholder="••••••••••••"
-                                                className="w-full h-10 px-3 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-none"
-                                                required
-                                            />
-                                        </div>
-
-                                        <div className="flex items-center justify-end gap-3 pt-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => setIsSlugModalOpen(false)}
-                                                className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 text-black font-black text-xs border-2 border-black"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button
-                                                type="submit"
-                                                disabled={isSubmittingSlug || !slugAvailable || !slugPassword}
-                                                className="px-5 py-2 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] disabled:opacity-50"
-                                            >
-                                                {isSubmittingSlug ? "Updating..." : "Confirm Change"}
-                                            </button>
-                                        </div>
-                                    </form>
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <ManageAccountView
+                        user={user}
+                        onBack={onBack}
+                        onRefreshStatus={onRefreshStatus}
+                    />
                 );
 
             // -----------------------------------------------------------------
@@ -1730,6 +1309,9 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                     </div>
                 );
 
+            case "your-activity":
+                return <ClubYourActivityView club={club} user={user} />;
+
             default:
                 return null;
         }
@@ -1744,6 +1326,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
             case "privacy-center": return "Privacy Center";
             case "account-status": return "Account Status";
             case "about": return "About";
+            case "your-activity": return "Team Access & Activity";
             default: return "Settings";
         }
     };

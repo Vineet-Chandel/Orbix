@@ -770,7 +770,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                 type="text"
                                 value={memberSearchQuery}
                                 onChange={(e) => setMemberSearchQuery(e.target.value)}
-                                placeholder="Search by name, handle, or title..."
+                                placeholder="Search by name, username, or title..."
                                 className="w-full pl-10 pr-4 py-2 bg-[#FAF6EE] border-2 border-black rounded-xl text-xs font-bold text-black focus:outline-none"
                             />
                         </div>

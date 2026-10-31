@@ -4,6 +4,7 @@ import { ShieldCheck, ArrowLeft, RefreshCw } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
+import { getOrCreateDeviceId } from "../../../api/sessionActivityApi";
 
 export default function SigninForm() {
     const navigate = useNavigate();
@@ -118,6 +119,7 @@ export default function SigninForm() {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
+                            "x-orbix-device-id": getOrCreateDeviceId(),
                         },
                         credentials: "include",
                         body: JSON.stringify({
@@ -231,6 +233,7 @@ export default function SigninForm() {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
+                            "x-orbix-device-id": getOrCreateDeviceId(),
                         },
                         credentials: "include",
                         body: JSON.stringify({

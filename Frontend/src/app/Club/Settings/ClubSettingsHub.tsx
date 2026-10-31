@@ -12,6 +12,7 @@ import {
     Lock,
     Globe,
     Building2,
+    Activity,
 } from "lucide-react";
 import type { ClubSettingsViewKey } from "./types";
 import { OrbixLogo } from "../../../components/OrbixLogo";
@@ -42,6 +43,13 @@ export const ClubSettingsHub: React.FC<ClubSettingsHubProps> = ({
 
     // More info and support items tailored for Student Organizations / Clubs
     const supportItems = [
+        {
+            id: "your-activity" as ClubSettingsViewKey,
+            title: "Your activity",
+            description: "Team access audit log, administrative logins & member session activity",
+            icon: <Activity className="w-5 h-5 text-black stroke-[2.5]" />,
+            iconBg: "bg-[#a2ff86]",
+        },
         {
             id: "help" as ClubSettingsViewKey,
             title: "Help",
@@ -253,7 +261,7 @@ export const ClubSettingsHub: React.FC<ClubSettingsHubProps> = ({
                                             Manage Account
                                         </p>
                                         <p className="text-[11px] text-neutral-600 font-medium truncate">
-                                            Official club email, handle/slug updates & data archive export
+                                            Primary email address, username updates & data archive export
                                         </p>
                                     </div>
                                 </div>

@@ -21,6 +21,7 @@ import manageAccountsRouter from './Routes/account/manageAccountsRoutes.js';
 import { accountGovernanceRouter } from './Routes/account/accountGovernanceRoutes.js';
 import { privacyRouter } from './Routes/account/privacyRoutes.js';
 import { platformRouter } from './Routes/platform/platformRoutes.js';
+import { sessionRouter } from './Routes/session/sessionRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import redis from './redis/client.js';
 
@@ -75,6 +76,9 @@ app.use('/api/manage-account', manageAccountsRouter);
 app.use('/api/account/governance', accountGovernanceRouter);
 app.use('/api/account/privacy', privacyRouter);
 app.use('/api/privacy', privacyRouter);
+app.use('/api/account/sessions', sessionRouter);
+app.use('/api/account', sessionRouter);
+app.use('/api', sessionRouter);
 app.use('/api/account', manageAccountsRouter);
 app.use('/api/platform', platformRouter);
 app.use('/api/about', platformRouter);

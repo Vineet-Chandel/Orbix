@@ -10,7 +10,8 @@ export type ClubSettingsViewKey =
     | "help"
     | "privacy-center"
     | "account-status"
-    | "about";
+    | "about"
+    | "your-activity";
 
 export interface ClubSettingItemDef {
     id: ClubSettingsViewKey;

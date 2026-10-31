@@ -1134,8 +1134,14 @@ export class ManageAccountsService {
         }
 
         // Check if taken in database
-        const conflictRes = await query(`SELECT id FROM users WHERE LOWER(username) = LOWER($1) LIMIT 1;`, [normalized]);
+        const conflictRes = await query(`SELECT id FROM users WHERE LOWER(username) = LOWER($1) AND id != $2 LIMIT 1;`, [normalized, currentUserId]);
         if (conflictRes.rows[0]) {
+            return { available: false, reason: "This username is already taken." };
+        }
+
+        // Check if taken in verified_clubs by another organization
+        const clubConflictRes = await query(`SELECT id FROM verified_clubs WHERE LOWER(slug) = LOWER($1) AND auth_user_id != $2 LIMIT 1;`, [normalized, currentUserId]);
+        if (clubConflictRes.rows[0]) {
             return { available: false, reason: "This username is already taken." };
         }
 

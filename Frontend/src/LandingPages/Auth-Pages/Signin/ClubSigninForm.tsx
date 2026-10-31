@@ -4,6 +4,7 @@ import { ArrowRight, ShieldCheck, ArrowLeft, RefreshCw } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
+import { getOrCreateDeviceId } from "../../../api/sessionActivityApi";
 
 export default function ClubSigninForm() {
     const navigate = useNavigate();
@@ -126,6 +127,7 @@ export default function ClubSigninForm() {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
+                            "x-orbix-device-id": getOrCreateDeviceId(),
                         },
                         credentials: "include",
                         body: JSON.stringify({
@@ -234,7 +236,10 @@ export default function ClubSigninForm() {
                 try {
                     const res = await fetch(url, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: { 
+                            "Content-Type": "application/json",
+                            "x-orbix-device-id": getOrCreateDeviceId(),
+                        },
                         credentials: "include",
                         body: JSON.stringify({
                             challengeToken,
@@ -278,7 +283,10 @@ export default function ClubSigninForm() {
                 try {
                     const res = await fetch(url, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: { 
+                            "Content-Type": "application/json",
+                            "x-orbix-device-id": getOrCreateDeviceId(),
+                        },
                         credentials: "include",
                         body: JSON.stringify({ challengeToken }),
                     });

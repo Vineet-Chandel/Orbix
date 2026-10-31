@@ -14,6 +14,12 @@ import { handleGetMyProfile, parseLinks } from '../profile/profile.js';
 import { EmailVerificationService } from '../../services/email/emailVerificationService.js';
 import { TwoFactorAuthService } from '../../services/auth/twoFactorAuthService.js';
 import { enrichUserWithClubData } from '../../services/club/clubEnrichmentService.js';
+import {
+    createSession,
+    revokeSession,
+    isSessionRevoked,
+    throttleTouchSession,
+} from '../../services/session/sessionService.js';
 import { time } from 'node:console';
 const authRouter = express.Router();
 
@@ -280,12 +286,22 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
             // Non-blocking if user doesn't have leaderboard row yet
         }
 
+        // Create canonical persistent session record on genuine signup authentication
+        const sessionResult = await createSession({
+            userId,
+            req,
+            loginMethod: "password",
+            isMfa: false,
+        });
+        const sessionId = sessionResult.sessionId;
+
         // 2. Generate Access Token & Refresh Token
         const token = jwt.sign(
             {
                 sub: userId,
                 gmail: validatedData.gmail,
-                username: validatedData.username
+                username: validatedData.username,
+                sid: sessionId,
             },
             JWT_SECRET,
             {
@@ -300,6 +316,7 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                 sub: userId,
                 gmail: validatedData.gmail,
                 username: validatedData.username,
+                sid: sessionId,
                 type: "refresh"
             },
             JWT_SECRET,
@@ -559,12 +576,22 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             });
         }
 
-        // Generate Access Token & Refresh Token with context-aware accountType
+        // Create canonical persistent session record on genuine authentication
+        const sessionResult = await createSession({
+            userId: user.id,
+            req,
+            loginMethod: "password",
+            isMfa: false,
+        });
+        const sessionId = sessionResult.sessionId;
+
+        // Generate Access Token & Refresh Token with context-aware accountType & session ID
         const token = jwt.sign(
             {
                 sub: user.id,
                 gmail: user.gmail,
                 username: user.username,
+                sid: sessionId,
                 accountType: effectiveAccountType,
             },
             JWT_SECRET,
@@ -580,6 +607,7 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
                 sub: user.id,
                 gmail: user.gmail,
                 username: user.username,
+                sid: sessionId,
                 accountType: effectiveAccountType,
                 type: "refresh"
             },
@@ -767,14 +795,30 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
             });
         }
 
+        const existingSessionId = decoded?.sid || decoded?.sessionId;
+        if (existingSessionId) {
+            const isRevoked = await isSessionRevoked(existingSessionId);
+            if (isRevoked) {
+                res.clearCookie("token", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+                res.clearCookie("refreshToken", { path: "/", httpOnly: true, sameSite: "lax", secure: isProduction });
+                return res.status(401).json({
+                    success: false,
+                    message: "Session has been terminated or expired. Please sign in again.",
+                });
+            }
+            // Touch existing session's last_active_at (throttled to once per 5 minutes)
+            throttleTouchSession(existingSessionId);
+        }
+
         const refreshedAccountType = decoded?.accountType || user.accountType || "personal";
 
-        // Generate fresh Access Token (8 hours) and fresh Refresh Token (7 days)
+        // Generate fresh Access Token (8 hours) and fresh Refresh Token (7 days) retaining existing session ID
         const newAccessToken = jwt.sign(
             {
                 sub: user.id,
                 gmail: user.gmail,
                 username: user.username,
+                sid: existingSessionId,
                 accountType: refreshedAccountType,
             },
             JWT_SECRET,
@@ -790,6 +834,7 @@ const handleTokenRefresh = async (req: Request, res: Response) => {
                 sub: user.id,
                 gmail: user.gmail,
                 username: user.username,
+                sid: existingSessionId,
                 accountType: refreshedAccountType,
                 type: "refresh"
             },
@@ -867,20 +912,33 @@ authRouter.get('/refresh', handleTokenRefresh);
 authRouter.post('/signout', async (req: Request, res: Response) => {
     try {
         let gmail = req.body?.gmail;
+        let sessionId: string | null = null;
+        let userId: string | null = null;
 
-        // If gmail was not passed in body, extract from cookie/JWT
-        if (!gmail) {
-            const rawToken = req.cookies?.token || req.cookies?.refreshToken;
-            if (rawToken && typeof rawToken === "string") {
-                try {
-                    const decoded = jwt.decode(rawToken) as any;
-                    if (decoded?.gmail) {
-                        gmail = decoded.gmail;
-                    }
-                } catch {
-                    // ignore
+        // Extract session ID and user from cookie/JWT
+        const rawToken = req.cookies?.token || req.cookies?.refreshToken;
+        if (rawToken && typeof rawToken === "string") {
+            try {
+                const decoded = jwt.decode(rawToken) as any;
+                if (decoded?.gmail && !gmail) {
+                    gmail = decoded.gmail;
                 }
+                if (decoded?.sub) {
+                    userId = decoded.sub;
+                }
+                if (decoded?.sid) {
+                    sessionId = decoded.sid;
+                }
+            } catch {
+                // ignore
             }
+        }
+
+        // Revoke persistent session in database and Redis
+        if (userId && sessionId) {
+            revokeSession(userId, sessionId, "user_logout").catch((err) => {
+                console.warn("[Signout] Session revocation non-blocking warning:", err?.message);
+            });
         }
 
         if (gmail && typeof gmail === 'string') {
@@ -962,12 +1020,22 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
         const requestedAccountType = req.body?.accountType || req.body?.loginMode || req.body?.expectedAccountType;
         const effectiveAccountType = requestedAccountType === "club" ? "club" : "personal";
 
+        // Create canonical persistent session record on genuine 2FA authentication
+        const sessionResult = await createSession({
+            userId: user.id,
+            req,
+            loginMethod: "2fa_otp",
+            isMfa: true,
+        });
+        const sessionId = sessionResult.sessionId;
+
         // Generate Access Token & Refresh Token
         const token = jwt.sign(
             {
                 sub: user.id,
                 gmail: user.gmail,
                 username: user.username,
+                sid: sessionId,
                 accountType: effectiveAccountType,
             },
             JWT_SECRET,
@@ -983,6 +1051,7 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
                 sub: user.id,
                 gmail: user.gmail,
                 username: user.username,
+                sid: sessionId,
                 accountType: effectiveAccountType,
                 type: "refresh"
             },

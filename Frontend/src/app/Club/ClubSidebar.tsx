@@ -23,6 +23,7 @@ interface ClubSidebarProps {
         clubUsername?: string;
         college_name: string;
         logo_url: string | null;
+        logoUrl?: string | null;
     };
     activeTab: ClubTab;
     onTabChange: (tab: ClubTab) => void;
@@ -395,9 +396,9 @@ export const ClubSidebar = ({
                     {/* Fixed 44px container centering the club logo / initials avatar */}
                     <div className="w-11 h-11 flex items-center justify-center flex-shrink-0 pl-0.5">
                         <div className="w-10 h-10 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center font-black text-black overflow-hidden relative group-hover:scale-105 transition-transform">
-                            {club.logo_url ? (
+                            {club.logo_url || club.logoUrl ? (
                                 <img
-                                    src={club.logo_url}
+                                    src={club.logo_url || club.logoUrl || ""}
                                     alt={club.name}
                                     className="w-full h-full object-cover"
                                 />

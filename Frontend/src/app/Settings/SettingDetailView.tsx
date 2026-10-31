@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
+    ArrowRight,
     Bookmark,
     UserX,
     MessageSquare,
@@ -41,6 +42,7 @@ import { OrbixLogo } from "../../components/OrbixLogo";
 import type { ConnectedUserItem } from "../../api/relationshipApi";
 import { HelpCenterView } from "./HelpCenterView";
 import { ManageAccountView } from "./ManageAccountView";
+import { YourActivityView } from "./YourActivityView";
 import {
     fetchAccountGovernanceStatus,
     fetchPrivacyPreferences,
@@ -587,20 +589,47 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                             />
                         </div>
 
-                        {/* Active Sessions Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
-                            <div className="flex items-center gap-2">
-                                <Laptop className="w-4 h-4 text-black stroke-[2.5]" />
-                                <h3 className="text-base font-black text-black">Where You're Logged In</h3>
-                            </div>
-                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-between gap-4">
-                                <div className="space-y-0.5">
-                                    <p className="text-xs font-black text-black">This Device (Current Session)</p>
-                                    <p className="text-[11px] text-neutral-600 font-medium">Browser session • Active now</p>
+                        {/* Active Sessions & Your Activity Portal Card */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-9 h-9 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000]">
+                                        <Laptop className="w-5 h-5 text-black stroke-[2.5]" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-black text-black">Where You're Logged In</h3>
+                                        <p className="text-xs text-neutral-600 font-medium">
+                                            Active device sessions, login locations, and remote termination
+                                        </p>
+                                    </div>
                                 </div>
-                                <span className="px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black">
-                                    Active
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black self-start sm:self-auto">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-pulse" />
+                                    <span>Real-Time Tracking</span>
                                 </span>
+                            </div>
+
+                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-xs font-black text-black">Active Device Authentication Pipeline</p>
+                                        <span className="px-2 py-0.5 rounded-md bg-white border border-black text-[10px] font-bold text-neutral-800">
+                                            Canonical SSO & 2FA
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Monitor authenticated hardware fingerprints, review security alerts, or log out of all other devices remotely with zero latency.
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => onSelectView("your-activity")}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffd93d] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer shrink-0"
+                                >
+                                    <span>Manage All Devices</span>
+                                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -632,43 +661,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                 );
 
             case "your-activity":
-                return (
-                    <div className="space-y-6">
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="space-y-1">
-                                <h3 className="text-xl font-black text-black">Your Activity & Metrics</h3>
-                                <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                    Summary of your platform syncs, submission consistency, and active engagement.
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-2">
-                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Platforms</p>
-                                    <p className="text-2xl font-black text-black">{user?.platforms?.length || 0}</p>
-                                    <p className="text-[10px] font-bold text-[#008f39]">Active</p>
-                                </div>
-                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Profile Status</p>
-                                    <p className="text-base font-black text-black truncate">{user?.isPublic !== false ? "Public" : "Private"}</p>
-                                    <p className="text-[10px] font-bold text-neutral-600">Visibility</p>
-                                </div>
-                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Account Age</p>
-                                    <p className="text-base font-black text-black">Active</p>
-                                    <p className={`text-[10px] font-bold ${user?.isEmailVerified ? "text-emerald-700 font-black" : "text-amber-800"}`}>
-                                        {user?.isEmailVerified ? "Email Verified" : "Pending OTP"}
-                                    </p>
-                                </div>
-                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Sync Pipeline</p>
-                                    <p className="text-base font-black text-black">Healthy</p>
-                                    <p className="text-[10px] font-bold text-[#008f39]">Live Redis</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
+                return <YourActivityView />;
 
             case "notifications":
                 return (
