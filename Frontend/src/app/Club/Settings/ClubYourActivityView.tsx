@@ -19,6 +19,7 @@ import {
     UserMinus,
 } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
+import { NeoSelect } from "../../../components/NeoSelect";
 import {
     fetchClubAccessActivity,
     logClubAccessEvent,
@@ -294,20 +295,22 @@ export const ClubYourActivityView: React.FC<ClubYourActivityViewProps> = ({ club
                 </div>
 
                 {/* Action Filter Dropdown */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-[200px]">
                     <Filter className="w-4 h-4 text-black stroke-[2.5] shrink-0" />
-                    <select
+                    <NeoSelect
                         value={selectedActionFilter}
-                        onChange={(e) => setSelectedActionFilter(e.target.value)}
-                        className="h-11 px-3.5 rounded-2xl bg-white border-2 border-black text-xs font-black text-black shadow-[3px_3px_0px_#000] focus:outline-none cursor-pointer"
-                    >
-                        <option value="all">All Actions</option>
-                        <option value="club_dashboard_opened">Dashboard Access</option>
-                        <option value="club_settings_viewed">Settings Access</option>
-                        <option value="club_settings_modified">Settings Modified</option>
-                        <option value="club_member_added">Member Added</option>
-                        <option value="club_member_removed">Member Removed</option>
-                    </select>
+                        onChange={(val) => setSelectedActionFilter(val)}
+                        size="md"
+                        triggerClassName="h-11 rounded-2xl bg-white shadow-[3px_3px_0px_#000]"
+                        options={[
+                            { value: "all", label: "All Actions" },
+                            { value: "club_dashboard_opened", label: "Dashboard Access" },
+                            { value: "club_settings_viewed", label: "Settings Access" },
+                            { value: "club_settings_modified", label: "Settings Modified" },
+                            { value: "club_member_added", label: "Member Added" },
+                            { value: "club_member_removed", label: "Member Removed" },
+                        ]}
+                    />
                 </div>
             </div>
 

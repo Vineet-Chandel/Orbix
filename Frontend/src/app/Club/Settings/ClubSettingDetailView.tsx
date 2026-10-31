@@ -27,6 +27,7 @@ import {
 import type { ClubSettingsViewKey } from "./types";
 import { useToast } from "../../../context/ToastContext";
 import { NeoToggle } from "../../../components/NeoToggle";
+import { NeoSelect } from "../../../components/NeoSelect";
 import OtpSegmentedInput from "../../../LandingPages/Auth-Pages/OtpSegmentedInput";
 import { OrbixLogo } from "../../../components/OrbixLogo";
 import {
@@ -703,17 +704,19 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                                 <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1.5">
                                                     Inquiry Category
                                                 </label>
-                                                <select
+                                                <NeoSelect
                                                     value={helpCategory}
-                                                    onChange={(e) => setHelpCategory(e.target.value)}
-                                                    className="w-full h-11 px-3 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none"
-                                                >
-                                                    <option value="college_verification">Collegiate Accreditation & Verification</option>
-                                                    <option value="event_scheduling">Event Scheduling & Registrations</option>
-                                                    <option value="sync_issue">Team Workspace & Member Roster</option>
-                                                    <option value="bug_report">Platform Bug Report</option>
-                                                    <option value="general_inquiry">General Inquiry & Sponsor Support</option>
-                                                </select>
+                                                    onChange={(val) => setHelpCategory(val)}
+                                                    size="md"
+                                                    triggerClassName="rounded-xl shadow-[2px_2px_0px_#000]"
+                                                    options={[
+                                                        { value: "college_verification", label: "Collegiate Accreditation & Verification" },
+                                                        { value: "event_scheduling", label: "Event Scheduling & Registrations" },
+                                                        { value: "sync_issue", label: "Team Workspace & Member Roster" },
+                                                        { value: "bug_report", label: "Platform Bug Report" },
+                                                        { value: "general_inquiry", label: "General Inquiry & Sponsor Support" },
+                                                    ]}
+                                                />
                                             </div>
 
                                             <div>

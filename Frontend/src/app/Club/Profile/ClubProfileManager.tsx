@@ -28,6 +28,7 @@ import {
 } from "../../../utils/clubProfileApi";
 import { useAppDispatch, useAppSelector, fetchClubProfile, saveClubProfile } from "../../../store";
 import { useToast } from "../../../context/ToastContext";
+import { NeoSelect } from "../../../components/NeoSelect";
 import { ClubMarkdownEditor } from "./ClubMarkdownEditor";
 import { ClubCoordinatorsManager } from "./ClubCoordinatorsManager";
 import { ClubAchievementsManager } from "./ClubAchievementsManager";
@@ -626,17 +627,13 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                             <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
                                 Primary Category
                             </label>
-                            <select
+                            <NeoSelect
                                 value={category}
-                                onChange={(e) => setCategory(e.target.value)}
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden cursor-pointer"
-                            >
-                                {CATEGORIES.map((cat) => (
-                                    <option key={cat} value={cat}>
-                                        {cat}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => setCategory(val)}
+                                options={CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+                                size="md"
+                                placeholder="Select category..."
+                            />
                         </div>
 
                         <div>
