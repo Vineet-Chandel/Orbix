@@ -1205,16 +1205,16 @@ export class ClubProfileService {
                  FROM club_coordinators
                  GROUP BY club_id
              ) cd ON cd.club_id = vc.id
-             WHERE (vc.is_active = true OR ($3::text IS NOT NULL AND vc.id::text = $3))
+             WHERE (vc.is_active = true OR ($3::text IS NOT NULL AND vc.id::text = $3::text))
                AND (
-                   ($3::text IS NOT NULL AND vc.id::text = $3)
+                   ($3::text IS NOT NULL AND vc.id::text = $3::text)
                    OR
-                   ($1::text IS NOT NULL AND vc.college_id::text = $1)
+                   ($1::text IS NOT NULL AND vc.college_id::text = $1::text)
                    OR
                    ($2::text IS NOT NULL AND LOWER(TRIM(vc.college_name)) = LOWER(TRIM($2)))
                )
              ORDER BY
-                 CASE WHEN $3::text IS NOT NULL AND vc.id::text = $3 THEN 0 ELSE 1 END,
+                 CASE WHEN $3::text IS NOT NULL AND vc.id::text = $3::text THEN 0 ELSE 1 END,
                  vc.name ASC;`,
             [collegeId || null, cleanCollegeName, callerClubId || null]
         );
@@ -1251,7 +1251,7 @@ export class ClubProfileService {
                 u.avatar_url AS "linkedAvatarUrl"
              FROM club_coordinators c
              LEFT JOIN users u ON u.id = c.linked_user_id
-             WHERE c.club_id = ANY($1::text[])
+             WHERE c.club_id = ANY($1::uuid[])
              ORDER BY c.display_order ASC, c.created_at ASC;`,
             [clubIds]
         );
@@ -1277,7 +1277,7 @@ export class ClubProfileService {
                 a.image_url AS "imageUrl",
                 a.external_link AS "externalLink"
              FROM club_achievements a
-             WHERE a.club_id = ANY($1::text[])
+             WHERE a.club_id = ANY($1::uuid[])
              ORDER BY a.display_order ASC, a.created_at ASC;`,
             [clubIds]
         );
