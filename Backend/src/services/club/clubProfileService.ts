@@ -5,6 +5,7 @@ import {
     assertCloudinaryConfigured,
     isCloudinaryConfigured,
     cloudinary,
+    destroyCloudinaryAsset,
 } from "../../config/cloudinary.js";
 import {
     getCachedPublicClubProfile,
@@ -12,6 +13,16 @@ import {
     invalidateClubProfileCache,
 } from "../../redis/cache/cache-club-profile.js";
 import { getClubModerationState } from "./clubModerationService.js";
+
+export interface ClubLink {
+    id?: string;
+    platform: string;
+    url: string;
+    label?: string;
+    displayOrder?: number;
+}
+
+export type ClubVisibilityTier = "draft" | "public" | "unlisted" | "private" | "archived";
 
 export interface CoordinatorData {
     id?: string;
@@ -32,11 +43,16 @@ export interface AchievementData {
     id?: string;
     clubId?: string;
     title: string;
-    description?: string | null;
-    achievementDate?: string | null;
+    type?: string | null;
+    achievementType?: string | null;
+    organization?: string | null;
     issuer?: string | null;
-    imageUrl?: string | null;
+    date?: string | null;
+    achievementDate?: string | null;
+    description?: string | null;
+    referenceUrl?: string | null;
     externalLink?: string | null;
+    imageUrl?: string | null;
     displayOrder?: number;
 }
 
@@ -44,31 +60,42 @@ export interface ProfileCompletionResult {
     percentage: number;
     completedItems: string[];
     missingItems: string[];
+    essentialMissing: string[];
+    canPublish: boolean;
 }
 
 export class ClubProfileService {
     /**
      * Compute club profile completion score and identify missing recommended items.
+     * Categorized into Essential (40%), Recommended (35%), and Optional Enhancements (25%).
      */
     static calculateCompletion(club: any, coordinatorsCount: number, achievementsCount: number): ProfileCompletionResult {
-        const checks = [
-            { id: "name", label: "Club Name", completed: Boolean(club.name && club.name.trim().length > 0), weight: 10 },
-            { id: "slug", label: "Custom Club Username", completed: Boolean(club.slug && club.slug.trim().length > 0), weight: 5 },
-            { id: "shortDescription", label: "Tagline / Short Description", completed: Boolean(club.shortDescription && club.shortDescription.trim().length > 10), weight: 10 },
-            { id: "about", label: "Detailed About Story", completed: Boolean(club.about && club.about.trim().length > 50), weight: 15 },
+        const essentialChecks = [
+            { id: "name", label: "Official Club Name", completed: Boolean(club.name && club.name.trim().length >= 2), weight: 15 },
+            { id: "category", label: "Primary Category", completed: Boolean(club.category && club.category.trim().length > 0), weight: 10 },
+            { id: "about", label: "About the Club (Markdown Story)", completed: Boolean(club.about && club.about.trim().length >= 20), weight: 15 },
+        ];
+
+        const recommendedChecks = [
             { id: "logoUrl", label: "Club Official Logo", completed: Boolean(club.logoUrl), weight: 10 },
             { id: "coverImageUrl", label: "Club Header Banner", completed: Boolean(club.coverImageUrl), weight: 10 },
-            { id: "coordinators", label: "Student Leads / Coordinators Added", completed: coordinatorsCount > 0, weight: 15 },
-            { id: "focusAreas", label: "Focus Areas & Topics", completed: Array.isArray(club.focusAreas) && club.focusAreas.length > 0, weight: 10 },
-            { id: "contactOrSocial", label: "Contact Info or Social Handles", completed: Boolean(club.publicEmail || club.websiteUrl || (club.socialLinks && Object.keys(club.socialLinks).length > 0)), weight: 10 },
-            { id: "achievementsOrMission", label: "Achievements or Mission & Vision", completed: achievementsCount > 0 || Boolean(club.mission || club.vision), weight: 5 },
+            { id: "coordinators", label: "Club Coordinators Added", completed: coordinatorsCount > 0, weight: 15 },
+        ];
+
+        const optionalChecks = [
+            { id: "tagline", label: "Tagline", completed: Boolean(club.shortDescription && club.shortDescription.trim().length > 0), weight: 5 },
+            { id: "focusAreas", label: "Focus Areas & Topics", completed: Array.isArray(club.focusAreas) && club.focusAreas.length > 0, weight: 5 },
+            { id: "contactOrLinks", label: "Official Contact or Connected Links", completed: Boolean(club.publicEmail || club.contactPhone || (Array.isArray(club.links) && club.links.length > 0) || club.websiteUrl), weight: 5 },
+            { id: "foundedYear", label: "Founded Year", completed: Boolean(club.foundedYear), weight: 5 },
+            { id: "achievements", label: "Achievements & Distinctions", completed: achievementsCount > 0, weight: 5 },
         ];
 
         let totalScore = 0;
         const completedItems: string[] = [];
         const missingItems: string[] = [];
+        const essentialMissing: string[] = [];
 
-        for (const c of checks) {
+        for (const c of [...essentialChecks, ...recommendedChecks, ...optionalChecks]) {
             if (c.completed) {
                 totalScore += c.weight;
                 completedItems.push(c.label);
@@ -77,10 +104,42 @@ export class ClubProfileService {
             }
         }
 
+        for (const c of essentialChecks) {
+            if (!c.completed) {
+                essentialMissing.push(c.label);
+            }
+        }
+
         return {
-            percentage: Math.min(100, totalScore),
+            percentage: Math.min(100, Math.round(totalScore)),
             completedItems,
             missingItems,
+            essentialMissing,
+            canPublish: essentialMissing.length === 0,
+        };
+    }
+
+    /**
+     * Server-side publishing validation checklist
+     */
+    static validatePublishingRequirements(club: any) {
+        const errors: string[] = [];
+        if (!club.name || String(club.name).trim().length < 2) {
+            errors.push("Official Club Name is required (minimum 2 characters).");
+        }
+        if (!club.category || String(club.category).trim().length === 0) {
+            errors.push("Primary Category is required.");
+        }
+        if (!club.about || String(club.about).trim().length < 20) {
+            errors.push("About the Club story is required (minimum 20 characters).");
+        }
+        if (!club.collegeName && !club.collegeId && !club.college_name) {
+            errors.push("Affiliated verified institution record is required.");
+        }
+
+        return {
+            valid: errors.length === 0,
+            errors,
         };
     }
 
@@ -142,6 +201,8 @@ export class ClubProfileService {
                 vc.publication_status AS "publication_status",
                 vc.profile_visibility AS "profileVisibility",
                 vc.profile_visibility AS "profile_visibility",
+                vc.visibility,
+                COALESCE(vc.links, '[]'::jsonb) AS links,
                 vc.recruitment_status AS "recruitmentStatus",
                 vc.recruitment_status AS "recruitment_status",
                 vc.recruitment_announcement AS "recruitmentAnnouncement",
@@ -168,6 +229,15 @@ export class ClubProfileService {
             const error: any = new Error("Verified club record not found.");
             error.statusCode = 404;
             throw error;
+        }
+
+        if (!club.visibility) {
+            club.visibility = club.publicationStatus === "published"
+                ? (club.profileVisibility || "public")
+                : (club.publicationStatus === "hidden" ? "archived" : "draft");
+        }
+        if (!Array.isArray(club.links)) {
+            club.links = [];
         }
 
         // Fetch coordinators
@@ -205,9 +275,14 @@ export class ClubProfileService {
                 title,
                 description,
                 achievement_date AS "achievementDate",
+                achievement_date AS "date",
                 issuer,
+                issuer AS "organization",
+                achievement_type AS "type",
+                achievement_type AS "achievementType",
                 image_url AS "imageUrl",
                 external_link AS "externalLink",
+                external_link AS "referenceUrl",
                 display_order AS "displayOrder",
                 created_at AS "createdAt",
                 updated_at AS "updatedAt"
@@ -313,9 +388,16 @@ export class ClubProfileService {
         }
 
         // Enumeration validations
-        const validOperating = ["active", "recruiting", "hiatus", "inactive"];
+        const validOperating = ["active", "on_hiatus", "inactive", "hiatus", "recruiting"];
         if (payload.operatingStatus && !validOperating.includes(payload.operatingStatus)) {
-            const error: any = new Error(`Invalid operating status. Allowed: ${validOperating.join(", ")}`);
+            const error: any = new Error(`Invalid operating status. Allowed: active, on_hiatus, inactive`);
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const validVisibility = ["draft", "public", "unlisted", "private", "archived"];
+        if (payload.visibility && !validVisibility.includes(payload.visibility)) {
+            const error: any = new Error(`Invalid visibility option. Allowed: ${validVisibility.join(", ")}`);
             error.statusCode = 400;
             throw error;
         }
@@ -341,16 +423,113 @@ export class ClubProfileService {
             throw error;
         }
 
-        // Focus areas cleanup
+        // Determine effective target visibility
+        let targetVisibility = payload.visibility as ClubVisibilityTier | undefined;
+        if (!targetVisibility && payload.publicationStatus) {
+            if (payload.publicationStatus === "hidden") targetVisibility = "archived";
+            else if (payload.publicationStatus === "draft") targetVisibility = "draft";
+            else if (payload.publicationStatus === "published") {
+                targetVisibility = (payload.profileVisibility as any) || "public";
+            }
+        }
+
+        // Server-side validation before publishing (public or unlisted)
+        if (targetVisibility === "public" || targetVisibility === "unlisted") {
+            const currentFull = await query(
+                `SELECT name, category, about, college_name, college_id FROM verified_clubs WHERE id = $1 LIMIT 1;`,
+                [clubId]
+            );
+            const curr = currentFull.rows[0] || {};
+            const pubValidation = this.validatePublishingRequirements({
+                name: payload.name !== undefined ? payload.name : curr.name,
+                category: payload.category !== undefined ? payload.category : curr.category,
+                about: payload.about !== undefined ? payload.about : curr.about,
+                collegeName: curr.college_name,
+                collegeId: curr.college_id,
+            });
+
+            if (!pubValidation.valid) {
+                const error: any = new Error(`Cannot publish club profile: ${pubValidation.errors.join("; ")}`);
+                error.statusCode = 400;
+                error.checklist = pubValidation.errors;
+                throw error;
+            }
+        }
+
+        // Focus areas cleanup (up to 15 tags, max 30 chars each, deduplicated)
         let cleanFocusAreas: string[] | undefined = undefined;
         if (payload.focusAreas !== undefined) {
             if (Array.isArray(payload.focusAreas)) {
-                cleanFocusAreas = payload.focusAreas
-                    .map((t: any) => String(t).trim())
-                    .filter((t: string) => t.length > 0 && t.length <= 40)
-                    .slice(0, 20);
+                const seen = new Set<string>();
+                cleanFocusAreas = [];
+                for (const item of payload.focusAreas) {
+                    const tag = String(item).trim().replace(/^#+/, "");
+                    if (tag.length > 0 && tag.length <= 30 && !seen.has(tag.toLowerCase())) {
+                        seen.add(tag.toLowerCase());
+                        cleanFocusAreas.push(tag);
+                        if (cleanFocusAreas.length >= 15) break;
+                    }
+                }
             } else {
                 cleanFocusAreas = [];
+            }
+        }
+
+        // Tagline cleanup (max 160 chars)
+        let cleanShortDescription: string | null | undefined = undefined;
+        const candidateShortDesc = payload.tagline !== undefined ? payload.tagline : payload.shortDescription;
+        if (candidateShortDesc !== undefined) {
+            cleanShortDescription = candidateShortDesc ? String(candidateShortDesc).trim().slice(0, 160) : null;
+        }
+
+        // Dynamic links validation & normalization
+        let cleanLinks: ClubLink[] | undefined = undefined;
+        let syncedWebsiteUrl: string | null | undefined = undefined;
+        let syncedSocialLinks: Record<string, string> | undefined = undefined;
+
+        if (payload.links !== undefined) {
+            if (Array.isArray(payload.links)) {
+                cleanLinks = [];
+                const seenSinglePlatforms = new Set<string>();
+                const singlePlatforms = new Set(["website", "github", "linkedin", "instagram", "x", "twitter", "discord", "youtube"]);
+                syncedSocialLinks = {};
+
+                for (let i = 0; i < payload.links.length; i++) {
+                    const linkItem: any = payload.links[i];
+                    if (!linkItem || !linkItem.url || !String(linkItem.url).trim()) continue;
+                    const plat: string = String(linkItem.platform || "website").toLowerCase().trim();
+                    const rawUrl: string = String(linkItem.url).trim();
+
+                    if (!/^https?:\/\/.+/i.test(rawUrl)) {
+                        const error: any = new Error(`Invalid URL format for ${plat}: must start with http:// or https://`);
+                        error.statusCode = 400;
+                        throw error;
+                    }
+
+                    if (singlePlatforms.has(plat)) {
+                        if (seenSinglePlatforms.has(plat)) continue;
+                        seenSinglePlatforms.add(plat);
+                    }
+
+                    const newLinkObj: ClubLink = {
+                        id: linkItem.id ? String(linkItem.id) : crypto.randomUUID(),
+                        platform: plat,
+                        url: rawUrl,
+                        displayOrder: typeof linkItem.displayOrder === "number" ? linkItem.displayOrder : i,
+                        ...(linkItem.label && String(linkItem.label).trim() ? { label: String(linkItem.label).trim() } : {}),
+                    };
+
+                    cleanLinks.push(newLinkObj);
+
+                    if (plat === "website" && !syncedWebsiteUrl) {
+                        syncedWebsiteUrl = rawUrl;
+                    } else if (["github", "linkedin", "instagram", "x", "twitter", "discord", "youtube"].includes(plat)) {
+                        const socKey = plat === "twitter" ? "x" : plat;
+                        syncedSocialLinks[socKey] = rawUrl;
+                    }
+                }
+            } else {
+                cleanLinks = [];
             }
         }
 
@@ -389,8 +568,8 @@ export class ClubProfileService {
         if (payload.category !== undefined && String(payload.category).trim().length > 0) {
             addField("category", String(payload.category).trim());
         }
-        if (payload.shortDescription !== undefined) {
-            addField("short_description", payload.shortDescription ? String(payload.shortDescription).trim() : null);
+        if (cleanShortDescription !== undefined) {
+            addField("short_description", cleanShortDescription);
         }
         if (payload.about !== undefined) {
             addField("about", payload.about ? String(payload.about).trim() : null);
@@ -403,6 +582,8 @@ export class ClubProfileService {
         }
         if (payload.websiteUrl !== undefined) {
             addField("website_url", payload.websiteUrl ? String(payload.websiteUrl).trim() : null);
+        } else if (syncedWebsiteUrl !== undefined) {
+            addField("website_url", syncedWebsiteUrl);
         }
         if (payload.publicEmail !== undefined) {
             addField("public_email", payload.publicEmail ? String(payload.publicEmail).trim() : null);
@@ -412,12 +593,22 @@ export class ClubProfileService {
         }
         if (payload.socialLinks !== undefined) {
             addField("social_links", JSON.stringify(payload.socialLinks || {}));
+        } else if (syncedSocialLinks !== undefined) {
+            addField("social_links", JSON.stringify(syncedSocialLinks));
+        }
+        if (cleanLinks !== undefined) {
+            addField("links", JSON.stringify(cleanLinks));
         }
         if (cleanFoundedYear !== undefined) {
             addField("founded_year", cleanFoundedYear);
         }
         if (payload.operatingStatus !== undefined) {
-            addField("operating_status", payload.operatingStatus);
+            const rawOp = String(payload.operatingStatus).toLowerCase();
+            const normalizedOp = rawOp === "hiatus" ? "on_hiatus" : rawOp === "recruiting" ? "active" : rawOp;
+            addField("operating_status", normalizedOp);
+            if (rawOp === "recruiting" && payload.recruitmentStatus === undefined) {
+                addField("recruitment_status", "open");
+            }
         }
         if (payload.mission !== undefined) {
             addField("mission", payload.mission ? String(payload.mission).trim() : null);
@@ -428,12 +619,40 @@ export class ClubProfileService {
         if (cleanFocusAreas !== undefined) {
             addField("focus_areas", JSON.stringify(cleanFocusAreas));
         }
-        if (payload.publicationStatus !== undefined) {
-            addField("publication_status", payload.publicationStatus);
+
+        // Apply synchronized visibility tier
+        if (targetVisibility !== undefined) {
+            addField("visibility", targetVisibility);
+            if (targetVisibility === "public") {
+                addField("publication_status", "published");
+                addField("profile_visibility", "public");
+                addField("is_active", true);
+            } else if (targetVisibility === "unlisted") {
+                addField("publication_status", "published");
+                addField("profile_visibility", "unlisted");
+                addField("is_active", true);
+            } else if (targetVisibility === "private") {
+                addField("publication_status", "published");
+                addField("profile_visibility", "private");
+                addField("is_active", true);
+            } else if (targetVisibility === "draft") {
+                addField("publication_status", "draft");
+                addField("profile_visibility", "private");
+                addField("is_active", true);
+            } else if (targetVisibility === "archived") {
+                addField("publication_status", "hidden");
+                addField("profile_visibility", "private");
+                addField("is_active", false);
+            }
+        } else {
+            if (payload.publicationStatus !== undefined) {
+                addField("publication_status", payload.publicationStatus);
+            }
+            if (payload.profileVisibility !== undefined) {
+                addField("profile_visibility", payload.profileVisibility);
+            }
         }
-        if (payload.profileVisibility !== undefined) {
-            addField("profile_visibility", payload.profileVisibility);
-        }
+
         if (payload.recruitmentStatus !== undefined) {
             addField("recruitment_status", payload.recruitmentStatus);
         }
@@ -462,6 +681,52 @@ export class ClubProfileService {
 
         // Invalidate public profile cache
         await invalidateClubProfileCache(currentClub.slug, []);
+
+        return await this.getFullClubProfile(userId, requestedClubId);
+    }
+
+    /**
+     * Explicitly remove club logo or banner image asset safely with Cloudinary cleanup.
+     */
+    static async removeClubImage(
+        userId: string,
+        imageType: "logo" | "banner",
+        requestedClubId?: string
+    ) {
+        const perms = await ClubTeamService.resolveUserClubPermissions(userId, requestedClubId);
+        if (!perms || (!perms.isOwner && !perms.isAdmin)) {
+            const error: any = new Error("Forbidden: You lack management permissions to remove club assets.");
+            error.statusCode = 403;
+            throw error;
+        }
+
+        const clubId = perms.clubId;
+        const colName = imageType === "logo" ? "logo_url" : "cover_image_url";
+
+        const currentRes = await query(
+            `SELECT ${colName} AS "oldImgUrl", slug FROM verified_clubs WHERE id = $1 LIMIT 1;`,
+            [clubId]
+        );
+        const oldImgUrl = currentRes.rows[0]?.oldImgUrl;
+
+        await query(
+            `UPDATE verified_clubs SET ${colName} = NULL, updated_at = NOW() WHERE id = $1;`,
+            [clubId]
+        );
+
+        await invalidateClubProfileCache(perms.clubSlug);
+
+        // Clean up Cloudinary asset asynchronously if it was hosted on Cloudinary
+        if (oldImgUrl && isCloudinaryConfigured()) {
+            try {
+                const match = oldImgUrl.match(/orbix\/clubs\/[^.]+/);
+                if (match) {
+                    destroyCloudinaryAsset(match[0], "image").catch(() => {});
+                }
+            } catch {
+                // Ignore cleanup errors
+            }
+        }
 
         return await this.getFullClubProfile(userId, requestedClubId);
     }
@@ -731,6 +996,11 @@ export class ClubProfileService {
         );
         const nextOrder = (maxOrderRes.rows[0]?.max_order ?? -1) + 1;
 
+        const achType = data.type || data.achievementType ? String(data.type || data.achievementType).trim() : null;
+        const achIssuer = data.issuer || data.organization ? String(data.issuer || data.organization).trim() : null;
+        const achLink = data.externalLink || data.referenceUrl ? String(data.externalLink || data.referenceUrl).trim() : null;
+        const achDate = data.achievementDate || data.date ? String(data.achievementDate || data.date).trim() : null;
+
         const insertRes = await query(
             `INSERT INTO club_achievements (
                 club_id,
@@ -740,18 +1010,36 @@ export class ClubProfileService {
                 issuer,
                 image_url,
                 external_link,
-                display_order
-             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-             RETURNING *;`,
+                display_order,
+                achievement_type
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING
+                id,
+                club_id AS "clubId",
+                title,
+                description,
+                achievement_date AS "achievementDate",
+                achievement_date AS "date",
+                issuer,
+                issuer AS "organization",
+                achievement_type AS "type",
+                achievement_type AS "achievementType",
+                image_url AS "imageUrl",
+                external_link AS "externalLink",
+                external_link AS "referenceUrl",
+                display_order AS "displayOrder",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt";`,
             [
                 clubId,
                 data.title.trim(),
                 data.description ? data.description.trim() : null,
-                data.achievementDate ? data.achievementDate.trim() : null,
-                data.issuer ? data.issuer.trim() : null,
+                achDate,
+                achIssuer,
                 data.imageUrl ? data.imageUrl.trim() : null,
-                data.externalLink ? data.externalLink.trim() : null,
+                achLink,
                 nextOrder,
+                achType,
             ]
         );
 
@@ -790,10 +1078,23 @@ export class ClubProfileService {
 
         if (data.title !== undefined) addField("title", data.title.trim());
         if (data.description !== undefined) addField("description", data.description ? data.description.trim() : null);
-        if (data.achievementDate !== undefined) addField("achievement_date", data.achievementDate ? data.achievementDate.trim() : null);
-        if (data.issuer !== undefined) addField("issuer", data.issuer ? data.issuer.trim() : null);
+        if (data.achievementDate !== undefined || data.date !== undefined) {
+            const d = data.achievementDate !== undefined ? data.achievementDate : data.date;
+            addField("achievement_date", d ? String(d).trim() : null);
+        }
+        if (data.issuer !== undefined || data.organization !== undefined) {
+            const org = data.issuer !== undefined ? data.issuer : data.organization;
+            addField("issuer", org ? String(org).trim() : null);
+        }
+        if (data.type !== undefined || data.achievementType !== undefined) {
+            const t = data.type !== undefined ? data.type : data.achievementType;
+            addField("achievement_type", t ? String(t).trim() : null);
+        }
         if (data.imageUrl !== undefined) addField("image_url", data.imageUrl ? data.imageUrl.trim() : null);
-        if (data.externalLink !== undefined) addField("external_link", data.externalLink ? data.externalLink.trim() : null);
+        if (data.externalLink !== undefined || data.referenceUrl !== undefined) {
+            const link = data.externalLink !== undefined ? data.externalLink : data.referenceUrl;
+            addField("external_link", link ? String(link).trim() : null);
+        }
         if (data.displayOrder !== undefined) addField("display_order", Number(data.displayOrder) || 0);
 
         if (updates.length === 0) {
@@ -807,7 +1108,23 @@ export class ClubProfileService {
             UPDATE club_achievements
             SET ${updates.join(", ")}
             WHERE id = $${pIndex++} AND club_id = $${pIndex}
-            RETURNING *;
+            RETURNING
+                id,
+                club_id AS "clubId",
+                title,
+                description,
+                achievement_date AS "achievementDate",
+                achievement_date AS "date",
+                issuer,
+                issuer AS "organization",
+                achievement_type AS "type",
+                achievement_type AS "achievementType",
+                image_url AS "imageUrl",
+                external_link AS "externalLink",
+                external_link AS "referenceUrl",
+                display_order AS "displayOrder",
+                created_at AS "createdAt",
+                updated_at AS "updatedAt";
         `;
 
         const updateRes = await query(sql, values);
@@ -930,6 +1247,8 @@ export class ClubProfileService {
                 vc.publication_status AS "publication_status",
                 vc.profile_visibility AS "profileVisibility",
                 vc.profile_visibility AS "profile_visibility",
+                vc.visibility,
+                COALESCE(vc.links, '[]'::jsonb) AS links,
                 vc.recruitment_status AS "recruitmentStatus",
                 vc.recruitment_status AS "recruitment_status",
                 vc.recruitment_announcement AS "recruitmentAnnouncement",
@@ -951,8 +1270,8 @@ export class ClubProfileService {
         );
 
         const club = clubRes.rows[0];
-        if (!club || !club.isActive) {
-            const error: any = new Error("Club not found or is currently inactive.");
+        if (!club) {
+            const error: any = new Error("Club not found.");
             error.statusCode = 404;
             throw error;
         }
@@ -966,15 +1285,46 @@ export class ClubProfileService {
             }
         }
 
-        // Publication Status check: if draft or hidden, only managers/members can preview
-        if (club.publicationStatus !== "published" && !isManagerOrMember) {
+        // Map visibility if null
+        if (!club.visibility) {
+            club.visibility = club.publicationStatus === "published"
+                ? (club.profileVisibility || "public")
+                : (club.publicationStatus === "hidden" ? "archived" : "draft");
+        }
+
+        // If links array is empty, construct dynamic links on the fly from website & socialLinks for seamless compat
+        if (!Array.isArray(club.links) || club.links.length === 0) {
+            const synthLinks: ClubLink[] = [];
+            let ord = 0;
+            if (club.websiteUrl) {
+                synthLinks.push({ id: `synth-web`, platform: "website", url: club.websiteUrl, label: "Official Website", displayOrder: ord++ });
+            }
+            const s = club.socialLinks || {};
+            for (const [k, v] of Object.entries(s)) {
+                if (v && typeof v === "string" && v.trim().length > 0) {
+                    const plat = k.toLowerCase() === "twitter" ? "x" : k.toLowerCase();
+                    synthLinks.push({ id: `synth-${plat}`, platform: plat, url: v.trim(), displayOrder: ord++ });
+                }
+            }
+            club.links = synthLinks;
+        }
+
+        // 1. Archived check:
+        if ((club.visibility === "archived" || club.publicationStatus === "hidden" || !club.isActive) && !isManagerOrMember) {
+            const error: any = new Error("This club profile has been archived and is not publicly accessible.");
+            error.statusCode = 404;
+            throw error;
+        }
+
+        // 2. Draft check:
+        if ((club.visibility === "draft" || club.publicationStatus === "draft") && !isManagerOrMember) {
             const error: any = new Error("This club profile is currently in draft mode and not published publicly.");
             error.statusCode = 404;
             throw error;
         }
 
-        // Profile Visibility check: if private, only members can view
-        if (club.profileVisibility === "private" && !isManagerOrMember) {
+        // 3. Private check:
+        if ((club.visibility === "private" || club.profileVisibility === "private") && !isManagerOrMember) {
             const error: any = new Error("This club profile is private to registered club members.");
             error.statusCode = 403;
             throw error;
@@ -1004,7 +1354,7 @@ export class ClubProfileService {
         }
 
         // Check Redis cache for public viewers (when not previewing draft as manager)
-        if (!isManagerOrMember && club.publicationStatus === "published" && club.profileVisibility === "public") {
+        if (!isManagerOrMember && (club.visibility === "public" || (club.publicationStatus === "published" && club.profileVisibility === "public"))) {
             const cached = await getCachedPublicClubProfile(cleanSlug);
             if (cached) {
                 return cached;
@@ -1066,9 +1416,14 @@ export class ClubProfileService {
                 title,
                 description,
                 achievement_date AS "achievementDate",
+                achievement_date AS "date",
                 issuer,
+                issuer AS "organization",
+                achievement_type AS "type",
+                achievement_type AS "achievementType",
                 image_url AS "imageUrl",
                 external_link AS "externalLink",
+                external_link AS "referenceUrl",
                 display_order AS "displayOrder"
              FROM club_achievements
              WHERE club_id = $1
@@ -1248,6 +1603,8 @@ export class ClubProfileService {
                 vc.recruitment_url AS "recruitmentUrl",
                 vc.publication_status AS "publicationStatus",
                 vc.profile_visibility AS "profileVisibility",
+                vc.visibility,
+                COALESCE(vc.links, '[]'::jsonb) AS links,
                 vc.is_active AS "isActive",
                 vc.verified_at AS "verifiedAt",
                 vc.created_at AS "createdAt",
@@ -1283,9 +1640,14 @@ export class ClubProfileService {
                AND (
                    ($3::text IS NOT NULL AND vc.id::text = $3::text)
                    OR
-                   ($1::text IS NOT NULL AND vc.college_id::text = $1::text)
-                   OR
-                   ($2::text IS NOT NULL AND LOWER(TRIM(vc.college_name)) = LOWER(TRIM($2)))
+                   (
+                       (vc.visibility = 'public' OR (vc.publication_status = 'published' AND vc.profile_visibility = 'public'))
+                       AND (
+                           ($1::text IS NOT NULL AND vc.college_id::text = $1::text)
+                           OR
+                           ($2::text IS NOT NULL AND LOWER(TRIM(vc.college_name)) = LOWER(TRIM($2)))
+                       )
+                   )
                )
              ORDER BY
                  CASE WHEN $3::text IS NOT NULL AND vc.id::text = $3::text THEN 0 ELSE 1 END,

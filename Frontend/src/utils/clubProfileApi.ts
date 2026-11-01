@@ -2,6 +2,16 @@
  * Client API for Orbix Club Profile Management & Dynamic Public Profiles
  */
 
+export interface ClubLink {
+    id?: string;
+    platform: "website" | "github" | "linkedin" | "instagram" | "x" | "discord" | "youtube" | "other" | string;
+    url: string;
+    label?: string;
+    displayOrder: number;
+}
+
+export type ClubVisibilityTier = "draft" | "public" | "unlisted" | "private" | "archived";
+
 export interface ClubProfileData {
     id: string;
     name: string;
@@ -20,6 +30,7 @@ export interface ClubProfileData {
     websiteUrl: string | null;
     publicEmail: string | null;
     contactPhone: string | null;
+    links: ClubLink[];
     socialLinks: {
         github?: string;
         linkedin?: string;
@@ -30,10 +41,11 @@ export interface ClubProfileData {
         youtube?: string;
     } | null;
     foundedYear: number | null;
-    operatingStatus: "active" | "recruiting" | "hiatus" | "inactive";
+    operatingStatus: "active" | "on_hiatus" | "inactive" | "recruiting" | "hiatus";
     mission: string | null;
     vision: string | null;
     focusAreas: string[];
+    visibility: ClubVisibilityTier;
     publicationStatus: "draft" | "published" | "hidden";
     profileVisibility: "public" | "unlisted" | "private";
     recruitmentStatus: "open" | "closed" | "upcoming";
@@ -69,11 +81,16 @@ export interface ClubAchievement {
     id: string;
     clubId: string;
     title: string;
+    type?: string | null;
+    achievementType?: string | null;
     description?: string | null;
     achievementDate?: string | null;
+    date?: string | null;
     issuer?: string | null;
+    organization?: string | null;
     imageUrl?: string | null;
     externalLink?: string | null;
+    referenceUrl?: string | null;
     displayOrder: number;
     createdAt: string;
     updatedAt: string;
@@ -104,6 +121,8 @@ export interface ClubProfileResponse {
         percentage: number;
         completedItems: string[];
         missingItems: string[];
+        essentialMissing?: string[];
+        canPublish?: boolean;
     };
 }
 
@@ -137,7 +156,34 @@ export async function updateClubProfile(payload: Record<string, any>, clubId?: s
     });
     const data = await res.json();
     if (!res.ok || !data.success) {
-        throw new Error(data?.message || "Failed to update club profile.");
+        const err: any = new Error(data?.message || "Failed to update club profile.");
+        if (data?.checklist) err.checklist = data.checklist;
+        throw err;
+    }
+    return data;
+}
+
+export async function removeClubImage(type: "logo" | "banner", clubId?: string): Promise<ClubProfileResponse> {
+    const url = clubId
+        ? `/api/club/profile/image?type=${type}&clubId=${encodeURIComponent(clubId)}`
+        : `/api/club/profile/image?type=${type}`;
+    const res = await fetch(url, {
+        method: "DELETE",
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || `Failed to remove club ${type}.`);
+    }
+    return data;
+}
+
+export async function fetchClubPreview(clubId?: string): Promise<any> {
+    const url = clubId ? `/api/club/profile/preview?clubId=${encodeURIComponent(clubId)}` : "/api/club/profile/preview";
+    const res = await fetch(url, { credentials: "include" });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to fetch club preview.");
     }
     return data;
 }
@@ -296,11 +342,16 @@ export async function reorderCoordinators(coordinatorIds: string[], clubId?: str
 export async function addAchievement(
     achievement: {
         title: string;
+        type?: string;
+        achievementType?: string;
         description?: string;
         achievementDate?: string;
+        date?: string;
         issuer?: string;
+        organization?: string;
         imageUrl?: string;
         externalLink?: string;
+        referenceUrl?: string;
     },
     clubId?: string
 ): Promise<ClubAchievement> {

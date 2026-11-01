@@ -47,6 +47,7 @@ interface PublicCoordinator {
 interface PublicAchievement {
     id: string;
     title: string;
+    type?: string | null;
     description?: string | null;
     achievementDate?: string | null;
     issuer?: string | null;
@@ -61,6 +62,12 @@ interface PublicTeam {
     description?: string | null;
     responsibilities?: string | null;
     memberCount?: number;
+}
+
+interface PublicClubLink {
+    platform: string;
+    url: string;
+    label?: string;
 }
 
 interface PublicClub {
@@ -79,6 +86,7 @@ interface PublicClub {
     websiteUrl: string | null;
     publicEmail: string | null;
     contactPhone: string | null;
+    links?: PublicClubLink[];
     socialLinks: {
         github?: string;
         linkedin?: string;
@@ -89,12 +97,13 @@ interface PublicClub {
         youtube?: string;
     } | null;
     foundedYear: number | null;
-    operatingStatus: "active" | "recruiting" | "hiatus" | "inactive";
+    operatingStatus: "active" | "recruiting" | "on_hiatus" | "hiatus" | "inactive";
     mission: string | null;
     vision: string | null;
     focusAreas: string[];
     publicationStatus?: "draft" | "published" | "hidden";
     profileVisibility?: "public" | "unlisted" | "private";
+    visibility?: "draft" | "public" | "unlisted" | "private" | "archived";
     recruitmentStatus: "open" | "closed" | "upcoming";
     recruitmentAnnouncement: string | null;
     recruitmentUrl: string | null;
@@ -337,6 +346,16 @@ export default function PublicClubProfilePage() {
 
                         {/* Top Badges */}
                         <div className="absolute top-4 right-4 flex items-center gap-2">
+                            {club.visibility === "unlisted" && (
+                                <span className="px-3 py-1 rounded-full bg-[#FFE566] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                                    Unlisted Profile
+                                </span>
+                            )}
+                            {club.visibility === "draft" && (
+                                <span className="px-3 py-1 rounded-full bg-neutral-100 border-2 border-black text-xs font-black text-neutral-800 shadow-[2px_2px_0px_#000]">
+                                    Draft Preview
+                                </span>
+                            )}
                             <span className="px-3 py-1 rounded-full bg-white/95 backdrop-blur-xs border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5">
                                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
                                 <span>Verified on Orbix</span>
@@ -374,6 +393,16 @@ export default function PublicClubProfilePage() {
                                             <span className="px-2 py-0.5 rounded-full bg-[#FFE566] border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000] flex items-center gap-1">
                                                 <Radio className="w-3 h-3 animate-pulse" />
                                                 <span>Recruiting Members</span>
+                                            </span>
+                                        )}
+                                        {(club.operatingStatus === "on_hiatus" || club.operatingStatus === "hiatus") && (
+                                            <span className="px-2 py-0.5 rounded-full bg-amber-100 border border-black text-[10px] font-black text-amber-900 shadow-[1px_1px_0px_#000]">
+                                                On Hiatus
+                                            </span>
+                                        )}
+                                        {club.operatingStatus === "inactive" && (
+                                            <span className="px-2 py-0.5 rounded-full bg-neutral-200 border border-black text-[10px] font-black text-neutral-700 shadow-[1px_1px_0px_#000]">
+                                                Inactive
                                             </span>
                                         )}
                                     </div>
@@ -427,62 +456,101 @@ export default function PublicClubProfilePage() {
                             </div>
                         )}
 
-                        {/* Social Links Bar */}
+                        {/* Links & Contacts Bar */}
                         <div className="pt-5 mt-5 border-t border-black/10 flex items-center gap-3 flex-wrap">
-                            {club.websiteUrl && (
-                                <a
-                                    href={club.websiteUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
-                                >
-                                    <Globe className="w-3.5 h-3.5" />
-                                    <span>Website</span>
-                                </a>
-                            )}
-                            {social.github && (
-                                <a
-                                    href={social.github}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
-                                >
-                                    {getPlatformIcon("github", "w-3.5 h-3.5")}
-                                    <span>GitHub</span>
-                                </a>
-                            )}
-                            {social.linkedin && (
-                                <a
-                                    href={social.linkedin}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
-                                >
-                                    {getPlatformIcon("linkedin", "w-3.5 h-3.5")}
-                                    <span>LinkedIn</span>
-                                </a>
-                            )}
-                            {social.instagram && (
-                                <a
-                                    href={social.instagram}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
-                                >
-                                    {getPlatformIcon("instagram", "w-3.5 h-3.5")}
-                                    <span>Instagram</span>
-                                </a>
-                            )}
-                            {(social.x || social.twitter) && (
-                                <a
-                                    href={social.x || social.twitter}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
-                                >
-                                    {getPlatformIcon("x", "w-3.5 h-3.5")}
-                                    <span>Twitter</span>
-                                </a>
+                            {Array.isArray(club.links) && club.links.length > 0 ? (
+                                club.links.map((linkItem, idx) => (
+                                    <a
+                                        key={idx}
+                                        href={linkItem.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000] transition-colors"
+                                    >
+                                        {getPlatformIcon(linkItem.platform || linkItem.url, "w-3.5 h-3.5")}
+                                        <span>{linkItem.label || (linkItem.platform === "x" ? "X / Twitter" : linkItem.platform.charAt(0).toUpperCase() + linkItem.platform.slice(1))}</span>
+                                    </a>
+                                ))
+                            ) : (
+                                <>
+                                    {club.websiteUrl && (
+                                        <a
+                                            href={club.websiteUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
+                                        >
+                                            <Globe className="w-3.5 h-3.5" />
+                                            <span>Website</span>
+                                        </a>
+                                    )}
+                                    {social.github && (
+                                        <a
+                                            href={social.github}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
+                                        >
+                                            {getPlatformIcon("github", "w-3.5 h-3.5")}
+                                            <span>GitHub</span>
+                                        </a>
+                                    )}
+                                    {social.linkedin && (
+                                        <a
+                                            href={social.linkedin}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
+                                        >
+                                            {getPlatformIcon("linkedin", "w-3.5 h-3.5")}
+                                            <span>LinkedIn</span>
+                                        </a>
+                                    )}
+                                    {social.instagram && (
+                                        <a
+                                            href={social.instagram}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
+                                        >
+                                            {getPlatformIcon("instagram", "w-3.5 h-3.5")}
+                                            <span>Instagram</span>
+                                        </a>
+                                    )}
+                                    {(social.x || social.twitter) && (
+                                        <a
+                                            href={social.x || social.twitter}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
+                                        >
+                                            {getPlatformIcon("x", "w-3.5 h-3.5")}
+                                            <span>Twitter</span>
+                                        </a>
+                                    )}
+                                    {social.discord && (
+                                        <a
+                                            href={social.discord}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
+                                        >
+                                            {getPlatformIcon("discord", "w-3.5 h-3.5")}
+                                            <span>Discord</span>
+                                        </a>
+                                    )}
+                                    {social.youtube && (
+                                        <a
+                                            href={social.youtube}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border border-black text-xs font-black text-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000]"
+                                        >
+                                            {getPlatformIcon("youtube", "w-3.5 h-3.5")}
+                                            <span>YouTube</span>
+                                        </a>
+                                    )}
+                                </>
                             )}
                             {club.publicEmail && (
                                 <a
@@ -772,6 +840,11 @@ export default function PublicClubProfilePage() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <h4 className="text-xs font-black text-black">{ach.title}</h4>
+                                                {ach.type && (
+                                                    <span className="px-2 py-0.5 rounded-md bg-[#FFE566] border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000]">
+                                                        {ach.type}
+                                                    </span>
+                                                )}
                                                 {ach.issuer && (
                                                     <span className="px-2 py-0.5 rounded-md bg-white border border-black text-[10px] font-bold text-neutral-800">
                                                         {ach.issuer}

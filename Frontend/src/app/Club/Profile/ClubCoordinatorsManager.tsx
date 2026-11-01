@@ -22,6 +22,7 @@ import {
 } from "../../../utils/clubProfileApi";
 import { useToast } from "../../../context/ToastContext";
 import { NeoImageDropzone } from "../../../components/NeoImageDropzone";
+import { ConfirmationModal } from "../../../components/ConfirmationModal";
 
 interface ClubCoordinatorsManagerProps {
     clubId: string;
@@ -58,6 +59,7 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [coordinatorToDelete, setCoordinatorToDelete] = useState<ClubCoordinator | null>(null);
 
     const openAddModal = () => {
         setEditingCoordinator(null);
@@ -151,15 +153,13 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to remove this coordinator from the public club profile?")) {
-            return;
-        }
-
+    const confirmDelete = async () => {
+        if (!coordinatorToDelete) return;
         try {
-            setDeletingId(id);
-            await deleteCoordinator(id, clubId);
+            setDeletingId(coordinatorToDelete.id);
+            await deleteCoordinator(coordinatorToDelete.id, clubId);
             toast.success("Coordinator removed.");
+            setCoordinatorToDelete(null);
             onUpdate();
         } catch (err: any) {
             toast.error(err.message || "Failed to remove coordinator.");
@@ -329,7 +329,7 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => handleDelete(coord.id)}
+                                            onClick={() => setCoordinatorToDelete(coord)}
                                             disabled={deletingId === coord.id}
                                             className="p-1 text-red-600 hover:text-red-800 rounded border border-neutral-300 hover:border-red-600 cursor-pointer disabled:opacity-50"
                                             title="Delete"
@@ -502,6 +502,19 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
                     </div>
                 </div>
             )}
+
+            {/* Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={Boolean(coordinatorToDelete)}
+                title="Remove Coordinator"
+                message={`Are you sure you want to remove "${coordinatorToDelete?.name}" from the public coordinators list?`}
+                confirmText="Yes, Remove"
+                cancelText="Keep"
+                variant="danger"
+                isLoading={deletingId !== null}
+                onConfirm={confirmDelete}
+                onClose={() => setCoordinatorToDelete(null)}
+            />
         </div>
     );
 };

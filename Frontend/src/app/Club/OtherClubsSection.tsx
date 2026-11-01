@@ -81,6 +81,8 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
             publicEmail: d.public_email || d.publicEmail || null,
             contactPhone: d.contact_phone || d.contactPhone || null,
             socialLinks: d.social_links || d.socialLinks || {},
+            links: d.links || [],
+            visibility: d.visibility || "public",
             foundedYear: d.founded_year || d.foundedYear || null,
             operatingStatus: "active",
             focusAreas: d.focus_areas || d.focusAreas || [],
