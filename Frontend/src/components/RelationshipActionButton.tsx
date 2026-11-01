@@ -6,10 +6,11 @@ import {
     Clock,
     Check,
     X,
-    Loader2,
     ShieldAlert,
     UserMinus,
 } from "lucide-react";
+import { OrbixLoader } from "./ui/loader";
+import { OrbixButton } from "./OrbixButton";
 import { useRelationship } from "../hooks/useRelationship";
 import { ConfirmationModal } from "./ConfirmationModal";
 import type { RelationshipState } from "../api/relationshipApi";
@@ -64,7 +65,7 @@ export const RelationshipActionButton: React.FC<RelationshipActionButtonProps> =
     if (loading) {
         return (
             <div className={`${baseBtnClasses} bg-neutral-100 text-neutral-400 border-neutral-300 cursor-not-allowed ${className}`}>
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <OrbixLoader size="xs" variant="inline" color="currentColor" />
                 <span>Checking...</span>
             </div>
         );
@@ -77,23 +78,21 @@ export const RelationshipActionButton: React.FC<RelationshipActionButtonProps> =
     // STATE: NONE -> Connect
     if (state === "none") {
         return (
-            <button
-                type="button"
+            <OrbixButton
+                size={isSmall ? "sm" : "md"}
+                variant="yellow"
+                icon={<UserPlus className="w-4 h-4 stroke-[2.5]" />}
+                loading={mutating}
+                loadingLabel="Connecting..."
                 onClick={async () => {
                     const ok = await request();
                     if (ok) handleActionComplete("outgoing_pending");
                 }}
-                disabled={mutating}
-                className={`${baseBtnClasses} bg-[#FFE566] hover:bg-[#ffe043] text-black ${className}`}
+                className={className}
                 title={`Send connection request to ${displayName}`}
             >
-                {mutating ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                    <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
-                )}
-                <span>Connect</span>
-            </button>
+                Connect
+            </OrbixButton>
         );
     }
 
@@ -109,7 +108,7 @@ export const RelationshipActionButton: React.FC<RelationshipActionButtonProps> =
                     title="Connection request sent. Click to cancel."
                 >
                     {mutating ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <OrbixLoader size="xs" variant="inline" color="currentColor" />
                     ) : (
                         <Clock className="w-3.5 h-3.5 stroke-[2.5]" />
                     )}
@@ -137,23 +136,20 @@ export const RelationshipActionButton: React.FC<RelationshipActionButtonProps> =
     if (state === "incoming_pending") {
         return (
             <div className={`inline-flex items-center gap-1.5 ${className}`}>
-                <button
-                    type="button"
+                <OrbixButton
+                    size={isSmall ? "sm" : "md"}
+                    variant="lime"
+                    icon={<Check className="w-4 h-4 stroke-[3]" />}
+                    loading={mutating}
+                    loadingLabel="Accepting..."
                     onClick={async () => {
                         const ok = await accept();
                         if (ok) handleActionComplete("connected");
                     }}
-                    disabled={mutating}
-                    className={`${baseBtnClasses} bg-[#a2ff86] hover:bg-[#8ee875] text-black`}
                     title={`Accept connection request from ${displayName}`}
                 >
-                    {mutating ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                    )}
-                    <span>Accept</span>
-                </button>
+                    Accept
+                </OrbixButton>
 
                 <button
                     type="button"
@@ -184,7 +180,7 @@ export const RelationshipActionButton: React.FC<RelationshipActionButtonProps> =
                     title="Connected. Click to remove connection."
                 >
                     {mutating ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <OrbixLoader size="xs" variant="inline" color="currentColor" />
                     ) : (
                         <>
                             <UserCheck className="w-3.5 h-3.5 stroke-[2.5] group-hover:hidden" />
@@ -215,23 +211,21 @@ export const RelationshipActionButton: React.FC<RelationshipActionButtonProps> =
     // STATE: BLOCKED_BY_ME -> Unblock
     if (state === "blocked_by_me") {
         return (
-            <button
-                type="button"
+            <OrbixButton
+                size={isSmall ? "sm" : "md"}
+                variant="white"
+                icon={<ShieldAlert className="w-4 h-4 stroke-[2.5]" />}
+                loading={mutating}
+                loadingLabel="Unblocking..."
                 onClick={async () => {
                     const ok = await unblock();
                     if (ok) handleActionComplete("none");
                 }}
-                disabled={mutating}
-                className={`${baseBtnClasses} bg-neutral-200 hover:bg-neutral-300 text-black ${className}`}
+                className={className}
                 title="You blocked this user. Click to unblock."
             >
-                {mutating ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                    <ShieldAlert className="w-3.5 h-3.5 stroke-[2.5]" />
-                )}
-                <span>Unblock</span>
-            </button>
+                Unblock
+            </OrbixButton>
         );
     }
 

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
 import { motion } from "framer-motion";
-import { X, Download, Repeat, Loader2 } from "lucide-react";
+import { X, Download, Repeat } from "lucide-react";
+import { OrbixLoader } from "../../components/ui/loader";
 import { toPng } from "html-to-image";
 import { useToast } from "../../context/ToastContext";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
@@ -421,7 +422,7 @@ export const GetTheCardModal: React.FC<GetTheCardModalProps> = ({
                         >
                             {downloadingSide === "front" ? (
                                 <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                     <span>Exporting Front...</span>
                                 </>
                             ) : (
@@ -440,7 +441,7 @@ export const GetTheCardModal: React.FC<GetTheCardModalProps> = ({
                         >
                             {downloadingSide === "back" ? (
                                 <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                     <span>Exporting Back...</span>
                                 </>
                             ) : (

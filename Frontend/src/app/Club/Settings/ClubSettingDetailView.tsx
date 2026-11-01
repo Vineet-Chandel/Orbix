@@ -393,7 +393,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                         type="button"
                                         disabled={isSendingVerifyOtp || verifyCooldown > 0}
                                         onClick={handleSendVerificationCode}
-                                        className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer disabled:opacity-50 shrink-0"
+                                        className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer disabled:opacity-50 shrink-0"
                                     >
                                         {isSendingVerifyOtp ? "Sending Code..." : verifyCooldown > 0 ? `Resend in ${verifyCooldown}s` : "Verify Now"}
                                     </button>
@@ -425,7 +425,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                             type="button"
                                             disabled={isConfirmingVerifyOtp || otpDigits.trim().length !== 6}
                                             onClick={handleConfirmVerificationCode}
-                                            className="px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer disabled:opacity-50"
+                                            className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer disabled:opacity-50"
                                         >
                                             {isConfirmingVerifyOtp ? "Verifying..." : "Confirm & Verify"}
                                         </button>
@@ -502,7 +502,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                 <button
                                     type="submit"
                                     disabled={isSavingPassword}
-                                    className="px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer disabled:opacity-50"
+                                    className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer disabled:opacity-50"
                                 >
                                     {isSavingPassword ? "Updating..." : "Update Password"}
                                 </button>
@@ -615,7 +615,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                             <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight">
                                                 Club Help Center
                                             </h3>
-                                            <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-black uppercase font-mono bg-black text-[#a2ff86] rounded-md">
+                                            <span className="hidden sm:inline-block px-2 py-0.5 text-[10px] font-black uppercase font-mono bg-[#a2ff86] text-black border border-black rounded-md">
                                                 Collegiate Support
                                             </span>
                                         </div>
@@ -815,7 +815,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                                 <button
                                                     type="submit"
                                                     disabled={isSubmittingTicket}
-                                                    className="px-6 py-3 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                                                    className="px-6 py-3 rounded-xl bg-[#a2ff86] text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer disabled:opacity-50 flex items-center gap-2"
                                                 >
                                                     <Send className="w-3.5 h-3.5 stroke-[2.5]" />
                                                     <span>{isSubmittingTicket ? "Transmitting..." : "Submit Club Ticket"}</span>
@@ -970,7 +970,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                                             <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight">
                                                 Collegiate Privacy Center
                                             </h3>
-                                            <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-black text-[#a2ff86] text-[10px] font-black uppercase font-mono tracking-wider">
+                                            <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black text-[10px] font-black uppercase font-mono tracking-wider">
                                                 FERPA Aligned
                                             </span>
                                         </div>
@@ -1057,7 +1057,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
                             <button
                                 type="button"
                                 onClick={() => onSelectView("account-privacy")}
-                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer shrink-0"
+                                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer shrink-0"
                             >
                                 <span>Manage Showcase Privacy</span>
                                 <ExternalLink className="w-3.5 h-3.5" />

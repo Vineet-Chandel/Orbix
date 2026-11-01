@@ -76,7 +76,7 @@ export const DynamicLinksManager: React.FC<DynamicLinksManagerProps> = ({ links,
                 <button
                     type="button"
                     onClick={handleAddLink}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer self-start sm:self-auto shrink-0"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer self-start sm:self-auto shrink-0"
                 >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add Link</span>

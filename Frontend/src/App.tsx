@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-
 import MainLanding from "./LandingPages/Main-Landing-Pages/Landing";
 import ProtectedRoute from "./ProtectedRoute";
 import { ToastProvider } from "./context/ToastContext";
+import { OrbixLoadingProvider, OrbixLoader } from "./components/ui/loader";
 import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
 
 // Code-split other routes & showcases to keep initial homepage bundle ultra-lean
@@ -68,10 +69,17 @@ const App = () => {
   }, [dispatch]);
 
   return (
-    <ToastProvider>
-      <BrowserRouter>
-        <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-black/20 border-t-black animate-spin" /></div>}>
-          <Routes>
+    <OrbixLoadingProvider>
+      <ToastProvider>
+        <BrowserRouter>
+          <Suspense
+            fallback={
+              <div className="min-h-screen bg-[#FAF6EE] flex items-center justify-center text-black">
+                <OrbixLoader size="lg" />
+              </div>
+            }
+          >
+            <Routes>
           {/* Public Landing & Marketing Pages */}
           <Route path="/" element={<MainLanding />} />
           <Route path="/customers" element={<CustomersPage />} />
@@ -118,10 +126,18 @@ const App = () => {
 
           {/* Club Verification, Dedicated Dashboard & Public Presence */}
           <Route path="/club/status" element={<ClubStatusPage />} />
+          <Route path="/clubs/status" element={<Navigate to="/club/status" replace />} />
+          <Route path="/club" element={<Navigate to="/club/dashboard" replace />} />
           <Route path="/club/dashboard" element={<ClubDashboardPage />} />
-          <Route path="/club/clubs" element={<Navigate to="/club/dashboard?tab=clubs" replace />} />
-          <Route path="/club/other-clubs" element={<Navigate to="/club/dashboard?tab=clubs" replace />} />
-          <Route path="/club/settings" element={<Navigate to="/club/dashboard?tab=settings" replace />} />
+          <Route path="/club/team" element={<ClubDashboardPage />} />
+          <Route path="/club/events" element={<ClubDashboardPage />} />
+          <Route path="/club/profile" element={<ClubDashboardPage />} />
+          <Route path="/club/manage-profile" element={<Navigate to="/club/profile" replace />} />
+          <Route path="/club/clubs" element={<ClubDashboardPage />} />
+          <Route path="/club/campus-clubs" element={<Navigate to="/club/clubs" replace />} />
+          <Route path="/club/other-clubs" element={<Navigate to="/club/clubs" replace />} />
+          <Route path="/club/settings" element={<ClubDashboardPage />} />
+          <Route path="/club/inbox" element={<ClubDashboardPage />} />
           <Route path="/clubs/:slug" element={<PublicClubProfilePage />} />
           <Route path="/staff/club-reviews" element={<ClubReviewerQueuePage />} />
 
@@ -145,9 +161,10 @@ const App = () => {
             <Route path="/projects" element={<Dashboard />} />
           </Route>
         </Routes>
-        </Suspense>
-      </BrowserRouter>
-    </ToastProvider>
+          </Suspense>
+        </BrowserRouter>
+      </ToastProvider>
+    </OrbixLoadingProvider>
   );
 };
 

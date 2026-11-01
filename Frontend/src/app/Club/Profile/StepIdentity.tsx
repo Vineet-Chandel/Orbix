@@ -187,21 +187,23 @@ export const StepIdentity: React.FC<StepIdentityProps> = ({
                                 onClick={() => onOperatingStatusChange(item.value)}
                                 className={`p-4 rounded-xl border-2 border-black text-left transition-all cursor-pointer flex flex-col justify-between space-y-2 ${
                                     isSelected
-                                        ? "bg-black text-white shadow-[3px_3px_0px_#000]"
+                                        ? "bg-[#a2ff86] text-black shadow-[3px_3px_0px_#000]"
                                         : "bg-white text-black hover:bg-[#FAF6EE] shadow-[2px_2px_0px_#000]"
                                 }`}
                             >
                                 <div className="flex items-center justify-between gap-2">
                                     <span
-                                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border border-black text-black ${item.badgeColor}`}
+                                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border border-black text-black ${
+                                            isSelected ? "bg-white" : item.badgeColor
+                                        }`}
                                     >
                                         {item.label}
                                     </span>
-                                    {isSelected && <CheckCircle2 className="w-4 h-4 text-[#a2ff86]" />}
+                                    {isSelected && <CheckCircle2 className="w-4 h-4 text-black stroke-[2.5]" />}
                                 </div>
                                 <p
-                                    className={`text-[11px] leading-relaxed font-medium ${
-                                        isSelected ? "text-neutral-300" : "text-neutral-600"
+                                    className={`text-[11px] leading-relaxed font-bold ${
+                                        isSelected ? "text-neutral-900" : "text-neutral-600"
                                     }`}
                                 >
                                     {item.description}

@@ -310,7 +310,7 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
                         <div className="pt-2 flex items-center gap-3">
                             <Link
                                 to="/profile"
-                                className="px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 <span>Set College in Profile</span>
                                 <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
@@ -426,7 +426,7 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
                                     onClick={() => setSelectedCategory("all")}
                                     className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                                         selectedCategory === "all"
-                                            ? "bg-black text-[#a2ff86] border-black font-black shadow-[1.5px_1.5px_0px_#000]"
+                                            ? "bg-[#a2ff86] text-black border-black font-black shadow-[1.5px_1.5px_0px_#000]"
                                             : "bg-[#FAF6EE] text-neutral-700 border-black/30 hover:border-black"
                                     }`}
                                 >
@@ -442,7 +442,7 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
                                             onClick={() => setSelectedCategory(isSelected ? "all" : cat)}
                                             className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer capitalize ${
                                                 isSelected
-                                                    ? "bg-black text-[#a2ff86] border-black font-black shadow-[1.5px_1.5px_0px_#000]"
+                                                    ? "bg-[#a2ff86] text-black border-black font-black shadow-[1.5px_1.5px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 border-black/30 hover:border-black"
                                             }`}
                                         >
@@ -476,7 +476,7 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
                                 <button
                                     type="button"
                                     onClick={handleCopyCampusInvite}
-                                    className="px-4 py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    className="px-4 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                 >
                                     {copiedInvite ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                                     <span>{copiedInvite ? "Link Copied!" : "Invite Campus Leads"}</span>
@@ -511,7 +511,7 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
                                 setSelectedCategory("all");
                                 setOnlyRecruiting(false);
                             }}
-                            className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer"
+                            className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer"
                         >
                             Reset All Filters
                         </button>

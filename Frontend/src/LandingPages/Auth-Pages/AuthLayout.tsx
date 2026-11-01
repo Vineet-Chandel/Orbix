@@ -42,7 +42,7 @@ export const AuthLayout = ({
                         className="group inline-flex items-center gap-2.5 text-black hover:opacity-80 transition-opacity cursor-pointer select-none"
                         title="Back to Orbix Homepage"
                     >
-                        <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                        <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
                         <span className="text-2xl sm:text-3xl font-black tracking-tight leading-none text-black">Orbix</span>
                     </Link>
                 </div>

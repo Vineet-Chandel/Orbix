@@ -6,13 +6,13 @@ import {
     MapPin,
     Building,
     X,
-    Loader2,
     PlusCircle,
     ShieldCheck,
     AlertCircle,
     Lock,
     Clock,
 } from "lucide-react";
+import { OrbixLoader } from "./ui/loader";
 import { searchInstitutions, type InstitutionItem } from "../utils/profileApi";
 import { RequestCollegeModal } from "./RequestCollegeModal";
 import { CollegeChangeWarningModal } from "./CollegeChangeWarningModal";
@@ -350,7 +350,7 @@ export function CollegeAutocomplete({
                     />
 
                     <div className="absolute right-3 flex items-center gap-1.5">
-                        {isLoading && <Loader2 className="w-4 h-4 text-black animate-spin" />}
+                        {isLoading && <OrbixLoader size="xs" variant="minimal" color="#000000" />}
                         {queryText && !isLoading && (
                             <button
                                 type="button"

@@ -7,9 +7,9 @@ import {
     RefreshCw,
     ExternalLink,
     Lock,
-    Loader2,
     CheckCircle2,
 } from "lucide-react";
+import { OrbixButton } from "../../components/OrbixButton";
 import { useToast } from "../../context/ToastContext";
 import { NeoSelect } from "../../components/NeoSelect";
 import { OrbixLogo } from "../../components/OrbixLogo";
@@ -253,7 +253,7 @@ export default function ClubReviewerQueuePage() {
                         className="flex items-center gap-2.5 group hover:opacity-85 transition-opacity"
                         title="Orbix Home"
                     >
-                        <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                        <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
                         <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none group-hover:text-neutral-700 transition-colors">
                             Orbix Staff
                         </span>
@@ -718,28 +718,18 @@ export default function ClubReviewerQueuePage() {
 
                                             {selectedRequest.status !== "approved" && (
                                                 <div className="pt-2 border-t-2 border-black/10 space-y-2">
-                                                    <button
-                                                        type="button"
-                                                        disabled={isSaving || isPromoting || !isAllChecklistConfirmed}
+                                                    <OrbixButton
+                                                        fullWidth
+                                                        disabled={isSaving || !isAllChecklistConfirmed}
+                                                        loading={isPromoting}
+                                                        loadingLabel="Activating Club in Database..."
                                                         onClick={handlePromoteClub}
-                                                        className={`w-full py-2.5 rounded-xl border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 transition-all ${
-                                                            isAllChecklistConfirmed
-                                                                ? "bg-emerald-400 hover:bg-emerald-500 text-black cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                                                                : "bg-neutral-100 text-neutral-400 border-neutral-300 cursor-not-allowed shadow-none"
-                                                        }`}
+                                                        variant="lime"
+                                                        size="md"
+                                                        icon={<ShieldCheck className="w-4 h-4" />}
                                                     >
-                                                        {isPromoting ? (
-                                                            <>
-                                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                                <span>Activating Club in Database...</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <ShieldCheck className="w-4 h-4" />
-                                                                <span>Approve & Activate Club (Promote to Live)</span>
-                                                            </>
-                                                        )}
-                                                    </button>
+                                                        Approve & Activate Club (Promote to Live)
+                                                    </OrbixButton>
 
                                                     <button
                                                         type="button"

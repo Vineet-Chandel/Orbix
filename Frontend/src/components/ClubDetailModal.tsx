@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import { Link } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { ClubMarkdownRenderer } from "../app/Club/Profile/ClubMarkdownRenderer";
 import {
     X,
     ShieldCheck,
@@ -311,7 +310,7 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
                             <div className="mb-6 p-5 rounded-2xl bg-[#a2ff86] border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
-                                        <span className="px-2 py-0.5 rounded-md bg-black text-[#a2ff86] text-[10px] font-black uppercase tracking-wider">
+                                        <span className="px-2 py-0.5 rounded-md bg-white text-black border border-black text-[10px] font-black uppercase tracking-wider">
                                             Recruitment Drive Active
                                         </span>
                                     </div>
@@ -324,7 +323,7 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
                                         href={club.recruitmentUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-2 whitespace-nowrap cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                        className="px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-2 whitespace-nowrap cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                     >
                                         <span>Apply to Join</span>
                                         <ExternalLink className="w-3.5 h-3.5" />
@@ -347,9 +346,7 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
                             )}
 
                             {club.about ? (
-                                <div className="prose prose-sm max-w-none text-neutral-700 font-medium leading-relaxed">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{club.about}</ReactMarkdown>
-                                </div>
+                                <ClubMarkdownRenderer content={club.about} />
                             ) : (
                                 <p className="text-xs text-neutral-500 italic">
                                     No extensive chapter biography provided yet.

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
     Calendar,
     CalendarDays,
@@ -32,6 +32,7 @@ import type { TeamStats } from "./Team/types";
 import { ClubProfileManager } from "./Profile/ClubProfileManager";
 import { ClubSettingsView } from "./Settings/ClubSettingsView";
 import { OtherClubsSection } from "./OtherClubsSection";
+import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 
 interface VerifiedClub {
     id: string;
@@ -121,40 +122,65 @@ export default function ClubDashboardPage() {
         }
     }, [clubState.club, clubState.stats, clubState.isInitialized]);
 
-    // Navigation & URL Tab Sync
-    const [searchParams, setSearchParams] = useSearchParams();
-    const tabFromUrl = searchParams.get("tab") as ClubTab | null;
-    const initialTab: ClubTab = (tabFromUrl === "team" || tabFromUrl === "events" || tabFromUrl === "profile" || tabFromUrl === "settings" || tabFromUrl === "clubs") ? tabFromUrl : "overview";
-    const [activeTab, setActiveTabState] = useState<ClubTab>(initialTab);
-    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-    // Switch tab and sync with URL query param
-    const handleTabChange = (tab: ClubTab) => {
-        setActiveTabState(tab);
-        if (tab === "overview") {
-            setSearchParams((prev) => {
-                const next = new URLSearchParams(prev);
-                next.delete("tab");
-                return next;
-            }, { replace: true });
-        } else {
-            setSearchParams((prev) => {
-                const next = new URLSearchParams(prev);
-                next.set("tab", tab);
-                return next;
-            }, { replace: true });
-        }
+    // Path to Club Tab mapping & clean full route paths
+    const getClubTabFromPath = (pathname: string): ClubTab => {
+        if (pathname.startsWith("/club/team")) return "team";
+        if (pathname.startsWith("/club/events")) return "events";
+        if (pathname.startsWith("/club/profile") || pathname.startsWith("/club/manage-profile")) return "profile";
+        if (pathname.startsWith("/club/clubs") || pathname.startsWith("/club/campus-clubs") || pathname.startsWith("/club/other-clubs")) return "clubs";
+        if (pathname.startsWith("/club/settings")) return "settings";
+        return "overview";
     };
 
-    // Update activeTab when browser back/forward or deep-link changes
-    useEffect(() => {
-        const currentTab = searchParams.get("tab") as ClubTab | null;
-        if (currentTab === "team" || currentTab === "events" || currentTab === "profile" || currentTab === "settings" || currentTab === "clubs") {
-            setActiveTabState(currentTab);
-        } else {
-            setActiveTabState("overview");
+    const clubTabToPath: Record<ClubTab, string> = {
+        overview: "/club/dashboard",
+        team: "/club/team",
+        events: "/club/events",
+        profile: "/club/profile",
+        clubs: "/club/clubs",
+        settings: "/club/settings",
+    };
+
+    // Navigation & Clean Full Route Sync
+    const location = useLocation();
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTabState] = useState<ClubTab>(() => {
+        const tabQuery = searchParams.get("tab") as ClubTab | null;
+        if (tabQuery && clubTabToPath[tabQuery]) {
+            return tabQuery;
         }
-    }, [searchParams]);
+        return getClubTabFromPath(location.pathname);
+    });
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+    // Keep activeTab in sync with route changes (browser back/forward, direct links)
+    useEffect(() => {
+        setActiveTabState(getClubTabFromPath(location.pathname));
+    }, [location.pathname]);
+
+    // Backward compatibility: automatically migrate legacy query parameters (?tab=team) to clean full routes (/club/team)
+    useEffect(() => {
+        const tabQuery = searchParams.get("tab") as ClubTab | null;
+        if (tabQuery && clubTabToPath[tabQuery]) {
+            navigate(clubTabToPath[tabQuery], { replace: true });
+        }
+    }, [searchParams, navigate]);
+
+    // Deep link support for /club/inbox
+    useEffect(() => {
+        if (location.pathname === "/club/inbox") {
+            setIsInboxModalOpen(true);
+        }
+    }, [location.pathname]);
+
+    // Switch tab by navigating to the full route
+    const handleTabChange = (tab: ClubTab) => {
+        setActiveTabState(tab);
+        const targetPath = clubTabToPath[tab] || "/club/dashboard";
+        if (location.pathname !== targetPath) {
+            navigate(targetPath);
+        }
+    };
 
     // Team Stats and Sidebar Badge States
     const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
@@ -230,7 +256,7 @@ export default function ClubDashboardPage() {
                     return;
                 }
                 if (typeof err === "string" && (err.includes("404") || err.includes("403") || err.toLowerCase().includes("no verified club"))) {
-                    navigate("/clubs/status", { replace: true });
+                    navigate("/club/status", { replace: true });
                     return;
                 }
             }
@@ -249,7 +275,8 @@ export default function ClubDashboardPage() {
     // Fetch inbox unread count
     const fetchInboxCounts = async () => {
         try {
-            const res = await fetch("/api/club/inbox/unread-count", { credentials: "include" });
+            const queryParam = club?.id ? `?clubId=${encodeURIComponent(club.id)}` : "";
+            const res = await fetch(`/api/club/inbox/unread-count${queryParam}`, { credentials: "include" });
             if (res.ok) {
                 const data = await res.json();
                 if (data?.success && data.counts) {
@@ -457,11 +484,8 @@ export default function ClubDashboardPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center text-neutral-900 font-sans">
-                <div className="flex flex-col items-center gap-4 bg-white p-6 rounded-2xl border-2 border-black shadow-[4px_4px_0px_#000]">
-                    <div className="w-10 h-10 border-4 border-black border-t-[#a2ff86] rounded-full animate-spin" />
-                    <p className="text-xs font-black tracking-wider uppercase">Loading Club Space...</p>
-                </div>
+            <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center text-black">
+                <OrbixLoader size="lg" />
             </div>
         );
     }
@@ -1004,30 +1028,6 @@ export default function ClubDashboardPage() {
                         {/* TAB: CLUB EVENTS & WORKSHOPS (EXCLUSIVELY FOR EVENTS TAB) */}
                         {activeTab === "events" && (
                             <div className="space-y-6">
-                                {/* Header Card with Title and Prominent + Create New Event Button */}
-                                <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <CalendarDays className="w-6 h-6 text-black" />
-                                            <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
-                                                Club Events & Workshops
-                                            </h2>
-                                        </div>
-                                        <p className="text-xs sm:text-sm font-bold text-neutral-600">
-                                            Manage your chapter's published sessions, drafts, cancelled meetups, and create new events.
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => openCreateEventModal("published")}
-                                        className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                                    >
-                                        <Plus className="w-4 h-4 stroke-[2.5]" />
-                                        <span>+ Create New Event</span>
-                                    </button>
-                                </div>
-
                                 {/* Quick Metric Summary Cards Row */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                                     {/* Metric 1: Total */}
@@ -1036,13 +1036,13 @@ export default function ClubDashboardPage() {
                                         onClick={() => setEventFilter("all")}
                                         className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
                                             eventFilter === "all"
-                                                ? "bg-black text-[#a2ff86] shadow-[3px_3px_0px_#000]"
+                                                ? "bg-[#a2ff86] text-black shadow-[3px_3px_0px_#000] font-black"
                                                 : "bg-white hover:bg-[#FAF6EE] text-neutral-900 shadow-[2px_2px_0px_#000]"
                                         }`}
                                     >
                                         <div className="flex items-center justify-between">
                                             <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wider ${
-                                                eventFilter === "all" ? "text-neutral-300" : "text-neutral-500"
+                                                eventFilter === "all" ? "text-neutral-800" : "text-neutral-500"
                                             }`}>
                                                 Total Sessions
                                             </span>
@@ -1125,7 +1125,7 @@ export default function ClubDashboardPage() {
                                             onClick={() => setEventFilter("all")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "all"
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1136,7 +1136,7 @@ export default function ClubDashboardPage() {
                                             onClick={() => setEventFilter("published")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "published"
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1147,7 +1147,7 @@ export default function ClubDashboardPage() {
                                             onClick={() => setEventFilter("draft")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "draft"
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1158,7 +1158,7 @@ export default function ClubDashboardPage() {
                                             onClick={() => setEventFilter("cancelled")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "cancelled"
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1378,6 +1378,9 @@ export default function ClubDashboardPage() {
                 isOpen={isInboxModalOpen}
                 onClose={() => {
                     setIsInboxModalOpen(false);
+                    if (location.pathname === "/club/inbox") {
+                        navigate("/club/dashboard", { replace: true });
+                    }
                     fetchInboxCounts();
                 }}
                 clubId={club.id}
@@ -1558,13 +1561,14 @@ export default function ClubDashboardPage() {
                                 >
                                     Cancel
                                 </button>
-                                <button
+                                <OrbixButton
                                     type="submit"
-                                    disabled={isSavingEvent}
-                                    className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    loading={isSavingEvent}
+                                    loadingLabel="Saving Event..."
+                                    variant="lime"
                                 >
-                                    {isSavingEvent ? "Saving..." : editingEventId ? "Update Event" : "Create Event"}
-                                </button>
+                                    {editingEventId ? "Update Event" : "Create Event"}
+                                </OrbixButton>
                             </div>
                         </form>
                     </div>

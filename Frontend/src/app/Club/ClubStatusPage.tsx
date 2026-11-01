@@ -355,7 +355,7 @@ export default function ClubStatusPage() {
                         className="flex items-center gap-2.5 group hover:opacity-85 transition-opacity"
                         title="Orbix Home"
                     >
-                        <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                        <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
                         <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none group-hover:text-neutral-700 transition-colors">
                             Orbix
                         </span>
@@ -465,7 +465,7 @@ export default function ClubStatusPage() {
                                 <div className="p-6 sm:p-8 rounded-3xl bg-[#a2ff86] border-2 border-black shadow-[5px_5px_0px_#000] space-y-4">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                         <div className="space-y-1">
-                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-[#a2ff86] text-xs font-black uppercase tracking-wider mb-1">
+                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white text-black border border-black text-xs font-black uppercase tracking-wider mb-1">
                                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                                 <span>Verified & Promoted</span>
                                             </div>

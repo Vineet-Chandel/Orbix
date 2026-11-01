@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { ClubMarkdownRenderer } from "./Profile/ClubMarkdownRenderer";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import {
     ShieldCheck,
@@ -17,7 +16,6 @@ import {
     AlertCircle,
     ArrowLeft,
     MessageSquare,
-    Loader2,
     Trophy,
     UserCheck,
     Sparkles,
@@ -25,6 +23,7 @@ import {
     FileText,
     Radio,
 } from "lucide-react";
+import { OrbixLoader } from "../../components/ui/loader";
 import { getPlatformIcon } from "../../utils/platformLinks";
 import MessageClubModal from "./MessageClubModal";
 import { useToast } from "../../context/ToastContext";
@@ -226,13 +225,8 @@ export default function PublicClubProfilePage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center p-6">
-                <div className="flex flex-col items-center gap-3">
-                    <Loader2 className="w-8 h-8 animate-spin text-black" />
-                    <p className="text-xs font-black uppercase tracking-wider text-neutral-600">
-                        Loading chapter profile...
-                    </p>
-                </div>
+            <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center p-6 text-black">
+                <OrbixLoader size="lg" />
             </div>
         );
     }
@@ -252,7 +246,7 @@ export default function PublicClubProfilePage() {
                     </div>
                     <Link
                         to="/"
-                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-black text-[#a2ff86] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#a2ff86] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         <ArrowLeft className="w-4 h-4" />
                         <span>Return to Orbix</span>
@@ -295,7 +289,7 @@ export default function PublicClubProfilePage() {
             <header className="sticky top-0 z-40 bg-[#FAF6EE]/95 backdrop-blur-md border-b-2 border-black">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
                     <Link to="/" className="flex items-center gap-2.5 hover:opacity-85 transition-opacity">
-                        <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                        <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
                         <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none">Orbix</span>
                         <span className="hidden sm:inline-block px-2 py-0.5 rounded-md bg-[#FFE566] border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
                             Clubs Directory
@@ -306,7 +300,7 @@ export default function PublicClubProfilePage() {
                         <button
                             type="button"
                             onClick={() => setIsMessageModalOpen(true)}
-                            className="px-3.5 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
+                            className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px] cursor-pointer"
                         >
                             <MessageSquare className="w-3.5 h-3.5" />
                             <span>Message Chapter</span>
@@ -314,7 +308,7 @@ export default function PublicClubProfilePage() {
 
                         {isManagerOrMember && (
                             <Link
-                                to="/club/dashboard?tab=profile"
+                                to="/club/profile"
                                 className="px-3 py-1.5 rounded-xl bg-[#FFE566] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#ebd04e] transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 Edit Profile
@@ -426,9 +420,9 @@ export default function PublicClubProfilePage() {
                                     href={club.recruitmentUrl}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="px-6 py-3 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 shrink-0 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    className="px-6 py-3 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 shrink-0 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                 >
-                                    <Sparkles className="w-4 h-4 text-[#a2ff86]" />
+                                    <Sparkles className="w-4 h-4 text-black" />
                                     <span>Apply for Chapter Team</span>
                                     <ExternalLink className="w-3.5 h-3.5" />
                                 </a>
@@ -591,7 +585,7 @@ export default function PublicClubProfilePage() {
                                 href={club.recruitmentUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] shrink-0 hover:bg-neutral-800 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] shrink-0 hover:bg-[#8ee673] transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 Fill Application Form
                             </a>
@@ -617,7 +611,7 @@ export default function PublicClubProfilePage() {
                                 onClick={() => setActiveSection(tab.id as any)}
                                 className={`px-4 py-2 rounded-xl border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] shrink-0 flex items-center gap-2 cursor-pointer transition-all ${
                                     isTabActive
-                                        ? "bg-black text-[#a2ff86]"
+                                        ? "bg-[#a2ff86] text-black"
                                         : "bg-white text-black hover:bg-neutral-100"
                                 }`}
                             >
@@ -674,37 +668,7 @@ export default function PublicClubProfilePage() {
                                 About {club.name}
                             </h3>
                             {club.about ? (
-                                <div className="prose prose-sm max-w-none text-xs text-neutral-800 leading-relaxed">
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm]}
-                                        components={{
-                                            h1: ({ children }) => <h1 className="text-lg font-black text-black pb-1 border-b border-black/20 my-3">{children}</h1>,
-                                            h2: ({ children }) => <h2 className="text-base font-black text-black pb-1 border-b border-black/10 mt-4 mb-2">{children}</h2>,
-                                            h3: ({ children }) => <h3 className="text-sm font-bold text-black mt-3 mb-1.5">{children}</h3>,
-                                            p: ({ children }) => <p className="text-xs text-neutral-700 leading-relaxed mb-3">{children}</p>,
-                                            ul: ({ children }) => <ul className="list-disc list-inside space-y-1 mb-3 text-xs text-neutral-700">{children}</ul>,
-                                            ol: ({ children }) => <ol className="list-decimal list-inside space-y-1 mb-3 text-xs text-neutral-700">{children}</ol>,
-                                            li: ({ children }) => <li className="text-xs text-neutral-700">{children}</li>,
-                                            blockquote: ({ children }) => (
-                                                <blockquote className="border-l-4 border-black pl-3 py-1 my-2 bg-[#FAF6EE] text-xs italic font-medium text-neutral-700">
-                                                    {children}
-                                                </blockquote>
-                                            ),
-                                            a: ({ href, children }) => (
-                                                <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline font-bold hover:text-blue-800">
-                                                    {children}
-                                                </a>
-                                            ),
-                                            code: ({ children }) => (
-                                                <code className="px-1.5 py-0.5 rounded-md bg-[#FAF6EE] border border-black/20 text-[11px] font-mono text-black">
-                                                    {children}
-                                                </code>
-                                            ),
-                                        }}
-                                    >
-                                        {club.about}
-                                    </ReactMarkdown>
-                                </div>
+                                <ClubMarkdownRenderer content={club.about} />
                             ) : (
                                 <p className="text-xs font-medium text-neutral-500 italic">
                                     No detailed description has been published for this chapter yet.
@@ -990,7 +954,7 @@ export default function PublicClubProfilePage() {
                                                     type="button"
                                                     disabled={registeringEventId === evt.id}
                                                     onClick={() => handleRegisterEvent(evt.id)}
-                                                    className="px-4 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                                    className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                                 >
                                                     {registeringEventId === evt.id ? "Registering..." : "RSVP / Register"}
                                                 </button>

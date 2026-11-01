@@ -13,8 +13,7 @@ import {
     UserCheck,
     FileText,
 } from "lucide-react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { ClubMarkdownRenderer } from "./ClubMarkdownRenderer";
 import { getPlatformIcon } from "../../../utils/platformLinks";
 import type { ClubProfileData, ClubCoordinator, ClubAchievement } from "../../../utils/clubProfileApi";
 
@@ -61,7 +60,7 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                                 type="button"
                                 onClick={() => setViewMode("desktop")}
                                 className={`px-2.5 py-1 text-xs font-black rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
-                                    viewMode === "desktop" ? "bg-black text-[#a2ff86]" : "text-black hover:bg-neutral-100"
+                                    viewMode === "desktop" ? "bg-[#a2ff86] text-black" : "text-black hover:bg-neutral-100"
                                 }`}
                             >
                                 <Monitor className="w-3.5 h-3.5" />
@@ -71,7 +70,7 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                                 type="button"
                                 onClick={() => setViewMode("mobile")}
                                 className={`px-2.5 py-1 text-xs font-black rounded-md flex items-center gap-1.5 transition-colors cursor-pointer ${
-                                    viewMode === "mobile" ? "bg-black text-[#a2ff86]" : "text-black hover:bg-neutral-100"
+                                    viewMode === "mobile" ? "bg-[#a2ff86] text-black" : "text-black hover:bg-neutral-100"
                                 }`}
                             >
                                 <Smartphone className="w-3.5 h-3.5" />
@@ -158,7 +157,7 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                                     </div>
 
                                     {club.recruitmentStatus === "open" && club.recruitmentUrl && (
-                                        <span className="px-3.5 py-1.5 rounded-xl bg-black text-[#a2ff86] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 shrink-0">
+                                        <span className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 shrink-0">
                                             <Sparkles className="w-3.5 h-3.5" />
                                             <span>Apply for Team</span>
                                         </span>
@@ -234,7 +233,7 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                                         type="button"
                                         onClick={() => setActiveTab(tab.id)}
                                         className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black shadow-[1px_1px_0px_#000] flex items-center gap-1.5 cursor-pointer ${
-                                            isTabActive ? "bg-black text-[#a2ff86]" : "bg-white text-black hover:bg-neutral-100"
+                                            isTabActive ? "bg-[#a2ff86] text-black" : "bg-white text-black hover:bg-neutral-100"
                                         }`}
                                     >
                                         <Icon className="w-3 h-3" />
@@ -260,11 +259,7 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                                     About {club.name || "the Club"}
                                 </h3>
                                 {club.about ? (
-                                    <div className="prose prose-sm max-w-none text-xs text-neutral-800 leading-relaxed">
-                                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                            {club.about}
-                                        </ReactMarkdown>
-                                    </div>
+                                    <ClubMarkdownRenderer content={club.about} />
                                 ) : (
                                     <p className="text-xs font-medium text-neutral-500 italic">
                                         No detailed description written yet.

@@ -12,7 +12,7 @@ export interface OrbixLogoProps extends SVGProps<SVGSVGElement> {
  * Extracted directly from the dashboard sidebar brand identity specification.
  */
 export const OrbixLogo = ({
-    className = "w-6 h-6 text-black",
+    className = "w-8 h-8 text-black",
     size,
     color = "currentColor",
     strokeColor = "currentColor",

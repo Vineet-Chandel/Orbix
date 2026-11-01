@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { X, Plus, Sparkles, Loader2 } from "lucide-react";
+import { X, Plus, Sparkles } from "lucide-react";
+import { OrbixButton } from "../../../components/OrbixButton";
 import { useToast } from "../../../context/ToastContext";
 import { NeoSelect } from "../../../components/NeoSelect";
 import type { ClubMember, ClubTeam } from "./types";
@@ -259,20 +260,16 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                         >
                             Cancel
                         </button>
-                        <button
+                        <OrbixButton
                             type="submit"
-                            disabled={isSubmitting || name.trim().length < 2}
-                            className="px-5 py-2.5 rounded-xl bg-[#a2ff86] border-2 border-black text-black font-black text-xs uppercase tracking-wider shadow-[3px_3px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            disabled={name.trim().length < 2}
+                            loading={isSubmitting}
+                            loadingLabel="Creating Team..."
+                            variant="lime"
+                            uppercase
                         >
-                            {isSubmitting ? (
-                                <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Creating Department...</span>
-                                </>
-                            ) : (
-                                <span>Create Team</span>
-                            )}
-                        </button>
+                            Create Team
+                        </OrbixButton>
                     </div>
                 </form>
             </div>

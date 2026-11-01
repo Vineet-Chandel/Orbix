@@ -528,7 +528,7 @@ export const Sidebar = ({
                         title="Orbix — AI Powered Ecosystem"
                     >
                         {/* Pure Black Orbix Brand Star Logo (DEAD CENTER when collapsed) */}
-                        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                             <OrbixLogo className="w-full h-full text-black" />
                         </div>
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { Mail, X, Check, Loader2 } from "lucide-react";
+import { Mail, X, Check } from "lucide-react";
+import { OrbixLoader } from "../../components/ui/loader";
 import { sendHireMessage } from "../../utils/profileApi";
 import { useToast } from "../../context/ToastContext";
 
@@ -255,7 +256,7 @@ export function HireMeModal({
                             >
                                 {sending ? (
                                     <>
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                         <span>Sending message...</span>
                                     </>
                                 ) : (

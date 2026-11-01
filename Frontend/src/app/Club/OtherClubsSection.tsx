@@ -245,7 +245,7 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                             Collegiate Directory
                         </span>
                         {displayCollegeName && (
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black text-[#a2ff86] text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] text-black border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
                                 <GraduationCap className="w-3.5 h-3.5 stroke-[2.5]" />
                                 {displayCollegeName}
                             </span>
@@ -312,7 +312,7 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                             <button
                                 type="button"
                                 onClick={handleCopyCampusInvite}
-                                className="px-3.5 py-2 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                className="px-3.5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 {copiedInvite ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                                 <span>{copiedInvite ? "Link Copied!" : "Invite Peer Clubs"}</span>
@@ -549,7 +549,7 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
                                     setSelectedCategory("all");
                                     setOnlyRecruiting(false);
                                 }}
-                                className="px-3.5 py-1.5 rounded-xl bg-black text-[#a2ff86] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer"
+                                className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer"
                             >
                                 Clear Search Filters
                             </button>

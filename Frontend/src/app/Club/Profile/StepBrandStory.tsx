@@ -8,8 +8,8 @@ import {
     Tag,
     X,
     Plus,
-    Loader2,
 } from "lucide-react";
+import { OrbixLoader } from "../../../components/ui/loader";
 import { ClubMarkdownEditor } from "./ClubMarkdownEditor";
 import { useToast } from "../../../context/ToastContext";
 import {
@@ -232,7 +232,7 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
                                             type="button"
                                             onClick={() => logoInputRef.current?.click()}
                                             disabled={isUploadingLogo}
-                                            className="px-2.5 py-1 rounded-lg bg-black text-[#a2ff86] text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] hover:bg-neutral-800 flex items-center gap-1 cursor-pointer"
+                                            className="px-2.5 py-1 rounded-lg bg-[#a2ff86] text-black text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] hover:bg-[#8ee673] flex items-center gap-1 cursor-pointer"
                                         >
                                             <RefreshCw className="w-3 h-3" />
                                             <span>Replace</span>
@@ -268,8 +268,8 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
                                 }`}
                             >
                                 {isUploadingLogo ? (
-                                    <div className="space-y-2 flex flex-col items-center py-2">
-                                        <Loader2 className="w-6 h-6 animate-spin text-black" />
+                                    <div className="space-y-2 flex flex-col items-center py-2 text-black">
+                                        <OrbixLoader size="sm" />
                                         <span className="text-xs font-bold text-black">
                                             Uploading {logoProgress !== null ? `${logoProgress}%` : "..."}
                                         </span>
@@ -323,7 +323,7 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
                                             type="button"
                                             onClick={() => coverInputRef.current?.click()}
                                             disabled={isUploadingCover}
-                                            className="px-2.5 py-1 rounded-lg bg-black text-[#a2ff86] text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] hover:bg-neutral-800 flex items-center gap-1 cursor-pointer"
+                                            className="px-2.5 py-1 rounded-lg bg-[#a2ff86] text-black text-[11px] font-black border border-black shadow-[1px_1px_0px_#000] hover:bg-[#8ee673] flex items-center gap-1 cursor-pointer"
                                         >
                                             <RefreshCw className="w-3 h-3" />
                                             <span>Replace</span>
@@ -359,8 +359,8 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
                                 }`}
                             >
                                 {isUploadingCover ? (
-                                    <div className="space-y-2 flex flex-col items-center py-2">
-                                        <Loader2 className="w-6 h-6 animate-spin text-black" />
+                                    <div className="space-y-2 flex flex-col items-center py-2 text-black">
+                                        <OrbixLoader size="sm" />
                                         <span className="text-xs font-bold text-black">
                                             Uploading {coverProgress !== null ? `${coverProgress}%` : "..."}
                                         </span>
@@ -478,7 +478,7 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
                     <button
                         type="button"
                         onClick={handleAddTag}
-                        className="px-3.5 py-2 rounded-xl bg-black text-[#a2ff86] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 transition-transform active:translate-x-[1px] active:translate-y-[1px] flex items-center gap-1 cursor-pointer"
+                        className="px-3.5 py-2 rounded-xl bg-[#a2ff86] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] transition-transform active:translate-x-[1px] active:translate-y-[1px] flex items-center gap-1 cursor-pointer"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         <span>Add</span>

@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { X, Send, AlertCircle, CheckCircle2, ShieldCheck, Loader2 } from "lucide-react";
+import { X, Send, AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { OrbixButton } from "../../components/OrbixButton";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
 import { Link } from "react-router-dom";
@@ -227,23 +228,16 @@ export default function MessageClubModal({
                                 >
                                     Cancel
                                 </button>
-                                <button
+                                <OrbixButton
                                     type="submit"
-                                    disabled={isSubmitting || body.trim().length < 5}
-                                    className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    disabled={body.trim().length < 5}
+                                    loading={isSubmitting}
+                                    loadingLabel="Sending..."
+                                    variant="lime"
+                                    icon={<Send className="w-3.5 h-3.5" />}
                                 >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            <span>Sending...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Send className="w-3.5 h-3.5" />
-                                            <span>Send Message</span>
-                                        </>
-                                    )}
-                                </button>
+                                    Send Message
+                                </OrbixButton>
                             </div>
                         </form>
                     )}

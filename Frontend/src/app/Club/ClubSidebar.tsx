@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import {
     LayoutDashboard,
     Users,
@@ -98,8 +99,8 @@ export const ClubSidebar = ({
                         isExpanded ? "px-1 justify-start" : "justify-center"
                     }`}
                 >
-                    <button
-                        type="button"
+                    <Link
+                        to="/club/dashboard"
                         onClick={() => {
                             onTabChange("overview");
                             if (onClose) onClose();
@@ -110,7 +111,7 @@ export const ClubSidebar = ({
                         title="Orbix — Empowering Dev Workflows"
                     >
                         {/* Pure Black Orbix Brand Star Logo (DEAD CENTER when collapsed) */}
-                        <div className="w-8 h-8 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                        <div className="w-10 h-10 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                             <OrbixLogo className="w-full h-full text-black" />
                         </div>
 
@@ -125,7 +126,7 @@ export const ClubSidebar = ({
                                 </span>
                             </div>
                         )}
-                    </button>
+                    </Link>
 
                     {/* Mobile Close Button */}
                     {onClose && (
@@ -143,8 +144,8 @@ export const ClubSidebar = ({
                 {/* Main Navigation Items */}
                 <div className="pt-3.5 space-y-1.5 overflow-x-hidden">
                     {/* Item 1: Dashboard Overview */}
-                    <button
-                        type="button"
+                    <Link
+                        to="/club/dashboard"
                         onClick={() => {
                             onTabChange("overview");
                             if (onClose) onClose();
@@ -193,11 +194,11 @@ export const ClubSidebar = ({
                                 {activeTab === "overview" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
                             </div>
                         )}
-                    </button>
+                    </Link>
 
                     {/* Item 2: Team Workspace */}
-                    <button
-                        type="button"
+                    <Link
+                        to="/club/team"
                         onClick={() => {
                             onTabChange("team");
                             if (onClose) onClose();
@@ -238,7 +239,7 @@ export const ClubSidebar = ({
                                         Team
                                     </span>
                                     {teamPendingCount > 0 && (
-                                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-black text-[#a2ff86] border border-black shadow-[1px_1px_0px_#000] flex-shrink-0 ml-2">
+                                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] flex-shrink-0 ml-2">
                                             {teamPendingCount}
                                         </span>
                                     )}
@@ -253,11 +254,11 @@ export const ClubSidebar = ({
                                 {activeTab === "team" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
                             </div>
                         )}
-                    </button>
+                    </Link>
 
                     {/* Item 3: Events & Workshops */}
-                    <button
-                        type="button"
+                    <Link
+                        to="/club/events"
                         onClick={() => {
                             onTabChange("events");
                             if (onClose) onClose();
@@ -313,11 +314,11 @@ export const ClubSidebar = ({
                                 {activeTab === "events" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
                             </div>
                         )}
-                    </button>
+                    </Link>
 
                     {/* Item 4: Manage Profile */}
-                    <button
-                        type="button"
+                    <Link
+                        to="/club/profile"
                         onClick={() => {
                             onTabChange("profile");
                             if (onClose) onClose();
@@ -366,11 +367,11 @@ export const ClubSidebar = ({
                                 {activeTab === "profile" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
                             </div>
                         )}
-                    </button>
+                    </Link>
 
                     {/* Item 5: Other Clubs */}
-                    <button
-                        type="button"
+                    <Link
+                        to="/club/clubs"
                         onClick={() => {
                             onTabChange("clubs");
                             if (onClose) onClose();
@@ -419,7 +420,7 @@ export const ClubSidebar = ({
                                 {activeTab === "clubs" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
                             </div>
                         )}
-                    </button>
+                    </Link>
                 </div>
             </div>
 
@@ -488,23 +489,25 @@ export const ClubSidebar = ({
                                 : "bottom-0 left-[calc(100%+12px)] slide-in-from-left-2"
                         }`}
                     >
-                        <button
-                            type="button"
+                        <Link
+                            to="/club/dashboard"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
                                 onTabChange("overview");
+                                if (onClose) onClose();
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
                             <LayoutDashboard className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
                             <span className="truncate">Overview Dashboard</span>
-                        </button>
+                        </Link>
 
-                        <button
-                            type="button"
+                        <Link
+                            to="/club/team"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
                                 onTabChange("team");
+                                if (onClose) onClose();
                             }}
                             className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
@@ -517,13 +520,14 @@ export const ClubSidebar = ({
                                     {teamPendingCount}
                                 </span>
                             )}
-                        </button>
+                        </Link>
 
-                        <button
-                            type="button"
+                        <Link
+                            to="/club/events"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
                                 onTabChange("events");
+                                if (onClose) onClose();
                             }}
                             className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
@@ -536,31 +540,33 @@ export const ClubSidebar = ({
                                     {eventsCount}
                                 </span>
                             )}
-                        </button>
+                        </Link>
 
-                        <button
-                            type="button"
+                        <Link
+                            to="/club/profile"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
                                 onTabChange("profile");
+                                if (onClose) onClose();
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
                             <Edit3 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
                             <span className="truncate">Manage Profile</span>
-                        </button>
+                        </Link>
 
-                        <button
-                            type="button"
+                        <Link
+                            to="/club/clubs"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
                                 onTabChange("clubs");
+                                if (onClose) onClose();
                             }}
                             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
                         >
                             <Building2 className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
                             <span className="truncate">Campus Clubs</span>
-                        </button>
+                        </Link>
 
                         <button
                             type="button"
@@ -581,11 +587,12 @@ export const ClubSidebar = ({
                             )}
                         </button>
 
-                        <button
-                            type="button"
+                        <Link
+                            to="/club/settings"
                             onClick={() => {
                                 setIsProfileMenuOpen(false);
                                 onTabChange("settings");
+                                if (onClose) onClose();
                             }}
                             className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl font-bold transition-colors text-left cursor-pointer ${
                                 activeTab === "settings"
@@ -595,7 +602,7 @@ export const ClubSidebar = ({
                         >
                             <Settings className={`w-3.5 h-3.5 flex-shrink-0 ${activeTab === "settings" ? "text-black" : "text-neutral-700"}`} />
                             <span className="truncate">Settings</span>
-                        </button>
+                        </Link>
 
                         <div className="my-1.5 h-0.5 bg-black/15" />
 

@@ -1,5 +1,6 @@
 import React, { useEffect } from "react";
-import { AlertTriangle, Trash2, Info, X, Loader2 } from "lucide-react";
+import { AlertTriangle, Trash2, Info, X } from "lucide-react";
+import { OrbixButton } from "./OrbixButton";
 
 export interface ConfirmationModalProps {
     isOpen: boolean;
@@ -74,16 +75,6 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         return "bg-blue-100 border-black";
     };
 
-    const getConfirmButtonStyles = () => {
-        if (variant === "danger") {
-            return "bg-rose-600 hover:bg-rose-700 text-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000]";
-        }
-        if (variant === "warning") {
-            return "bg-[#FFE566] hover:bg-[#ffe043] text-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000]";
-        }
-        return "bg-black hover:bg-neutral-800 text-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000]";
-    };
-
     return (
         <div
             role="dialog"
@@ -139,15 +130,15 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     >
                         {finalCancelText}
                     </button>
-                    <button
-                        type="button"
+                    <OrbixButton
+                        loading={isLoading}
+                        loadingLabel={finalConfirmText.endsWith("...") ? finalConfirmText : `${finalConfirmText}...`}
                         onClick={onConfirm}
-                        disabled={isLoading}
-                        className={`inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer transition-all disabled:opacity-50 disabled:cursor-not-allowed ${getConfirmButtonStyles()}`}
+                        variant={variant === "danger" ? "danger-solid" : variant === "warning" ? "yellow" : "black"}
+                        uppercase
                     >
-                        {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                        <span>{finalConfirmText}</span>
-                    </button>
+                        {finalConfirmText}
+                    </OrbixButton>
                 </div>
             </div>
         </div>

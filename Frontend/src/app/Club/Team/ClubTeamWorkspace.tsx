@@ -360,7 +360,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                     onClick={() => setActiveTab("overview")}
                     className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                         activeTab === "overview"
-                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                            ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                             : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                     }`}
                 >
@@ -371,7 +371,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                     onClick={() => setActiveTab("departments")}
                     className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                         activeTab === "departments"
-                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                            ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                             : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                     }`}
                 >
@@ -385,7 +385,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                     onClick={() => setActiveTab("members")}
                     className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                         activeTab === "members"
-                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                            ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                             : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                     }`}
                 >
@@ -399,7 +399,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                     onClick={() => setActiveTab("invitations")}
                     className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                         activeTab === "invitations"
-                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                            ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                             : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                     }`}
                 >
@@ -948,7 +948,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                         onClick={() => setInvitationStatusFilter(st)}
                                         className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
                                             invitationStatusFilter === st
-                                                ? "bg-black text-[#a2ff86] border border-black"
+                                                ? "bg-[#a2ff86] text-black border border-black font-black"
                                                 : "bg-[#FAF6EE] text-neutral-700 hover:text-black border border-black/40"
                                         }`}
                                     >

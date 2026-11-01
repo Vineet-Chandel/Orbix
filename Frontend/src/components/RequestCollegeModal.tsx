@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, CheckCircle2, AlertCircle, Building2, Globe, Loader2, ShieldCheck } from "lucide-react";
+import { X, CheckCircle2, AlertCircle, Building2, Globe, ShieldCheck } from "lucide-react";
 import { submitInstitutionVerificationRequest } from "../utils/profileApi";
 import { useToast } from "../context/ToastContext";
 import { NeoSelect } from "./NeoSelect";
+import { OrbixLoader } from "./ui/loader";
 
 const INDIAN_STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
@@ -299,10 +300,7 @@ export function RequestCollegeModal({
                                 className="px-5 py-2.5 rounded-xl border-2 border-black bg-black text-[#a2ff86] hover:bg-neutral-900 font-black text-xs shadow-[3px_3px_0px_#000] cursor-pointer flex items-center gap-2 transition-all active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
                             >
                                 {submitting ? (
-                                    <>
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                        <span>Submitting...</span>
-                                    </>
+                                    <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                 ) : (
                                     <span>Submit Request</span>
                                 )}

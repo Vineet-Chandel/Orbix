@@ -13,9 +13,9 @@ import {
     User,
     GraduationCap,
     ArrowRight,
-    Loader2,
     ArrowLeft,
 } from "lucide-react";
+import { OrbixLoader } from "../../components/ui/loader";
 import { NeoToggle } from "../../components/NeoToggle";
 
 interface AccountPrivacyViewProps {
@@ -110,7 +110,7 @@ export const AccountPrivacyView: React.FC<AccountPrivacyViewProps> = ({
                                 </span>
                                 {isUpdating && (
                                     <span className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-neutral-500">
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                         Syncing...
                                     </span>
                                 )}

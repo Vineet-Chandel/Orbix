@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { X, Edit3, Loader2, Archive, AlertTriangle } from "lucide-react";
+import { X, Edit3, Archive, AlertTriangle } from "lucide-react";
+import { OrbixButton } from "../../../components/OrbixButton";
 import { useToast } from "../../../context/ToastContext";
 import { NeoSelect } from "../../../components/NeoSelect";
 import type { ClubMember, ClubTeam } from "./types";
@@ -313,20 +314,16 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
                         >
                             Cancel
                         </button>
-                        <button
+                        <OrbixButton
                             type="submit"
-                            disabled={isSubmitting || name.trim().length < 2}
-                            className="px-5 py-2.5 rounded-xl bg-[#a2ff86] border-2 border-black text-black font-black text-xs uppercase tracking-wider shadow-[3px_3px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            disabled={name.trim().length < 2}
+                            loading={isSubmitting}
+                            loadingLabel="Saving Changes..."
+                            variant="lime"
+                            uppercase
                         >
-                            {isSubmitting ? (
-                                <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Saving Changes...</span>
-                                </>
-                            ) : (
-                                <span>Save Changes</span>
-                            )}
-                        </button>
+                            Save Changes
+                        </OrbixButton>
                     </div>
                 </form>
             </div>

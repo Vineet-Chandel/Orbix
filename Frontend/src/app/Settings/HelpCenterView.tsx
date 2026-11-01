@@ -13,13 +13,13 @@ import {
     ChevronDown,
     ChevronUp,
     ExternalLink,
-    Loader2,
     Paperclip,
     Plus,
     Check,
     MessageSquare,
     Laptop,
 } from "lucide-react";
+import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import {
     createHelpTicket,
     fetchUserHelpTickets,
@@ -707,23 +707,17 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
 
                                     {/* Action Buttons */}
                                     <div className="flex items-center justify-end gap-3 pt-2">
-                                        <button
+                                        <OrbixButton
                                             type="submit"
-                                            disabled={isSubmitting}
-                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            loading={isSubmitting}
+                                            loadingLabel="Transmitting Request..."
+                                            variant="black"
+                                            size="lg"
+                                            icon={<Send className="w-4 h-4 stroke-[2.5]" />}
+                                            uppercase
                                         >
-                                            {isSubmitting ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                    <span>Transmitting Request...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Send className="w-4 h-4 stroke-[2.5]" />
-                                                    <span>Submit Help Request</span>
-                                                </>
-                                            )}
-                                        </button>
+                                            Submit Help Request
+                                        </OrbixButton>
                                     </div>
                                 </form>
                             )}
@@ -734,11 +728,8 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
                     {activeTab === "history" && (
                         <div>
                             {isLoadingDetail ? (
-                                <div className="py-12 text-center space-y-2">
-                                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-black" />
-                                    <p className="text-xs font-bold text-neutral-600">
-                                        Loading ticket details...
-                                    </p>
+                                <div className="py-16 flex items-center justify-center text-black">
+                                    <OrbixLoader size="md" />
                                 </div>
                             ) : selectedTicket ? (
                                 /* Selected Ticket Detail View */
@@ -842,18 +833,18 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
                                                 className="w-full p-3 bg-[#FAF6EE] text-black text-xs font-medium rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] focus:outline-none focus:ring-2 focus:ring-black"
                                             />
                                             <div className="flex justify-end">
-                                                <button
+                                                <OrbixButton
                                                     type="submit"
-                                                    disabled={isSendingReply || !replyText.trim()}
-                                                    className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                    disabled={!replyText.trim()}
+                                                    loading={isSendingReply}
+                                                    loadingLabel="Sending Reply..."
+                                                    variant="black"
+                                                    size="sm"
+                                                    icon={<Send className="w-3.5 h-3.5" />}
+                                                    uppercase
                                                 >
-                                                    {isSendingReply ? (
-                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    ) : (
-                                                        <Send className="w-3.5 h-3.5" />
-                                                    )}
-                                                    <span>Send Reply</span>
-                                                </button>
+                                                    Send Reply
+                                                </OrbixButton>
                                             </div>
                                         </form>
                                     </div>
@@ -862,11 +853,8 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
                                 /* Ticket List */
                                 <div className="space-y-4">
                                     {isLoadingTickets ? (
-                                        <div className="py-12 text-center space-y-2">
-                                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-black" />
-                                            <p className="text-xs font-bold text-neutral-600">
-                                                Loading your tickets...
-                                            </p>
+                                        <div className="py-16 flex items-center justify-center text-black">
+                                            <OrbixLoader size="md" />
                                         </div>
                                     ) : tickets.length === 0 ? (
                                         <div className="py-12 text-center space-y-3">

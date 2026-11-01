@@ -12,7 +12,6 @@ import {
     Lock,
     Laptop,
     Search,
-    Loader2,
     UserCheck,
     UserMinus,
     MoreVertical,
@@ -25,6 +24,7 @@ import {
     Check,
     Globe,
 } from "lucide-react";
+import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import type { SettingsViewKey } from "./types";
 import { useToast } from "../../context/ToastContext";
 import { NeoToggle } from "../../components/NeoToggle";
@@ -771,9 +771,8 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                         </div>
 
                         {blocked.isLoading ? (
-                            <div className="py-16 text-center space-y-3">
-                                <Loader2 className="w-7 h-7 text-black animate-spin mx-auto" />
-                                <p className="text-xs font-bold text-neutral-500">Loading blocked accounts...</p>
+                            <div className="py-16 flex items-center justify-center text-black">
+                                <OrbixLoader size="md" />
                             </div>
                         ) : blocked.items.length === 0 ? (
                             <div className="p-8 sm:p-12 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
@@ -806,19 +805,17 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                             </div>
                                         </div>
 
-                                        <button
-                                            type="button"
+                                        <OrbixButton
+                                            size="sm"
+                                            variant="white"
+                                            icon={<UserCheck className="w-3.5 h-3.5" />}
+                                            loading={unblockingId === b.blockedId}
+                                            loadingLabel="Unblocking..."
                                             onClick={() => handleUnblock(b.blockedId, b.username)}
-                                            disabled={unblockingId === b.blockedId}
-                                            className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+                                            className="shrink-0"
                                         >
-                                            {unblockingId === b.blockedId ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            ) : (
-                                                <UserCheck className="w-3.5 h-3.5" />
-                                            )}
-                                            <span>Unblock</span>
-                                        </button>
+                                            Unblock
+                                        </OrbixButton>
                                     </div>
                                 ))}
                             </div>
@@ -941,9 +938,8 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                             </div>
 
                             {connections.isLoading ? (
-                                <div className="py-16 text-center space-y-3">
-                                    <Loader2 className="w-7 h-7 text-black animate-spin mx-auto" />
-                                    <p className="text-xs font-bold text-neutral-500">Loading connections...</p>
+                                <div className="py-16 flex items-center justify-center text-black">
+                                    <OrbixLoader size="md" />
                                 </div>
                             ) : filteredConn.length === 0 ? (
                                 <div className="p-8 text-center rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
@@ -1008,20 +1004,18 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                             </div>
 
                                             <div className="flex items-center gap-2 shrink-0">
-                                                <button
-                                                    type="button"
+                                                <OrbixButton
+                                                    size="sm"
+                                                    variant="white"
+                                                    icon={<UserMinus className="w-3.5 h-3.5 stroke-[2]" />}
+                                                    loading={disconnectingId === c.relationshipId}
+                                                    loadingLabel="Disconnecting..."
                                                     onClick={() => setDisconnectTarget(c)}
-                                                    disabled={disconnectingId === c.relationshipId}
-                                                    className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-rose-50 text-neutral-800 hover:text-rose-700 font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 transition-colors"
+                                                    className="hover:bg-rose-50 hover:text-rose-700"
                                                     title="Disconnect"
                                                 >
-                                                    {disconnectingId === c.relationshipId ? (
-                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    ) : (
-                                                        <UserMinus className="w-3.5 h-3.5 stroke-[2]" />
-                                                    )}
-                                                    <span>Disconnect</span>
-                                                </button>
+                                                    Disconnect
+                                                </OrbixButton>
 
                                                 <div className="relative">
                                                     <button
@@ -1209,7 +1203,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                 <div className="space-y-0.5">
                                     <div className="flex items-center gap-2">
                                         <p className="text-xs font-black text-black">Anonymous Diagnostics & Performance Telemetry</p>
-                                        {isUpdatingPrivacy && <Loader2 className="w-3.5 h-3.5 text-neutral-500 animate-spin" />}
+                                        {isUpdatingPrivacy && <OrbixLoader size="xs" variant="inline" color="currentColor" />}
                                     </div>
                                     <p className="text-[11px] text-neutral-600 font-medium">
                                         Help optimize Orbix by sharing anonymous latency and client crash logs. No personal data, handles, or source code are ever recorded.
@@ -1283,7 +1277,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                             Account Standing
                                         </h3>
                                         {isLoadingGovernance ? (
-                                            <Loader2 className="w-4 h-4 text-neutral-500 animate-spin" />
+                                            <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                         ) : statusType === "good" ? (
                                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
                                                 <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -1722,7 +1716,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                 >
                                     {isVerifyingSetupOtp ? (
                                         <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                             <span>Verifying...</span>
                                         </>
                                     ) : (
@@ -1810,7 +1804,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                 >
                                     {isDisabling2FA ? (
                                         <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                             <span>Disabling...</span>
                                         </>
                                     ) : (

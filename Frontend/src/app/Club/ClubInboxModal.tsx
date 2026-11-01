@@ -11,12 +11,12 @@ import {
     Archive,
     RotateCcw,
     Send,
-    Loader2,
     ExternalLink,
     AlertTriangle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "../../context/ToastContext";
+import { OrbixLoader } from "../../components/ui/loader";
 
 interface ClubInboxModalProps {
     isOpen: boolean;
@@ -374,9 +374,8 @@ export default function ClubInboxModal({
                         }`}
                     >
                         {loadingList ? (
-                            <div className="p-8 text-center space-y-2 text-neutral-500">
-                                <Loader2 className="w-6 h-6 animate-spin mx-auto text-black" />
-                                <span className="text-xs font-bold">Loading inquiries...</span>
+                            <div className="p-8 flex items-center justify-center text-black">
+                                <OrbixLoader size="sm" />
                             </div>
                         ) : filteredConversations.length === 0 ? (
                             <div className="p-8 text-center space-y-3 my-auto">
@@ -611,9 +610,8 @@ export default function ClubInboxModal({
                                 {/* Message History */}
                                 <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4">
                                     {loadingMessages ? (
-                                        <div className="p-8 text-center space-y-2 text-neutral-500">
-                                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-black" />
-                                            <span className="text-xs font-bold">Loading message history...</span>
+                                        <div className="p-8 flex items-center justify-center text-black">
+                                            <OrbixLoader size="sm" />
                                         </div>
                                     ) : messages.length === 0 ? (
                                         <div className="text-center py-8 text-xs font-bold text-neutral-500">
@@ -672,7 +670,7 @@ export default function ClubInboxModal({
                                         disabled={sendingReply || !replyBody.trim()}
                                         className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-2 cursor-pointer self-end transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                     >
-                                        {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                        {sendingReply ? <OrbixLoader size="xs" variant="inline" color="currentColor" /> : <Send className="w-4 h-4" />}
                                         <span className="hidden sm:inline">Reply</span>
                                     </button>
                                 </form>
@@ -726,7 +724,7 @@ export default function ClubInboxModal({
                                 onClick={handleExecuteBlock}
                                 className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
                             >
-                                {isExecutingModeration ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                                {isExecutingModeration ? <OrbixLoader size="xs" variant="inline" color="currentColor" /> : <Ban className="w-3.5 h-3.5" />}
                                 <span>Confirm Block</span>
                             </button>
                         </div>

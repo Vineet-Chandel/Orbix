@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600&display=swap');
+@import "katex/dist/katex.min.css";
 
 @tailwind base;
 @tailwind components;
@@ -522,20 +523,26 @@ html.dark body:has(.blog-container) {
   background-color: rgba(82, 82, 91, 0.7);
 }
 
-/* Prism syntax highlighting theme for blog code blocks */
+/* Prism syntax highlighting theme for blog and markdown code blocks */
 .blog-container .token.comment,
 .blog-container .token.prolog,
 .blog-container .token.doctype,
-.blog-container .token.cdata {
+.blog-container .token.cdata,
+.markdown-code .token.comment,
+.markdown-code .token.prolog,
+.markdown-code .token.doctype,
+.markdown-code .token.cdata {
   color: #71717a;
   font-style: italic;
 }
 
-.blog-container .token.punctuation {
+.blog-container .token.punctuation,
+.markdown-code .token.punctuation {
   color: #a1a1aa;
 }
 
-.blog-container .token.namespace {
+.blog-container .token.namespace,
+.markdown-code .token.namespace {
   opacity: 0.7;
 }
 
@@ -543,12 +550,19 @@ html.dark body:has(.blog-container) {
 .blog-container .token.tag,
 .blog-container .token.constant,
 .blog-container .token.symbol,
-.blog-container .token.deleted {
+.blog-container .token.deleted,
+.markdown-code .token.property,
+.markdown-code .token.tag,
+.markdown-code .token.constant,
+.markdown-code .token.symbol,
+.markdown-code .token.deleted {
   color: #f87171;
 }
 
 .blog-container .token.boolean,
-.blog-container .token.number {
+.blog-container .token.number,
+.markdown-code .token.boolean,
+.markdown-code .token.number {
   color: #fb923c;
 }
 
@@ -557,7 +571,13 @@ html.dark body:has(.blog-container) {
 .blog-container .token.string,
 .blog-container .token.char,
 .blog-container .token.builtin,
-.blog-container .token.inserted {
+.blog-container .token.inserted,
+.markdown-code .token.selector,
+.markdown-code .token.attr-name,
+.markdown-code .token.string,
+.markdown-code .token.char,
+.markdown-code .token.builtin,
+.markdown-code .token.inserted {
   color: #34d399;
 }
 
@@ -565,37 +585,54 @@ html.dark body:has(.blog-container) {
 .blog-container .token.entity,
 .blog-container .token.url,
 .blog-container .language-css .token.string,
-.blog-container .style .token.string {
+.blog-container .style .token.string,
+.markdown-code .token.operator,
+.markdown-code .token.entity,
+.markdown-code .token.url,
+.markdown-code .language-css .token.string,
+.markdown-code .style .token.string {
   color: #38bdf8;
 }
 
 .blog-container .token.atrule,
 .blog-container .token.attr-value,
-.blog-container .token.keyword {
+.blog-container .token.keyword,
+.markdown-code .token.atrule,
+.markdown-code .token.attr-value,
+.markdown-code .token.keyword {
   color: #a78bfa;
 }
 
 .blog-container .token.function,
-.blog-container .token.class-name {
+.blog-container .token.class-name,
+.markdown-code .token.function,
+.markdown-code .token.class-name {
   color: #60a5fa;
 }
 
 .blog-container .token.regex,
 .blog-container .token.important,
-.blog-container .token.variable {
+.blog-container .token.variable,
+.markdown-code .token.regex,
+.markdown-code .token.important,
+.markdown-code .token.variable {
   color: #fbbf24;
 }
 
 .blog-container .token.important,
-.blog-container .token.bold {
+.blog-container .token.bold,
+.markdown-code .token.important,
+.markdown-code .token.bold {
   font-weight: bold;
 }
 
-.blog-container .token.italic {
+.blog-container .token.italic,
+.markdown-code .token.italic {
   font-style: italic;
 }
 
-.blog-container .token.entity {
+.blog-container .token.entity,
+.markdown-code .token.entity {
   cursor: help;
 }
 

@@ -9,8 +9,8 @@ import {
     X,
     ExternalLink,
     Calendar,
-    Loader2,
 } from "lucide-react";
+import { OrbixButton } from "../../../components/OrbixButton";
 import { NeoImageDropzone } from "../../../components/NeoImageDropzone";
 import { ConfirmationModal } from "../../../components/ConfirmationModal";
 import type { ClubAchievement } from "../../../utils/clubProfileApi";
@@ -481,20 +481,14 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
                                 >
                                     Cancel
                                 </button>
-                                <button
+                                <OrbixButton
                                     type="submit"
-                                    disabled={isSubmitting}
-                                    className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    loading={isSubmitting}
+                                    loadingLabel="Saving..."
+                                    variant="lime"
                                 >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            <span>Saving...</span>
-                                        </>
-                                    ) : (
-                                        <span>{editingAchievement ? "Update Achievement" : "Add Achievement"}</span>
-                                    )}
-                                </button>
+                                    {editingAchievement ? "Update Achievement" : "Add Achievement"}
+                                </OrbixButton>
                             </div>
                         </form>
                     </div>

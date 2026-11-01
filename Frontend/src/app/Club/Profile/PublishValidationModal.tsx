@@ -97,7 +97,7 @@ export const PublishValidationModal: React.FC<PublishValidationModalProps> = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="px-4 py-2 rounded-xl bg-black text-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 cursor-pointer"
+                        className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         Got it, I'll update
                     </button>

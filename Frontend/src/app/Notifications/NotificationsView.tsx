@@ -9,7 +9,6 @@ import {
     Copy,
     RefreshCw,
     Inbox,
-    Loader2,
     ArrowUpRight,
     User,
     Users,
@@ -34,6 +33,7 @@ import {
     LifeBuoy,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
+import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import { terminateSession } from "../../api/sessionActivityApi";
 import { useAppSelector } from "../../store";
 import {
@@ -669,9 +669,8 @@ export const NotificationsView: React.FC = () => {
                     {/* Messages Scroll Area */}
                     <div className="flex-1 overflow-y-auto divide-y-2 divide-black/10 max-h-[660px]">
                         {loading && notifications.length === 0 ? (
-                            <div className="p-12 flex flex-col items-center justify-center gap-2">
-                                <Loader2 className="w-5 h-5 animate-spin text-black" />
-                                <span className="text-xs font-bold text-neutral-600">Loading inbox...</span>
+                            <div className="py-16 flex items-center justify-center text-black">
+                                <OrbixLoader size="md" />
                             </div>
                         ) : filteredNotifications.length === 0 ? (
                             <div className="p-12 text-center flex flex-col items-center justify-center">
@@ -1062,7 +1061,7 @@ export const NotificationsView: React.FC = () => {
                                                     title="Delete notification"
                                                 >
                                                     {deletingId === activeItem.id ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                        <OrbixLoader size="xs" variant="inline" color="#f43f5e" />
                                                     ) : (
                                                         <Trash2 className="w-4 h-4 stroke-[2]" />
                                                     )}
@@ -1217,24 +1216,16 @@ export const NotificationsView: React.FC = () => {
                                                     >
                                                         Decline
                                                     </button>
-                                                    <button
-                                                        type="button"
+                                                    <OrbixButton
+                                                        variant="black"
+                                                        size="sm"
+                                                        icon={<Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                                        loading={isActing}
+                                                        loadingLabel="Processing..."
                                                         onClick={() => handleAcceptTeamInvitation(activeItem.id, invitationId)}
-                                                        disabled={isActing}
-                                                        className="px-5 py-2 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                                                     >
-                                                        {isActing ? (
-                                                            <>
-                                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                                <span>Processing...</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                                                <span>Accept Invitation</span>
-                                                            </>
-                                                        )}
-                                                    </button>
+                                                        Accept Invitation
+                                                    </OrbixButton>
                                                 </div>
                                             </div>
                                         )}
@@ -1361,7 +1352,7 @@ export const NotificationsView: React.FC = () => {
                                                     title="Delete notification"
                                                 >
                                                     {deletingId === activeItem.id ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                        <OrbixLoader size="xs" variant="inline" color="#f43f5e" />
                                                     ) : (
                                                         <Trash2 className="w-4 h-4 stroke-[2]" />
                                                     )}
@@ -1597,7 +1588,7 @@ export const NotificationsView: React.FC = () => {
                                                     title="Delete notification"
                                                 >
                                                     {deletingId === activeItem.id ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                        <OrbixLoader size="xs" variant="inline" color="#f43f5e" />
                                                     ) : (
                                                         <Trash2 className="w-4 h-4 stroke-[2]" />
                                                     )}
@@ -1706,7 +1697,7 @@ export const NotificationsView: React.FC = () => {
                                                     }`}
                                                 >
                                                     {isTerminating ? (
-                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                        <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                                     ) : isTerminated ? (
                                                         <Check className="w-3.5 h-3.5 stroke-[3]" />
                                                     ) : (
@@ -1777,7 +1768,7 @@ export const NotificationsView: React.FC = () => {
                                                     title="Delete notification"
                                                 >
                                                     {deletingId === activeItem.id ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                        <OrbixLoader size="xs" variant="inline" color="#f43f5e" />
                                                     ) : (
                                                         <Trash2 className="w-4 h-4 stroke-[2]" />
                                                     )}
@@ -1873,7 +1864,7 @@ export const NotificationsView: React.FC = () => {
                                                     title="Delete notification"
                                                 >
                                                     {deletingId === activeItem.id ? (
-                                                        <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                        <OrbixLoader size="xs" variant="inline" color="#f43f5e" />
                                                     ) : (
                                                         <Trash2 className="w-4 h-4 stroke-[2]" />
                                                     )}
@@ -1981,7 +1972,7 @@ export const NotificationsView: React.FC = () => {
                                                 title="Delete message"
                                             >
                                                 {deletingId === activeItem.id ? (
-                                                    <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                    <OrbixLoader size="xs" variant="inline" color="#f43f5e" />
                                                 ) : (
                                                     <Trash2 className="w-4 h-4 stroke-[2]" />
                                                 )}

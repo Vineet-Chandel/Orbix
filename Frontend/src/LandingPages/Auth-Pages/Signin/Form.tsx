@@ -5,6 +5,7 @@ import { FormInput } from "../FormInput";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
 import { getOrCreateDeviceId } from "../../../api/sessionActivityApi";
+import { OrbixLoader } from "../../../components/ui/loader";
 
 export default function SigninForm() {
     const navigate = useNavigate();
@@ -468,13 +469,7 @@ export default function SigninForm() {
                     className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
                     {loading ? (
-                        <div className="flex items-center gap-2">
-                            <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                            </svg>
-                            <span>Logging in...</span>
-                        </div>
+                        <OrbixLoader size="xs" variant="inline" />
                     ) : (
                         <span className="inline-flex items-center gap-2">
                             <span>Login</span>

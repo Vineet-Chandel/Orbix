@@ -8,8 +8,8 @@ import {
     MoveDown,
     X,
     Mail,
-    Loader2,
 } from "lucide-react";
+import { OrbixButton } from "../../../components/OrbixButton";
 import { getPlatformIcon } from "../../../utils/platformLinks";
 import type { ClubCoordinator } from "../../../utils/clubProfileApi";
 import {
@@ -483,20 +483,14 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
                                 >
                                     Cancel
                                 </button>
-                                <button
+                                <OrbixButton
                                     type="submit"
-                                    disabled={isSubmitting}
-                                    className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    loading={isSubmitting}
+                                    loadingLabel="Saving..."
+                                    variant="lime"
                                 >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            <span>Saving...</span>
-                                        </>
-                                    ) : (
-                                        <span>{editingCoordinator ? "Update Coordinator" : "Add Coordinator"}</span>
-                                    )}
-                                </button>
+                                    {editingCoordinator ? "Update Coordinator" : "Add Coordinator"}
+                                </OrbixButton>
                             </div>
                         </form>
                     </div>

@@ -174,25 +174,27 @@ export const StepRecruitmentPublishing: React.FC<StepRecruitmentPublishingProps>
                                 onClick={() => onRecruitmentStatusChange(opt.value)}
                                 className={`p-4 rounded-xl border-2 border-black text-left transition-all cursor-pointer flex flex-col justify-between space-y-2.5 ${
                                     isSelected
-                                        ? "bg-black text-white shadow-[3px_3px_0px_#000]"
+                                        ? "bg-[#a2ff86] text-black shadow-[3px_3px_0px_#000]"
                                         : "bg-white text-black hover:bg-[#FAF6EE] shadow-[2px_2px_0px_#000]"
                                 }`}
                             >
                                 <div className="flex items-center justify-between gap-2">
                                     <span
-                                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border border-black text-black ${opt.badgeColor}`}
+                                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border border-black text-black ${
+                                            isSelected ? "bg-white" : opt.badgeColor
+                                        }`}
                                     >
                                         {opt.label}
                                     </span>
                                     {isSelected ? (
-                                        <CheckCircle2 className="w-4 h-4 text-[#a2ff86]" />
+                                        <CheckCircle2 className="w-4 h-4 text-black stroke-[2.5]" />
                                     ) : (
                                         <Icon className="w-4 h-4 text-neutral-400" />
                                     )}
                                 </div>
                                 <p
-                                    className={`text-[11px] leading-relaxed font-medium ${
-                                        isSelected ? "text-neutral-300" : "text-neutral-600"
+                                    className={`text-[11px] leading-relaxed font-bold ${
+                                        isSelected ? "text-neutral-900" : "text-neutral-600"
                                     }`}
                                 >
                                     {opt.desc}
@@ -335,7 +337,7 @@ export const StepRecruitmentPublishing: React.FC<StepRecruitmentPublishingProps>
                                 onClick={() => handleSelectVisibility(opt.value)}
                                 className={`p-4 sm:p-5 rounded-2xl border-2 border-black text-left transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
                                     isSelected
-                                        ? "bg-black text-white shadow-[4px_4px_0px_#000] scale-[1.01]"
+                                        ? "bg-[#a2ff86] text-black shadow-[4px_4px_0px_#000] scale-[1.01]"
                                         : "bg-white text-black hover:bg-[#FAF6EE] shadow-[2px_2px_0px_#000]"
                                 }`}
                             >
@@ -351,14 +353,16 @@ export const StepRecruitmentPublishing: React.FC<StepRecruitmentPublishingProps>
                                         <span className="text-xs font-black">{opt.label}</span>
                                     </div>
                                     <span
-                                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border border-black text-black ${opt.badgeBg}`}
+                                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border border-black text-black ${
+                                            isSelected ? "bg-white" : opt.badgeBg
+                                        }`}
                                     >
                                         {opt.badge}
                                     </span>
                                 </div>
                                 <p
-                                    className={`text-[11px] leading-relaxed font-medium ${
-                                        isSelected ? "text-neutral-300" : "text-neutral-600"
+                                    className={`text-[11px] leading-relaxed font-bold ${
+                                        isSelected ? "text-neutral-900" : "text-neutral-600"
                                     }`}
                                 >
                                     {opt.description}

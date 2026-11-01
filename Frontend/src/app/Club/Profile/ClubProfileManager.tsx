@@ -3,7 +3,6 @@ import {
     Save,
     Eye,
     Check,
-    Loader2,
     CheckCircle2,
     ArrowLeft,
     ArrowRight,
@@ -19,6 +18,7 @@ import { StepLinksAchievements } from "./StepLinksAchievements";
 import { StepRecruitmentPublishing } from "./StepRecruitmentPublishing";
 import { ProfilePreviewModal } from "./ProfilePreviewModal";
 import { PublishValidationModal } from "./PublishValidationModal";
+import { OrbixButton } from "../../../components/OrbixButton";
 
 interface ClubProfileManagerProps {
     clubId?: string;
@@ -507,7 +507,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                                 onClick={() => setCurrentStep(st.id)}
                                 className={`p-3 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between ${
                                     isCurrent
-                                        ? "bg-black text-[#a2ff86] border-black shadow-[2px_2px_0px_#000]"
+                                        ? "bg-[#a2ff86] text-black border-black shadow-[2px_2px_0px_#000]"
                                         : isPast
                                         ? "bg-[#FAF6EE] text-black border-black/40 hover:border-black"
                                         : "bg-white text-neutral-400 border-neutral-200 hover:border-neutral-300"
@@ -523,7 +523,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                                     <h4 className="text-xs font-black truncate">{st.title}</h4>
                                     <p
                                         className={`text-[10px] truncate ${
-                                            isCurrent ? "text-neutral-300" : "text-neutral-500"
+                                            isCurrent ? "text-neutral-800 font-bold" : "text-neutral-500"
                                         }`}
                                     >
                                         {st.subtitle}
@@ -552,7 +552,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                                 onClick={() => setCurrentStep(st.id)}
                                 className={`w-6 h-6 rounded-lg text-[10px] font-black border flex items-center justify-center cursor-pointer ${
                                     currentStep === st.id
-                                        ? "bg-black text-[#a2ff86] border-black"
+                                        ? "bg-[#a2ff86] text-black border-black"
                                         : currentStep > st.id
                                         ? "bg-[#FFE566] text-black border-black"
                                         : "bg-neutral-100 text-neutral-400 border-neutral-200"
@@ -682,50 +682,46 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                         </button>
 
                         {/* Save Draft Button (always available) */}
-                        <button
-                            type="button"
+                        <OrbixButton
                             onClick={() => handleSave()}
-                            disabled={isSaving}
-                            className="px-4 py-2 rounded-xl bg-[#FAF6EE] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-200 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                            loading={isSaving}
+                            loadingLabel="Saving Draft..."
+                            variant="white"
+                            icon={<Save className="w-3.5 h-3.5" />}
                         >
-                            {isSaving ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                                <Save className="w-3.5 h-3.5" />
-                            )}
-                            <span>Save Draft</span>
-                        </button>
+                            Save Draft
+                        </OrbixButton>
 
                         {/* Next or Publish Action */}
                         {currentStep < 5 ? (
                             <button
                                 type="button"
                                 onClick={handleNextStep}
-                                className="px-5 py-2 rounded-xl bg-black text-[#a2ff86] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 <span>Continue</span>
                                 <ArrowRight className="w-3.5 h-3.5" />
                             </button>
                         ) : (
-                            <button
-                                type="button"
+                            <OrbixButton
                                 onClick={() => handleSave()}
-                                disabled={isSaving}
-                                className="px-5 py-2 rounded-xl bg-[#FFE566] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#ebd04e] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
-                            >
-                                {isSaving ? (
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                    <Sparkles className="w-3.5 h-3.5" />
-                                )}
-                                <span>
-                                    {visibility === "public"
-                                        ? "Publish Profile"
+                                loading={isSaving}
+                                loadingLabel={
+                                    visibility === "public"
+                                        ? "Publishing..."
                                         : visibility === "unlisted"
-                                        ? "Save Unlisted"
-                                        : "Save Changes"}
-                                </span>
-                            </button>
+                                        ? "Saving..."
+                                        : "Saving Changes..."
+                                }
+                                variant="yellow"
+                                icon={<Sparkles className="w-3.5 h-3.5" />}
+                            >
+                                {visibility === "public"
+                                    ? "Publish Profile"
+                                    : visibility === "unlisted"
+                                    ? "Save Unlisted"
+                                    : "Save Changes"}
+                            </OrbixButton>
                         )}
                     </div>
                 </div>

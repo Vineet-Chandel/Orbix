@@ -1,6 +1,7 @@
 import React, { useState, useRef, useId } from "react";
-import { UploadCloud, Loader2, CheckCircle2, Trash2, RefreshCw } from "lucide-react";
+import { UploadCloud, CheckCircle2, Trash2, RefreshCw } from "lucide-react";
 import { useToast } from "../context/ToastContext";
+import { OrbixLoader } from "./ui/loader";
 
 export interface NeoImageDropzoneProps {
     label?: string;
@@ -176,9 +177,9 @@ export const NeoImageDropzone: React.FC<NeoImageDropzoneProps> = ({
             >
                 {/* State 1: Uploading progress */}
                 {isUploading ? (
-                    <div className="space-y-3 py-3">
-                        <div className="w-14 h-14 rounded-2xl bg-[#a2ff86] border-2 border-black flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
-                            <Loader2 className="w-7 h-7 text-black stroke-[2.5] animate-spin" />
+                    <div className="space-y-3 py-3 text-black">
+                        <div className="flex items-center justify-center mx-auto py-2">
+                            <OrbixLoader size="md" />
                         </div>
                         <div className="space-y-1 max-w-sm mx-auto">
                             <p className="text-sm font-black text-black">

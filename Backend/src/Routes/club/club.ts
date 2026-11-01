@@ -2445,11 +2445,40 @@ clubRouter.get("/:slug", optionalAuthenticate, handleGetPublicClub);
 /**
  * Helper to retrieve staff verified club
  */
-async function getStaffClub(userId: string) {
+async function getStaffClub(userId: string, requestedClubId?: string) {
+    if (requestedClubId) {
+        const res = await query(
+            `SELECT vc.id, vc.name, vc.slug, vc.auth_user_id AS "authUserId", vc.is_active AS "isActive"
+             FROM verified_clubs vc
+             WHERE vc.id = $1 AND (
+                 vc.auth_user_id = $2
+                 OR EXISTS (
+                     SELECT 1 FROM club_team_members ctm
+                     WHERE ctm.club_id = vc.id AND ctm.user_id = $2 AND ctm.status = 'active'
+                 )
+                 OR EXISTS (
+                     SELECT 1 FROM club_coordinators cc
+                     WHERE cc.club_id = vc.id AND cc.linked_user_id = $2
+                 )
+             ) LIMIT 1;`,
+            [requestedClubId, userId]
+        );
+        if (res.rows[0]) return res.rows[0];
+    }
+
     const res = await query(
-        `SELECT id, name, slug, auth_user_id AS "authUserId", is_active AS "isActive"
-         FROM verified_clubs
-         WHERE auth_user_id = $1 LIMIT 1;`,
+        `SELECT vc.id, vc.name, vc.slug, vc.auth_user_id AS "authUserId", vc.is_active AS "isActive"
+         FROM verified_clubs vc
+         WHERE vc.auth_user_id = $1
+            OR EXISTS (
+                SELECT 1 FROM club_team_members ctm
+                WHERE ctm.club_id = vc.id AND ctm.user_id = $1 AND ctm.status = 'active'
+            )
+            OR EXISTS (
+                SELECT 1 FROM club_coordinators cc
+                WHERE cc.club_id = vc.id AND cc.linked_user_id = $1
+            )
+         LIMIT 1;`,
         [userId]
     );
     return res.rows[0] || null;
@@ -2737,8 +2766,14 @@ clubRouter.get("/inbox", authenticate, async (req: Request, res: Response) => {
  */
 clubRouter.get("/inbox/unread-count", authenticate, async (req: Request, res: Response) => {
     try {
-        const club = await getStaffClub(req.user!.id);
-        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+        const requestedClubId = (req.query.clubId as string) || undefined;
+        const club = await getStaffClub(req.user!.id, requestedClubId);
+        if (!club) {
+            return res.json({
+                success: true,
+                counts: { unreadCount: 0, mutedCount: 0, totalCount: 0 },
+            });
+        }
 
         const countsRes = await query(
             `SELECT
@@ -2757,7 +2792,10 @@ clubRouter.get("/inbox/unread-count", authenticate, async (req: Request, res: Re
         });
     } catch (err: any) {
         console.error("GET /api/club/inbox/unread-count error:", err);
-        return res.status(500).json({ success: false, message: "Failed to fetch unread count." });
+        return res.status(200).json({
+            success: true,
+            counts: { unreadCount: 0, mutedCount: 0, totalCount: 0 },
+        });
     }
 });
 

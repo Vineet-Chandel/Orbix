@@ -6,8 +6,8 @@ import {
     ShieldCheck,
     AlertCircle,
     ArrowRight,
-    Loader2
 } from "lucide-react";
+import { OrbixButton } from "../../../components/OrbixButton";
 import {
     applyProfileSyncApi,
     type ProfileSyncProposal,
@@ -246,24 +246,17 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
                         >
                             Cancel
                         </button>
-                        <button
-                            type="button"
-                            disabled={isApplying || selectedFields.length === 0}
+                        <OrbixButton
+                            disabled={selectedFields.length === 0}
+                            loading={isApplying}
+                            loadingLabel="Syncing..."
                             onClick={handleApply}
-                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#FDD835] disabled:opacity-50 font-black text-xs text-black transition shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2"
+                            variant="yellow"
+                            icon={<Check className="w-4 h-4 stroke-[2.5]" />}
+                            className="w-full sm:w-auto"
                         >
-                            {isApplying ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin text-black" />
-                                    <span>Syncing...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Check className="w-4 h-4 stroke-[2.5]" />
-                                    <span>Sync {selectedFields.length} Field{selectedFields.length !== 1 ? "s" : ""}</span>
-                                </>
-                            )}
-                        </button>
+                            Sync {selectedFields.length} Field{selectedFields.length !== 1 ? "s" : ""}
+                        </OrbixButton>
                     </div>
                 </div>
             </div>

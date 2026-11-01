@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Mail, Trash2, X, Inbox, Loader2, ArrowUpRight } from "lucide-react";
+import { Bell, Mail, Trash2, X, Inbox, ArrowUpRight } from "lucide-react";
+import { OrbixLoader } from "./ui/loader";
 import { useAppSelector } from "../store";
 import {
     fetchNotifications,
@@ -253,11 +254,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                     {/* Notification Items List */}
                     <div className={`max-h-[380px] overflow-y-auto divide-y-2 ${isDark ? "divide-neutral-800" : "divide-black/10"}`}>
                         {loading && notifications.length === 0 ? (
-                            <div className="py-12 flex flex-col items-center justify-center gap-2">
-                                <Loader2 className="w-5 h-5 animate-spin text-black" />
-                                <span className={`text-xs font-bold ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>
-                                    Checking updates...
-                                </span>
+                            <div className="py-8 flex flex-col items-center justify-center">
+                                <OrbixLoader size="sm" />
                             </div>
                         ) : notifications.length === 0 ? (
                             <div className="py-10 px-6 text-center flex flex-col items-center justify-center">
@@ -344,7 +342,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                                                         title="Delete"
                                                     >
                                                         {isDeleting ? (
-                                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                            <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                                         ) : (
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         )}
