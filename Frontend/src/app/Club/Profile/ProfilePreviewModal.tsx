@@ -21,23 +21,23 @@ interface ProfilePreviewModalProps {
     isOpen: boolean;
     onClose: () => void;
     club: ClubProfileData;
-    coordinators: ClubCoordinator[];
-    achievements: ClubAchievement[];
+    coordinators?: ClubCoordinator[];
+    achievements?: ClubAchievement[];
 }
 
 export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
     isOpen,
     onClose,
     club,
-    coordinators,
-    achievements,
+    coordinators = [],
+    achievements = [],
 }) => {
     const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
     const [activeTab, setActiveTab] = useState<"about" | "coordinators" | "achievements">("about");
 
     if (!isOpen) return null;
 
-    const publicCoordinators = coordinators.filter((c) => c.isPublic !== false);
+    const publicCoordinators = (coordinators || []).filter((c) => c.isPublic !== false);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
@@ -313,11 +313,11 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                         {activeTab === "achievements" && (
                             <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-4">
                                 <h3 className="text-sm font-black text-black">Club Achievements & Highlights</h3>
-                                {achievements.length === 0 ? (
+                                {(achievements || []).length === 0 ? (
                                     <p className="text-xs text-neutral-500 italic">No achievements listed yet.</p>
                                 ) : (
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                                        {achievements.map((ach) => (
+                                        {(achievements || []).map((ach) => (
                                             <div
                                                 key={ach.id}
                                                 className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-start gap-3"

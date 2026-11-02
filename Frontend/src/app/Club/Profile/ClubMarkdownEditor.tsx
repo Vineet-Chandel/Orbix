@@ -18,6 +18,7 @@ import {
     Edit3,
 } from "lucide-react";
 import { ClubMarkdownRenderer } from "./ClubMarkdownRenderer";
+import { MarkdownErrorBoundary } from "./MarkdownErrorBoundary";
 
 interface ClubMarkdownEditorProps {
     value: string;
@@ -261,7 +262,9 @@ export const ClubMarkdownEditor: React.FC<ClubMarkdownEditorProps> = ({
                 />
             ) : (
                 <div className={`p-4 sm:p-6 bg-white overflow-y-auto ${minHeight}`}>
-                    <ClubMarkdownRenderer content={value} />
+                    <MarkdownErrorBoundary fallbackContent={value}>
+                        <ClubMarkdownRenderer content={value} />
+                    </MarkdownErrorBoundary>
                 </div>
             )}
         </div>

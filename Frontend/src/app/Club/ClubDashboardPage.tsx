@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
     Calendar,
@@ -231,8 +231,14 @@ export default function ClubDashboardPage() {
     const [isSavingEvent, setIsSavingEvent] = useState(false);
     const [eventFilter, setEventFilter] = useState<"all" | "published" | "draft" | "cancelled">("all");
 
+    // In-flight request guards to prevent duplicate concurrent network calls (e.g. StrictMode, rapid switches)
+    const isFetchingClubRef = useRef(false);
+    const isFetchingInboxRef = useRef(false);
+
     // Fetch club profile and events (leveraging Redux and Redis caching)
     const fetchClubData = async (force = false) => {
+        if (isFetchingClubRef.current && !force) return;
+        isFetchingClubRef.current = true;
         try {
             if (!clubState.isInitialized || force) {
                 setLoading(true);
@@ -269,11 +275,14 @@ export default function ClubDashboardPage() {
             toast.error("Could not load club dashboard. Please refresh.", { title: "Error" });
         } finally {
             setLoading(false);
+            isFetchingClubRef.current = false;
         }
     };
 
     // Fetch inbox unread count
     const fetchInboxCounts = async () => {
+        if (isFetchingInboxRef.current) return;
+        isFetchingInboxRef.current = true;
         try {
             const queryParam = club?.id ? `?clubId=${encodeURIComponent(club.id)}` : "";
             const res = await fetch(`/api/club/inbox/unread-count${queryParam}`, { credentials: "include" });
@@ -289,6 +298,8 @@ export default function ClubDashboardPage() {
             }
         } catch {
             // silent fail for badge sync
+        } finally {
+            isFetchingInboxRef.current = false;
         }
     };
 
@@ -491,7 +502,37 @@ export default function ClubDashboardPage() {
     }
 
     if (!club) {
-        return null;
+        return (
+            <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center p-4 text-black">
+                <div className="max-w-md w-full bg-white rounded-2xl border-2 border-black p-6 sm:p-8 shadow-[6px_6px_0px_#000] text-center space-y-4">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_#000]">
+                        <Building2 className="w-7 h-7 text-black stroke-[2.5]" />
+                    </div>
+                    <div className="space-y-1">
+                        <h2 className="text-lg font-black text-black">Club Session Unavailable</h2>
+                        <p className="text-xs text-neutral-600 font-medium">
+                            We could not synchronize club credentials for this session. Please refresh or sign in to continue.
+                        </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => fetchClubData(true)}
+                            className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] cursor-pointer"
+                        >
+                            Retry Sync
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => navigate("/auth/signin")}
+                            className="px-4 py-2 rounded-xl bg-black text-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 cursor-pointer"
+                        >
+                            Sign In
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (

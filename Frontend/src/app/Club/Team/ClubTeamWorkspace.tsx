@@ -232,7 +232,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setIsAddMemberOpen(true)}
-                                className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                                className="px-4 py-2.5 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 <UserPlus className="w-4 h-4 stroke-[2.5]" />
                                 <span>Add Member</span>
@@ -268,7 +268,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setIsAddMemberOpen(true)}
-                                className="px-3.5 py-2 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                                className="px-3.5 py-2 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
                                 <span>Add Member</span>

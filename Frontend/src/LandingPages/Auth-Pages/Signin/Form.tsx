@@ -110,7 +110,7 @@ export default function SigninForm() {
         setLoading(true);
 
         try {
-            const endpoints = ["http://localhost:3000/api/signin", "/api/signin"];
+            const endpoints = ["/api/signin", "http://localhost:3000/api/signin"];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -224,7 +224,7 @@ export default function SigninForm() {
 
         setIsVerifying2FA(true);
         try {
-            const endpoints = ["http://localhost:3000/api/auth/2fa/verify-login", "/api/auth/2fa/verify-login"];
+            const endpoints = ["/api/auth/2fa/verify-login", "http://localhost:3000/api/auth/2fa/verify-login"];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -276,7 +276,7 @@ export default function SigninForm() {
         if (cooldownSeconds > 0 || isResending) return;
         setIsResending(true);
         try {
-            const endpoints = ["http://localhost:3000/api/auth/2fa/resend-login-otp", "/api/auth/2fa/resend-login-otp"];
+            const endpoints = ["/api/auth/2fa/resend-login-otp", "http://localhost:3000/api/auth/2fa/resend-login-otp"];
             let response: Response | null = null;
             let resultData: any = null;
 

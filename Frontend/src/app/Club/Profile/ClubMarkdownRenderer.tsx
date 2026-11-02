@@ -5,7 +5,6 @@ import remarkMath from "remark-math";
 import remarkEmoji from "remark-emoji";
 import rehypeRaw from "rehype-raw";
 import rehypeKatex from "rehype-katex";
-import DOMPurify from "dompurify";
 import {
     Info,
     Lightbulb,
@@ -19,35 +18,10 @@ import {
     ImageOff,
 } from "lucide-react";
 import { highlightCode } from "../../../utils/prismHelper";
+import { safeSanitizeSvg, extractText, githubSlug } from "./markdownUtils";
+import { MarkdownErrorBoundary } from "./MarkdownErrorBoundary";
 
-/**
- * Extracts raw plain text from React children nodes.
- */
-export function extractText(children: React.ReactNode): string {
-    if (typeof children === "string") return children;
-    if (typeof children === "number") return String(children);
-    if (!children) return "";
-    if (Array.isArray(children)) return children.map(extractText).join("");
-    if (React.isValidElement(children) && children.props && (children.props as any).children) {
-        return extractText((children.props as any).children);
-    }
-    return "";
-}
-
-/**
- * Generates a GitHub-compatible deterministic slug.
- */
-export function githubSlug(text: string): string {
-    return text
-        .toLowerCase()
-        .trim()
-        .replace(/[*_`~[\]()]/g, "") // strip markdown markers
-        .replace(/<[^>]*>/g, "") // strip HTML tags
-        .replace(/[^\w\s\u00C0-\u024F\u1E00-\u1EFF\u0900-\u097F\u0400-\u04FF\u4E00-\u9FFF-]/g, "") // keep unicode words & hyphen
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-")
-        .replace(/^-+|-+$/g, "");
-}
+export { MarkdownErrorBoundary };
 
 /**
  * Lazy-loaded and sanitized Mermaid diagram renderer.
@@ -65,6 +39,7 @@ export const MermaidBlock: React.FC<MermaidBlockProps> = ({ code }) => {
     useEffect(() => {
         let isMounted = true;
         let tempContainer: HTMLDivElement | null = null;
+        let renderedId: string | null = null;
 
         async function renderDiagram() {
             setLoading(true);
@@ -94,12 +69,11 @@ export const MermaidBlock: React.FC<MermaidBlockProps> = ({ code }) => {
                 await new Promise((r) => requestAnimationFrame(r));
 
                 const uniqueId = `mermaid-svg-${Math.random().toString(36).substring(2, 9)}`;
+                renderedId = uniqueId;
                 const { svg: rawSvg } = await mermaid.render(uniqueId, code, tempContainer);
 
                 if (isMounted) {
-                    const cleanSvg = DOMPurify.sanitize(rawSvg, {
-                        USE_PROFILES: { svg: true, svgFilters: true },
-                    });
+                    const cleanSvg = safeSanitizeSvg(rawSvg);
                     setSvg(cleanSvg);
                 }
             } catch (err: any) {
@@ -107,6 +81,12 @@ export const MermaidBlock: React.FC<MermaidBlockProps> = ({ code }) => {
                     setError(err?.message || "Failed to parse or render Mermaid diagram syntax.");
                 }
             } finally {
+                if (renderedId) {
+                    const orphan = document.getElementById(`d${renderedId}`);
+                    if (orphan && orphan.parentNode) {
+                        orphan.parentNode.removeChild(orphan);
+                    }
+                }
                 if (tempContainer && document.body.contains(tempContainer)) {
                     document.body.removeChild(tempContainer);
                     tempContainer = null;
@@ -118,6 +98,12 @@ export const MermaidBlock: React.FC<MermaidBlockProps> = ({ code }) => {
         renderDiagram();
         return () => {
             isMounted = false;
+            if (renderedId) {
+                const orphan = document.getElementById(`d${renderedId}`);
+                if (orphan && orphan.parentNode) {
+                    orphan.parentNode.removeChild(orphan);
+                }
+            }
             if (tempContainer && document.body.contains(tempContainer)) {
                 document.body.removeChild(tempContainer);
                 tempContainer = null;
@@ -273,19 +259,25 @@ export const CalloutBlockquote: React.FC<CalloutBlockquoteProps> = ({ children }
     const alertType = match[1].toUpperCase() as "NOTE" | "TIP" | "IMPORTANT" | "WARNING" | "CAUTION";
 
     // Clean [!TYPE] marker from the rendered child nodes
-    const stripMarker = (nodes: any): any => {
-        if (typeof nodes === "string") {
-            return nodes.replace(/^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i, "");
+    let stripped = false;
+    const stripMarker = (node: any): any => {
+        if (stripped) return node;
+        if (typeof node === "string") {
+            if (/^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]/i.test(node)) {
+                stripped = true;
+                return node.replace(/^\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*/i, "");
+            }
+            return node;
         }
-        if (Array.isArray(nodes)) {
-            return nodes.map((n, i) => (i === 0 ? stripMarker(n) : n));
+        if (Array.isArray(node)) {
+            return node.map((child) => stripMarker(child));
         }
-        if (nodes && typeof nodes === "object" && nodes.props && nodes.props.children) {
-            return React.cloneElement(nodes, {
-                children: stripMarker(nodes.props.children),
+        if (React.isValidElement(node) && (node.props as any)?.children) {
+            return React.cloneElement(node as React.ReactElement<any>, {
+                children: stripMarker((node.props as any).children),
             });
         }
-        return nodes;
+        return node;
     };
 
     const cleanedContent = stripMarker(children);
@@ -469,14 +461,23 @@ export const ClubMarkdownRenderer: React.FC<ClubMarkdownRendererProps> = ({
             h6: createHeading(6, idCounterMap),
 
             p: ({ children, ...props }: any) => (
-                <p className="my-3 text-sm leading-relaxed text-neutral-800" {...props}>
+                <div className="my-3 text-sm leading-relaxed text-neutral-800" {...props}>
                     {children}
-                </p>
+                </div>
             ),
 
             strong: ({ children }: any) => <strong className="font-black text-black">{children}</strong>,
             em: ({ children }: any) => <em className="italic">{children}</em>,
             del: ({ children }: any) => <del className="line-through text-neutral-500">{children}</del>,
+            ins: ({ children }: any) => <ins className="underline decoration-2 text-neutral-900">{children}</ins>,
+            mark: ({ children }: any) => <mark className="bg-[#FFE566] px-1 py-0.5 rounded text-black font-semibold">{children}</mark>,
+            sub: ({ children }: any) => <sub className="text-[10px] align-sub font-medium">{children}</sub>,
+            sup: ({ children }: any) => <sup className="text-[10px] align-super font-medium">{children}</sup>,
+            abbr: ({ children, title, ...props }: any) => (
+                <abbr title={title} className="cursor-help underline decoration-dotted" {...props}>
+                    {children}
+                </abbr>
+            ),
 
             blockquote: CalloutBlockquote,
 
@@ -526,7 +527,7 @@ export const ClubMarkdownRenderer: React.FC<ClubMarkdownRendererProps> = ({
 
             code: ({ className: codeClass, children, ...props }: any) => {
                 const match = /language-(\w+)/.exec(codeClass || "");
-                const codeText = String(children);
+                const codeText = extractText(children);
                 const isMultiline = codeText.includes("\n");
 
                 // Fenced block code
@@ -651,11 +652,33 @@ export const ClubMarkdownRenderer: React.FC<ClubMarkdownRendererProps> = ({
                 </kbd>
             ),
 
+            section: ({ children, "data-footnotes": isFootnotes, ...props }: any) => {
+                if (isFootnotes) {
+                    return (
+                        <section
+                            className="mt-8 pt-4 border-t-2 border-black/15 text-xs text-neutral-600 space-y-2"
+                            {...props}
+                        >
+                            <h4 className="font-mono text-[11px] font-black uppercase tracking-wider text-black">
+                                Footnotes
+                            </h4>
+                            {children}
+                        </section>
+                    );
+                }
+                return <section {...props}>{children}</section>;
+            },
+
             // Disallow and neutralize dangerous embedded executable HTML elements
+            style: () => null,
             script: () => null,
             iframe: () => null,
             object: () => null,
             embed: () => null,
+            link: () => null,
+            meta: () => null,
+            base: () => null,
+            form: () => null,
         };
     }, [idCounterMap]);
 
@@ -668,14 +691,16 @@ export const ClubMarkdownRenderer: React.FC<ClubMarkdownRendererProps> = ({
     }
 
     return (
-        <div className={`club-markdown-preview prose prose-neutral max-w-none text-neutral-900 ${className}`}>
-            <ReactMarkdown
-                remarkPlugins={[remarkGfm, remarkMath, remarkEmoji]}
-                rehypePlugins={[rehypeRaw, rehypeKatex]}
-                components={components}
-            >
-                {content}
-            </ReactMarkdown>
-        </div>
+        <MarkdownErrorBoundary fallbackContent={content}>
+            <div className={`club-markdown-preview prose prose-neutral max-w-none text-neutral-900 ${className}`}>
+                <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath, remarkEmoji]}
+                    rehypePlugins={[rehypeRaw, [rehypeKatex, { throwOnError: false, strict: false, errorColor: "#cc0000" }]]}
+                    components={components}
+                >
+                    {content}
+                </ReactMarkdown>
+            </div>
+        </MarkdownErrorBoundary>
     );
 };

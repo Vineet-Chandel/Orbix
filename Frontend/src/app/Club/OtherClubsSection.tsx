@@ -95,13 +95,13 @@ export const OtherClubsSection: React.FC<OtherClubsSectionProps> = ({
             verifiedAt: d.verified_at || d.verifiedAt || new Date().toISOString(),
             createdAt: d.created_at || d.createdAt || new Date().toISOString(),
             updatedAt: d.updated_at || d.updatedAt || new Date().toISOString(),
-            memberCount: 0,
-            eventsCount: 0,
-            achievementsCount: 0,
-            coordinatorsCount: 0,
+            memberCount: d.member_count || d.memberCount || 0,
+            eventsCount: d.events_count || d.eventsCount || 0,
+            achievementsCount: Array.isArray(d.achievements) ? d.achievements.length : (d.achievements_count || d.achievementsCount || 0),
+            coordinatorsCount: Array.isArray(d.coordinators) ? d.coordinators.length : (d.coordinators_count || d.coordinatorsCount || 0),
             isCurrentClub: true,
-            coordinators: [],
-            achievements: [],
+            coordinators: d.coordinators || [],
+            achievements: d.achievements || [],
         };
     };
 

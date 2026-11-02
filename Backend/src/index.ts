@@ -36,7 +36,18 @@ app.use((req: Request, res: Response, next: express.NextFunction) => {
     }
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    
+    const requestedHeaders = req.headers["access-control-request-headers"];
+    if (requestedHeaders) {
+        res.setHeader("Access-Control-Allow-Headers", requestedHeaders);
+    } else {
+        res.setHeader(
+            "Access-Control-Allow-Headers",
+            "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-orbix-device-id, X-Orbix-Device-Id, *"
+        );
+    }
+    res.setHeader("Access-Control-Expose-Headers", "Authorization, Set-Cookie");
+
     if (req.method === "OPTIONS") {
         res.sendStatus(200);
         return;

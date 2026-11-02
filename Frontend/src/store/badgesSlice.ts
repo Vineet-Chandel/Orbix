@@ -34,7 +34,19 @@ export interface BadgesState {
 const getStoredBadges = (): Record<string, UnifiedBadgesData> => {
     try {
         const stored = localStorage.getItem("orbix_unified_badges");
-        return stored ? JSON.parse(stored) : {};
+        if (!stored) return {};
+        const parsed = JSON.parse(stored);
+        for (const user in parsed) {
+            if (Array.isArray(parsed[user]?.badges)) {
+                parsed[user].badges = parsed[user].badges.map((b: UnifiedBadgeRecord) => {
+                    if (b.icon && b.icon.includes("cdn.codechef.com")) {
+                        return { ...b, icon: "" };
+                    }
+                    return b;
+                });
+            }
+        }
+        return parsed;
     } catch {
         return {};
     }

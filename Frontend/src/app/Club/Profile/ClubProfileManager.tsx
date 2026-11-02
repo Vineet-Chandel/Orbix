@@ -153,7 +153,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
 
     // Load profile on mount or club change
     useEffect(() => {
-        if (!clubState.isInitialized) {
+        if (!clubState.isInitialized && !clubState.loading) {
             dispatch(fetchClubProfile({ clubId }))
                 .unwrap()
                 .then((data) => {
@@ -163,7 +163,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
         } else if (clubState.club) {
             populateForm(clubState.club);
         }
-    }, [clubId, clubState.isInitialized]);
+    }, [clubId, clubState.isInitialized, clubState.loading, clubState.club]);
 
     // Check if form is dirty
     const isDirty = useMemo(() => {

@@ -19,6 +19,7 @@ import "prismjs/components/prism-markdown";
 import "prismjs/components/prism-docker";
 import "prismjs/components/prism-go";
 import "prismjs/components/prism-rust";
+import "prismjs/components/prism-diff";
 
 /**
  * Normalizes language aliases to supported Prism grammar identifiers.
