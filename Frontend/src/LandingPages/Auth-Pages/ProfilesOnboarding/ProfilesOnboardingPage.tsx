@@ -10,6 +10,7 @@ import { Sidebar } from "../../../app/Dashboard/Sidebar";
 import { disconnectPlatform } from "../../../utils/profileApi";
 import { invalidateConnectedPlatformCaches } from "../../../utils/cacheManager";
 import { SectionBottomIllustration } from "../../../app/common/SectionBottomIllustration";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 type CategoryFilter = "all" | "cp" | "practice" | "dev";
 
@@ -208,6 +209,11 @@ export default function ProfilesOnboardingPage() {
     const [searchQuery, setSearchQuery] = useState("");
     const [isSaving, setIsSaving] = useState(false);
     const [isMobileBucketOpen, setIsMobileBucketOpen] = useState(false);
+
+    const { handleBackdropClick: handleMobileBucketBackdropClick } = useModalDismiss({
+        isOpen: isMobileBucketOpen,
+        onClose: () => setIsMobileBucketOpen(false),
+    });
 
     // Refs for dirty state tracking (production-level change detection)
     const initialConnectedProfilesRef = useRef<Record<string, PortalProfileData>>({ ...connectedProfiles });
@@ -1013,9 +1019,13 @@ export default function ProfilesOnboardingPage() {
 
             {/* Mobile Responsive Bucket Drawer / Modal */}
             {isMobileBucketOpen && (
-                <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-fadeIn">
+                <div
+                    className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-fadeIn"
+                    onClick={handleMobileBucketBackdropClick}
+                >
                     <div
                         className="w-full max-w-lg bg-white border-2 border-black rounded-t-3xl sm:rounded-xl text-black p-5 flex flex-col max-h-[85vh] shadow-[8px_8px_0px_#000] animate-slideUp"
+                        onClick={(e) => e.stopPropagation()}
                     >
                         {/* Drawer handle for mobile */}
                         <div className="w-12 h-1.5 bg-black rounded-full mx-auto mb-4 sm:hidden" />

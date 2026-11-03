@@ -1,5 +1,6 @@
 import React from "react";
 import { AlertCircle, X, ArrowRight, ShieldAlert } from "lucide-react";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 interface PublishValidationModalProps {
     isOpen: boolean;
@@ -14,6 +15,8 @@ export const PublishValidationModal: React.FC<PublishValidationModalProps> = ({
     missingItems,
     onGoToStep,
 }) => {
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
     if (!isOpen) return null;
 
     const getItemTargetStep = (item: string): { step: number; label: string } => {
@@ -34,8 +37,14 @@ export const PublishValidationModal: React.FC<PublishValidationModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-            <div className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] w-full max-w-md overflow-hidden flex flex-col">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] w-full max-w-md overflow-hidden flex flex-col"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="p-4 sm:p-5 bg-[#FFE566] border-b-2 border-black flex items-center justify-between">
                     <div className="flex items-center gap-2">

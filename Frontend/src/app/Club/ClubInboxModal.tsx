@@ -17,6 +17,7 @@ import {
 import { Link } from "react-router-dom";
 import { useToast } from "../../context/ToastContext";
 import { OrbixLoader } from "../../components/ui/loader";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface ClubInboxModalProps {
     isOpen: boolean;
@@ -270,11 +271,27 @@ export default function ClubInboxModal({
         }
     };
 
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen: isOpen && !blockConfirmUser,
+        onClose,
+    });
+
+    const { handleBackdropClick: handleBlockBackdropClick } = useModalDismiss({
+        isOpen: Boolean(blockConfirmUser),
+        onClose: () => setBlockConfirmUser(null),
+    });
+
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs select-none">
-            <div className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl shadow-[8px_8px_0px_#000] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs select-none"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl shadow-[8px_8px_0px_#000] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Top Action Header */}
                 <div className="p-4 sm:px-6 bg-white border-b-2 border-black flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
@@ -682,8 +699,14 @@ export default function ClubInboxModal({
 
             {/* Block Confirmation Modal */}
             {blockConfirmUser && (
-                <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs select-none">
-                    <div className="w-full max-w-md bg-[#FAF6EE] border-2 border-black rounded-3xl p-6 shadow-[8px_8px_0px_#000] space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                <div
+                    className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs select-none"
+                    onClick={handleBlockBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-md bg-[#FAF6EE] border-2 border-black rounded-3xl p-6 shadow-[8px_8px_0px_#000] space-y-4 animate-in fade-in zoom-in-95 duration-150"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="w-12 h-12 rounded-2xl bg-rose-100 border-2 border-black flex items-center justify-center text-rose-700 shadow-[2px_2px_0px_#000]">
                             <AlertTriangle className="w-6 h-6" />
                         </div>

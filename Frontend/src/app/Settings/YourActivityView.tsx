@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 import {
     fetchSessionOverview,
     fetchSessionHistory,
@@ -50,6 +51,11 @@ export const YourActivityView: React.FC = () => {
 
     // Modal & Inspection states
     const [inspectedSession, setInspectedSession] = useState<UserSessionItem | null>(null);
+
+    const { handleBackdropClick: handleInspectedSessionBackdropClick } = useModalDismiss({
+        isOpen: Boolean(inspectedSession),
+        onClose: () => setInspectedSession(null),
+    });
     const [isHistoryExpanded, setIsHistoryExpanded] = useState<boolean>(false);
     const [copiedField, setCopiedField] = useState<string | null>(null);
 
@@ -798,8 +804,14 @@ export const YourActivityView: React.FC = () => {
             {/* 4. INSPECT SESSION DETAILS MODAL                                          */}
             {/* ========================================================================= */}
             {inspectedSession && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-                    <div className="w-full max-w-xl rounded-3xl bg-white border-2 sm:border-[3px] border-black shadow-[6px_6px_0px_#000] p-6 space-y-5 max-h-[90vh] overflow-y-auto">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+                    onClick={handleInspectedSessionBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-xl rounded-3xl bg-white border-2 sm:border-[3px] border-black shadow-[6px_6px_0px_#000] p-6 space-y-5 max-h-[90vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Modal Header */}
                         <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                             <div className="flex items-center gap-3">

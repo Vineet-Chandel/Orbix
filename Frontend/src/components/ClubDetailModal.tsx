@@ -24,6 +24,7 @@ import {
 import type { CollegeClubItem, ClubCoordinator } from "../utils/clubProfileApi";
 import { getPlatformIcon } from "../utils/platformLinks";
 import { useToast } from "../context/ToastContext";
+import { useModalDismiss } from "../hooks/useModalDismiss";
 
 interface ClubDetailModalProps {
     club: CollegeClubItem | null;
@@ -42,19 +43,16 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
     const [loadedCoordinators, setLoadedCoordinators] = useState<ClubCoordinator[]>(club?.coordinators || []);
     const [loadingCoordinators, setLoadingCoordinators] = useState(false);
 
-    // Close on Escape & Lock body scroll
+    useModalDismiss({ isOpen, onClose });
+
+    // Lock body scroll
     useEffect(() => {
         if (!isOpen) return;
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onClose();
-        };
         document.body.style.overflow = "hidden";
-        window.addEventListener("keydown", handleKeyDown);
         return () => {
             document.body.style.overflow = "";
-            window.removeEventListener("keydown", handleKeyDown);
         };
-    }, [isOpen, onClose]);
+    }, [isOpen]);
 
     // Ensure coordinators are loaded even if summary item did not provide them
     useEffect(() => {
@@ -177,9 +175,10 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
 
                     {/* Club Header & Avatar Section */}
                     <div className="px-5 sm:px-8 pt-0 pb-8">
-                        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12 sm:-mt-16 mb-5 relative z-10">
-                            <div className="flex items-end gap-4">
-                                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] overflow-hidden flex items-center justify-center flex-shrink-0 relative">
+                        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6 relative z-10">
+                            <div className="flex flex-col sm:flex-row sm:items-end gap-4 sm:gap-5">
+                                {/* Overlapping Avatar Box */}
+                                <div className="w-24 h-24 sm:w-28 sm:h-28 -mt-12 sm:-mt-16 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] overflow-hidden flex items-center justify-center flex-shrink-0 relative">
                                     {club.logoUrl ? (
                                         <img
                                             src={club.logoUrl}
@@ -196,36 +195,31 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="space-y-1 pb-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
+                                {/* Club Identity & Narrative Info (Positioned safely below banner on solid background) */}
+                                <div className="space-y-1.5 pt-2 sm:pt-4 pb-0.5">
+                                    <div className="flex items-center gap-2.5 flex-wrap">
                                         <h2
                                             id="club-modal-title"
                                             className="text-2xl sm:text-3xl font-black text-black tracking-tight"
                                         >
                                             {club.name}
                                         </h2>
-                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-950 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-950 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
                                             <ShieldCheck className="w-3 h-3 text-emerald-700" />
                                             Verified
                                         </span>
                                     </div>
-                                    <p className="text-xs sm:text-sm font-bold text-neutral-600 flex items-center gap-1.5 flex-wrap">
-                                        <span>orbix.in/clubs/{club.slug}</span>
-                                        {club.collegeName && (
-                                            <>
-                                                <span>·</span>
-                                                <span className="text-black font-black flex items-center gap-1">
-                                                    <MapPin className="w-3.5 h-3.5 text-neutral-600" />
-                                                    {club.collegeName}
-                                                </span>
-                                            </>
-                                        )}
-                                    </p>
+                                    {club.collegeName && (
+                                        <p className="text-xs sm:text-sm font-bold text-neutral-700 flex items-center gap-1.5 flex-wrap">
+                                            <MapPin className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
+                                            <span className="text-black font-black">{club.collegeName}</span>
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
                             {/* Action Buttons Hub: Only Share button kept */}
-                            <div className="flex items-center gap-2 flex-wrap">
+                            <div className="flex items-center gap-2 flex-wrap sm:pb-1">
                                 <button
                                     type="button"
                                     onClick={handleCopyShareUrl}

@@ -26,6 +26,7 @@ import { CodeChefBadge } from "../../components/CodeChefBadge";
 import { CodeChefRatingLadder } from "../../components/CodeChefRatingLadder";
 import { AtCoderBadge } from "../../components/AtCoderBadge";
 import { AtCoderRatingLadder } from "../../components/AtCoderRatingLadder";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface ContestPerformanceSectionProps {
     connectedPortals: Record<string, any>;
@@ -63,6 +64,11 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
     const [timeRange, setTimeRange] = useState<TimeRangeFilter>("ALL");
     const [hoveredPoint, setHoveredPoint] = useState<ContestHistoryPoint | null>(null);
     const [isTierModalOpen, setIsTierModalOpen] = useState<boolean>(false);
+
+    const { handleBackdropClick: handleTierModalBackdropClick } = useModalDismiss({
+        isOpen: isTierModalOpen,
+        onClose: () => setIsTierModalOpen(false),
+    });
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const initialSelectionDoneRef = useRef<boolean>(false);
 
@@ -1269,8 +1275,12 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                     aria-modal="true"
                     aria-labelledby="tier-modal-title"
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn"
+                    onClick={handleTierModalBackdropClick}
                 >
-                    <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-white border border-black/10 shadow-2xl p-6 sm:p-7 space-y-5 text-neutral-900 relative">
+                    <div
+                        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-white border border-black/10 shadow-2xl p-6 sm:p-7 space-y-5 text-neutral-900 relative"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Close button */}
                         <button
                             type="button"

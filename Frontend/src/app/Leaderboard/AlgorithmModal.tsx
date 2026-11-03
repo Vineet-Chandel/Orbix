@@ -1,6 +1,7 @@
 import React from "react";
 import { X, ShieldCheck, Award, Zap, Code2, BookOpen, GitPullRequest, Flame, CheckCircle2 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface AlgorithmModalProps {
     isOpen: boolean;
@@ -8,6 +9,8 @@ interface AlgorithmModalProps {
 }
 
 export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose }) => {
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
     if (!isOpen) return null;
 
     const pillars = [
@@ -111,11 +114,15 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
     ];
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+            onClick={handleBackdropClick}
+        >
             <div
                 className="relative w-full max-w-4xl max-h-[90vh] bg-[#FAF6EE] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] flex flex-col overflow-hidden text-black"
                 role="dialog"
                 aria-modal="true"
+                onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b-2 border-black bg-white">

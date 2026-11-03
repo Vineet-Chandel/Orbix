@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
     Save,
-    Eye,
+    ChevronDown,
     Check,
-    CheckCircle2,
     ArrowLeft,
     ArrowRight,
-    Sparkles,
 } from "lucide-react";
 import type { ClubProfileData, ClubLink, ClubVisibilityTier } from "../../../utils/clubProfileApi";
 import { useAppDispatch, useAppSelector, fetchClubProfile, saveClubProfile } from "../../../store";
@@ -18,7 +16,6 @@ import { StepLinksAchievements } from "./StepLinksAchievements";
 import { StepRecruitmentPublishing } from "./StepRecruitmentPublishing";
 import { ProfilePreviewModal } from "./ProfilePreviewModal";
 import { PublishValidationModal } from "./PublishValidationModal";
-import { OrbixButton } from "../../../components/OrbixButton";
 
 interface ClubProfileManagerProps {
     clubId?: string;
@@ -72,11 +69,71 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
 
     // UI & Action states
     const [isSaving, setIsSaving] = useState(false);
-    const [lastSavedTime, setLastSavedTime] = useState<string | null>(null);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
     const [validationMissingItems, setValidationMissingItems] = useState<string[]>([]);
     const [showCompletionDetails, setShowCompletionDetails] = useState(false);
+    const completionRef = useRef<HTMLDivElement>(null);
+
+    // Dismiss completion popover on outside click or Escape
+    useEffect(() => {
+        if (!showCompletionDetails) return;
+        const handleClickOutside = (e: MouseEvent) => {
+            if (completionRef.current && !completionRef.current.contains(e.target as Node)) {
+                setShowCompletionDetails(false);
+            }
+        };
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setShowCompletionDetails(false);
+            }
+        };
+        window.addEventListener("mousedown", handleClickOutside);
+        window.addEventListener("keydown", handleKeyDown);
+        return () => {
+            window.removeEventListener("mousedown", handleClickOutside);
+            window.removeEventListener("keydown", handleKeyDown);
+        };
+    }, [showCompletionDetails]);
+
+    // Dynamic completion tier theme with interactive border and vibrant neo-brutalist styling
+    const completionTheme = useMemo(() => {
+        const pct = completion.percentage || 0;
+        if (pct >= 100) {
+            return {
+                borderClass: "border-emerald-500 hover:border-black",
+                shadowClass: "shadow-[3px_3px_0px_#10b981] hover:shadow-[4px_4px_0px_#059669]",
+                badgeBg: "bg-[#a2ff86] text-black border-2 border-black",
+                accentText: "text-emerald-700",
+                label: "Complete",
+            };
+        }
+        if (pct >= 70) {
+            return {
+                borderClass: "border-sky-500 hover:border-black",
+                shadowClass: "shadow-[3px_3px_0px_#0284c7] hover:shadow-[4px_4px_0px_#0369a1]",
+                badgeBg: "bg-sky-100 text-sky-950 border-2 border-sky-400",
+                accentText: "text-sky-700",
+                label: "Almost Done",
+            };
+        }
+        if (pct >= 40) {
+            return {
+                borderClass: "border-amber-500 hover:border-black",
+                shadowClass: "shadow-[3px_3px_0px_#f59e0b] hover:shadow-[4px_4px_0px_#d97706]",
+                badgeBg: "bg-amber-100 text-amber-950 border-2 border-amber-400",
+                accentText: "text-amber-700",
+                label: "In Progress",
+            };
+        }
+        return {
+            borderClass: "border-rose-500 hover:border-black",
+            shadowClass: "shadow-[3px_3px_0px_#f43f5e] hover:shadow-[4px_4px_0px_#e11d48]",
+            badgeBg: "bg-rose-100 text-rose-950 border-2 border-rose-400",
+            accentText: "text-rose-700",
+            label: "Getting Started",
+        };
+    }, [completion.percentage]);
 
     // Snapshot for dirty-state tracking
     const initialSnapshotRef = useRef<string>("");
@@ -267,11 +324,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                 populateForm(updated.club);
             }
 
-            const now = new Date();
-            setLastSavedTime(
-                now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-            );
-
             if (effectiveVisibility === "public") {
                 toast.success("Club profile published to the Orbix Directory!");
             } else if (effectiveVisibility === "unlisted") {
@@ -385,12 +437,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                         <span className="px-2.5 py-0.5 rounded-full bg-[#FFE566] border border-black text-[10px] font-black uppercase text-black">
                             Profile Management
                         </span>
-                        {isDirty && (
-                            <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-100 border border-amber-300 text-[10px] font-bold text-amber-900">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                <span>Unsaved changes</span>
-                            </span>
-                        )}
                     </div>
                     <h1 className="text-xl sm:text-2xl font-black text-black tracking-tight mt-1">
                         Manage Club Profile
@@ -400,24 +446,34 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                     </p>
                 </div>
 
-                {/* Completion & Preview Actions */}
+                {/* Completion Action */}
                 <div className="flex items-center gap-3 self-start md:self-auto flex-wrap">
                     {/* Completion Pill with Popover */}
-                    <div className="relative">
+                    <div className="relative" ref={completionRef}>
                         <button
                             type="button"
                             onClick={() => setShowCompletionDetails(!showCompletionDetails)}
-                            className="px-3.5 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black flex items-center gap-2 hover:bg-neutral-100 cursor-pointer"
+                            className={`px-3.5 py-2 rounded-2xl bg-white border-2 ${completionTheme.borderClass} ${completionTheme.shadowClass} flex items-center gap-3 transition-all cursor-pointer hover:-translate-y-0.5 active:translate-y-0 active:translate-x-0 select-none group`}
+                            title="View profile completion breakdown"
+                            aria-expanded={showCompletionDetails}
                         >
-                            <div className="w-5 h-5 rounded-full border border-black bg-white flex items-center justify-center text-[10px] font-mono">
+                            <div className={`px-2.5 py-1 rounded-xl ${completionTheme.badgeBg} flex items-center justify-center text-sm sm:text-base font-black font-mono shadow-[1.5px_1.5px_0px_#000]`}>
                                 {completion.percentage}%
                             </div>
-                            <span>Profile Completion</span>
+                            <div className="flex flex-col text-left">
+                                <span className="text-xs font-black text-black group-hover:text-neutral-800 transition-colors leading-tight">
+                                    Profile Completion
+                                </span>
+                                <span className={`text-[10px] font-bold ${completionTheme.accentText} leading-tight`}>
+                                    {completionTheme.label}
+                                </span>
+                            </div>
+                            <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform duration-200 ${showCompletionDetails ? "rotate-180" : ""}`} />
                         </button>
 
                         {/* Completion Details Popover */}
                         {showCompletionDetails && (
-                            <div className="absolute right-0 top-12 z-40 w-80 p-4 rounded-2xl bg-white border-2 border-black shadow-[5px_5px_0px_#000] space-y-3 animate-in fade-in duration-100">
+                            <div className="absolute right-0 top-14 z-40 w-80 p-4 rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] space-y-3 animate-in fade-in zoom-in-95 duration-100">
                                 <div className="flex items-center justify-between border-b border-black/10 pb-2">
                                     <h4 className="text-xs font-black text-black uppercase tracking-wider">
                                         Completion Score
@@ -479,16 +535,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                             </div>
                         )}
                     </div>
-
-                    {/* Preview Button */}
-                    <button
-                        type="button"
-                        onClick={() => setIsPreviewOpen(true)}
-                        className="px-3.5 py-2 rounded-xl bg-white border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                    >
-                        <Eye className="w-3.5 h-3.5 text-black" />
-                        <span>Preview Profile</span>
-                    </button>
                 </div>
             </div>
 
@@ -648,81 +694,106 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                 )}
             </div>
 
+            {/* Action Bar Just Below the Form */}
+            <div className="flex items-center justify-center gap-3 pt-3 pb-2">
+                {/* Previous Button (arrow only pointing left, green background, black icon) */}
+                <button
+                    type="button"
+                    onClick={handlePrevStep}
+                    disabled={currentStep === 1}
+                    className="w-11 h-11 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[2px_2px_0px_#000] disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                    title="Previous"
+                    aria-label="Previous"
+                >
+                    <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
+                </button>
+
+                {/* Save Changes Button (green background, black text) */}
+                <button
+                    type="button"
+                    onClick={() => handleSave()}
+                    disabled={isSaving}
+                    className="px-6 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[2px_2px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
+                >
+                    {isSaving ? (
+                        <>
+                            <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                            <span>Saving Changes...</span>
+                        </>
+                    ) : (
+                        <>
+                            <Save className="w-4 h-4 stroke-[2.5]" />
+                            <span>Save Changes</span>
+                            {isDirty && (
+                                <span className="w-2 h-2 rounded-full bg-black/60" title="Unsaved changes" />
+                            )}
+                        </>
+                    )}
+                </button>
+
+                {/* Next Button (arrow only pointing right, green background, black icon) */}
+                <button
+                    type="button"
+                    onClick={handleNextStep}
+                    disabled={currentStep === 5}
+                    className="w-11 h-11 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[2px_2px_0px_#000] disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                    title="Next"
+                    aria-label="Next"
+                >
+                    <ArrowRight className="w-5 h-5 stroke-[2.5]" />
+                </button>
+            </div>
+
             {/* Persistent Bottom Action Bar */}
             <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t-2 border-black p-3 sm:p-4 shadow-[0px_-4px_12px_rgba(0,0,0,0.06)]">
-                <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-                    {/* Status indicator on the left */}
-                    <div className="flex items-center gap-3 text-xs font-bold text-neutral-600 self-start sm:self-auto">
-                        {isDirty ? (
-                            <span className="flex items-center gap-1.5 text-amber-600">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                <span>Unsaved changes in profile</span>
-                            </span>
-                        ) : lastSavedTime ? (
-                            <span className="flex items-center gap-1.5 text-emerald-600">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>Saved at {lastSavedTime}</span>
-                            </span>
-                        ) : (
-                            <span className="text-neutral-400">All data in sync</span>
-                        )}
-                    </div>
-
-                    {/* Navigation and Save Actions */}
-                    <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                        {/* Previous Button */}
+                <div className="max-w-6xl mx-auto flex items-center justify-center">
+                    <div className="flex items-center justify-center gap-3">
+                        {/* Previous Button (arrow only pointing left, green background, black icon) */}
                         <button
                             type="button"
                             onClick={handlePrevStep}
                             disabled={currentStep === 1}
-                            className="px-3.5 py-2 rounded-xl bg-white text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1 cursor-pointer"
+                            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[2px_2px_0px_#000] disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                            title="Previous"
+                            aria-label="Previous"
                         >
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                            <span>Previous</span>
+                            <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
                         </button>
 
-                        {/* Save Draft Button (always available) */}
-                        <OrbixButton
+                        {/* Save Changes Button (green background, black text) */}
+                        <button
+                            type="button"
                             onClick={() => handleSave()}
-                            loading={isSaving}
-                            loadingLabel="Saving Draft..."
-                            variant="white"
-                            icon={<Save className="w-3.5 h-3.5" />}
+                            disabled={isSaving}
+                            className="px-6 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[2px_2px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
                         >
-                            Save Draft
-                        </OrbixButton>
+                            {isSaving ? (
+                                <>
+                                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                    <span>Saving Changes...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4 stroke-[2.5]" />
+                                    <span>Save Changes</span>
+                                    {isDirty && (
+                                        <span className="w-2 h-2 rounded-full bg-black/60" title="Unsaved changes" />
+                                    )}
+                                </>
+                            )}
+                        </button>
 
-                        {/* Next or Publish Action */}
-                        {currentStep < 5 ? (
-                            <button
-                                type="button"
-                                onClick={handleNextStep}
-                                className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                            >
-                                <span>Continue</span>
-                                <ArrowRight className="w-3.5 h-3.5" />
-                            </button>
-                        ) : (
-                            <OrbixButton
-                                onClick={() => handleSave()}
-                                loading={isSaving}
-                                loadingLabel={
-                                    visibility === "public"
-                                        ? "Publishing..."
-                                        : visibility === "unlisted"
-                                        ? "Saving..."
-                                        : "Saving Changes..."
-                                }
-                                variant="yellow"
-                                icon={<Sparkles className="w-3.5 h-3.5" />}
-                            >
-                                {visibility === "public"
-                                    ? "Publish Profile"
-                                    : visibility === "unlisted"
-                                    ? "Save Unlisted"
-                                    : "Save Changes"}
-                            </OrbixButton>
-                        )}
+                        {/* Next Button (arrow only pointing right, green background, black icon) */}
+                        <button
+                            type="button"
+                            onClick={handleNextStep}
+                            disabled={currentStep === 5}
+                            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[2px_2px_0px_#000] disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                            title="Next"
+                            aria-label="Next"
+                        >
+                            <ArrowRight className="w-5 h-5 stroke-[2.5]" />
+                        </button>
                     </div>
                 </div>
             </div>

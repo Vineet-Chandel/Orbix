@@ -23,6 +23,7 @@ import {
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { useToast } from "../../context/ToastContext";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface ConnectionsSettingsViewProps {
     user: any;
@@ -45,6 +46,18 @@ export const ConnectionsSettingsView: React.FC<ConnectionsSettingsViewProps> = (
     const [notifyTitle, setNotifyTitle] = useState("");
     const [notifyBody, setNotifyBody] = useState("");
     const [isSendingNotify, setIsSendingNotify] = useState(false);
+
+    const { handleBackdropClick: handleNotifyModalBackdropClick } = useModalDismiss({
+        isOpen: isNotifyModalOpen,
+        onClose: () => {
+            if (!isSendingNotify) {
+                setIsNotifyModalOpen(false);
+                setActiveTarget(null);
+            }
+        },
+        disableEscape: isSendingNotify,
+        disableBackdrop: isSendingNotify,
+    });
 
     const loadConnections = useCallback(
         async (cursor?: string, search?: string, isRefresh = false) => {
@@ -348,8 +361,14 @@ export const ConnectionsSettingsView: React.FC<ConnectionsSettingsViewProps> = (
 
             {/* Notify Modal (Subject to 3/24h Limit) */}
             {isNotifyModalOpen && activeTarget && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-                    <div className="w-full max-w-md bg-white border-2 border-black rounded-3xl p-6 shadow-[6px_6px_0px_#000] space-y-4">
+                <div
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
+                    onClick={handleNotifyModalBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-md bg-white border-2 border-black rounded-3xl p-6 shadow-[6px_6px_0px_#000] space-y-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                             <div className="flex items-center gap-2.5">
                                 <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000]">

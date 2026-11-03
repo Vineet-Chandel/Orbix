@@ -109,7 +109,7 @@ export const StepIdentity: React.FC<StepIdentityProps> = ({
                     </div>
                 </div>
 
-                {!isVerified ? (
+                {!isVerified && (
                     <Link
                         to="/club/verification"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FFE566] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#ebd04e] transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
@@ -117,10 +117,6 @@ export const StepIdentity: React.FC<StepIdentityProps> = ({
                         <span>Start Verification</span>
                         <ArrowUpRight className="w-3.5 h-3.5" />
                     </Link>
-                ) : (
-                    <span className="text-[11px] font-bold text-neutral-500 italic shrink-0">
-                        Populated from verified record
-                    </span>
                 )}
             </div>
 

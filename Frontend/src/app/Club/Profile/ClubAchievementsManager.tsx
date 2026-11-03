@@ -13,6 +13,7 @@ import {
 import { OrbixButton } from "../../../components/OrbixButton";
 import { NeoImageDropzone } from "../../../components/NeoImageDropzone";
 import { ConfirmationModal } from "../../../components/ConfirmationModal";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 import type { ClubAchievement } from "../../../utils/clubProfileApi";
 import {
     addAchievement,
@@ -52,6 +53,10 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingAchievement, setEditingAchievement] = useState<ClubAchievement | null>(null);
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen: isModalOpen,
+        onClose: () => setIsModalOpen(false),
+    });
 
     // Form fields
     const [title, setTitle] = useState("");
@@ -348,8 +353,14 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
 
             {/* MODAL: ADD / EDIT ACHIEVEMENT */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-                    <div className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+                    onClick={handleBackdropClick}
+                >
+                    <div
+                        className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Header */}
                         <div className="p-4 sm:p-5 bg-[#FAF6EE] border-b-2 border-black flex items-center justify-between">
                             <h3 className="text-base font-black text-black">

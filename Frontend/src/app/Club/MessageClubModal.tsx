@@ -5,6 +5,7 @@ import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
 import { Link } from "react-router-dom";
 import { NeoSelect } from "../../components/NeoSelect";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface MessageClubModalProps {
     isOpen: boolean;
@@ -98,9 +99,17 @@ export default function MessageClubModal({
         onClose();
     };
 
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose: handleClose });
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none">
-            <div className="w-full max-w-lg bg-[#FAF6EE] border-2 border-black rounded-3xl shadow-[8px_8px_0px_#000] overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="w-full max-w-lg bg-[#FAF6EE] border-2 border-black rounded-3xl shadow-[8px_8px_0px_#000] overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="p-5 bg-white border-b-2 border-black flex items-center justify-between">
                     <div className="flex items-center gap-3">

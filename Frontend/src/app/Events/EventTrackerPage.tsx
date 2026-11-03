@@ -29,6 +29,7 @@ import {
     toggleLocalReminder,
     type EventItem,
 } from "../../store";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { Sidebar } from "../Dashboard/Sidebar";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
@@ -564,6 +565,11 @@ export const EventTrackerPage: React.FC = () => {
 
     // Modal state for "+N more" contests on a day
     const [selectedDayEvents, setSelectedDayEvents] = useState<{ date: string; events: EventItem[] } | null>(null);
+
+    const { handleBackdropClick: handleDayEventsBackdropClick } = useModalDismiss({
+        isOpen: Boolean(selectedDayEvents),
+        onClose: () => setSelectedDayEvents(null),
+    });
 
     // Calendar dropdown menu toggle for specific event
     const [openCalDropdownId, setOpenCalDropdownId] = useState<string | null>(null);
@@ -1554,7 +1560,7 @@ export const EventTrackerPage: React.FC = () => {
             {selectedDayEvents && (
                 <div
                     className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in"
-                    onClick={() => setSelectedDayEvents(null)}
+                    onClick={handleDayEventsBackdropClick}
                 >
                     <div
                         className="relative z-[101] w-full max-w-xl rounded-3xl bg-black border border-neutral-800 p-6 shadow-2xl space-y-4 text-white ring-1 ring-white/10 animate-in zoom-in-95"

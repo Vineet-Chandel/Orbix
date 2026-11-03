@@ -14,6 +14,7 @@ import {
     type ProposedSyncField
 } from "../../../utils/resumeIntelligenceApi";
 import { useAppDispatch, updateUserProfile } from "../../../store";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 interface ProfileSyncModalProps {
     isOpen: boolean;
@@ -35,6 +36,15 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
     const [isApplying, setIsApplying] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen,
+        onClose: () => {
+            if (!isApplying) onClose();
+        },
+        disableEscape: isApplying,
+        disableBackdrop: isApplying,
+    });
 
     if (!isOpen || !proposal || proposal.proposedFields.length === 0) {
         return null;
@@ -114,8 +124,14 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-            <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white border-2 border-black rounded-2xl shadow-[8px_8px_0px_#000] overflow-hidden">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white border-2 border-black rounded-2xl shadow-[8px_8px_0px_#000] overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="p-5 sm:p-6 bg-[#FFE566] border-b-2 border-black flex items-center justify-between">
                     <div className="flex items-center gap-3">

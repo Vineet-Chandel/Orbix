@@ -359,10 +359,10 @@ export default function PublicClubProfilePage() {
 
                     {/* Profile Information Row */}
                     <div className="p-6 sm:p-8 relative">
-                        {/* Overlapping Logo */}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 -mt-16 sm:-mt-20 mb-6">
+                        {/* Overlapping Logo & Identity Row */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 mb-6">
                             <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5">
-                                <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-white border-3 border-black overflow-hidden shadow-[4px_4px_0px_#000] shrink-0 flex items-center justify-center font-black text-2xl text-black">
+                                <div className="w-24 h-24 sm:w-28 sm:h-28 -mt-16 sm:-mt-20 rounded-2xl bg-white border-3 border-black overflow-hidden shadow-[4px_4px_0px_#000] shrink-0 flex items-center justify-center font-black text-2xl text-black">
                                     {club.logoUrl ? (
                                         <img src={club.logoUrl} alt={club.name} className="w-full h-full object-cover" />
                                     ) : (
@@ -370,7 +370,7 @@ export default function PublicClubProfilePage() {
                                     )}
                                 </div>
 
-                                <div className="space-y-1.5">
+                                <div className="space-y-1.5 pt-2 sm:pt-4">
                                     <div className="flex items-center gap-2.5 flex-wrap">
                                         <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
                                             {club.name}

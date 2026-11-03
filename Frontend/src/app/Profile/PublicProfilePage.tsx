@@ -48,6 +48,7 @@ import { isDemoProfileUsername, demoPublicProfile, demoConnectedPortals } from "
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
 import { HireMeModal } from "./HireMeModal";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { GetTheCardModal } from "./GetTheCardModal";
 import { CARD_THEMES } from "./CardStudio/types";
 import { useToast } from "../../context/ToastContext";
@@ -547,6 +548,11 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     const [isHireModalOpen, setIsHireModalOpen] = useState(false);
     const [isCardModalOpen, setIsCardModalOpen] = useState(false);
     const [isResumePreviewOpen, setIsResumePreviewOpen] = useState(false);
+
+    const { handleBackdropClick: handleResumePreviewBackdropClick } = useModalDismiss({
+        isOpen: isResumePreviewOpen,
+        onClose: () => setIsResumePreviewOpen(false),
+    });
     const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
 
     const handleBlockUser = async () => {
@@ -1849,8 +1855,14 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
 
             {/* Interactive PDF Resume Modal */}
             {isResumePreviewOpen && profile.resumeUrl && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
-                    <div className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl overflow-hidden shadow-[8px_8px_0px_#000] flex flex-col">
+                <div
+                    className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+                    onClick={handleResumePreviewBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl overflow-hidden shadow-[8px_8px_0px_#000] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black bg-white">
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black text-black flex items-center justify-center flex-shrink-0 shadow-[1.5px_1.5px_0px_#000]">

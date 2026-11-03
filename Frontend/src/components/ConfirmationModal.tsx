@@ -1,6 +1,7 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { AlertTriangle, Trash2, Info, X } from "lucide-react";
 import { OrbixButton } from "./OrbixButton";
+import { useModalDismiss } from "../hooks/useModalDismiss";
 
 export interface ConfirmationModalProps {
     isOpen: boolean;
@@ -44,17 +45,14 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     const finalConfirmText = confirmLabel || confirmText;
     const finalCancelText = cancelLabel || cancelText;
 
-    // ESC key closes modal
-    useEffect(() => {
-        if (!isOpen) return;
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && !isLoading) {
-                handleClose();
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, isLoading, onClose, onCancel]);
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen,
+        onClose: () => {
+            if (!isLoading) handleClose();
+        },
+        disableEscape: isLoading,
+        disableBackdrop: isLoading,
+    });
 
     if (!isOpen) return null;
 
@@ -80,14 +78,13 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirmModalTitle"
-            onClick={(e) => {
-                if (e.target === e.currentTarget && !isLoading) {
-                    handleClose();
-                }
-            }}
+            onClick={handleBackdropClick}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn"
         >
-            <div className="w-full max-w-md bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] text-black space-y-4 animate-scaleUp">
+            <div
+                className="w-full max-w-md bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] text-black space-y-4 animate-scaleUp"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header with Icon and Close Button */}
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">

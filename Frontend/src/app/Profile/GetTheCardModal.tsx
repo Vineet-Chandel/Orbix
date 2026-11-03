@@ -7,6 +7,7 @@ import { useToast } from "../../context/ToastContext";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
 import { InstagramStoryCard } from "./CardStudio/InstagramStoryCard";
 import { CARD_THEMES, type CardFormat, type CardFace } from "./CardStudio/types";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 import type {
     AggregatedCodingStats,
     CoderTypeBadge,
@@ -160,10 +161,15 @@ export const GetTheCardModal: React.FC<GetTheCardModalProps> = ({
         }
     };
 
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md overflow-y-auto">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md overflow-y-auto"
+            onClick={handleBackdropClick}
+        >
             <div
                 className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}

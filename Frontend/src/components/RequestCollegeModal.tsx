@@ -4,6 +4,7 @@ import { submitInstitutionVerificationRequest } from "../utils/profileApi";
 import { useToast } from "../context/ToastContext";
 import { NeoSelect } from "./NeoSelect";
 import { OrbixLoader } from "./ui/loader";
+import { useModalDismiss } from "../hooks/useModalDismiss";
 
 const INDIAN_STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
@@ -114,19 +115,25 @@ export function RequestCollegeModal({
         }
     };
 
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen,
+        onClose: () => {
+            if (!submitting) onClose();
+        },
+    });
+
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
             role="dialog"
             aria-modal="true"
             aria-labelledby="request-modal-title"
-            onClick={(e) => {
-                if (e.target === e.currentTarget && !submitting) {
-                    onClose();
-                }
-            }}
+            onClick={handleBackdropClick}
         >
-            <div className="relative w-full max-w-lg rounded-2xl bg-white border-2 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 overflow-hidden text-black animate-scaleUp">
+            <div
+                className="relative w-full max-w-lg rounded-2xl bg-white border-2 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 overflow-hidden text-black animate-scaleUp"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Neo-Brutalist Close Button */}
                 <button
                     type="button"

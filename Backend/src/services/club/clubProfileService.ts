@@ -147,8 +147,8 @@ export class ClubProfileService {
      * Fetch complete club profile for workspace management, including coordinators,
      * achievements, stats, and viewer permissions.
      */
-    static async getFullClubProfile(userId: string, requestedClubId?: string) {
-        const perms = await ClubTeamService.resolveUserClubPermissions(userId, requestedClubId);
+    static async getFullClubProfile(userId: string, requestedClubId?: string, existingPerms?: ClubUserPermissions | null) {
+        const perms = existingPerms || await ClubTeamService.resolveUserClubPermissions(userId, requestedClubId);
         if (!perms) {
             const error: any = new Error("No verified club workspace found for your account.");
             error.statusCode = 404;
@@ -157,72 +157,132 @@ export class ClubProfileService {
 
         const clubId = perms.clubId;
 
-        // Fetch club details
-        const clubRes = await query(
-            `SELECT
-                vc.id,
-                vc.name,
-                COALESCE(u.username, vc.slug) AS slug,
-                u.username AS "clubUsername",
-                vc.category,
-                vc.college_id AS "collegeId",
-                vc.college_name AS "collegeName",
-                vc.college_name AS "college_name",
-                vc.college_city AS "collegeCity",
-                vc.college_city AS "college_city",
-                vc.college_state AS "collegeState",
-                vc.college_state AS "college_state",
-                vc.college_country AS "collegeCountry",
-                vc.college_country AS "college_country",
-                vc.short_description AS "shortDescription",
-                vc.short_description AS "short_description",
-                vc.about,
-                vc.logo_url AS "logoUrl",
-                vc.logo_url AS "logo_url",
-                vc.cover_image_url AS "coverImageUrl",
-                vc.cover_image_url AS "cover_image_url",
-                vc.website_url AS "websiteUrl",
-                vc.website_url AS "website_url",
-                vc.public_email AS "publicEmail",
-                vc.public_email AS "public_email",
-                vc.contact_phone AS "contactPhone",
-                vc.contact_phone AS "contact_phone",
-                vc.social_links AS "socialLinks",
-                vc.social_links AS "social_links",
-                vc.founded_year AS "foundedYear",
-                vc.founded_year AS "founded_year",
-                vc.operating_status AS "operatingStatus",
-                vc.operating_status AS "operating_status",
-                vc.mission,
-                vc.vision,
-                vc.focus_areas AS "focusAreas",
-                vc.focus_areas AS "focus_areas",
-                vc.publication_status AS "publicationStatus",
-                vc.publication_status AS "publication_status",
-                vc.profile_visibility AS "profileVisibility",
-                vc.profile_visibility AS "profile_visibility",
-                vc.visibility,
-                COALESCE(vc.links, '[]'::jsonb) AS links,
-                vc.recruitment_status AS "recruitmentStatus",
-                vc.recruitment_status AS "recruitment_status",
-                vc.recruitment_announcement AS "recruitmentAnnouncement",
-                vc.recruitment_announcement AS "recruitment_announcement",
-                vc.recruitment_url AS "recruitmentUrl",
-                vc.recruitment_url AS "recruitment_url",
-                vc.is_active AS "isActive",
-                vc.is_active AS "is_active",
-                vc.verified_at AS "verifiedAt",
-                vc.verified_at AS "verified_at",
-                vc.created_at AS "createdAt",
-                vc.created_at AS "created_at",
-                vc.updated_at AS "updatedAt",
-                vc.updated_at AS "updated_at"
-             FROM verified_clubs vc
-             LEFT JOIN users u ON u.id = vc.auth_user_id
-             WHERE vc.id = $1
-             LIMIT 1;`,
-            [clubId]
-        );
+        // Fetch club details, coordinators, achievements, and stats in parallel for lowest latency
+        const [clubRes, coordRes, achRes, countRes] = await Promise.all([
+            query(
+                `SELECT
+                    vc.id,
+                    vc.name,
+                    COALESCE(u.username, vc.slug) AS slug,
+                    u.username AS "clubUsername",
+                    vc.category,
+                    vc.college_id AS "collegeId",
+                    vc.college_name AS "collegeName",
+                    vc.college_name AS "college_name",
+                    vc.college_city AS "collegeCity",
+                    vc.college_city AS "college_city",
+                    vc.college_state AS "collegeState",
+                    vc.college_state AS "college_state",
+                    vc.college_country AS "collegeCountry",
+                    vc.college_country AS "college_country",
+                    vc.short_description AS "shortDescription",
+                    vc.short_description AS "short_description",
+                    vc.about,
+                    vc.logo_url AS "logoUrl",
+                    vc.logo_url AS "logo_url",
+                    vc.cover_image_url AS "coverImageUrl",
+                    vc.cover_image_url AS "cover_image_url",
+                    vc.website_url AS "websiteUrl",
+                    vc.website_url AS "website_url",
+                    vc.public_email AS "publicEmail",
+                    vc.public_email AS "public_email",
+                    vc.contact_phone AS "contactPhone",
+                    vc.contact_phone AS "contact_phone",
+                    vc.social_links AS "socialLinks",
+                    vc.social_links AS "social_links",
+                    vc.founded_year AS "foundedYear",
+                    vc.founded_year AS "founded_year",
+                    vc.operating_status AS "operatingStatus",
+                    vc.operating_status AS "operating_status",
+                    vc.mission,
+                    vc.vision,
+                    vc.focus_areas AS "focusAreas",
+                    vc.focus_areas AS "focus_areas",
+                    vc.publication_status AS "publicationStatus",
+                    vc.publication_status AS "publication_status",
+                    vc.profile_visibility AS "profileVisibility",
+                    vc.profile_visibility AS "profile_visibility",
+                    vc.visibility,
+                    COALESCE(vc.links, '[]'::jsonb) AS links,
+                    vc.recruitment_status AS "recruitmentStatus",
+                    vc.recruitment_status AS "recruitment_status",
+                    vc.recruitment_announcement AS "recruitmentAnnouncement",
+                    vc.recruitment_announcement AS "recruitment_announcement",
+                    vc.recruitment_url AS "recruitmentUrl",
+                    vc.recruitment_url AS "recruitment_url",
+                    vc.is_active AS "isActive",
+                    vc.is_active AS "is_active",
+                    vc.verified_at AS "verifiedAt",
+                    vc.verified_at AS "verified_at",
+                    vc.created_at AS "createdAt",
+                    vc.created_at AS "created_at",
+                    vc.updated_at AS "updatedAt",
+                    vc.updated_at AS "updated_at"
+                 FROM verified_clubs vc
+                 LEFT JOIN users u ON u.id = vc.auth_user_id
+                 WHERE vc.id = $1
+                 LIMIT 1;`,
+                [clubId]
+            ),
+            query(
+                `SELECT
+                    c.id,
+                    c.club_id AS "clubId",
+                    c.linked_user_id AS "linkedUserId",
+                    c.name,
+                    c.department,
+                    c.role,
+                    c.image_url AS "imageUrl",
+                    c.is_primary AS "isPrimary",
+                    c.display_order AS "displayOrder",
+                    c.is_public AS "isPublic",
+                    c.contact_email AS "contactEmail",
+                    c.linkedin_url AS "linkedinUrl",
+                    c.created_at AS "createdAt",
+                    c.updated_at AS "updatedAt",
+                    u.username AS "linkedUsername",
+                    COALESCE(NULLIF(TRIM(CONCAT(u.firstname, ' ', u.lastname)), ''), u.username) AS "linkedDisplayName",
+                    u.avatar_url AS "linkedAvatarUrl"
+                 FROM club_coordinators c
+                 LEFT JOIN users u ON u.id = c.linked_user_id
+                 WHERE c.club_id = $1
+                 ORDER BY c.display_order ASC, c.created_at ASC;`,
+                [clubId]
+            ),
+            query(
+                `SELECT
+                    id,
+                    club_id AS "clubId",
+                    title,
+                    description,
+                    achievement_date AS "achievementDate",
+                    achievement_date AS "date",
+                    issuer,
+                    issuer AS "organization",
+                    achievement_type AS "type",
+                    achievement_type AS "achievementType",
+                    image_url AS "imageUrl",
+                    external_link AS "externalLink",
+                    external_link AS "referenceUrl",
+                    display_order AS "displayOrder",
+                    created_at AS "createdAt",
+                    updated_at AS "updatedAt"
+                 FROM club_achievements
+                 WHERE club_id = $1
+                 ORDER BY display_order ASC, created_at ASC;`,
+                [clubId]
+            ),
+            query(
+                `SELECT 
+                    COUNT(*) FILTER (WHERE status = 'published' AND starts_at >= NOW()) AS upcoming_count,
+                    COUNT(*) FILTER (WHERE status = 'published' AND starts_at < NOW()) AS past_count,
+                    COUNT(*) FILTER (WHERE status = 'draft') AS draft_count,
+                    COUNT(*) AS total_count
+                 FROM club_events
+                 WHERE club_id = $1;`,
+                [clubId]
+            ),
+        ]);
 
         const club = clubRes.rows[0];
         if (!club) {
@@ -239,70 +299,6 @@ export class ClubProfileService {
         if (!Array.isArray(club.links)) {
             club.links = [];
         }
-
-        // Fetch coordinators
-        const coordRes = await query(
-            `SELECT
-                c.id,
-                c.club_id AS "clubId",
-                c.linked_user_id AS "linkedUserId",
-                c.name,
-                c.department,
-                c.role,
-                c.image_url AS "imageUrl",
-                c.is_primary AS "isPrimary",
-                c.display_order AS "displayOrder",
-                c.is_public AS "isPublic",
-                c.contact_email AS "contactEmail",
-                c.linkedin_url AS "linkedinUrl",
-                c.created_at AS "createdAt",
-                c.updated_at AS "updatedAt",
-                u.username AS "linkedUsername",
-                COALESCE(NULLIF(TRIM(CONCAT(u.firstname, ' ', u.lastname)), ''), u.username) AS "linkedDisplayName",
-                u.avatar_url AS "linkedAvatarUrl"
-             FROM club_coordinators c
-             LEFT JOIN users u ON u.id = c.linked_user_id
-             WHERE c.club_id = $1
-             ORDER BY c.display_order ASC, c.created_at ASC;`,
-            [clubId]
-        );
-
-        // Fetch achievements
-        const achRes = await query(
-            `SELECT
-                id,
-                club_id AS "clubId",
-                title,
-                description,
-                achievement_date AS "achievementDate",
-                achievement_date AS "date",
-                issuer,
-                issuer AS "organization",
-                achievement_type AS "type",
-                achievement_type AS "achievementType",
-                image_url AS "imageUrl",
-                external_link AS "externalLink",
-                external_link AS "referenceUrl",
-                display_order AS "displayOrder",
-                created_at AS "createdAt",
-                updated_at AS "updatedAt"
-             FROM club_achievements
-             WHERE club_id = $1
-             ORDER BY display_order ASC, created_at ASC;`,
-            [clubId]
-        );
-
-        // Event stats
-        const countRes = await query(
-            `SELECT 
-                COUNT(*) FILTER (WHERE status = 'published' AND starts_at >= NOW()) AS upcoming_count,
-                COUNT(*) FILTER (WHERE status = 'published' AND starts_at < NOW()) AS past_count,
-                COUNT(*) FILTER (WHERE status = 'draft') AS draft_count,
-                COUNT(*) AS total_count
-             FROM club_events
-             WHERE club_id = $1;`,
-            [clubId]
-        );
 
         const coordinators = coordRes.rows;
         const achievements = achRes.rows;
@@ -343,9 +339,9 @@ export class ClubProfileService {
 
         const clubId = perms.clubId;
 
-        // Current club record for slug and diff
+        // Current club record for validation, diffing and slug resolution (single fast query)
         const currentRes = await query(
-            `SELECT id, slug, auth_user_id FROM verified_clubs WHERE id = $1 LIMIT 1;`,
+            `SELECT id, slug, auth_user_id, name, category, about, college_name, college_id FROM verified_clubs WHERE id = $1 LIMIT 1;`,
             [clubId]
         );
         const currentClub = currentRes.rows[0];
@@ -435,17 +431,12 @@ export class ClubProfileService {
 
         // Server-side validation before publishing (public or unlisted)
         if (targetVisibility === "public" || targetVisibility === "unlisted") {
-            const currentFull = await query(
-                `SELECT name, category, about, college_name, college_id FROM verified_clubs WHERE id = $1 LIMIT 1;`,
-                [clubId]
-            );
-            const curr = currentFull.rows[0] || {};
             const pubValidation = this.validatePublishingRequirements({
-                name: payload.name !== undefined ? payload.name : curr.name,
-                category: payload.category !== undefined ? payload.category : curr.category,
-                about: payload.about !== undefined ? payload.about : curr.about,
-                collegeName: curr.college_name,
-                collegeId: curr.college_id,
+                name: payload.name !== undefined ? payload.name : currentClub.name,
+                category: payload.category !== undefined ? payload.category : currentClub.category,
+                about: payload.about !== undefined ? payload.about : currentClub.about,
+                collegeName: currentClub.college_name,
+                collegeId: currentClub.college_id,
             });
 
             if (!pubValidation.valid) {
@@ -664,7 +655,7 @@ export class ClubProfileService {
         }
 
         if (updates.length === 0) {
-            return await this.getFullClubProfile(userId, requestedClubId);
+            return await this.getFullClubProfile(userId, requestedClubId, perms);
         }
 
         updates.push(`updated_at = NOW()`);
@@ -679,10 +670,12 @@ export class ClubProfileService {
 
         await query(sql, values);
 
-        // Invalidate public profile cache
-        await invalidateClubProfileCache(currentClub.slug, []);
+        // Invalidate public profile cache asynchronously without blocking response
+        invalidateClubProfileCache(currentClub.slug || perms.clubSlug, []).catch((err) => {
+            console.warn("Async cache invalidation warning:", err);
+        });
 
-        return await this.getFullClubProfile(userId, requestedClubId);
+        return await this.getFullClubProfile(userId, requestedClubId, perms);
     }
 
     /**
@@ -728,7 +721,7 @@ export class ClubProfileService {
             }
         }
 
-        return await this.getFullClubProfile(userId, requestedClubId);
+        return await this.getFullClubProfile(userId, requestedClubId, perms);
     }
 
     /**

@@ -9,6 +9,7 @@ import {
     Radio,
     ExternalLink,
     Trophy,
+    MapPin,
 } from "lucide-react";
 import type { CollegeClubItem } from "../utils/clubProfileApi";
 
@@ -148,15 +149,16 @@ export const ClubCard: React.FC<ClubCardProps> = ({
                             {club.name}
                         </h3>
 
-                        <p className="text-[11px] font-bold text-neutral-500 truncate flex items-center gap-1">
-                            <span>orbix.in/clubs/{club.slug}</span>
-                            {showCampusName && club.collegeName && (
-                                <>
-                                    <span>·</span>
-                                    <span className="text-neutral-700 truncate">{club.collegeName}</span>
-                                </>
-                            )}
-                        </p>
+                        {showCampusName && club.collegeName ? (
+                            <p className="text-[11px] font-bold text-neutral-600 truncate flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-neutral-500 shrink-0" />
+                                <span className="truncate">{club.collegeName}</span>
+                            </p>
+                        ) : (
+                            <p className="text-[11px] font-bold text-neutral-500 truncate">
+                                @{club.slug}
+                            </p>
+                        )}
                     </div>
 
                     {/* Short Description */}

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 import {
     X,
     Smartphone,
@@ -34,14 +35,21 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
 }) => {
     const [viewMode, setViewMode] = useState<"desktop" | "mobile">("desktop");
     const [activeTab, setActiveTab] = useState<"about" | "coordinators" | "achievements">("about");
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     if (!isOpen) return null;
 
     const publicCoordinators = (coordinators || []).filter((c) => c.isPublic !== false);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
-            <div className="bg-[#FAF6EE] rounded-2xl border-2 border-black shadow-[8px_8px_0px_#000] w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="bg-[#FAF6EE] rounded-2xl border-2 border-black shadow-[8px_8px_0px_#000] w-full max-w-5xl h-[92vh] flex flex-col overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header Bar */}
                 <div className="px-4 py-3 bg-white border-b-2 border-black flex items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-2">
@@ -124,16 +132,16 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
 
                             {/* Identity Info */}
                             <div className="p-5 sm:p-6 relative">
-                                <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 -mt-14 sm:-mt-16 mb-4">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-4">
                                     <div className="flex items-end gap-3.5">
-                                        <div className="w-20 h-20 rounded-xl bg-white border-2 border-black overflow-hidden shadow-[3px_3px_0px_#000] shrink-0 flex items-center justify-center font-black text-xl text-black">
+                                        <div className="w-20 h-20 -mt-14 sm:-mt-16 rounded-xl bg-white border-2 border-black overflow-hidden shadow-[3px_3px_0px_#000] shrink-0 flex items-center justify-center font-black text-xl text-black">
                                             {club.logoUrl ? (
                                                 <img src={club.logoUrl} alt={club.name} className="w-full h-full object-cover" />
                                             ) : (
                                                 <span>{(club.name || "CB").slice(0, 2).toUpperCase()}</span>
                                             )}
                                         </div>
-                                        <div className="space-y-1">
+                                        <div className="space-y-1 pt-2 sm:pt-4">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <h1 className="text-xl sm:text-2xl font-black text-black">
                                                     {club.name || "Club Official Name"}

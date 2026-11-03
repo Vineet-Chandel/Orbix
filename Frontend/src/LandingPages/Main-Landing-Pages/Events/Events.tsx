@@ -15,8 +15,15 @@ import {
     EyeOff,
 } from "lucide-react";
 import { getPortalIcon } from "../../../utils/portalIcons";
-import { MOCK_EVENT_LIST } from "./mockEvents";
+import {
+    getInitialLandingEvents,
+    fetchLandingEventsApi,
+    mergeLandingEvents,
+    saveLandingEventsProfile,
+    generateDynamicMockEvents,
+} from "./mockEvents";
 import type { EventItem } from "../../../store";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 export const ALL_FILTER_PLATFORMS = [
     { id: "leetcode", name: "LeetCode", color: "#FFA116" },
@@ -221,9 +228,8 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
     // Toggle to see/remove finished contests from the list (default false to keep the list clean & focused on upcoming)
     const [showFinished, setShowFinished] = useState<boolean>(false);
 
-    const [reminders, setReminders] = useState<string[]>(["starters-261"]);
-    const [openCalDropdownId, setOpenCalDropdownId] = useState<string | null>(null);
-    const [selectedDayEvents, setSelectedDayEvents] = useState<{ date: string; events: EventItem[] } | null>(null);
+    // Dynamic Landing Events state (rehydrated from dummy profile cache or dynamic generator)
+    const [eventsList, setEventsList] = useState<EventItem[]>(() => getInitialLandingEvents());
 
     // Month Navigation State for Calendar View
     const today = new Date();
@@ -255,6 +261,67 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
         setViewMonthIndex(today.getMonth());
     };
 
+    // Fire live contest search API (/api/events) on mount & sync into dummy data profile
+    useEffect(() => {
+        let isMounted = true;
+        const syncContests = async () => {
+            try {
+                const apiEvents = await fetchLandingEventsApi();
+                if (apiEvents && Array.isArray(apiEvents) && apiEvents.length > 0 && isMounted) {
+                    const merged = mergeLandingEvents(apiEvents);
+                    setEventsList(merged);
+                    saveLandingEventsProfile(merged);
+                }
+            } catch (err) {
+                console.warn("Landing events live sync notice:", err);
+            }
+        };
+
+        syncContests();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    // Ensure viewed month has a rich schedule even if user navigates far forward or backward in calendar
+    useEffect(() => {
+        const hasMonthEvents = eventsList.some((ev) => {
+            const d = new Date(ev.startTime);
+            return d.getFullYear() === viewYear && d.getMonth() === viewMonthIndex;
+        });
+
+        if (!hasMonthEvents) {
+            const extraEvents = generateDynamicMockEvents(new Date(viewYear, viewMonthIndex, 1));
+            setEventsList((prev) => {
+                const map = new Map<string, EventItem>();
+                prev.forEach((e) => map.set(e.id, e));
+                extraEvents.forEach((e) => {
+                    if (!map.has(e.id)) map.set(e.id, e);
+                });
+                const res = Array.from(map.values());
+                res.sort((a, b) => a.startTimestamp - b.startTimestamp);
+                return res;
+            });
+        }
+    }, [viewYear, viewMonthIndex, eventsList]);
+
+    // Reminder state persisted in localStorage
+    const [reminders, setReminders] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem("orbix_landing_reminders");
+            return saved ? JSON.parse(saved) : ["starters-262"];
+        } catch {
+            return ["starters-262"];
+        }
+    });
+    const [openCalDropdownId, setOpenCalDropdownId] = useState<string | null>(null);
+    const [selectedDayEvents, setSelectedDayEvents] = useState<{ date: string; events: EventItem[] } | null>(null);
+
+    const { handleBackdropClick: handleDayEventsBackdropClick } = useModalDismiss({
+        isOpen: Boolean(selectedDayEvents),
+        onClose: () => setSelectedDayEvents(null),
+    });
+
     // Close calendar dropdown on outside click
     const calDropdownRef = useRef<HTMLDivElement | null>(null);
     useEffect(() => {
@@ -270,38 +337,45 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
     // Toggle Reminder
     const handleToggleReminder = (id: string, e?: React.MouseEvent) => {
         e?.stopPropagation();
-        setReminders((prev) =>
-            prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
-        );
+        setReminders((prev) => {
+            const next = prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id];
+            try {
+                localStorage.setItem("orbix_landing_reminders", JSON.stringify(next));
+            } catch {
+                // Ignore storage errors
+            }
+            return next;
+        });
     };
 
     // Dynamic 7-day rolling window algorithm: calculates upcoming contests and participating platforms in [nowMs, nowMs + 7 days]
     const next7DaysStats = useMemo(() => {
         const now = nowMs;
         const sevenDaysLater = now + 7 * 24 * 60 * 60 * 1000;
-        const upcomingIn7Days = MOCK_EVENT_LIST.filter((ev) => {
+        const upcomingIn7Days = eventsList.filter((ev) => {
             const start = ev.startTimestamp;
-            return start >= now && start <= sevenDaysLater;
+            const matchesType = selectedType === "contests" ? ev.type === "contest" : ev.type === "hackathon";
+            return matchesType && start >= now && start <= sevenDaysLater;
         });
         const uniquePlatforms = new Set(upcomingIn7Days.map((ev) => ev.platform.toLowerCase()));
         return {
-            count: upcomingIn7Days.length || 12,
-            platforms: uniquePlatforms.size || 9,
+            count: upcomingIn7Days.length || (selectedType === "contests" ? 14 : 3),
+            platforms: uniquePlatforms.size || (selectedType === "contests" ? 9 : 3),
         };
-    }, [nowMs]);
+    }, [eventsList, nowMs, selectedType]);
 
     // Base filter by Type and Platform
     const baseFilteredEvents = useMemo(() => {
-        return MOCK_EVENT_LIST.filter((ev) => {
+        return eventsList.filter((ev) => {
             const matchesType = selectedType === "contests" ? ev.type === "contest" : ev.type === "hackathon";
             const matchesPlatform = selectedPlatform === null || ev.platform === selectedPlatform;
             return matchesType && matchesPlatform;
         });
-    }, [selectedType, selectedPlatform]);
+    }, [eventsList, selectedType, selectedPlatform]);
 
     // Count finished contests in the current filter
     const finishedCount = useMemo(() => {
-        return baseFilteredEvents.filter((ev) => ev.status === "FINISHED" || ev.endTimestamp < nowMs).length;
+        return baseFilteredEvents.filter((ev) => ev.endTimestamp < nowMs).length;
     }, [baseFilteredEvents, nowMs]);
 
     // Visible events for List View: Removes finished contests when showFinished is false
@@ -309,7 +383,7 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
         if (showFinished) {
             return baseFilteredEvents;
         }
-        return baseFilteredEvents.filter((ev) => ev.status !== "FINISHED" && ev.endTimestamp >= nowMs);
+        return baseFilteredEvents.filter((ev) => ev.endTimestamp >= nowMs);
     }, [baseFilteredEvents, showFinished, nowMs]);
 
     // Group events by Date for the List View
@@ -354,8 +428,8 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                 day: "numeric",
             });
 
-            const hasLive = val.events.some((e) => e.status === "LIVE");
-            const allFinished = val.events.every((e) => e.status === "FINISHED");
+            const hasLive = val.events.some((e) => nowMs >= e.startTimestamp && nowMs < e.endTimestamp);
+            const allFinished = val.events.every((e) => nowMs >= e.endTimestamp);
 
             val.events.sort((a, b) => a.startTimestamp - b.startTimestamp);
 
@@ -376,7 +450,7 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
 
         groups.sort((a, b) => a.dateObj.getTime() - b.dateObj.getTime());
         return groups;
-    }, [filteredEvents]);
+    }, [filteredEvents, nowMs]);
 
     // Dynamic platform contest counts for the currently viewed month
     const activeCounts = useMemo(() => {
@@ -384,7 +458,7 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
         ALL_FILTER_PLATFORMS.forEach((p) => {
             counts[p.id] = 0;
         });
-        MOCK_EVENT_LIST.forEach((ev) => {
+        eventsList.forEach((ev) => {
             const d = new Date(ev.startTime);
             if (d.getFullYear() === viewYear && d.getMonth() === viewMonthIndex) {
                 if (selectedType === "contests" ? ev.type === "contest" : ev.type === "hackathon") {
@@ -393,23 +467,53 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
             }
         });
         return counts;
-    }, [viewYear, viewMonthIndex, selectedType]);
+    }, [eventsList, viewYear, viewMonthIndex, selectedType]);
 
-    // Active Up Next Contest: prioritized to live or upcoming contests
+    // Active Up Next Contest: prioritized to upcoming or live contests
     const activeUpNext = useMemo(() => {
-        const upcoming = baseFilteredEvents.filter((e) => e.endTimestamp > nowMs && e.status !== "FINISHED");
-        if (upcoming.length > 0) return upcoming[0];
-        const anyUpcoming = MOCK_EVENT_LIST.filter((e) => e.endTimestamp > nowMs && e.status !== "FINISHED");
+        // Priority 1: An upcoming contest in the current platform filter
+        const upcomingFiltered = baseFilteredEvents.filter((e) => e.startTimestamp > nowMs);
+        if (upcomingFiltered.length > 0) return upcomingFiltered[0];
+
+        // Priority 2: A live contest in current platform filter
+        const liveFiltered = baseFilteredEvents.filter((e) => e.startTimestamp <= nowMs && e.endTimestamp > nowMs);
+        if (liveFiltered.length > 0) return liveFiltered[0];
+
+        // Priority 3: Any upcoming contest of the current type (contest vs hackathon)
+        const upcomingSameType = eventsList.filter((e) =>
+            (selectedType === "contests" ? e.type === "contest" : e.type === "hackathon") &&
+            e.startTimestamp > nowMs
+        );
+        if (upcomingSameType.length > 0) return upcomingSameType[0];
+
+        // Priority 4: Any live contest of current type
+        const liveSameType = eventsList.filter((e) =>
+            (selectedType === "contests" ? e.type === "contest" : e.type === "hackathon") &&
+            e.startTimestamp <= nowMs && e.endTimestamp > nowMs
+        );
+        if (liveSameType.length > 0) return liveSameType[0];
+
+        // Priority 5: Any upcoming contest overall
+        const anyUpcoming = eventsList.filter((e) => e.startTimestamp > nowMs);
         if (anyUpcoming.length > 0) return anyUpcoming[0];
-        return MOCK_EVENT_LIST.find((e) => e.id === "starters-261") || MOCK_EVENT_LIST[0];
-    }, [baseFilteredEvents, nowMs]);
+
+        // Fallback: First event matching filter or first overall
+        return baseFilteredEvents[0] || eventsList[0] || null;
+    }, [baseFilteredEvents, eventsList, nowMs, selectedType]);
+
+    // Whether active Up Next contest is currently live
+    const isUpNextLive = useMemo(() => {
+        if (!activeUpNext) return false;
+        return nowMs >= activeUpNext.startTimestamp && nowMs < activeUpNext.endTimestamp;
+    }, [activeUpNext, nowMs]);
 
     // Live Countdown
     const countdown = useMemo(() => {
         if (!activeUpNext) {
             return { days: "00", hours: "00", minutes: "00", seconds: "00" };
         }
-        const diffMs = Math.max(0, activeUpNext.startTimestamp - nowMs);
+        const targetMs = isUpNextLive ? activeUpNext.endTimestamp : activeUpNext.startTimestamp;
+        const diffMs = Math.max(0, targetMs - nowMs);
         const totalSeconds = Math.floor(diffMs / 1000);
         const days = Math.floor(totalSeconds / 86400);
         const hours = Math.floor((totalSeconds % 86400) / 3600);
@@ -422,7 +526,7 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
             minutes: String(minutes).padStart(2, "0"),
             seconds: String(seconds).padStart(2, "0"),
         };
-    }, [activeUpNext, nowMs]);
+    }, [activeUpNext, nowMs, isUpNextLive]);
 
     // Calendar Matrix calculation for Month View
     const calendarCells = useMemo(() => {
@@ -645,8 +749,15 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                                 </div>
                                 <div className="min-w-0 space-y-1">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-[11px] font-black uppercase tracking-wider text-black bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] px-2 py-0.5 rounded-md">
-                                            UP NEXT · {activeUpNext.platformName}
+                                        <span className="text-[11px] font-black uppercase tracking-wider text-black bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                                            {isUpNextLive ? (
+                                                <>
+                                                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                                                    LIVE NOW · {activeUpNext.platformName}
+                                                </>
+                                            ) : (
+                                                `UP NEXT · ${activeUpNext.platformName}`
+                                            )}
                                         </span>
                                         {activeUpNext.rated && (
                                             <span className="text-[10px] font-black uppercase tracking-wider text-black bg-[#a2ff86] border-2 border-black shadow-[1.5px_1.5px_0px_#000] px-2 py-0.5 rounded-md">
@@ -1151,8 +1262,8 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
                                                     <div className="flex-1 min-w-0 space-y-2">
                                                         {group.events.map((ev) => {
                                                             const isReminded = reminders.includes(ev.id);
-                                                            const isLive = ev.status === "LIVE";
-                                                            const isFinished = ev.status === "FINISHED";
+                                                            const isLive = nowMs >= ev.startTimestamp && nowMs < ev.endTimestamp;
+                                                            const isFinished = nowMs >= ev.endTimestamp;
 
                                                             return (
                                                                 <div
@@ -1290,7 +1401,7 @@ export const Events: React.FC<EventsProps> = ({ className = "" }) => {
             {selectedDayEvents && (
                 <div
                     className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in"
-                    onClick={() => setSelectedDayEvents(null)}
+                    onClick={handleDayEventsBackdropClick}
                 >
                     <div
                         className="w-full max-w-lg rounded-2xl bg-[#FAF6EE] text-black border-2 border-black shadow-[6px_6px_0px_#000] p-6 space-y-4 max-h-[85vh] overflow-y-auto"

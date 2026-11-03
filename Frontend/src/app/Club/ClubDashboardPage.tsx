@@ -33,6 +33,7 @@ import { ClubProfileManager } from "./Profile/ClubProfileManager";
 import { ClubSettingsView } from "./Settings/ClubSettingsView";
 import { OtherClubsSection } from "./OtherClubsSection";
 import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface VerifiedClub {
     id: string;
@@ -214,6 +215,10 @@ export default function ClubDashboardPage() {
 
     // Event Modal State
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+    const { handleBackdropClick: handleEventModalBackdropClick } = useModalDismiss({
+        isOpen: isEventModalOpen,
+        onClose: () => setIsEventModalOpen(false),
+    });
     const [editingEventId, setEditingEventId] = useState<string | null>(null);
     const [eventForm, setEventForm] = useState({
         title: "",
@@ -1431,8 +1436,14 @@ export default function ClubDashboardPage() {
 
             {/* Event Create / Edit Modal */}
             {isEventModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="w-full max-w-xl bg-white rounded-3xl border-2 border-black shadow-[8px_8px_0px_#000] p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-8">
+                <div
+                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+                    onClick={handleEventModalBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-xl bg-white rounded-3xl border-2 border-black shadow-[8px_8px_0px_#000] p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-8"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                             <div>
                                 <h3 className="font-black text-base text-neutral-900">

@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import { AlertTriangle, Lock, GraduationCap, X, Clock, ShieldAlert } from "lucide-react";
+import { useModalDismiss } from "../hooks/useModalDismiss";
 
 export interface CollegeChangeWarningModalProps {
     isOpen: boolean;
@@ -20,17 +20,7 @@ export function CollegeChangeWarningModal({
     remainingMs = 0,
     nextAllowedDate,
 }: CollegeChangeWarningModalProps) {
-    // ESC key closes modal
-    useEffect(() => {
-        if (!isOpen) return;
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") {
-                onClose();
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, onClose]);
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     if (!isOpen) return null;
 
@@ -82,14 +72,13 @@ export function CollegeChangeWarningModal({
             role="dialog"
             aria-modal="true"
             aria-labelledby="collegeModalTitle"
-            onClick={(e) => {
-                if (e.target === e.currentTarget) {
-                    onClose();
-                }
-            }}
+            onClick={handleBackdropClick}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
         >
-            <div className="w-full max-w-md bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] text-black space-y-4 animate-in zoom-in-95 duration-150">
+            <div
+                className="w-full max-w-md bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] text-black space-y-4 animate-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">

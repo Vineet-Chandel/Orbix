@@ -28,6 +28,7 @@ import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import type { SettingsViewKey } from "./types";
 import { useToast } from "../../context/ToastContext";
 import { NeoToggle } from "../../components/NeoToggle";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { useAppDispatch, useAppSelector, setUser } from "../../store";
 import {
     fetchBlockedUsersThunk,
@@ -105,6 +106,29 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
     const [showTwoFactorDisableModal, setShowTwoFactorDisableModal] = useState(false);
     const [disablePassword, setDisablePassword] = useState("");
     const [isDisabling2FA, setIsDisabling2FA] = useState(false);
+
+    const { handleBackdropClick: handleSetupModalBackdropClick } = useModalDismiss({
+        isOpen: showTwoFactorSetupModal,
+        onClose: () => {
+            if (!isVerifyingSetupOtp && !isSendingSetupOtp) {
+                setShowTwoFactorSetupModal(false);
+            }
+        },
+        disableEscape: isVerifyingSetupOtp || isSendingSetupOtp,
+        disableBackdrop: isVerifyingSetupOtp || isSendingSetupOtp,
+    });
+
+    const { handleBackdropClick: handleDisableModalBackdropClick } = useModalDismiss({
+        isOpen: showTwoFactorDisableModal,
+        onClose: () => {
+            if (!isDisabling2FA) {
+                setShowTwoFactorDisableModal(false);
+                setDisablePassword("");
+            }
+        },
+        disableEscape: isDisabling2FA,
+        disableBackdrop: isDisabling2FA,
+    });
 
     // Setup timer
     useEffect(() => {
@@ -1621,8 +1645,14 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
             {/* Two-Factor Authentication Setup Modal */}
             {showTwoFactorSetupModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-                    <div className="w-full max-w-md bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-5 animate-scaleUp">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+                    onClick={handleSetupModalBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-md bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-5 animate-scaleUp"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Modal Header */}
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3">
@@ -1731,8 +1761,14 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
             {/* Two-Factor Authentication Disable Confirmation Modal */}
             {showTwoFactorDisableModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-                    <div className="w-full max-w-md bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-5 animate-scaleUp">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+                    onClick={handleDisableModalBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-md bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-5 animate-scaleUp"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Modal Header */}
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3">

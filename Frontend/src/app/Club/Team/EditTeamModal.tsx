@@ -3,6 +3,7 @@ import { X, Edit3, Archive, AlertTriangle } from "lucide-react";
 import { OrbixButton } from "../../../components/OrbixButton";
 import { useToast } from "../../../context/ToastContext";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 import type { ClubMember, ClubTeam } from "./types";
 
 interface EditTeamModalProps {
@@ -131,9 +132,17 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
         }
     };
 
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-            <div className="w-full max-w-xl bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-5 sm:p-6 space-y-5 my-auto max-h-[92vh] overflow-y-auto no-scrollbar">
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="w-full max-w-xl bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-5 sm:p-6 space-y-5 my-auto max-h-[92vh] overflow-y-auto no-scrollbar"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3 pb-3 border-b-2 border-black/15">
                     <div className="flex items-center gap-3">

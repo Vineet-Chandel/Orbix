@@ -1,5 +1,5 @@
 import React from "react";
-import { Mail, Phone, Info } from "lucide-react";
+import { Mail, Phone } from "lucide-react";
 import { ClubCoordinatorsManager } from "./ClubCoordinatorsManager";
 import type { ClubCoordinator } from "../../../utils/clubProfileApi";
 

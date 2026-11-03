@@ -14,6 +14,7 @@ import { evaluatePassword } from "../passwordValidator";
 import OtpSegmentedInput from "../OtpSegmentedInput";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 export default function SignupForm() {
     const navigate = useNavigate();
@@ -48,6 +49,15 @@ export default function SignupForm() {
     const [emailCooldown, setEmailCooldown] = useState(0);
     const [resendingOtp, setResendingOtp] = useState(false);
     const [verifyingAndRegistering, setVerifyingAndRegistering] = useState(false);
+
+    const { handleBackdropClick: handleOtpModalBackdropClick } = useModalDismiss({
+        isOpen: showOtpModal,
+        onClose: () => {
+            if (!verifyingAndRegistering) setShowOtpModal(false);
+        },
+        disableEscape: verifyingAndRegistering,
+        disableBackdrop: verifyingAndRegistering,
+    });
 
     const passwordStrength = evaluatePassword(formData.password);
 
@@ -531,12 +541,16 @@ export default function SignupForm() {
 
             {/* Neo-Brutalist Email Verification Modal */}
             {showOtpModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+                    onClick={handleOtpModalBackdropClick}
+                >
                     <div
                         className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="otp-dialog-title"
+                        onClick={(e) => e.stopPropagation()}
                     >
                         {/* Modal Header */}
                         <div className="flex items-start justify-between gap-3">

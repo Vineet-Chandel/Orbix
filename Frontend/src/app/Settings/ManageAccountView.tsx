@@ -29,6 +29,7 @@ import { useToast } from "../../context/ToastContext";
 import { useAppDispatch } from "../../store";
 import { updateUserProfile, setEmailVerified } from "../../store/userSlice";
 import OtpSegmentedInput from "../../LandingPages/Auth-Pages/OtpSegmentedInput";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 import {
     fetchManageAccountsStatus,
     startEmailChange,
@@ -134,6 +135,55 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
     const [isPreviewJsonOpen, setIsPreviewJsonOpen] = useState(false);
     const [isCopiedChecksum, setIsCopiedChecksum] = useState(false);
     const [previewPayload, setPreviewPayload] = useState<any | null>(null);
+
+    const { handleBackdropClick: handleEmailChangeBackdropClick } = useModalDismiss({
+        isOpen: isEmailChangeModalOpen,
+        onClose: () => {
+            if (!isSubmittingStartEmail && !isSubmittingOtp) {
+                setIsEmailChangeModalOpen(false);
+            }
+        },
+        disableEscape: isSubmittingStartEmail || isSubmittingOtp,
+        disableBackdrop: isSubmittingStartEmail || isSubmittingOtp,
+    });
+
+    const { handleBackdropClick: handlePrimaryVerifyBackdropClick } = useModalDismiss({
+        isOpen: isPrimaryVerifyModalOpen,
+        onClose: () => {
+            if (!isSubmittingPrimaryOtp) {
+                setIsPrimaryVerifyModalOpen(false);
+            }
+        },
+        disableEscape: isSubmittingPrimaryOtp,
+        disableBackdrop: isSubmittingPrimaryOtp,
+    });
+
+    const { handleBackdropClick: handleUsernameBackdropClick } = useModalDismiss({
+        isOpen: isUsernameModalOpen,
+        onClose: () => {
+            if (!isSubmittingUsernameRequest && !isSubmittingUsernameConfirm) {
+                setIsUsernameModalOpen(false);
+            }
+        },
+        disableEscape: isSubmittingUsernameRequest || isSubmittingUsernameConfirm,
+        disableBackdrop: isSubmittingUsernameRequest || isSubmittingUsernameConfirm,
+    });
+
+    const { handleBackdropClick: handleArchiveBackdropClick } = useModalDismiss({
+        isOpen: isArchiveModalOpen,
+        onClose: () => {
+            if (!isGeneratingArchive) {
+                setIsArchiveModalOpen(false);
+            }
+        },
+        disableEscape: isGeneratingArchive,
+        disableBackdrop: isGeneratingArchive,
+    });
+
+    const { handleBackdropClick: handlePreviewJsonBackdropClick } = useModalDismiss({
+        isOpen: isPreviewJsonOpen,
+        onClose: () => setIsPreviewJsonOpen(false),
+    });
 
     // Fetch authoritative status
     const loadStatus = async (showLoading = true) => {
@@ -1070,13 +1120,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             {isEmailChangeModalOpen && typeof document !== "undefined" && createPortal(
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget && !isSubmittingStartEmail && !isSubmittingOtp) {
-                            if (emailChangeStep === "input_email") {
-                                setIsEmailChangeModalOpen(false);
-                            }
-                        }
-                    }}
+                    onClick={handleEmailChangeBackdropClick}
                 >
                     <div
                         className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto my-auto"
@@ -1235,11 +1279,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             {isPrimaryVerifyModalOpen && typeof document !== "undefined" && createPortal(
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget && !isSubmittingPrimaryOtp) {
-                            setIsPrimaryVerifyModalOpen(false);
-                        }
-                    }}
+                    onClick={handlePrimaryVerifyBackdropClick}
                 >
                     <div
                         className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto my-auto"
@@ -1323,11 +1363,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             {isUsernameModalOpen && typeof document !== "undefined" && createPortal(
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget && !isSubmittingUsernameRequest && !isSubmittingUsernameConfirm) {
-                            setIsUsernameModalOpen(false);
-                        }
-                    }}
+                    onClick={handleUsernameBackdropClick}
                 >
                     <div
                         className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto my-auto"
@@ -1490,11 +1526,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             {isArchiveModalOpen && typeof document !== "undefined" && createPortal(
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget && !isGeneratingArchive) {
-                            setIsArchiveModalOpen(false);
-                        }
-                    }}
+                    onClick={handleArchiveBackdropClick}
                 >
                     <div
                         className="relative w-full max-w-lg bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5 animate-in zoom-in-95 duration-150 max-h-[92vh] overflow-y-auto my-auto"
@@ -1798,7 +1830,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             {isPreviewJsonOpen && previewPayload && typeof document !== "undefined" && createPortal(
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
-                    onClick={() => setIsPreviewJsonOpen(false)}
+                    onClick={handlePreviewJsonBackdropClick}
                 >
                     <div
                         className="relative w-full max-w-2xl bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-4 animate-in zoom-in-95 duration-150 max-h-[85vh] flex flex-col my-auto"

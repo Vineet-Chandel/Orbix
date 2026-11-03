@@ -23,6 +23,7 @@ import {
 import { useToast } from "../../../context/ToastContext";
 import { NeoImageDropzone } from "../../../components/NeoImageDropzone";
 import { ConfirmationModal } from "../../../components/ConfirmationModal";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 interface ClubCoordinatorsManagerProps {
     clubId: string;
@@ -42,6 +43,10 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCoordinator, setEditingCoordinator] = useState<ClubCoordinator | null>(null);
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen: isModalOpen,
+        onClose: () => setIsModalOpen(false),
+    });
 
     // Form fields
     const [name, setName] = useState("");
@@ -346,8 +351,14 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
 
             {/* MODAL: ADD / EDIT COORDINATOR */}
             {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-                    <div className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+                    onClick={handleBackdropClick}
+                >
+                    <div
+                        className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Header */}
                         <div className="p-4 sm:p-5 bg-[#FAF6EE] border-b-2 border-black flex items-center justify-between">
                             <h3 className="text-base font-black text-black">

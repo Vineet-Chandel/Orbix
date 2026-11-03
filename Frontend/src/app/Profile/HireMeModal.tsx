@@ -3,6 +3,7 @@ import { Mail, X, Check } from "lucide-react";
 import { OrbixLoader } from "../../components/ui/loader";
 import { sendHireMessage } from "../../utils/profileApi";
 import { useToast } from "../../context/ToastContext";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface HireMeModalProps {
     isOpen: boolean;
@@ -116,12 +117,19 @@ export function HireMeModal({
         }
     };
 
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen,
+        onClose: () => {
+            if (!sending) onClose();
+        },
+        disableEscape: sending,
+        disableBackdrop: sending,
+    });
+
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fadeIn"
-            onClick={(e) => {
-                if (e.target === e.currentTarget && !sending) onClose();
-            }}
+            onClick={handleBackdropClick}
         >
             <div
                 className="relative w-full max-w-lg rounded-2xl bg-[#111622] border border-neutral-800 shadow-2xl p-6 sm:p-7 text-neutral-100 select-none overflow-hidden"
