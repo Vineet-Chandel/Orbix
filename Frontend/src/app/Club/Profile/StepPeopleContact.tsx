@@ -36,13 +36,6 @@ export const StepPeopleContact: React.FC<StepPeopleContactProps> = ({
 
             {/* A. Club Coordinators Section */}
             <div className="space-y-4">
-                <div className="p-3.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-start gap-2.5">
-                    <Info className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                    <p className="text-[11px] text-amber-900 leading-relaxed font-medium">
-                        <strong>Public Showcase:</strong> Coordinators added here represent student leaders on your public club profile. Adding a coordinator does not create login accounts or grant management permissions.
-                    </p>
-                </div>
-
                 <ClubCoordinatorsManager
                     clubId={clubId}
                     coordinators={coordinators}
