@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { ClubMarkdownRenderer } from "../app/Club/Profile/ClubMarkdownRenderer";
 import {
     X,
-    ShieldCheck,
     Users,
     Calendar,
     Trophy,
@@ -25,6 +25,7 @@ import type { CollegeClubItem, ClubCoordinator } from "../utils/clubProfileApi";
 import { getPlatformIcon } from "../utils/platformLinks";
 import { useToast } from "../context/ToastContext";
 import { useModalDismiss } from "../hooks/useModalDismiss";
+import { VerifiedBadge } from "./VerifiedBadge";
 
 interface ClubDetailModalProps {
     club: CollegeClubItem | null;
@@ -101,9 +102,11 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
         ? club.links
         : socialsList.map((item) => ({ platform: item.icon, url: item.url!, label: item.label }));
 
-    return (
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-5 overflow-y-auto animate-in fade-in duration-200"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 md:p-5 overflow-y-auto animate-in fade-in duration-200"
             onClick={onClose}
             role="dialog"
             aria-modal="true"
@@ -190,24 +193,21 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
                                             {club.name.slice(0, 2).toUpperCase()}
                                         </div>
                                     )}
-                                    <div className="absolute bottom-1 right-1 bg-[#a2ff86] text-black rounded-full p-1 border border-black shadow-[1px_1px_0px_#000]">
-                                        <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <div className="absolute -bottom-1 -right-1">
+                                        <VerifiedBadge size="md" title="Verified Collegiate Club" />
                                     </div>
                                 </div>
 
                                 {/* Club Identity & Narrative Info (Positioned safely below banner on solid background) */}
                                 <div className="space-y-1.5 pt-2 sm:pt-4 pb-0.5">
-                                    <div className="flex items-center gap-2.5 flex-wrap">
+                                    <div className="flex items-center gap-2 flex-wrap">
                                         <h2
                                             id="club-modal-title"
                                             className="text-2xl sm:text-3xl font-black text-black tracking-tight"
                                         >
                                             {club.name}
                                         </h2>
-                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-950 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
-                                            <ShieldCheck className="w-3 h-3 text-emerald-700" />
-                                            Verified
-                                        </span>
+                                        <VerifiedBadge size="md" title="Verified Collegiate Club" />
                                     </div>
                                     {club.collegeName && (
                                         <p className="text-xs sm:text-sm font-bold text-neutral-700 flex items-center gap-1.5 flex-wrap">
@@ -622,6 +622,7 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

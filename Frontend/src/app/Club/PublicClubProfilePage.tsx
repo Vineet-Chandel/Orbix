@@ -3,7 +3,6 @@ import { useParams, Link } from "react-router-dom";
 import { ClubMarkdownRenderer } from "./Profile/ClubMarkdownRenderer";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import {
-    ShieldCheck,
     ShieldAlert,
     Building2,
     Globe,
@@ -28,6 +27,7 @@ import { getPlatformIcon } from "../../utils/platformLinks";
 import MessageClubModal from "./MessageClubModal";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
+import { VerifiedBadge } from "../../components/VerifiedBadge";
 
 interface PublicCoordinator {
     id: string;
@@ -351,7 +351,7 @@ export default function PublicClubProfilePage() {
                                 </span>
                             )}
                             <span className="px-3 py-1 rounded-full bg-white/95 backdrop-blur-xs border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5">
-                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 stroke-[2.5]" />
+                                <VerifiedBadge size="sm" />
                                 <span>Verified on Orbix</span>
                             </span>
                         </div>
@@ -362,18 +362,22 @@ export default function PublicClubProfilePage() {
                         {/* Overlapping Logo & Identity Row */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 mb-6">
                             <div className="flex flex-col sm:flex-row items-start sm:items-end gap-5">
-                                <div className="w-24 h-24 sm:w-28 sm:h-28 -mt-16 sm:-mt-20 rounded-2xl bg-white border-3 border-black overflow-hidden shadow-[4px_4px_0px_#000] shrink-0 flex items-center justify-center font-black text-2xl text-black">
+                                <div className="w-24 h-24 sm:w-28 sm:h-28 -mt-16 sm:-mt-20 rounded-2xl bg-white border-3 border-black overflow-hidden shadow-[4px_4px_0px_#000] shrink-0 flex items-center justify-center font-black text-2xl text-black relative">
                                     {club.logoUrl ? (
                                         <img src={club.logoUrl} alt={club.name} className="w-full h-full object-cover" />
                                     ) : (
                                         <span>{club.name.slice(0, 2).toUpperCase()}</span>
                                     )}
+                                    <div className="absolute -bottom-1 -right-1">
+                                        <VerifiedBadge size="md" title="Verified on Orbix" />
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1.5 pt-2 sm:pt-4">
                                     <div className="flex items-center gap-2.5 flex-wrap">
-                                        <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                                            {club.name}
+                                        <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight flex items-center gap-2">
+                                            <span>{club.name}</span>
+                                            <VerifiedBadge size="md" title="Verified on Orbix" />
                                         </h1>
                                         <span className="px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000]">
                                             {club.category}

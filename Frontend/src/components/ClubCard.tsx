@@ -1,7 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import {
-    ShieldCheck,
     Users,
     Calendar,
     ArrowUpRight,
@@ -12,6 +11,7 @@ import {
     MapPin,
 } from "lucide-react";
 import type { CollegeClubItem } from "../utils/clubProfileApi";
+import { VerifiedBadge } from "./VerifiedBadge";
 
 interface ClubCardProps {
     club: CollegeClubItem;
@@ -136,11 +136,8 @@ export const ClubCard: React.FC<ClubCardProps> = ({
                             )}
                         </div>
 
-                        {/* Verified badge pill */}
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-950 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
-                            <ShieldCheck className="w-3 h-3 text-emerald-700 stroke-[2.5]" />
-                            <span>Verified</span>
-                        </span>
+                        {/* Verified badge */}
+                        <VerifiedBadge size="sm" title="Verified Club" />
                     </div>
 
                     {/* Club Name & Handle */}

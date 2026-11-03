@@ -19,7 +19,7 @@ import { PublishValidationModal } from "./PublishValidationModal";
 
 interface ClubProfileManagerProps {
     clubId?: string;
-    onProfileUpdated?: () => void;
+    onProfileUpdated?: (updatedClub?: any) => void;
 }
 
 export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
@@ -334,7 +334,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                 toast.success("Club profile draft saved successfully!");
             }
 
-            if (onProfileUpdated) onProfileUpdated();
+            if (onProfileUpdated) onProfileUpdated(updated.club);
         } catch (err: any) {
             console.error("Save profile error:", err);
             if (err?.checklist && Array.isArray(err.checklist)) {
@@ -742,60 +742,6 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                 >
                     <ArrowRight className="w-5 h-5 stroke-[2.5]" />
                 </button>
-            </div>
-
-            {/* Persistent Bottom Action Bar */}
-            <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t-2 border-black p-3 sm:p-4 shadow-[0px_-4px_12px_rgba(0,0,0,0.06)]">
-                <div className="max-w-6xl mx-auto flex items-center justify-center">
-                    <div className="flex items-center justify-center gap-3">
-                        {/* Previous Button (arrow only pointing left, green background, black icon) */}
-                        <button
-                            type="button"
-                            onClick={handlePrevStep}
-                            disabled={currentStep === 1}
-                            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[2px_2px_0px_#000] disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                            title="Previous"
-                            aria-label="Previous"
-                        >
-                            <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
-                        </button>
-
-                        {/* Save Changes Button (green background, black text) */}
-                        <button
-                            type="button"
-                            onClick={() => handleSave()}
-                            disabled={isSaving}
-                            className="px-6 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[2px_2px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
-                        >
-                            {isSaving ? (
-                                <>
-                                    <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                                    <span>Saving Changes...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-4 h-4 stroke-[2.5]" />
-                                    <span>Save Changes</span>
-                                    {isDirty && (
-                                        <span className="w-2 h-2 rounded-full bg-black/60" title="Unsaved changes" />
-                                    )}
-                                </>
-                            )}
-                        </button>
-
-                        {/* Next Button (arrow only pointing right, green background, black icon) */}
-                        <button
-                            type="button"
-                            onClick={handleNextStep}
-                            disabled={currentStep === 5}
-                            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[2px_2px_0px_#000] disabled:opacity-40 disabled:pointer-events-none flex items-center justify-center cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                            title="Next"
-                            aria-label="Next"
-                        >
-                            <ArrowRight className="w-5 h-5 stroke-[2.5]" />
-                        </button>
-                    </div>
-                </div>
             </div>
 
             {/* PREVIEW MODAL */}

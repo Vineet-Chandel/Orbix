@@ -757,7 +757,11 @@ export default function ClubDashboardPage() {
                         {activeTab === "profile" && (
                             <ClubProfileManager
                                 clubId={club.id}
-                                onProfileUpdated={fetchClubData}
+                                onProfileUpdated={(updatedClub) => {
+                                    if (updatedClub) {
+                                        setClub(updatedClub as any);
+                                    }
+                                }}
                             />
                         )}
 

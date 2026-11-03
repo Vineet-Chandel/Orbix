@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { AlertCircle, X, ArrowRight, ShieldAlert } from "lucide-react";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
@@ -18,6 +19,7 @@ export const PublishValidationModal: React.FC<PublishValidationModalProps> = ({
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const getItemTargetStep = (item: string): { step: number; label: string } => {
         const lower = item.toLowerCase();
@@ -36,9 +38,9 @@ export const PublishValidationModal: React.FC<PublishValidationModalProps> = ({
         return { step: 1, label: "Identity" };
     };
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150"
             onClick={handleBackdropClick}
         >
             <div
@@ -112,6 +114,7 @@ export const PublishValidationModal: React.FC<PublishValidationModalProps> = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

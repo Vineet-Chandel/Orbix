@@ -1,5 +1,7 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import { VerifiedBadge } from "../../../components/VerifiedBadge";
 import {
     X,
     Smartphone,
@@ -38,12 +40,13 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const publicCoordinators = (coordinators || []).filter((c) => c.isPublic !== false);
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150"
             onClick={handleBackdropClick}
         >
             <div
@@ -124,7 +127,7 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                                 )}
                                 <div className="absolute top-3 right-3 flex items-center gap-2">
                                     <span className="px-2.5 py-1 rounded-full bg-white/95 backdrop-blur-xs border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000] flex items-center gap-1">
-                                        <ShieldCheck className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
+                                        <VerifiedBadge size="xs" />
                                         <span>Verified on Orbix</span>
                                     </span>
                                 </div>
@@ -134,17 +137,21 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                             <div className="p-5 sm:p-6 relative">
                                 <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-4 mb-4">
                                     <div className="flex items-end gap-3.5">
-                                        <div className="w-20 h-20 -mt-14 sm:-mt-16 rounded-xl bg-white border-2 border-black overflow-hidden shadow-[3px_3px_0px_#000] shrink-0 flex items-center justify-center font-black text-xl text-black">
+                                        <div className="w-20 h-20 -mt-14 sm:-mt-16 rounded-xl bg-white border-2 border-black overflow-hidden shadow-[3px_3px_0px_#000] shrink-0 flex items-center justify-center font-black text-xl text-black relative">
                                             {club.logoUrl ? (
                                                 <img src={club.logoUrl} alt={club.name} className="w-full h-full object-cover" />
                                             ) : (
                                                 <span>{(club.name || "CB").slice(0, 2).toUpperCase()}</span>
                                             )}
+                                            <div className="absolute -bottom-1 -right-1">
+                                                <VerifiedBadge size="sm" title="Verified on Orbix" />
+                                            </div>
                                         </div>
                                         <div className="space-y-1 pt-2 sm:pt-4">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <h1 className="text-xl sm:text-2xl font-black text-black">
-                                                    {club.name || "Club Official Name"}
+                                                <h1 className="text-xl sm:text-2xl font-black text-black flex items-center gap-1.5">
+                                                    <span>{club.name || "Club Official Name"}</span>
+                                                    <VerifiedBadge size="md" title="Verified on Orbix" />
                                                 </h1>
                                                 <span className="px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[10px] font-black text-black">
                                                     {club.category}
@@ -357,6 +364,7 @@ export const ProfilePreviewModal: React.FC<ProfilePreviewModalProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
