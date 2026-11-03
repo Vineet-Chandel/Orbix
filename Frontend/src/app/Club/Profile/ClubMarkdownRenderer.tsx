@@ -18,6 +18,7 @@ import {
     ImageOff,
 } from "lucide-react";
 import { highlightCode } from "../../../utils/prismHelper";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { safeSanitizeSvg, extractText, githubSlug } from "./markdownUtils";
 import { MarkdownErrorBoundary } from "./MarkdownErrorBoundary";
 
@@ -502,12 +503,11 @@ export const ClubMarkdownRenderer: React.FC<ClubMarkdownRendererProps> = ({
                 if (checked !== null && checked !== undefined) {
                     return (
                         <li className="flex items-start gap-2.5 my-1.5 list-none -ml-6 text-sm text-neutral-800">
-                            <input
-                                type="checkbox"
+                            <NeoCheckbox
                                 checked={checked}
-                                readOnly
                                 disabled
-                                className="mt-1 h-4 w-4 rounded border-2 border-black accent-[#a2ff86] cursor-default shrink-0"
+                                size="sm"
+                                className="mt-0.5 shrink-0"
                             />
                             <span className={checked ? "line-through text-neutral-400 font-medium" : "text-neutral-900 font-medium"}>
                                 {children}

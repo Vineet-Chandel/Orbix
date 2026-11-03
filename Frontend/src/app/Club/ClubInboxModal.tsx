@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
     X,
     Inbox,
@@ -282,10 +283,11 @@ export default function ClubInboxModal({
     });
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs select-none"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs select-none"
             onClick={handleBackdropClick}
         >
             <div
@@ -754,6 +756,7 @@ export default function ClubInboxModal({
                     </div>
                 </div>
             )}
-        </div>
+        </div>,
+        document.body
     );
 }

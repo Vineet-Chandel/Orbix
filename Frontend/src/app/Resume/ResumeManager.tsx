@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
     Sparkles,
     FileText,
@@ -705,11 +706,11 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
             {/* ========================================================================= */}
             {/* INTERACTIVE PDF PREVIEW MODAL */}
             {/* ========================================================================= */}
-            {isPreviewModalOpen && resumeData?.resumeUrl && (
+            {isPreviewModalOpen && resumeData?.resumeUrl && typeof document !== "undefined" && createPortal(
                 <div
                     role="dialog"
                     aria-modal="true"
-                    className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
                     onClick={handlePreviewBackdropClick}
                 >
                     <div
@@ -768,7 +769,8 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                             />
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ========================================================================= */}

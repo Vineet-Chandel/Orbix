@@ -1,7 +1,8 @@
 import React from "react";
-import { Building2, ShieldCheck, CheckCircle2, ArrowUpRight } from "lucide-react";
+import { Building2, CheckCircle2, ArrowUpRight } from "lucide-react";
 import { NeoSelect } from "../../../components/NeoSelect";
 import { Link } from "react-router-dom";
+import { VerifiedBadge } from "../../../components/VerifiedBadge";
 
 export const CLUB_CATEGORIES = [
     "Technical & Coding",
@@ -92,10 +93,7 @@ export const StepIdentity: React.FC<StepIdentityProps> = ({
                                 Affiliated Institution
                             </span>
                             {isVerified && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-black text-[10px] font-black text-emerald-700 shadow-[1px_1px_0px_#000]">
-                                    <ShieldCheck className="w-3 h-3 text-emerald-600 stroke-[2.5]" />
-                                    <span>Verified</span>
-                                </span>
+                                <VerifiedBadge size="xs" title="Verified Collegiate Institution" />
                             )}
                         </div>
                         <h3 className="text-sm font-black text-black mt-0.5">

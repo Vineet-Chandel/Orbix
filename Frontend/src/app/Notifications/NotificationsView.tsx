@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
+import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { terminateSession } from "../../api/sessionActivityApi";
 import { useAppSelector } from "../../store";
 import {
@@ -1301,9 +1302,7 @@ export const NotificationsView: React.FC = () => {
                                                             {senderDisplayName}
                                                         </h3>
                                                         {Boolean(senderProfile.isVerifiedCoder || senderProfile.isEmailVerified) && (
-                                                            <span title="Verified Developer (Email OTP Verified)">
-                                                                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                                                            </span>
+                                                            <VerifiedBadge size="sm" title="Verified Developer" />
                                                         )}
                                                         {!isConnAccepted && (
                                                             <span className="text-xs font-black px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1 shrink-0">

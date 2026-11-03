@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
     Calendar,
@@ -1439,9 +1440,9 @@ export default function ClubDashboardPage() {
             />
 
             {/* Event Create / Edit Modal */}
-            {isEventModalOpen && (
+            {isEventModalOpen && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
                     onClick={handleEventModalBackdropClick}
                 >
                     <div
@@ -1628,7 +1629,8 @@ export default function ClubDashboardPage() {
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

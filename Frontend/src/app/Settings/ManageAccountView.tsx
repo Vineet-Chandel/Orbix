@@ -1119,7 +1119,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             {/* UNIFIED MODAL 1: CHANGE EMAIL REQUEST & 2-STEP OTP VERIFICATION (SEAMLESS SINGLE DIALOG) */}
             {isEmailChangeModalOpen && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
                     onClick={handleEmailChangeBackdropClick}
                 >
                     <div
@@ -1278,7 +1278,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             {/* MODAL 2: PRIMARY EMAIL VERIFICATION (FOR UNVERIFIED ACCOUNTS) */}
             {isPrimaryVerifyModalOpen && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
                     onClick={handlePrimaryVerifyBackdropClick}
                 >
                     <div
@@ -1362,7 +1362,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             {/* MODAL 3: USERNAME CHANGE FLOW */}
             {isUsernameModalOpen && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
                     onClick={handleUsernameBackdropClick}
                 >
                     <div
@@ -1525,7 +1525,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             {/* UNIFIED MODAL 4: DATA ARCHIVE & PORTABILITY STEP-UP GENERATOR */}
             {isArchiveModalOpen && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
                     onClick={handleArchiveBackdropClick}
                 >
                     <div
@@ -1829,7 +1829,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             {/* UNIFIED MODAL 5: JSON DATA INSPECTION PREVIEW MODAL */}
             {isPreviewJsonOpen && previewPayload && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200"
                     onClick={handlePreviewJsonBackdropClick}
                 >
                     <div

@@ -137,9 +137,11 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
 
     // Snapshot for dirty-state tracking
     const initialSnapshotRef = useRef<string>("");
+    const hasPopulatedForClubIdRef = useRef<string | null>(null);
 
     // Synchronize form from club data
     const populateForm = (c: ClubProfileData) => {
+        hasPopulatedForClubIdRef.current = c.id || clubId || null;
         setName(c.name || "");
         setCategory(c.category || "Technical & Coding");
         setFoundedYear(c.foundedYear ? String(c.foundedYear) : "");
@@ -210,15 +212,17 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
 
     // Load profile on mount or club change
     useEffect(() => {
-        if (!clubState.isInitialized && !clubState.loading) {
-            dispatch(fetchClubProfile({ clubId }))
-                .unwrap()
-                .then((data) => {
-                    if (data?.club) populateForm(data.club);
-                })
-                .catch((err) => toast.error(err || "Failed to load club profile."));
-        } else if (clubState.club) {
-            populateForm(clubState.club);
+        if (hasPopulatedForClubIdRef.current !== clubId) {
+            if (!clubState.isInitialized && !clubState.loading) {
+                dispatch(fetchClubProfile({ clubId }))
+                    .unwrap()
+                    .then((data) => {
+                        if (data?.club) populateForm(data.club);
+                    })
+                    .catch((err) => toast.error(err || "Failed to load club profile."));
+            } else if (clubState.club && clubState.club.id === clubId) {
+                populateForm(clubState.club);
+            }
         }
     }, [clubId, clubState.isInitialized, clubState.loading, clubState.club]);
 
@@ -708,12 +712,17 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                     <ArrowLeft className="w-5 h-5 stroke-[2.5]" />
                 </button>
 
-                {/* Save Changes Button (green background, black text) */}
+                {/* Save Changes Button (green background, black text - active only when changes occur) */}
                 <button
                     type="button"
                     onClick={() => handleSave()}
-                    disabled={isSaving}
-                    className="px-6 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[2px_2px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
+                    disabled={!isDirty || isSaving}
+                    className={`px-6 py-2.5 rounded-xl border-2 text-xs sm:text-sm font-black transition-all flex items-center gap-2 select-none ${
+                        !isDirty || isSaving
+                            ? "bg-neutral-200 text-neutral-400 border-neutral-300 shadow-none cursor-not-allowed opacity-60"
+                            : "bg-[#a2ff86] text-black hover:bg-[#8ee673] border-black shadow-[2px_2px_0px_#000] cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                    }`}
+                    title={isDirty ? "Save your changes" : "No changes to save"}
                 >
                     {isSaving ? (
                         <>
@@ -725,7 +734,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                             <Save className="w-4 h-4 stroke-[2.5]" />
                             <span>Save Changes</span>
                             {isDirty && (
-                                <span className="w-2 h-2 rounded-full bg-black/60" title="Unsaved changes" />
+                                <span className="w-2 h-2 rounded-full bg-black animate-pulse" title="Unsaved changes" />
                             )}
                         </>
                     )}

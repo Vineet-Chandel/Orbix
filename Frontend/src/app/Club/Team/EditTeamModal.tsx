@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Edit3, Archive, AlertTriangle } from "lucide-react";
 import { OrbixButton } from "../../../components/OrbixButton";
 import { useToast } from "../../../context/ToastContext";
@@ -48,6 +49,7 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
     }, [team]);
 
     if (!isOpen || !team) return null;
+    if (typeof document === "undefined") return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -134,9 +136,9 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
 
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs animate-fadeIn overflow-y-auto"
             onClick={handleBackdropClick}
         >
             <div
@@ -336,6 +338,7 @@ export const EditTeamModal: React.FC<EditTeamModalProps> = ({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "react-router-dom";
 import {
     Laptop,
@@ -803,9 +804,9 @@ export const YourActivityView: React.FC = () => {
             {/* ========================================================================= */}
             {/* 4. INSPECT SESSION DETAILS MODAL                                          */}
             {/* ========================================================================= */}
-            {inspectedSession && (
+            {inspectedSession && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
                     onClick={handleInspectedSessionBackdropClick}
                 >
                     <div
@@ -951,7 +952,8 @@ export const YourActivityView: React.FC = () => {
                             )}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ========================================================================= */}

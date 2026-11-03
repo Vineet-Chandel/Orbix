@@ -31,6 +31,7 @@ import { evaluatePassword } from "../passwordValidator";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, useAppSelector, setUser } from "../../../store";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { CollegeAutocomplete } from "../../../components/CollegeAutocomplete";
 import type { InstitutionItem } from "../../../utils/profileApi";
 
@@ -1352,44 +1353,42 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
                     {/* SECTION E: LEGAL CONSENT */}
                     <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-2.5">
-                        <div className="space-y-2 pt-1">
-                            <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.termsAccepted}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, termsAccepted: e.target.checked });
-                                        if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
-                                    }}
-                                    className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
-                                />
-                                <span className="leading-snug font-medium">
-                                    I accept the{" "}
-                                    <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                        Terms of Service
-                                    </a>
-                                    .
-                                </span>
-                            </label>
+                        <div className="space-y-3 pt-1">
+                            <NeoCheckbox
+                                checked={formData.termsAccepted}
+                                onCheckedChange={(checked) => {
+                                    setFormData({ ...formData, termsAccepted: checked });
+                                    if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
+                                }}
+                                size="sm"
+                                label={
+                                    <span className="leading-snug font-medium text-xs text-neutral-700">
+                                        I accept the{" "}
+                                        <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                            Terms of Service
+                                        </a>
+                                        .
+                                    </span>
+                                }
+                            />
 
-                            <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.privacyPolicyAccepted}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, privacyPolicyAccepted: e.target.checked });
-                                        if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
-                                    }}
-                                    className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
-                                />
-                                <span className="leading-snug font-medium">
-                                    I accept the{" "}
-                                    <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                        Privacy Policy
-                                    </a>
-                                    .
-                                </span>
-                            </label>
+                            <NeoCheckbox
+                                checked={formData.privacyPolicyAccepted}
+                                onCheckedChange={(checked) => {
+                                    setFormData({ ...formData, privacyPolicyAccepted: checked });
+                                    if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
+                                }}
+                                size="sm"
+                                label={
+                                    <span className="leading-snug font-medium text-xs text-neutral-700">
+                                        I accept the{" "}
+                                        <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                            Privacy Policy
+                                        </a>
+                                        .
+                                    </span>
+                                }
+                            />
                         </div>
                         {errors.termsAccepted && (
                             <p className="text-xs font-bold text-rose-600 px-1">{errors.termsAccepted}</p>

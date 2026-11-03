@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X, CheckCircle2, AlertCircle, Building2, Globe, ShieldCheck } from "lucide-react";
 import { submitInstitutionVerificationRequest } from "../utils/profileApi";
 import { useToast } from "../context/ToastContext";
@@ -57,18 +58,8 @@ export function RequestCollegeModal({
         }
     }, [isOpen, initialQuery]);
 
-    // Handle Escape key to close
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && isOpen && !submitting) {
-                onClose();
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, submitting, onClose]);
-
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -122,9 +113,9 @@ export function RequestCollegeModal({
         },
     });
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
             role="dialog"
             aria-modal="true"
             aria-labelledby="request-modal-title"
@@ -316,7 +307,8 @@ export function RequestCollegeModal({
                     </form>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 export default RequestCollegeModal;

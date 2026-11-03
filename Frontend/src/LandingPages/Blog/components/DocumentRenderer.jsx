@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { CodeBlock } from './CodeBlock';
 import { slugify, extractText } from '../utils/slugify';
+import { NeoCheckbox } from '../../../../components/NeoCheckbox';
 
 /**
  * Parses and renders callout banners if a blockquote starts with [!TYPE].
@@ -202,11 +203,11 @@ export function DocumentRenderer({ content }) {
         if (checked !== null && checked !== undefined) {
           return (
             <li className="flex items-start gap-2.5 my-1.5 list-none -ml-6 text-zinc-700 dark:text-zinc-300">
-              <input
-                type="checkbox"
+              <NeoCheckbox
                 checked={checked}
-                readOnly
-                className="mt-1 h-4 w-4 rounded border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-zinc-100 focus:ring-0 cursor-default accent-zinc-900 dark:accent-zinc-100"
+                disabled
+                size="sm"
+                className="mt-0.5 shrink-0"
               />
               <span className={checked ? 'line-through text-zinc-400 dark:text-zinc-500' : ''}>
                 {children}

@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { AlertTriangle, Lock, GraduationCap, X, Clock, ShieldAlert } from "lucide-react";
 import { useModalDismiss } from "../hooks/useModalDismiss";
 
@@ -23,6 +24,7 @@ export function CollegeChangeWarningModal({
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     // Calculate human-friendly remaining time text
     const formatRemainingTime = () => {
@@ -67,13 +69,13 @@ export function CollegeChangeWarningModal({
         }
     };
 
-    return (
+    return createPortal(
         <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="collegeModalTitle"
             onClick={handleBackdropClick}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150"
         >
             <div
                 className="w-full max-w-md bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] text-black space-y-4 animate-in zoom-in-95 duration-150"
@@ -234,6 +236,7 @@ export function CollegeChangeWarningModal({
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

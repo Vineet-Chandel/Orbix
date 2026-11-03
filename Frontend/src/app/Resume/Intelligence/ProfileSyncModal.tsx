@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import {
     X,
     Check,
@@ -49,6 +50,7 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
     if (!isOpen || !proposal || proposal.proposedFields.length === 0) {
         return null;
     }
+    if (typeof document === "undefined") return null;
 
     const toggleField = (key: string) => {
         setSelectedFields(prev =>
@@ -123,9 +125,9 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
         );
     };
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
             onClick={handleBackdropClick}
         >
             <div
@@ -276,6 +278,7 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     Calendar as CalendarIcon,
@@ -1557,9 +1558,9 @@ export const EventTrackerPage: React.FC = () => {
     </div>
 
             {/* Modal: Full Day Contest Breakdown (triggered by "+N more" or day click) */}
-            {selectedDayEvents && (
+            {selectedDayEvents && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in"
                     onClick={handleDayEventsBackdropClick}
                 >
                     <div
@@ -1704,7 +1705,8 @@ export const EventTrackerPage: React.FC = () => {
                             })}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

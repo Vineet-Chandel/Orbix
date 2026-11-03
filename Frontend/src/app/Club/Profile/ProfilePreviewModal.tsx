@@ -6,7 +6,6 @@ import {
     X,
     Smartphone,
     Monitor,
-    ShieldCheck,
     Building2,
     Globe,
     Mail,

@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
 import type { ClubMember, ClubTeam, ClubInvitation, TeamStats } from "./types";
 import { AddMemberModal } from "./AddMemberModal";
@@ -595,15 +596,13 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                             <span className="text-xs font-black uppercase tracking-wider text-black">
                                 Departments ({visibleTeams.length})
                             </span>
-                            <label className="inline-flex items-center gap-1.5 text-xs font-bold text-neutral-700 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={showArchivedTeams}
-                                    onChange={(e) => setShowArchivedTeams(e.target.checked)}
-                                    className="rounded border-black cursor-pointer"
-                                />
-                                <span>Show Archived</span>
-                            </label>
+                            <NeoCheckbox
+                                checked={showArchivedTeams}
+                                onCheckedChange={setShowArchivedTeams}
+                                label="Show Archived"
+                                labelClassName="text-xs font-bold text-neutral-700"
+                                size="sm"
+                            />
                         </div>
 
                         {canManageTeams && (

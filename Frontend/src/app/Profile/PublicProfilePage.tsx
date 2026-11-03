@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -48,6 +49,7 @@ import { isDemoProfileUsername, demoPublicProfile, demoConnectedPortals } from "
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
 import { HireMeModal } from "./HireMeModal";
+import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { GetTheCardModal } from "./GetTheCardModal";
 import { CARD_THEMES } from "./CardStudio/types";
@@ -1156,8 +1158,8 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                             </span>
                                         </div>
                                         {Boolean(profile.isEmailVerified || profile.isVerified || profile.isVerifiedCoder) ? (
-                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-black font-black text-xs shadow-[1.5px_1.5px_0px_#000]">
-                                                <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border-2 border-black text-black font-black text-xs shadow-[1.5px_1.5px_0px_#000]">
+                                                <VerifiedBadge size="xs" />
                                                 <span>Verified Orbix Profile</span>
                                             </div>
                                         ) : (
@@ -1527,8 +1529,8 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                         {profile.college.officialName}
                                                     </span>
                                                     {profile.college.verificationStatus === "verified" && (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[10px] font-black text-black uppercase shadow-[1px_1px_0px_#000]">
-                                                            <ShieldCheck className="w-2.5 h-2.5 text-black stroke-[2.5]" />
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-black text-[10px] font-black text-black uppercase shadow-[1px_1px_0px_#000]">
+                                                            <VerifiedBadge size="xs" />
                                                             Verified
                                                         </span>
                                                     )}
@@ -1854,9 +1856,9 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
             />
 
             {/* Interactive PDF Resume Modal */}
-            {isResumePreviewOpen && profile.resumeUrl && (
+            {isResumePreviewOpen && profile.resumeUrl && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
                     onClick={handleResumePreviewBackdropClick}
                 >
                     <div
@@ -1916,7 +1918,8 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                             />
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

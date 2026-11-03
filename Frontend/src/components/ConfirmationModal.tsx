@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, Trash2, Info, X } from "lucide-react";
 import { OrbixButton } from "./OrbixButton";
 import { useModalDismiss } from "../hooks/useModalDismiss";
@@ -55,6 +56,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     });
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const getIcon = () => {
         if (icon) return icon;
@@ -73,13 +75,13 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
         return "bg-blue-100 border-black";
     };
 
-    return (
+    return createPortal(
         <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="confirmModalTitle"
             onClick={handleBackdropClick}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fadeIn"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
         >
             <div
                 className="w-full max-w-md bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] text-black space-y-4 animate-scaleUp"
@@ -138,6 +140,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
                     </OrbixButton>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

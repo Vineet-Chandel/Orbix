@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
     X,
     Search,
@@ -12,6 +13,7 @@ import { OrbixLoader, OrbixButton } from "../../../components/ui/loader";
 import { useToast } from "../../../context/ToastContext";
 import { NeoSelect } from "../../../components/NeoSelect";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import { VerifiedBadge } from "../../../components/VerifiedBadge";
 import type { ClubTeam, UserSearchItem } from "./types";
 import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
 
@@ -176,9 +178,12 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
-    return (
+    if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs animate-fadeIn overflow-y-auto"
             onClick={handleBackdropClick}
         >
             <div
@@ -277,9 +282,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                                                                     {user.displayName}
                                                                 </span>
                                                                 {user.isVerifiedCoder && (
-                                                                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-600">
-                                                                        Verified
-                                                                    </span>
+                                                                    <VerifiedBadge size="xs" title="Verified Coder" />
                                                                 )}
                                                             </div>
                                                             <span className="text-[11px] font-mono font-bold text-neutral-600 block truncate">
@@ -327,6 +330,9 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                                     <div className="min-w-0">
                                         <p className="text-xs font-black text-black flex items-center gap-1.5">
                                             <span>{selectedUser.displayName}</span>
+                                            {selectedUser.isVerifiedCoder && (
+                                                <VerifiedBadge size="xs" title="Verified Coder" />
+                                            )}
                                             <span className="font-mono font-bold text-neutral-700">(@{selectedUser.username})</span>
                                         </p>
                                         <p className="text-[11px] text-neutral-600 font-medium truncate">
@@ -540,6 +546,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

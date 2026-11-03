@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
@@ -29,6 +30,7 @@ import type { SettingsViewKey } from "./types";
 import { useToast } from "../../context/ToastContext";
 import { NeoToggle } from "../../components/NeoToggle";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
+import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { useAppDispatch, useAppSelector, setUser } from "../../store";
 import {
     fetchBlockedUsersThunk,
@@ -990,7 +992,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                                 <div className="min-w-0">
                                                     <div className="flex items-center gap-1.5">
                                                         <h4 className="font-black text-sm text-black truncate">{c.displayName}</h4>
-                                                        {c.isVerifiedCoder && <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                                                        {c.isVerifiedCoder && <VerifiedBadge size="xs" />}
                                                     </div>
                                                     <p className="text-xs font-mono font-bold text-neutral-500 truncate">@{c.username}</p>
                                                     {c.headline && (
@@ -1644,9 +1646,9 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             {renderContent()}
 
             {/* Two-Factor Authentication Setup Modal */}
-            {showTwoFactorSetupModal && (
+            {showTwoFactorSetupModal && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
                     onClick={handleSetupModalBackdropClick}
                 >
                     <div
@@ -1756,13 +1758,14 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Two-Factor Authentication Disable Confirmation Modal */}
-            {showTwoFactorDisableModal && (
+            {showTwoFactorDisableModal && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
                     onClick={handleDisableModalBackdropClick}
                 >
                     <div
@@ -1850,7 +1853,8 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

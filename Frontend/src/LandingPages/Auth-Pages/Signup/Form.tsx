@@ -15,6 +15,7 @@ import OtpSegmentedInput from "../OtpSegmentedInput";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 
 export default function SignupForm() {
     const navigate = useNavigate();
@@ -479,28 +480,27 @@ export default function SignupForm() {
 
                 {/* Terms & Conditions Checkbox */}
                 <div className="pt-1">
-                    <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
-                        <input
-                            type="checkbox"
-                            checked={formData.termsAccepted}
-                            onChange={(e) => {
-                                setFormData({ ...formData, termsAccepted: e.target.checked });
-                                if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: undefined });
-                            }}
-                            className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
-                        />
-                        <span className="leading-snug font-medium">
-                            I accept the{" "}
-                            <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                Terms of Service
-                            </a>{" "}
-                            and{" "}
-                            <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                Privacy Policy
-                            </a>
-                            .
-                        </span>
-                    </label>
+                    <NeoCheckbox
+                        checked={formData.termsAccepted}
+                        onCheckedChange={(checked) => {
+                            setFormData({ ...formData, termsAccepted: checked });
+                            if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: undefined });
+                        }}
+                        size="sm"
+                        label={
+                            <span className="leading-snug font-medium text-xs text-neutral-700">
+                                I accept the{" "}
+                                <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                    Terms of Service
+                                </a>{" "}
+                                and{" "}
+                                <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                    Privacy Policy
+                                </a>
+                                .
+                            </span>
+                        }
+                    />
                     {errors.termsAccepted && (
                         <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
                     )}

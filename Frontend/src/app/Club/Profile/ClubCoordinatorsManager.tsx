@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import {
     Plus,
     UserCheck,
@@ -23,6 +24,7 @@ import {
 import { useToast } from "../../../context/ToastContext";
 import { NeoImageDropzone } from "../../../components/NeoImageDropzone";
 import { ConfirmationModal } from "../../../components/ConfirmationModal";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 interface ClubCoordinatorsManagerProps {
@@ -350,9 +352,9 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
             )}
 
             {/* MODAL: ADD / EDIT COORDINATOR */}
-            {isModalOpen && (
+            {isModalOpen && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150"
                     onClick={handleBackdropClick}
                 >
                     <div
@@ -461,28 +463,20 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
 
                             {/* Toggles */}
                             <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-2.5">
-                                <label className="flex items-center gap-2.5 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={isPrimary}
-                                        onChange={(e) => setIsPrimary(e.target.checked)}
-                                        className="w-4 h-4 rounded border-2 border-black text-black focus:ring-0"
-                                    />
-                                    <span className="text-xs font-black text-black">
-                                        Designate as Primary / Lead Coordinator
-                                    </span>
-                                </label>
-                                <label className="flex items-center gap-2.5 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={isPublic}
-                                        onChange={(e) => setIsPublic(e.target.checked)}
-                                        className="w-4 h-4 rounded border-2 border-black text-black focus:ring-0"
-                                    />
-                                    <span className="text-xs font-bold text-neutral-800">
-                                        Publicly visible on the club's showcase profile
-                                    </span>
-                                </label>
+                                <NeoCheckbox
+                                    checked={isPrimary}
+                                    onCheckedChange={setIsPrimary}
+                                    label="Designate as Primary / Lead Coordinator"
+                                    labelClassName="text-xs font-black text-black"
+                                    size="sm"
+                                />
+                                <NeoCheckbox
+                                    checked={isPublic}
+                                    onCheckedChange={setIsPublic}
+                                    label="Publicly visible on the club's showcase profile"
+                                    labelClassName="text-xs font-bold text-neutral-800"
+                                    size="sm"
+                                />
                             </div>
 
                             {/* Modal Actions */}
@@ -505,7 +499,8 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Confirmation Modal */}

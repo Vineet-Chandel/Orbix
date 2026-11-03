@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Shield } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
 import { NeoSelect } from "../../../components/NeoSelect";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import { VerifiedBadge } from "../../../components/VerifiedBadge";
 import type { ClubMember, ClubTeam } from "./types";
 import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
 
@@ -49,6 +51,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
     }, [member]);
 
     if (!isOpen || !member) return null;
+    if (typeof document === "undefined") return null;
 
     const isTargetOwner = member.clubRole === "owner";
 
@@ -189,9 +192,9 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
 
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs animate-fadeIn overflow-y-auto"
             onClick={handleBackdropClick}
         >
             <div
@@ -210,9 +213,14 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                             }}
                         />
                         <div className="min-w-0">
-                            <h3 className="text-base font-black text-black truncate">
-                                {member.displayName}
-                            </h3>
+                            <div className="flex items-center gap-1.5">
+                                <h3 className="text-base font-black text-black truncate">
+                                    {member.displayName}
+                                </h3>
+                                {member.isVerifiedCoder && (
+                                    <VerifiedBadge size="xs" title="Verified Coder" />
+                                )}
+                            </div>
                             <p className="text-xs font-mono font-bold text-neutral-600 truncate">
                                 @{member.username} {member.college ? `• ${member.college}` : ""}
                             </p>
@@ -408,6 +416,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

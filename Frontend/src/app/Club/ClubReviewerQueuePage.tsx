@@ -12,6 +12,7 @@ import {
 import { OrbixButton } from "../../components/OrbixButton";
 import { useToast } from "../../context/ToastContext";
 import { NeoSelect } from "../../components/NeoSelect";
+import { NeoCheckbox } from "../../components/NeoCheckbox";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
 interface ReviewerApplication {
@@ -559,50 +560,46 @@ export default function ClubReviewerQueuePage() {
                                                 </div>
 
                                                 {/* Checklist Checkboxes */}
-                                                <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
-                                                    <input
-                                                        type="checkbox"
+                                                <div className="space-y-2 pt-1">
+                                                    <NeoCheckbox
                                                         checked={editForm.clubExistenceConfirmed}
-                                                        onChange={(e) =>
+                                                        onCheckedChange={(checked) =>
                                                             setEditForm({
                                                                 ...editForm,
-                                                                clubExistenceConfirmed: e.target.checked,
+                                                                clubExistenceConfirmed: checked,
                                                             })
                                                         }
-                                                        className="h-4 w-4 rounded border-2 border-black accent-black"
+                                                        label="1. Club Existence Confirmed"
+                                                        labelClassName="text-xs font-bold text-black"
+                                                        size="sm"
                                                     />
-                                                    <span>1. Club Existence Confirmed</span>
-                                                </label>
 
-                                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                    <input
-                                                        type="checkbox"
+                                                    <NeoCheckbox
                                                         checked={editForm.collegeAuthorizationConfirmed}
-                                                        onChange={(e) =>
+                                                        onCheckedChange={(checked) =>
                                                             setEditForm({
                                                                 ...editForm,
-                                                                collegeAuthorizationConfirmed: e.target.checked,
+                                                                collegeAuthorizationConfirmed: checked,
                                                             })
                                                         }
-                                                        className="h-4 w-4 rounded border-2 border-black accent-black"
+                                                        label="2. College Association Confirmed"
+                                                        labelClassName="text-xs font-bold text-black"
+                                                        size="sm"
                                                     />
-                                                    <span>2. College Association Confirmed</span>
-                                                </label>
 
-                                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                    <input
-                                                        type="checkbox"
+                                                    <NeoCheckbox
                                                         checked={editForm.representativeAuthorityConfirmed}
-                                                        onChange={(e) =>
+                                                        onCheckedChange={(checked) =>
                                                             setEditForm({
                                                                 ...editForm,
-                                                                representativeAuthorityConfirmed: e.target.checked,
+                                                                representativeAuthorityConfirmed: checked,
                                                             })
                                                         }
-                                                        className="h-4 w-4 rounded border-2 border-black accent-black"
+                                                        label="3. Representative Authority Confirmed"
+                                                        labelClassName="text-xs font-bold text-black"
+                                                        size="sm"
                                                     />
-                                                    <span>3. Representative Authority Confirmed</span>
-                                                </label>
+                                                </div>
 
                                                 {/* Last Contacted Date */}
                                                 <div className="pt-1">

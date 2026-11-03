@@ -1,6 +1,7 @@
 import React from "react";
 import { Plus, Trash2, Globe, ExternalLink, AlertCircle } from "lucide-react";
 import { getPlatformIcon } from "../../../utils/platformLinks";
+import { NeoSelect } from "../../../components/NeoSelect";
 import type { ClubLink } from "../../../utils/clubProfileApi";
 
 interface DynamicLinksManagerProps {
@@ -41,6 +42,10 @@ export const DynamicLinksManager: React.FC<DynamicLinksManagerProps> = ({ links,
 
     const handleUpdateLink = (index: number, updates: Partial<ClubLink>) => {
         const next = [...links];
+        if (updates.url !== undefined) {
+            // Sanitize whitespace and prevent unsafe schemes
+            updates.url = updates.url.replace(/[\r\n\t]/g, "").trimStart();
+        }
         next[index] = { ...next[index], ...updates };
         onChange(next);
     };
@@ -112,22 +117,19 @@ export const DynamicLinksManager: React.FC<DynamicLinksManagerProps> = ({ links,
                                 key={link.id || index}
                                 className="p-3 sm:p-4 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex flex-col sm:flex-row items-start sm:items-center gap-3 transition-all"
                             >
-                                {/* Platform Selector */}
-                                <div className="w-full sm:w-48 shrink-0 flex items-center gap-2 bg-[#FAF6EE] px-2.5 py-1.5 rounded-lg border border-black">
-                                    <span className="shrink-0">
-                                        {getPlatformIcon(link.platform, "w-4 h-4 text-black")}
-                                    </span>
-                                    <select
+                                {/* Platform Selector with NeoSelect */}
+                                <div className="w-full sm:w-56 shrink-0">
+                                    <NeoSelect
                                         value={link.platform}
-                                        onChange={(e) => handleUpdateLink(index, { platform: e.target.value })}
-                                        className="w-full bg-transparent text-xs font-black text-black focus:outline-none cursor-pointer"
-                                    >
-                                        {PLATFORM_OPTIONS.map((opt) => (
-                                            <option key={opt.value} value={opt.value}>
-                                                {opt.label}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={(val) => handleUpdateLink(index, { platform: val })}
+                                        options={PLATFORM_OPTIONS.map((opt) => ({
+                                            value: opt.value,
+                                            label: opt.label,
+                                            icon: getPlatformIcon(opt.value, "w-4 h-4 text-black"),
+                                        }))}
+                                        size="sm"
+                                        triggerClassName="py-2 rounded-xl text-xs font-black"
+                                    />
                                 </div>
 
                                 {/* URL Input */}

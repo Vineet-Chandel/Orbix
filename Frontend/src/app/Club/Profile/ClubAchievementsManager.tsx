@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import {
     Plus,
     Trophy,
@@ -14,6 +15,7 @@ import { OrbixButton } from "../../../components/OrbixButton";
 import { NeoImageDropzone } from "../../../components/NeoImageDropzone";
 import { ConfirmationModal } from "../../../components/ConfirmationModal";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import { NeoSelect } from "../../../components/NeoSelect";
 import type { ClubAchievement } from "../../../utils/clubProfileApi";
 import {
     addAchievement,
@@ -42,6 +44,29 @@ export const ACHIEVEMENT_TYPES = [
     "Other Distinction",
 ];
 
+const CURRENT_YEAR = new Date().getFullYear();
+
+const MONTH_OPTIONS = [
+    { value: "", label: "Full Year (No Month)" },
+    { value: "Jan", label: "January" },
+    { value: "Feb", label: "February" },
+    { value: "Mar", label: "March" },
+    { value: "Apr", label: "April" },
+    { value: "May", label: "May" },
+    { value: "Jun", label: "June" },
+    { value: "Jul", label: "July" },
+    { value: "Aug", label: "August" },
+    { value: "Sep", label: "September" },
+    { value: "Oct", label: "October" },
+    { value: "Nov", label: "November" },
+    { value: "Dec", label: "December" },
+];
+
+const YEAR_OPTIONS = Array.from({ length: CURRENT_YEAR + 1 - 1970 + 1 }, (_, i) => {
+    const yr = String(CURRENT_YEAR + 1 - i);
+    return { value: yr, label: yr };
+});
+
 export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = ({
     clubId,
     achievements,
@@ -62,7 +87,8 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
     const [title, setTitle] = useState("");
     const [type, setType] = useState(ACHIEVEMENT_TYPES[0]);
     const [description, setDescription] = useState("");
-    const [achievementDate, setAchievementDate] = useState("");
+    const [selectedMonth, setSelectedMonth] = useState("");
+    const [selectedYear, setSelectedYear] = useState(String(CURRENT_YEAR));
     const [issuer, setIssuer] = useState("");
     const [imageUrl, setImageUrl] = useState("");
     const [externalLink, setExternalLink] = useState("");
@@ -79,7 +105,8 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
         setTitle("");
         setType(ACHIEVEMENT_TYPES[0]);
         setDescription("");
-        setAchievementDate("");
+        setSelectedMonth("");
+        setSelectedYear(String(CURRENT_YEAR));
         setIssuer("");
         setImageUrl("");
         setExternalLink("");
@@ -91,7 +118,21 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
         setTitle(ach.title || "");
         setType(ach.type || ach.achievementType || ACHIEVEMENT_TYPES[0]);
         setDescription(ach.description || "");
-        setAchievementDate(ach.achievementDate || ach.date || "");
+
+        // Safely parse date and year (rejecting absurd years like 23234)
+        const rawDate = (ach.achievementDate || ach.date || "").trim();
+        const yearMatch = rawDate.match(/\b(19\d{2}|20\d{2})\b/);
+        if (yearMatch) {
+            setSelectedYear(yearMatch[1]);
+        } else {
+            setSelectedYear(String(CURRENT_YEAR));
+        }
+
+        const foundMonth = MONTH_OPTIONS.find(
+            (m) => m.value && rawDate.toLowerCase().includes(m.value.toLowerCase())
+        );
+        setSelectedMonth(foundMonth ? foundMonth.value : "");
+
         setIssuer(ach.issuer || ach.organization || "");
         setImageUrl(ach.imageUrl || "");
         setExternalLink(ach.externalLink || ach.referenceUrl || "");
@@ -131,25 +172,67 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title.trim()) {
-            toast.error("Please enter the achievement title.");
+
+        // 1. Title validation
+        const trimmedTitle = title.trim();
+        if (!trimmedTitle || trimmedTitle.length < 3) {
+            toast.error("Achievement title must be at least 3 characters long.");
+            return;
+        }
+        if (trimmedTitle.length > 120) {
+            toast.error("Achievement title cannot exceed 120 characters.");
+            return;
+        }
+
+        // 2. Year validation (strictly between 1970 and CURRENT_YEAR + 1)
+        const yr = parseInt(selectedYear, 10);
+        if (isNaN(yr) || yr < 1970 || yr > CURRENT_YEAR + 1) {
+            toast.error(`Please select a valid achievement year between 1970 and ${CURRENT_YEAR + 1}.`);
+            return;
+        }
+        const formattedDate = selectedMonth ? `${selectedMonth} ${yr}` : String(yr);
+
+        // 3. Organization / Issuer validation
+        const trimmedIssuer = issuer.trim();
+        if (trimmedIssuer.length > 80) {
+            toast.error("Awarding organization name cannot exceed 80 characters.");
+            return;
+        }
+
+        // 4. Proof / Reference URL validation
+        const trimmedLink = externalLink.trim();
+        if (trimmedLink) {
+            if (!/^https?:\/\/[^\s$.?#].[^\s]*$/i.test(trimmedLink)) {
+                toast.error("Please enter a valid proof URL starting with https:// or http://");
+                return;
+            }
+            if (trimmedLink.length > 255) {
+                toast.error("Proof URL cannot exceed 255 characters.");
+                return;
+            }
+        }
+
+        // 5. Description validation
+        const trimmedDesc = description.trim();
+        if (trimmedDesc.length > 500) {
+            toast.error("Description cannot exceed 500 characters.");
             return;
         }
 
         try {
             setIsSubmitting(true);
             const payload = {
-                title: title.trim(),
+                title: trimmedTitle,
                 type: type.trim() || undefined,
                 achievementType: type.trim() || undefined,
-                description: description.trim() || undefined,
-                achievementDate: achievementDate.trim() || undefined,
-                date: achievementDate.trim() || undefined,
-                issuer: issuer.trim() || undefined,
-                organization: issuer.trim() || undefined,
+                description: trimmedDesc || undefined,
+                achievementDate: formattedDate,
+                date: formattedDate,
+                issuer: trimmedIssuer || undefined,
+                organization: trimmedIssuer || undefined,
                 imageUrl: imageUrl.trim() || undefined,
-                externalLink: externalLink.trim() || undefined,
-                referenceUrl: externalLink.trim() || undefined,
+                externalLink: trimmedLink || undefined,
+                referenceUrl: trimmedLink || undefined,
             };
 
             if (editingAchievement) {
@@ -352,9 +435,9 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
             )}
 
             {/* MODAL: ADD / EDIT ACHIEVEMENT */}
-            {isModalOpen && (
+            {isModalOpen && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150"
                     onClick={handleBackdropClick}
                 >
                     <div
@@ -398,24 +481,21 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
                                     <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
                                         Achievement Type
                                     </label>
-                                    <select
+                                    <NeoSelect
                                         value={type}
-                                        onChange={(e) => setType(e.target.value)}
-                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden cursor-pointer"
-                                    >
-                                        {ACHIEVEMENT_TYPES.map((t) => (
-                                            <option key={t} value={t}>
-                                                {t}
-                                            </option>
-                                        ))}
-                                    </select>
+                                        onChange={(val) => setType(val)}
+                                        options={ACHIEVEMENT_TYPES.map((t) => ({ value: t, label: t }))}
+                                        size="sm"
+                                        triggerClassName="py-2 rounded-xl text-xs font-bold"
+                                    />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                        Awarding Organization
+                                        Awarding Organization <span className="text-[10px] text-neutral-400 font-bold">(Optional)</span>
                                     </label>
                                     <input
                                         type="text"
+                                        maxLength={80}
                                         value={issuer}
                                         onChange={(e) => setIssuer(e.target.value)}
                                         placeholder="e.g. Ministry of Education, AWS, IEEE"
@@ -428,22 +508,33 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                        Year or Date
+                                        Achievement Year *
                                     </label>
-                                    <input
-                                        type="text"
-                                        value={achievementDate}
-                                        onChange={(e) => setAchievementDate(e.target.value)}
-                                        placeholder="e.g. 2024 or Dec 2024"
-                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden"
-                                    />
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <NeoSelect
+                                            value={selectedMonth}
+                                            onChange={(val) => setSelectedMonth(val)}
+                                            options={MONTH_OPTIONS}
+                                            placeholder="Month (Opt)"
+                                            size="sm"
+                                            triggerClassName="py-2 rounded-xl text-xs font-bold"
+                                        />
+                                        <NeoSelect
+                                            value={selectedYear}
+                                            onChange={(val) => setSelectedYear(val)}
+                                            options={YEAR_OPTIONS}
+                                            size="sm"
+                                            triggerClassName="py-2 rounded-xl text-xs font-bold"
+                                        />
+                                    </div>
                                 </div>
                                 <div>
                                     <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                        Proof or Reference URL
+                                        Proof or Reference URL <span className="text-[10px] text-neutral-400 font-bold">(Optional)</span>
                                     </label>
                                     <input
                                         type="url"
+                                        maxLength={255}
                                         value={externalLink}
                                         onChange={(e) => setExternalLink(e.target.value)}
                                         placeholder="https://..."
@@ -454,11 +545,17 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
 
                             {/* Description */}
                             <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                    Description / Summary
-                                </label>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                        Description / Summary <span className="text-[10px] text-neutral-400 font-bold">(Optional)</span>
+                                    </label>
+                                    <span className="text-[10px] font-mono font-bold text-neutral-400">
+                                        {description.length}/500
+                                    </span>
+                                </div>
                                 <textarea
                                     rows={3}
+                                    maxLength={500}
                                     value={description}
                                     onChange={(e) => setDescription(e.target.value)}
                                     placeholder="Brief explanation of the competition, problem solved, or milestone attained..."
@@ -503,7 +600,8 @@ export const ClubAchievementsManager: React.FC<ClubAchievementsManagerProps> = (
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* DELETE CONFIRMATION MODAL */}

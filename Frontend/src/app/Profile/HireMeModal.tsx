@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { Mail, X, Check } from "lucide-react";
 import { OrbixLoader } from "../../components/ui/loader";
 import { sendHireMessage } from "../../utils/profileApi";
@@ -47,17 +48,8 @@ export function HireMeModal({
         }
     }, [isOpen]);
 
-    // Handle ESC key to close
-    useEffect(() => {
-        if (!isOpen) return;
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onClose();
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, onClose]);
-
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -126,9 +118,9 @@ export function HireMeModal({
         disableBackdrop: sending,
     });
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fadeIn"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
             onClick={handleBackdropClick}
         >
             <div
@@ -278,7 +270,8 @@ export function HireMeModal({
                     </form>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 

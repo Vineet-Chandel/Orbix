@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { X, ShieldCheck, Award, Zap, Code2, BookOpen, GitPullRequest, Flame, CheckCircle2 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
@@ -12,6 +13,7 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const pillars = [
         {
@@ -113,9 +115,9 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
         { name: "Substack", category: "Technical Writing", metrics: "Newsletter posts, Subscribers, Publications", pillars: "P6 (5%)" },
     ];
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in"
             onClick={handleBackdropClick}
         >
             <div
@@ -273,6 +275,7 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Plus, Sparkles } from "lucide-react";
 import { OrbixButton } from "../../../components/OrbixButton";
 import { useToast } from "../../../context/ToastContext";
@@ -72,6 +73,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const handleApplyTemplate = (tmpl: typeof SUGGESTED_TEMPLATES[0]) => {
         setName(tmpl.name);
@@ -121,9 +123,9 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
 
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs animate-fadeIn overflow-y-auto"
             onClick={handleBackdropClick}
         >
             <div
@@ -282,6 +284,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { OrbixLogo } from "../../../components/OrbixLogo";
 import { NeoSelect, type NeoSelectOption } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 
 interface SampleApplication {
     id: string;
@@ -636,35 +637,35 @@ export const ClubVerificationDocumentary: React.FC = () => {
 
                             {/* 3 Checkboxes */}
                             <div className="space-y-2.5 pt-1 text-xs font-bold select-none">
-                                <label className="flex items-center gap-3 p-3.5 rounded-xl bg-white border border-black/10 hover:border-black/30 cursor-pointer hover:bg-white shadow-sm transition-all">
-                                    <input
-                                        type="checkbox"
+                                <div className="p-3.5 rounded-xl bg-white border border-black/10 hover:border-black/30 shadow-sm transition-all">
+                                    <NeoCheckbox
                                         checked={clubExistence}
-                                        onChange={(e) => setClubExistence(e.target.checked)}
-                                        className="w-4 h-4 rounded border-2 border-black accent-black"
+                                        onCheckedChange={setClubExistence}
+                                        label="1. Club Existence Confirmed"
+                                        labelClassName="text-xs font-bold text-black"
+                                        size="sm"
                                     />
-                                    <span>1. Club Existence Confirmed</span>
-                                </label>
+                                </div>
 
-                                <label className="flex items-center gap-3 p-3.5 rounded-xl bg-white border border-black/10 hover:border-black/30 cursor-pointer hover:bg-white shadow-sm transition-all">
-                                    <input
-                                        type="checkbox"
+                                <div className="p-3.5 rounded-xl bg-white border border-black/10 hover:border-black/30 shadow-sm transition-all">
+                                    <NeoCheckbox
                                         checked={collegeAuth}
-                                        onChange={(e) => setCollegeAuth(e.target.checked)}
-                                        className="w-4 h-4 rounded border-2 border-black accent-black"
+                                        onCheckedChange={setCollegeAuth}
+                                        label="2. College Association Confirmed"
+                                        labelClassName="text-xs font-bold text-black"
+                                        size="sm"
                                     />
-                                    <span>2. College Association Confirmed</span>
-                                </label>
+                                </div>
 
-                                <label className="flex items-center gap-3 p-3.5 rounded-xl bg-white border border-black/10 hover:border-black/30 cursor-pointer hover:bg-white shadow-sm transition-all">
-                                    <input
-                                        type="checkbox"
+                                <div className="p-3.5 rounded-xl bg-white border border-black/10 hover:border-black/30 shadow-sm transition-all">
+                                    <NeoCheckbox
                                         checked={repAuthority}
-                                        onChange={(e) => setRepAuthority(e.target.checked)}
-                                        className="w-4 h-4 rounded border-2 border-black accent-black"
+                                        onCheckedChange={setRepAuthority}
+                                        label="3. Representative Authority Confirmed"
+                                        labelClassName="text-xs font-bold text-black"
+                                        size="sm"
                                     />
-                                    <span>3. Representative Authority Confirmed</span>
-                                </label>
+                                </div>
                             </div>
 
                             {/* Promotion Gate Button */}

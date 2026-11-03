@@ -34,7 +34,7 @@ export const OrbixLoaderOverlay: React.FC<OrbixLoaderOverlayProps> = ({
                     transition={{ duration: 0.2, ease: "easeInOut" }}
                     className={`flex flex-col items-center justify-center select-none ${
                         fullscreen
-                            ? "fixed inset-0 z-[9999] bg-black/40 backdrop-blur-xs text-white"
+                            ? "fixed inset-0 top-0 left-0 right-0 bottom-0 z-[9999] bg-black/50 backdrop-blur-xs text-white"
                             : "absolute inset-0 z-50 bg-black/20 backdrop-blur-xs rounded-inherit text-white"
                     } ${className}`}
                     role="alertdialog"

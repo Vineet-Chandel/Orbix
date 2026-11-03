@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import {
     X,
     Calculator,
@@ -23,12 +24,13 @@ export const ExplainScoreModal: React.FC<ExplainScoreModalProps> = ({
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     if (!isOpen || !scoring) return null;
+    if (typeof document === "undefined") return null;
 
     const dimensionsList = Object.values(scoring.dimensions || {});
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
             onClick={handleBackdropClick}
         >
             <div
@@ -185,6 +187,7 @@ export const ExplainScoreModal: React.FC<ExplainScoreModalProps> = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

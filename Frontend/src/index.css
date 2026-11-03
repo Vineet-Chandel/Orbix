@@ -22,6 +22,69 @@ textarea {
 }
 
 /* ==========================================================================
+   GLOBAL NEO-BRUTALIST CHECKBOXES
+   Transforms all native checkboxes across the entire platform into Orbix's
+   signature Neo-Brutalist design language.
+   ========================================================================== */
+@layer base {
+  input[type="checkbox"]:not(.sr-only) {
+    appearance: none;
+    -webkit-appearance: none;
+    margin: 0;
+    width: 1.125rem;
+    height: 1.125rem;
+    border: 2px solid #000000;
+    border-radius: 5px;
+    background-color: #ffffff;
+    box-shadow: 2px 2px 0px #000000;
+    cursor: pointer;
+    display: inline-grid;
+    place-content: center;
+    vertical-align: middle;
+    position: relative;
+    transition: transform 0.1s ease-out, box-shadow 0.1s ease-out, background-color 0.1s ease-out;
+  }
+
+  input[type="checkbox"]:not(.sr-only):hover:not(:disabled) {
+    background-color: #fafafa;
+    box-shadow: 2.5px 2.5px 0px #000000;
+    transform: translate(-0.5px, -0.5px);
+  }
+
+  input[type="checkbox"]:not(.sr-only):active:not(:disabled) {
+    box-shadow: 1px 1px 0px #000000;
+    transform: translate(1px, 1px);
+  }
+
+  input[type="checkbox"]:not(.sr-only):focus-visible {
+    outline: 2px solid #000000;
+    outline-offset: 2px;
+  }
+
+  input[type="checkbox"]:not(.sr-only):checked {
+    background-color: #a2ff86;
+    background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='none' stroke='%23000000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M3.5 8.5l3 3 6-7'/%3e%3c/svg%3e");
+    background-size: 85% 85%;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  input[type="checkbox"]:not(.sr-only):indeterminate {
+    background-color: #FFE566;
+    background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='none' stroke='%23000000' stroke-width='3.2' stroke-linecap='round' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M3.5 8h9'/%3e%3c/svg%3e");
+    background-size: 85% 85%;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+
+  input[type="checkbox"]:not(.sr-only):disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background-color: #e5e5e5;
+  }
+}
+
+/* ==========================================================================
    GLOBAL SCROLLBAR REMOVAL (Zero visible scrollbars across the entire web app)
    Standard: scrollbar-width: none (Firefox, Chrome 121+, Safari 18.2+)
    Legacy WebKit: ::-webkit-scrollbar { display: none; }

@@ -976,10 +976,36 @@ export class ClubProfileService {
             throw error;
         }
 
-        if (!data.title || !data.title.trim()) {
-            const error: any = new Error("Achievement title is required.");
+        const trimmedTitle = data.title ? data.title.trim() : "";
+        if (!trimmedTitle || trimmedTitle.length < 2 || trimmedTitle.length > 150) {
+            const error: any = new Error("Achievement title must be between 2 and 150 characters.");
             error.statusCode = 400;
             throw error;
+        }
+
+        // Validate date / year if provided
+        let achDate = data.achievementDate || data.date ? String(data.achievementDate || data.date).trim() : null;
+        if (achDate) {
+            const currentYear = new Date().getFullYear();
+            const yearMatch = achDate.match(/\b\d{4,}\b/);
+            if (yearMatch) {
+                const yr = parseInt(yearMatch[0], 10);
+                if (yr < 1970 || yr > currentYear + 2) {
+                    const error: any = new Error(`Achievement year must be between 1970 and ${currentYear + 2}.`);
+                    error.statusCode = 400;
+                    throw error;
+                }
+            }
+        }
+
+        // Validate URL if provided
+        let achLink = data.externalLink || data.referenceUrl ? String(data.externalLink || data.referenceUrl).trim() : null;
+        if (achLink) {
+            if (!/^https?:\/\/.+/i.test(achLink)) {
+                const error: any = new Error("Reference link must be a valid URL starting with http:// or https://");
+                error.statusCode = 400;
+                throw error;
+            }
         }
 
         const clubId = perms.clubId;
@@ -991,8 +1017,6 @@ export class ClubProfileService {
 
         const achType = data.type || data.achievementType ? String(data.type || data.achievementType).trim() : null;
         const achIssuer = data.issuer || data.organization ? String(data.issuer || data.organization).trim() : null;
-        const achLink = data.externalLink || data.referenceUrl ? String(data.externalLink || data.referenceUrl).trim() : null;
-        const achDate = data.achievementDate || data.date ? String(data.achievementDate || data.date).trim() : null;
 
         const insertRes = await query(
             `INSERT INTO club_achievements (
@@ -1069,11 +1093,32 @@ export class ClubProfileService {
             }
         };
 
-        if (data.title !== undefined) addField("title", data.title.trim());
+        if (data.title !== undefined) {
+            const trimmedTitle = data.title.trim();
+            if (!trimmedTitle || trimmedTitle.length < 2 || trimmedTitle.length > 150) {
+                const error: any = new Error("Achievement title must be between 2 and 150 characters.");
+                error.statusCode = 400;
+                throw error;
+            }
+            addField("title", trimmedTitle);
+        }
         if (data.description !== undefined) addField("description", data.description ? data.description.trim() : null);
         if (data.achievementDate !== undefined || data.date !== undefined) {
             const d = data.achievementDate !== undefined ? data.achievementDate : data.date;
-            addField("achievement_date", d ? String(d).trim() : null);
+            const strDate = d ? String(d).trim() : null;
+            if (strDate) {
+                const currentYear = new Date().getFullYear();
+                const yearMatch = strDate.match(/\b\d{4,}\b/);
+                if (yearMatch) {
+                    const yr = parseInt(yearMatch[0], 10);
+                    if (yr < 1970 || yr > currentYear + 2) {
+                        const error: any = new Error(`Achievement year must be between 1970 and ${currentYear + 2}.`);
+                        error.statusCode = 400;
+                        throw error;
+                    }
+                }
+            }
+            addField("achievement_date", strDate);
         }
         if (data.issuer !== undefined || data.organization !== undefined) {
             const org = data.issuer !== undefined ? data.issuer : data.organization;
@@ -1086,7 +1131,13 @@ export class ClubProfileService {
         if (data.imageUrl !== undefined) addField("image_url", data.imageUrl ? data.imageUrl.trim() : null);
         if (data.externalLink !== undefined || data.referenceUrl !== undefined) {
             const link = data.externalLink !== undefined ? data.externalLink : data.referenceUrl;
-            addField("external_link", link ? String(link).trim() : null);
+            const strLink = link ? String(link).trim() : null;
+            if (strLink && !/^https?:\/\/.+/i.test(strLink)) {
+                const error: any = new Error("Reference link must be a valid URL starting with http:// or https://");
+                error.statusCode = 400;
+                throw error;
+            }
+            addField("external_link", strLink);
         }
         if (data.displayOrder !== undefined) addField("display_order", Number(data.displayOrder) || 0);
 

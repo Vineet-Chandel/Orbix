@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     LineChart as ChartIcon,
@@ -1269,12 +1270,12 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
             {/* ========================================================================= */}
             {/* TIER EXPLANATION MODAL ("What does Candidate Master mean?")                */}
             {/* ========================================================================= */}
-            {isTierModalOpen && activePlatform && (
+            {isTierModalOpen && activePlatform && typeof document !== "undefined" && createPortal(
                 <div
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="tier-modal-title"
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
                     onClick={handleTierModalBackdropClick}
                 >
                     <div
@@ -1428,7 +1429,8 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </section>
     );

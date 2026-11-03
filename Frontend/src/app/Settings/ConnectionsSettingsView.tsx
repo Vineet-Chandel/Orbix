@@ -1,5 +1,6 @@
 // Frontend/src/app/Settings/ConnectionsSettingsView.tsx
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     Users,
@@ -360,9 +361,9 @@ export const ConnectionsSettingsView: React.FC<ConnectionsSettingsViewProps> = (
             />
 
             {/* Notify Modal (Subject to 3/24h Limit) */}
-            {isNotifyModalOpen && activeTarget && (
+            {isNotifyModalOpen && activeTarget && typeof document !== "undefined" && createPortal(
                 <div
-                    className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
                     onClick={handleNotifyModalBackdropClick}
                 >
                     <div
@@ -436,7 +437,8 @@ export const ConnectionsSettingsView: React.FC<ConnectionsSettingsViewProps> = (
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

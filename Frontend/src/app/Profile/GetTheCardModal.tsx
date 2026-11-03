@@ -1,4 +1,5 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { X, Download, Repeat } from "lucide-react";
 import { OrbixLoader } from "../../components/ui/loader";
@@ -164,10 +165,11 @@ export const GetTheCardModal: React.FC<GetTheCardModalProps> = ({
     const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md overflow-y-auto"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-xs overflow-y-auto"
             onClick={handleBackdropClick}
         >
             <div
@@ -547,6 +549,7 @@ export const GetTheCardModal: React.FC<GetTheCardModalProps> = ({
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
