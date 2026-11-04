@@ -452,10 +452,10 @@ export function CollegeAutocomplete({
                                                     e.stopPropagation();
                                                     handleSelect(item);
                                                 }}
-                                                className="px-3 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] text-xs font-black uppercase tracking-wider flex items-center gap-1 transition-all flex-shrink-0 cursor-pointer"
+                                                className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all flex-shrink-0 cursor-pointer select-none"
                                             >
                                                 <span>Select</span>
-                                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                                             </button>
                                         </li>
                                     );

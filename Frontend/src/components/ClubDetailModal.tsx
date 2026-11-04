@@ -310,16 +310,11 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
                             <div className="space-y-6">
                                 {/* Coordinators Showcase Box */}
                                 <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[3.5px_3.5px_0px_#000] space-y-4">
-                                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                                    <div className="pb-3 border-b-2 border-black/10">
                                         <h3 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-2">
                                             <Users className="w-4 h-4 text-black" />
                                             <span>Chapter Leadership & Coordinators</span>
                                         </h3>
-                                        {loadedCoordinators.length > 0 && (
-                                            <span className="px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
-                                                {loadedCoordinators.length}
-                                            </span>
-                                        )}
                                     </div>
 
                                     {loadingCoordinators ? (
@@ -430,14 +425,11 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
                                 {/* Recent Achievements & Highlights */}
                                 {club.achievements && club.achievements.length > 0 && (
                                     <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[3.5px_3.5px_0px_#000] space-y-4">
-                                        <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                                        <div className="pb-3 border-b-2 border-black/10">
                                             <h3 className="text-sm font-black uppercase tracking-wider text-black flex items-center gap-2">
                                                 <Award className="w-4 h-4 text-amber-600" />
-                                                Recognition & Milestone Highlights
+                                                <span>Recognition & Milestone Highlights</span>
                                             </h3>
-                                            <span className="px-2 py-0.5 rounded-full bg-[#FFE566] text-black border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
-                                                {club.achievements.length}
-                                            </span>
                                         </div>
 
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

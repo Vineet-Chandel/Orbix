@@ -5,12 +5,10 @@ import {
     GraduationCap,
     Search,
     X,
-    RefreshCw,
     Radio,
     AlertCircle,
     Rocket,
-    Check,
-    Copy,
+    Share2,
     MapPin,
     ArrowUpRight,
     SlidersHorizontal,
@@ -18,8 +16,8 @@ import {
 import { fetchCollegeClubs, type CollegeClubItem, type CollegeClubsResponse } from "../../../utils/clubProfileApi";
 import { ClubCard } from "../../../components/ClubCard";
 import { ClubDetailModal } from "../../../components/ClubDetailModal";
+import { InviteCampusLeadsModal } from "../../../components/InviteCampusLeadsModal";
 import { NeoSelect } from "../../../components/NeoSelect";
-import { useToast } from "../../../context/ToastContext";
 import { useAppSelector } from "../../../store";
 import { SectionBottomIllustration } from "../../common/SectionBottomIllustration";
 
@@ -30,7 +28,6 @@ interface StudentCampusClubsViewProps {
 export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
     onOpenMobileSidebar,
 }) => {
-    const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
 
     const [clubs, setClubs] = useState<CollegeClubItem[]>([]);
@@ -50,7 +47,7 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [copiedInvite, setCopiedInvite] = useState(false);
+    const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
     // Filters and Search
     const [searchQuery, setSearchQuery] = useState("");
@@ -166,16 +163,6 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
 
     const displayCollegeName = collegeData.collegeName || "Your College Campus";
 
-    const handleCopyCampusInvite = () => {
-        const inviteUrl = `${window.location.origin}/auth/signup?ref=campus-invite&college=${encodeURIComponent(displayCollegeName)}`;
-        navigator.clipboard.writeText(inviteUrl);
-        setCopiedInvite(true);
-        toast.success("Campus invitation link copied! Share with presidents and leads of other clubs.", {
-            title: "Invite Link Copied",
-        });
-        setTimeout(() => setCopiedInvite(false), 2500);
-    };
-
     const hasNoCollege = !user?.collegeId && !user?.college && (!collegeData.collegeName || collegeData.collegeName === "Your College");
 
     return (
@@ -214,7 +201,7 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
                         </p>
                     </div>
 
-                    {/* Right Summary Badges & Refresh */}
+                    {/* Right Summary Badges & Outreach */}
                     <div className="flex items-center gap-2.5 flex-wrap">
                         <div className="px-3.5 py-1.5 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-2">
                             <span className="text-[11px] font-black uppercase tracking-wider text-neutral-600">
@@ -234,15 +221,17 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
                             </div>
                         )}
 
-                        <button
-                            type="button"
-                            onClick={loadClubs}
-                            disabled={loading}
-                            className="p-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
-                            title="Refresh Clubs List"
-                        >
-                            <RefreshCw className={`w-4 h-4 stroke-[2.5] ${loading ? "animate-spin" : ""}`} />
-                        </button>
+                        {!hasNoCollege && (
+                            <button
+                                type="button"
+                                onClick={() => setIsInviteModalOpen(true)}
+                                className="px-3 py-1.5 rounded-xl bg-[#FFE566] hover:bg-yellow-300 text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                title="Invite Campus Club Leads"
+                            >
+                                <Share2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>Invite Leads</span>
+                            </button>
+                        )}
                     </div>
                 </header>
 
@@ -475,15 +464,15 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
                             <div className="flex items-center gap-2.5 flex-wrap shrink-0">
                                 <button
                                     type="button"
-                                    onClick={handleCopyCampusInvite}
+                                    onClick={() => setIsInviteModalOpen(true)}
                                     className="px-4 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                 >
-                                    {copiedInvite ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                                    <span>{copiedInvite ? "Link Copied!" : "Invite Campus Leads"}</span>
+                                    <Share2 className="w-4 h-4 stroke-[2.5]" />
+                                    <span>Invite Campus Leads</span>
                                 </button>
 
                                 <Link
-                                    to="/auth/signup"
+                                    to={`/auth/signup?tab=club&ref=campus-invite&college=${encodeURIComponent(displayCollegeName)}${collegeData.collegeId ? `&collegeId=${encodeURIComponent(collegeData.collegeId)}` : ""}`}
                                     className="px-4 py-2.5 rounded-xl bg-[#FFE566] hover:bg-yellow-300 text-black border-2 border-black font-black text-xs shadow-[2.5px_2.5px_0px_#000] flex items-center gap-1.5 cursor-pointer"
                                 >
                                     <span>Register a Club</span>
@@ -546,6 +535,14 @@ export const StudentCampusClubsView: React.FC<StudentCampusClubsViewProps> = ({
                 club={selectedClubForModal}
                 isOpen={!!selectedClubForModal}
                 onClose={() => setSelectedClubForModal(null)}
+            />
+
+            {/* Invite Campus Leads Modal */}
+            <InviteCampusLeadsModal
+                isOpen={isInviteModalOpen}
+                onClose={() => setIsInviteModalOpen(false)}
+                collegeName={displayCollegeName}
+                collegeId={collegeData.collegeId || user?.collegeId}
             />
 
             {/* Bottom Neo-Brutalist Illustration */}
