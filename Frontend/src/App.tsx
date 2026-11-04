@@ -9,6 +9,7 @@ import { useAppDispatch, useAppSelector, fetchUserProfile } from "./store";
 // Code-split other routes & showcases to keep initial homepage bundle ultra-lean
 const SignInPage = lazy(() => import('./LandingPages/Auth-Pages/Signin/Landing'));
 const SignUpPage = lazy(() => import('./LandingPages/Auth-Pages/Signup/Landing'));
+const OAuthCallbackPage = lazy(() => import('./LandingPages/Auth-Pages/OAuthCallbackPage'));
 const CustomersPage = lazy(() => import("./LandingPages/Customers/Landing"));
 const PricingPage = lazy(() => import("./LandingPages/Pricing/Landing"));
 const SupportPage = lazy(() => import("./LandingPages/Support/Landing"));
@@ -121,6 +122,7 @@ const App = () => {
           {/* Auth Pages */}
           <Route path="/auth/signup" element={<SignUpPage />} />
           <Route path="/auth/signin" element={<SignInPage />} />
+          <Route path="/auth/callback" element={<OAuthCallbackPage />} />
           <Route path="/login" element={<Navigate to="/auth/signin" replace />} />
           <Route path="/workspace" element={<WorkspaceRedirect />} />
 
@@ -150,6 +152,8 @@ const App = () => {
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/clubs" element={<Dashboard />} />
+            <Route path="/college-events" element={<Dashboard />} />
+            <Route path="/applications" element={<Dashboard />} />
             <Route path="/explore" element={<Dashboard />} />
             <Route path="/trends" element={<Dashboard />} />
             <Route path="/reports" element={<Dashboard />} />

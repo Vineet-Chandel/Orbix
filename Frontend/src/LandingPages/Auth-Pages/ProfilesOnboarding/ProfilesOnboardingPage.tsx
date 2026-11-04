@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../../utils/portalParser";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { PortalProfileInput } from "../PortalProfileInput";
@@ -127,6 +127,7 @@ const MobilePillAvatar = ({
 
 export default function ProfilesOnboardingPage() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const dispatch = useAppDispatch();
     const toast = useToast();
     const { user } = useAppSelector((state) => state.user);
@@ -512,7 +513,8 @@ export default function ProfilesOnboardingPage() {
         // If there are NO additions, edits, or deletions, do NOT fire the API!
         // Immediately navigate to the dashboard without network overhead.
         if (!isDirty) {
-            navigate("/dashboard");
+            const redirectTarget = searchParams.get("redirect") || "/dashboard";
+            navigate(redirectTarget);
             return;
         }
 
@@ -631,7 +633,8 @@ export default function ProfilesOnboardingPage() {
         } finally {
             setIsSaving(false);
             setTimeout(() => {
-                navigate("/dashboard");
+                const redirectTarget = searchParams.get("redirect") || "/dashboard";
+                navigate(redirectTarget);
             }, 500);
         }
     };

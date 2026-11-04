@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ShieldCheck, ArrowLeft, RefreshCw } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { useToast } from "../../../context/ToastContext";
@@ -9,6 +9,7 @@ import { OrbixLoader } from "../../../components/ui/loader";
 
 export default function SigninForm() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const toast = useToast();
     const dispatch = useAppDispatch();
 
@@ -99,7 +100,8 @@ export default function SigninForm() {
         }
 
         toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });
-        navigate("/dashboard");
+        const redirectParam = searchParams.get("redirect");
+        navigate(redirectParam || "/dashboard");
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

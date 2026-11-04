@@ -89,7 +89,9 @@ export const Sidebar = ({
             activeTab === "college-events" ||
             activeTab === "applications" ||
             location.pathname.startsWith("/events") ||
-            location.pathname.startsWith("/clubs")
+            location.pathname.startsWith("/clubs") ||
+            location.pathname.startsWith("/college-events") ||
+            location.pathname.startsWith("/applications")
         ) {
             setOpenSection("events");
         } else if (
@@ -326,7 +328,8 @@ export const Sidebar = ({
                     <path d="M6 12v5c3 3 9 3 12 0v-5" />
                 </svg>
             ),
-            isComingSoon: true,
+            path: "/college-events",
+            isComingSoon: false,
         },
         {
             id: "events" as SidebarTab,
@@ -352,7 +355,8 @@ export const Sidebar = ({
                     <path d="m9 14 2 2 4-4" />
                 </svg>
             ),
-            isComingSoon: true,
+            path: "/applications",
+            isComingSoon: false,
         },
     ];
 
@@ -445,7 +449,7 @@ export const Sidebar = ({
                 to={item.path}
                 onClick={() => handleItemClick(item.id)}
                 className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${isCurrentActive
-                    ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                    ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
                     : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                     }`}
             >
@@ -562,7 +566,7 @@ export const Sidebar = ({
                 </div>
 
                 {/* Main Navigation Items (EXACTLY CENTERED when collapsed) */}
-                <div className="pt-3.5 space-y-1.5 overflow-x-hidden">
+                <div className="pt-3.5 space-y-1.5 px-0.5 pr-1.5">
                     {mainNavItems.map(renderNavItem)}
                 </div>
 
@@ -613,7 +617,7 @@ export const Sidebar = ({
                                 animate={{ height: "auto", opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
                                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                                className="space-y-1.5 overflow-hidden pt-0.5"
+                                className="space-y-1.5 overflow-hidden pt-0.5 px-0.5 pr-1.5"
                             >
                                 {eventItems.map((item) =>
                                     item.isComingSoon || !item.path ? (
@@ -700,7 +704,7 @@ export const Sidebar = ({
                                 animate={{ height: "auto", opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
                                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                                className="space-y-1.5 overflow-hidden pt-0.5"
+                                className="space-y-1.5 overflow-hidden pt-0.5 px-0.5 pr-1.5"
                             >
                                 {documentationItems.map(renderNavItem)}
                             </motion.div>
@@ -755,7 +759,7 @@ export const Sidebar = ({
                                 animate={{ height: "auto", opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
                                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                                className="space-y-1.5 overflow-hidden pt-0.5"
+                                className="space-y-1.5 overflow-hidden pt-0.5 px-0.5 pr-1.5"
                             >
                                 {workspaceItems.map((item) => (
                                     <div

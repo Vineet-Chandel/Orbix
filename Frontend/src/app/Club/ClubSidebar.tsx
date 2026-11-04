@@ -142,7 +142,7 @@ export const ClubSidebar = ({
                 </div>
 
                 {/* Main Navigation Items */}
-                <div className="pt-3.5 space-y-1.5 overflow-x-hidden">
+                <div className="pt-3.5 space-y-1.5 px-0.5 pr-1.5">
                     {/* Item 1: Dashboard Overview */}
                     <Link
                         to="/club/dashboard"
@@ -152,7 +152,7 @@ export const ClubSidebar = ({
                         }}
                         className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
                             activeTab === "overview"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
                         title={!isExpanded ? "Dashboard" : undefined}
@@ -205,7 +205,7 @@ export const ClubSidebar = ({
                         }}
                         className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
                             activeTab === "team"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
                         title={!isExpanded ? "Team Workspace" : undefined}
@@ -265,7 +265,7 @@ export const ClubSidebar = ({
                         }}
                         className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
                             activeTab === "events"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
                         title={!isExpanded ? "Events & Workshops" : undefined}
@@ -325,7 +325,7 @@ export const ClubSidebar = ({
                         }}
                         className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
                             activeTab === "profile"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
                         title={!isExpanded ? "Manage Profile" : undefined}
@@ -378,7 +378,7 @@ export const ClubSidebar = ({
                         }}
                         className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
                             activeTab === "clubs"
-                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black"
+                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
                                 : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
                         }`}
                         title={!isExpanded ? "Campus Clubs" : undefined}

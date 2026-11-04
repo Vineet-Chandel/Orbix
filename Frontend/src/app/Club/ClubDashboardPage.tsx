@@ -1,5 +1,4 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import {
     Calendar,
@@ -9,7 +8,6 @@ import {
     Trash2,
     Clock,
     MapPin,
-    X,
     Bell,
     ExternalLink,
     CheckCircle2,
@@ -21,20 +19,44 @@ import {
     Building2,
     Mail,
     Settings,
+    FileSpreadsheet,
+    MoreVertical,
+    BarChart3,
+    XCircle,
+    RotateCcw,
 } from "lucide-react";
-import { useAppDispatch, useAppSelector, clearUser, fetchClubProfile } from "../../store";
+import {
+    useAppDispatch,
+    useAppSelector,
+    clearUser,
+    fetchClubProfile,
+    fetchClubEvents,
+    createClubEvent,
+    updateClubEvent,
+    changeClubEventStatus,
+    deleteClubEvent,
+    addEventOptimistic,
+    updateEventOptimistic,
+    updateStatusOptimistic,
+    type ClubEvent,
+    type CreateClubEventPayload,
+    type ClubEventStatus,
+    type ClubEventFilter,
+} from "../../store";
 import { useToast } from "../../context/ToastContext";
-import { NeoSelect } from "../../components/NeoSelect";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { ClubSidebar, type ClubTab } from "./ClubSidebar";
 import ClubInboxModal from "./ClubInboxModal";
+import { ClubEventModal } from "./ClubEventModal";
+import { EventApplicationsModal } from "./EventApplicationsModal";
+import { EventSecurityConfirmModal } from "./EventSecurityConfirmModal";
+import { EventAnalyticsModal } from "./EventAnalyticsModal";
 import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
 import type { TeamStats } from "./Team/types";
 import { ClubProfileManager } from "./Profile/ClubProfileManager";
 import { ClubSettingsView } from "./Settings/ClubSettingsView";
 import { OtherClubsSection } from "./OtherClubsSection";
-import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
-import { useModalDismiss } from "../../hooks/useModalDismiss";
+import { OrbixLoader } from "../../components/ui/loader";
 
 interface VerifiedClub {
     id: string;
@@ -43,6 +65,7 @@ interface VerifiedClub {
     slug: string;
     clubUsername?: string;
     category: string;
+    college_id?: string;
     college_name: string;
     college_city: string;
     college_state: string;
@@ -77,25 +100,6 @@ interface ClubStats {
     total_count: string | number;
 }
 
-interface ClubEvent {
-    id: string;
-    clubId: string;
-    title: string;
-    slug: string;
-    summary: string | null;
-    description: string | null;
-    startsAt: string;
-    endsAt: string | null;
-    timezone: string;
-    locationType: "in_person" | "virtual" | "hybrid";
-    venueOrLocation: string | null;
-    registrationUrl: string | null;
-    coverImageUrl: string | null;
-    status: "draft" | "published" | "cancelled";
-    publishedAt: string | null;
-    createdAt: string;
-}
-
 export default function ClubDashboardPage() {
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
@@ -104,11 +108,11 @@ export default function ClubDashboardPage() {
 
     // Centralized Redux club state
     const clubState = useAppSelector((state) => state.club);
+    const { events } = useAppSelector((state) => state.clubEvents);
 
     // Data States (initialized immediately from Redux if already in memory)
     const [club, setClub] = useState<VerifiedClub | null>(clubState.club as any);
     const [, setStats] = useState<ClubStats>(clubState.stats || { upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
-    const [events, setEvents] = useState<ClubEvent[]>([]);
     const [loading, setLoading] = useState(!clubState.isInitialized);
 
     // Synchronize local states with Redux club slice
@@ -216,26 +220,18 @@ export default function ClubDashboardPage() {
 
     // Event Modal State
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-    const { handleBackdropClick: handleEventModalBackdropClick } = useModalDismiss({
-        isOpen: isEventModalOpen,
-        onClose: () => setIsEventModalOpen(false),
-    });
-    const [editingEventId, setEditingEventId] = useState<string | null>(null);
-    const [eventForm, setEventForm] = useState({
-        title: "",
-        summary: "",
-        description: "",
-        startsAt: "",
-        endsAt: "",
-        timezone: "Asia/Kolkata",
-        locationType: "in_person" as "in_person" | "virtual" | "hybrid",
-        venueOrLocation: "",
-        registrationUrl: "",
-        coverImageUrl: "",
-        status: "published" as "draft" | "published" | "cancelled",
-    });
-    const [isSavingEvent, setIsSavingEvent] = useState(false);
-    const [eventFilter, setEventFilter] = useState<"all" | "published" | "draft" | "cancelled">("all");
+    const [editingEvent, setEditingEvent] = useState<ClubEvent | null>(null);
+    const [initialModalStatus, setInitialModalStatus] = useState<ClubEventStatus>("published");
+    const [eventFilter, setEventFilter] = useState<ClubEventFilter>("all");
+    const [viewingApplicationsEvent, setViewingApplicationsEvent] = useState<ClubEvent | null>(null);
+
+    // Event Security Confirmation and Analytics Modals State
+    const [securityConfirmTarget, setSecurityConfirmTarget] = useState<{
+        event: ClubEvent;
+        action: "draft" | "cancelled" | "delete";
+    } | null>(null);
+    const [analyticsEvent, setAnalyticsEvent] = useState<ClubEvent | null>(null);
+    const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
 
     // In-flight request guards to prevent duplicate concurrent network calls (e.g. StrictMode, rapid switches)
     const isFetchingClubRef = useRef(false);
@@ -249,9 +245,9 @@ export default function ClubDashboardPage() {
             if (!clubState.isInitialized || force) {
                 setLoading(true);
             }
-            const [profileResult, eventsRes] = await Promise.allSettled([
+            const [profileResult] = await Promise.allSettled([
                 dispatch(fetchClubProfile({ force })).unwrap(),
-                fetch("/api/club/events", { credentials: "include" }).then((r) => r.json()),
+                dispatch(fetchClubEvents(club?.id)).unwrap(),
             ]);
 
             if (profileResult.status === "fulfilled") {
@@ -271,10 +267,6 @@ export default function ClubDashboardPage() {
                     navigate("/club/status", { replace: true });
                     return;
                 }
-            }
-
-            if (eventsRes.status === "fulfilled" && eventsRes.value?.success && Array.isArray(eventsRes.value.events)) {
-                setEvents(eventsRes.value.events);
             }
         } catch (err) {
             console.error("Failed to load club dashboard:", err);
@@ -323,150 +315,148 @@ export default function ClubDashboardPage() {
     }, []);
 
     // Open Event Create Modal
-    const openCreateEventModal = (initialStatus: "draft" | "published" = "published") => {
-        setEditingEventId(null);
-        setEventForm({
-            title: "",
-            summary: "",
-            description: "",
-            startsAt: "",
-            endsAt: "",
-            timezone: "Asia/Kolkata",
-            locationType: "in_person",
-            venueOrLocation: "",
-            registrationUrl: "",
-            coverImageUrl: "",
-            status: initialStatus,
-        });
+    const openCreateEventModal = (initialStatus: ClubEventStatus = "published") => {
+        setEditingEvent(null);
+        setInitialModalStatus(initialStatus);
         setIsEventModalOpen(true);
     };
 
     // Open Event Edit Modal
     const handleEditEvent = (ev: ClubEvent) => {
-        setEditingEventId(ev.id);
-        const formatForInput = (isoStr: string | null) => {
-            if (!isoStr) return "";
-            const d = new Date(isoStr);
-            const pad = (n: number) => (n < 10 ? `0${n}` : n);
-            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        };
-
-        setEventForm({
-            title: ev.title,
-            summary: ev.summary || "",
-            description: ev.description || "",
-            startsAt: formatForInput(ev.startsAt),
-            endsAt: formatForInput(ev.endsAt),
-            timezone: ev.timezone || "Asia/Kolkata",
-            locationType: ev.locationType || "in_person",
-            venueOrLocation: ev.venueOrLocation || "",
-            registrationUrl: ev.registrationUrl || "",
-            coverImageUrl: ev.coverImageUrl || "",
-            status: ev.status,
-        });
+        setEditingEvent(ev);
         setIsEventModalOpen(true);
     };
 
-    // Handle Event Save (Create or Edit)
-    const handleSaveEvent = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!eventForm.title.trim()) {
-            toast.error("Event title is required.", { title: "Validation Error" });
-            return;
-        }
-        if (!eventForm.startsAt) {
-            toast.error("Event start date and time is required.", { title: "Validation Error" });
-            return;
-        }
-
-        setIsSavingEvent(true);
-        try {
-            const url = editingEventId ? `/api/club/events/${editingEventId}` : "/api/club/events";
-            const method = editingEventId ? "PATCH" : "POST";
-
-            const res = await fetch(url, {
-                method,
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: eventForm.title,
-                    summary: eventForm.summary || null,
-                    description: eventForm.description || null,
-                    startsAt: new Date(eventForm.startsAt).toISOString(),
-                    endsAt: eventForm.endsAt ? new Date(eventForm.endsAt).toISOString() : null,
-                    timezone: eventForm.timezone,
-                    locationType: eventForm.locationType,
-                    venueOrLocation: eventForm.venueOrLocation || null,
-                    registrationUrl: eventForm.registrationUrl || null,
-                    coverImageUrl: eventForm.coverImageUrl || null,
-                    status: eventForm.status,
-                }),
-            });
-
-            const data = await res.json().catch(() => null);
-            if (!res.ok) {
-                throw new Error(data?.message || "Failed to save event.");
-            }
-
-            toast.success(
-                editingEventId ? "Event updated successfully!" : "New event created successfully!",
-                { title: "Success" }
-            );
-
+    // Handle Event Save (Optimistic create or update with background API processing)
+    const handleModalSubmit = (payload: CreateClubEventPayload, isEditing: boolean, eventId?: string) => {
+        if (isEditing && eventId) {
+            const previousEvent = events.find((e) => e.id === eventId);
+            // 1. Optimistic Redux update immediately
+            dispatch(updateEventOptimistic({ id: eventId, changes: payload }));
             setIsEventModalOpen(false);
-            setEditingEventId(null);
-            fetchClubData();
-        } catch (err: any) {
-            console.error("Save event error:", err);
-            toast.error(err.message || "Failed to save event.", { title: "Error" });
-        } finally {
-            setIsSavingEvent(false);
+            setEditingEvent(null);
+            toast.success("Event updated successfully!", { title: "Success" });
+
+            // 2. Background API call
+            dispatch(updateClubEvent({ eventId, payload, previousEvent }))
+                .unwrap()
+                .catch((err: any) => {
+                    toast.error(err?.message || "Failed to sync update to server. Changes reverted.", {
+                        title: "Sync Error",
+                    });
+                });
+        } else {
+            const tempId = `opt-event-${Date.now()}`;
+            const optimisticEvent: ClubEvent = {
+                id: tempId,
+                clubId: club?.id || "",
+                title: payload.title,
+                slug: payload.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+                summary: payload.summary || null,
+                description: payload.description || null,
+                startsAt: payload.startsAt,
+                endsAt: payload.endsAt || null,
+                timezone: payload.timezone || "Asia/Kolkata",
+                locationType: payload.locationType,
+                venueOrLocation: payload.venueOrLocation || null,
+                registrationUrl: payload.registrationUrl || null,
+                coverImageUrl: payload.coverImageUrl || null,
+                status: payload.status,
+                publishedAt: payload.status === "published" ? new Date().toISOString() : null,
+                createdAt: new Date().toISOString(),
+                isOptimistic: true,
+            };
+
+            // 1. Optimistic Redux add immediately: instantly reflects in listing & counts!
+            dispatch(addEventOptimistic(optimisticEvent));
+            setIsEventModalOpen(false);
+            setEditingEvent(null);
+
+            const statusToastText =
+                payload.status === "published"
+                    ? "Event published! Added to live listing immediately."
+                    : payload.status === "draft"
+                    ? "Event saved to drafts immediately."
+                    : "Event saved as cancelled.";
+
+            toast.success(statusToastText, { title: "Event Added" });
+
+            // 2. Background API call
+            dispatch(createClubEvent({ tempId, payload }))
+                .unwrap()
+                .catch((err: any) => {
+                    toast.error(err?.message || "Failed to persist event to server. Removed from listing.", {
+                        title: "Sync Error",
+                    });
+                });
         }
     };
 
-    // Handle Delete Event
-    const handleDeleteEvent = async (eventId: string) => {
-        if (!confirm("Are you sure you want to permanently delete this event?")) return;
-
-        try {
-            const res = await fetch(`/api/club/events/${eventId}`, {
-                method: "DELETE",
-                credentials: "include",
-            });
-            const data = await res.json().catch(() => null);
-            if (!res.ok) throw new Error(data?.message || "Failed to delete event.");
-
-            toast.success("Event deleted successfully.", { title: "Deleted" });
-            fetchClubData();
-        } catch (err: any) {
-            console.error("Delete event error:", err);
-            toast.error(err.message || "Failed to delete event.", { title: "Error" });
-        }
+    // Handle Delete Event (Security challenge enforced: requires typing "delete <title>" + club password)
+    const handleDeleteEvent = (ev: ClubEvent) => {
+        setSecurityConfirmTarget({ event: ev, action: "delete" });
     };
 
-    // Handle Quick Status Changes (Publish, Draft, Cancel)
-    const handleSetEventStatus = async (ev: ClubEvent, nextStatus: "draft" | "published" | "cancelled") => {
-        try {
-            const res = await fetch(`/api/club/events/${ev.id}`, {
-                method: "PATCH",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: nextStatus }),
-            });
-            const data = await res.json().catch(() => null);
-            if (!res.ok) throw new Error(data?.message || "Failed to change status.");
+    // Handle Quick Status Changes (Publish live directly; Draft / Cancel triggers security confirmation)
+    const handleSetEventStatus = (ev: ClubEvent, nextStatus: ClubEventStatus) => {
+        if (nextStatus === "draft" || nextStatus === "cancelled") {
+            setSecurityConfirmTarget({ event: ev, action: nextStatus });
+            return;
+        }
 
-            const statusLabel =
-                nextStatus === "published"
-                    ? "published live"
-                    : nextStatus === "cancelled"
-                    ? "marked as cancelled"
-                    : "moved to draft";
-            toast.success(`Event is now ${statusLabel}.`, { title: "Status Updated" });
-            fetchClubData();
+        // Publishing does not require destructive security challenge
+        const previousStatus = ev.status;
+        dispatch(updateStatusOptimistic({ id: ev.id, status: nextStatus }));
+        toast.success("Event is now published live.", { title: "Status Updated" });
+
+        dispatch(changeClubEventStatus({ eventId: ev.id, status: nextStatus, previousStatus }))
+            .unwrap()
+            .catch((err: any) => {
+                toast.error(err?.message || "Failed to update status on server. Reverted.", {
+                    title: "Sync Error",
+                });
+            });
+    };
+
+    // Execute Security-Protected Action (Move to Draft, Cancel Event, or Permanently Delete)
+    const handleExecuteSecurityConfirm = async (password: string, confirmationText: string) => {
+        if (!securityConfirmTarget) return;
+        const { event, action } = securityConfirmTarget;
+
+        try {
+            if (action === "draft" || action === "cancelled") {
+                const previousStatus = event.status;
+                await dispatch(
+                    changeClubEventStatus({
+                        eventId: event.id,
+                        status: action,
+                        previousStatus,
+                        password,
+                        confirmationText,
+                    })
+                ).unwrap();
+
+                const statusLabel = action === "draft" ? "moved to draft" : "marked as cancelled";
+                toast.success(`Event "${event.title}" is now ${statusLabel}.`, { title: "Status Updated" });
+            } else if (action === "delete") {
+                await dispatch(
+                    deleteClubEvent({
+                        eventId: event.id,
+                        previousEvent: event,
+                        password,
+                        confirmationText,
+                    })
+                ).unwrap();
+
+                toast.success(`Event "${event.title}" permanently deleted.`, { title: "Deleted" });
+            }
+            setSecurityConfirmTarget(null);
         } catch (err: any) {
-            console.error("Update status error:", err);
-            toast.error(err.message || "Failed to update event status.", { title: "Error" });
+            const message =
+                err?.message ||
+                err?.payload?.message ||
+                "Authentication failed. Please verify your password credentials and confirmation phrase.";
+            throw new Error(message);
         }
     };
 
@@ -1011,6 +1001,11 @@ export default function ClubDashboardPage() {
                                                     className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex flex-col justify-between space-y-2"
                                                 >
                                                     <div>
+                                                        {ev.coverImageUrl && (
+                                                            <div className="w-full h-24 rounded-lg border border-black overflow-hidden mb-2 bg-neutral-100 shadow-[1px_1px_0px_#000]">
+                                                                <img src={ev.coverImageUrl} alt={ev.title} className="w-full h-full object-cover" />
+                                                            </div>
+                                                        )}
                                                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
                                                             <span
                                                                 className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-black ${
@@ -1252,22 +1247,45 @@ export default function ClubDashboardPage() {
                                                 className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between"
                                             >
                                                 <div>
+                                                    {/* Cover Banner if attached */}
+                                                    {ev.coverImageUrl && (
+                                                        <div className="w-full h-40 sm:h-48 rounded-xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                                            <img
+                                                                src={ev.coverImageUrl}
+                                                                alt={ev.title}
+                                                                className="w-full h-full object-cover"
+                                                            />
+                                                            {ev.isOptimistic && (
+                                                                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">
+                                                                    Syncing...
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
                                                     <div className="flex items-center justify-between gap-2 mb-2">
-                                                        <span
-                                                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black ${
-                                                                ev.status === "published"
-                                                                    ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span
+                                                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black ${
+                                                                    ev.status === "published"
+                                                                        ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
+                                                                        : ev.status === "draft"
+                                                                        ? "bg-amber-200 text-black shadow-[1px_1px_0px_#000]"
+                                                                        : "bg-rose-200 text-black shadow-[1px_1px_0px_#000]"
+                                                                }`}
+                                                            >
+                                                                {ev.status === "published"
+                                                                    ? "Published"
                                                                     : ev.status === "draft"
-                                                                    ? "bg-amber-200 text-black shadow-[1px_1px_0px_#000]"
-                                                                    : "bg-rose-200 text-black shadow-[1px_1px_0px_#000]"
-                                                            }`}
-                                                        >
-                                                            {ev.status === "published"
-                                                                ? "Published"
-                                                                : ev.status === "draft"
-                                                                ? "Draft"
-                                                                : "Cancelled"}
-                                                        </span>
+                                                                    ? "Draft"
+                                                                    : "Cancelled"}
+                                                            </span>
+                                                            {!ev.coverImageUrl && ev.isOptimistic && (
+                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">
+                                                                    Syncing...
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <span className="text-xs font-bold text-neutral-500 flex items-center gap-1">
                                                             <Clock className="w-3.5 h-3.5" />
                                                             {new Date(ev.startsAt).toLocaleDateString(undefined, {
@@ -1308,80 +1326,184 @@ export default function ClubDashboardPage() {
 
                                                 {/* Action Bar */}
                                                 <div className="mt-5 pt-3.5 border-t-2 border-black/10 flex flex-wrap items-center justify-between gap-2">
-                                                    <div className="flex flex-wrap items-center gap-1.5">
-                                                        {/* Status Toggles */}
-                                                        {ev.status === "published" && (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "draft")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-amber-100 hover:bg-amber-200 text-amber-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    To Draft
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "cancelled")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-rose-100 hover:bg-rose-200 text-rose-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    Cancel Event
-                                                                </button>
-                                                            </>
-                                                        )}
+                                                    <div className="flex items-center gap-2">
+                                                        {/* Three Dots Menu Button (on the left side of Applications Sheet) */}
+                                                        <div className="relative inline-block text-left">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setOpenActionMenuId(openActionMenuId === ev.id ? null : ev.id);
+                                                                }}
+                                                                className="w-8 h-8 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[1.5px_1.5px_0px_#000] hover:shadow-[2px_2px_0px_#000] cursor-pointer transition-all active:translate-x-[0.5px] active:translate-y-[0.5px] flex items-center justify-center"
+                                                                title="More Event Options & Actions"
+                                                                aria-label="More Event Options & Actions"
+                                                            >
+                                                                <MoreVertical className="w-4 h-4 stroke-[2.5]" />
+                                                            </button>
 
-                                                        {ev.status === "draft" && (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "published")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-emerald-200 hover:bg-emerald-300 text-emerald-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    Publish Live
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "cancelled")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-rose-100 hover:bg-rose-200 text-rose-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    Cancel Event
-                                                                </button>
-                                                            </>
-                                                        )}
+                                                            {openActionMenuId === ev.id && (
+                                                                <>
+                                                                    {/* Backdrop to dismiss */}
+                                                                    <div
+                                                                        className="fixed inset-0 z-30 cursor-default"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setOpenActionMenuId(null);
+                                                                        }}
+                                                                    />
+                                                                    {/* Neo-Brutalist Dropdown */}
+                                                                    <div
+                                                                        className="absolute left-0 bottom-full mb-1.5 w-52 bg-[#FAF6EE] border-2 border-black rounded-2xl shadow-[4px_4px_0px_#000] p-1.5 z-40 animate-in fade-in zoom-in-95 text-left divide-y divide-black/10"
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                    >
+                                                                        <div className="py-1">
+                                                                            {/* Option: Edit */}
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setOpenActionMenuId(null);
+                                                                                    handleEditEvent(ev);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-neutral-900 hover:bg-white rounded-xl transition-colors text-left cursor-pointer"
+                                                                            >
+                                                                                <Edit3 className="w-3.5 h-3.5 stroke-[2.5] text-neutral-700" />
+                                                                                <span>Edit Event Details</span>
+                                                                            </button>
 
-                                                        {ev.status === "cancelled" && (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "draft")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-amber-100 hover:bg-amber-200 text-amber-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    Restore to Draft
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "published")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-emerald-200 hover:bg-emerald-300 text-emerald-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    Publish Live
-                                                                </button>
-                                                            </>
-                                                        )}
+                                                                            {/* Option: See Analytics */}
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setOpenActionMenuId(null);
+                                                                                    setAnalyticsEvent(ev);
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-[#0284c7] hover:bg-white rounded-xl transition-colors text-left cursor-pointer"
+                                                                            >
+                                                                                <BarChart3 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                                                <span>See Analytics</span>
+                                                                            </button>
+                                                                        </div>
 
-                                                        {/* Edit Button */}
+                                                                        {/* Status Transitions */}
+                                                                        <div className="py-1">
+                                                                            {ev.status === "published" && (
+                                                                                <>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            setOpenActionMenuId(null);
+                                                                                            setSecurityConfirmTarget({ event: ev, action: "draft" });
+                                                                                        }}
+                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-amber-900 hover:bg-amber-100 rounded-xl transition-colors text-left cursor-pointer"
+                                                                                    >
+                                                                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                                                        <span>To Draft...</span>
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            setOpenActionMenuId(null);
+                                                                                            setSecurityConfirmTarget({ event: ev, action: "cancelled" });
+                                                                                        }}
+                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-rose-900 hover:bg-rose-100 rounded-xl transition-colors text-left cursor-pointer"
+                                                                                    >
+                                                                                        <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                                                        <span>Cancel Event...</span>
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+
+                                                                            {ev.status === "draft" && (
+                                                                                <>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            setOpenActionMenuId(null);
+                                                                                            handleSetEventStatus(ev, "published");
+                                                                                        }}
+                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-emerald-900 hover:bg-emerald-100 rounded-xl transition-colors text-left cursor-pointer"
+                                                                                    >
+                                                                                        <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                                                        <span>Publish Live</span>
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            setOpenActionMenuId(null);
+                                                                                            setSecurityConfirmTarget({ event: ev, action: "cancelled" });
+                                                                                        }}
+                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-rose-900 hover:bg-rose-100 rounded-xl transition-colors text-left cursor-pointer"
+                                                                                    >
+                                                                                        <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                                                        <span>Cancel Event...</span>
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+
+                                                                            {ev.status === "cancelled" && (
+                                                                                <>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            setOpenActionMenuId(null);
+                                                                                            handleSetEventStatus(ev, "published");
+                                                                                        }}
+                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-emerald-900 hover:bg-emerald-100 rounded-xl transition-colors text-left cursor-pointer"
+                                                                                    >
+                                                                                        <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                                                        <span>Publish Live</span>
+                                                                                    </button>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        onClick={() => {
+                                                                                            setOpenActionMenuId(null);
+                                                                                            setSecurityConfirmTarget({ event: ev, action: "draft" });
+                                                                                        }}
+                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-amber-900 hover:bg-amber-100 rounded-xl transition-colors text-left cursor-pointer"
+                                                                                    >
+                                                                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                                                        <span>Restore to Draft...</span>
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+
+                                                                        {/* Delete Option */}
+                                                                        <div className="py-1">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    setOpenActionMenuId(null);
+                                                                                    setSecurityConfirmTarget({ event: ev, action: "delete" });
+                                                                                }}
+                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-100 rounded-xl transition-colors text-left cursor-pointer"
+                                                                            >
+                                                                                <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                                                <span>Delete Event...</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Applications Sheet Button (Right next to Three Dots) */}
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleEditEvent(ev)}
-                                                            className="px-2.5 py-1 rounded-xl bg-white hover:bg-neutral-50 text-neutral-900 text-xs font-black border-2 border-black shadow-[1px_1px_0px_#000] cursor-pointer flex items-center gap-1"
+                                                            onClick={() => setViewingApplicationsEvent(ev)}
+                                                            className="px-3 py-1.5 rounded-xl bg-[#38BDF8] hover:bg-[#0ea5e9] text-black text-xs font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                                            title="View applicant roster and Excel export"
                                                         >
-                                                            <Edit3 className="w-3 h-3" />
-                                                            <span>Edit</span>
+                                                            <FileSpreadsheet className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                            <span>Applications Sheet</span>
                                                         </button>
                                                     </div>
 
                                                     {/* Delete Button */}
                                                     <button
                                                         type="button"
-                                                        onClick={() => handleDeleteEvent(ev.id)}
+                                                        onClick={() => handleDeleteEvent(ev)}
                                                         className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border-2 border-black shadow-[1px_1px_0px_#000] cursor-pointer"
                                                         title="Delete Event"
                                                     >
@@ -1439,199 +1561,53 @@ export default function ClubDashboardPage() {
                 onUnreadCountChange={(newCount) => setInboxCounts((prev) => ({ ...prev, unreadCount: newCount }))}
             />
 
-            {/* Event Create / Edit Modal */}
-            {isEventModalOpen && typeof document !== "undefined" && createPortal(
-                <div
-                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto"
-                    onClick={handleEventModalBackdropClick}
-                >
-                    <div
-                        className="w-full max-w-xl bg-white rounded-3xl border-2 border-black shadow-[8px_8px_0px_#000] p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-8"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
-                            <div>
-                                <h3 className="font-black text-base text-neutral-900">
-                                    {editingEventId ? "Edit Event" : "Create New Club Event"}
-                                </h3>
-                                <p className="text-xs text-neutral-500 font-medium">
-                                    Publish or draft workshops, hackathons, and chapter meetups.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsEventModalOpen(false)}
-                                className="p-1 rounded-lg border-2 border-black hover:bg-neutral-100 cursor-pointer"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
+            {/* Full-Screen Club Event Modal with Banner Import & 50/50 Layout */}
+            <ClubEventModal
+                isOpen={isEventModalOpen}
+                onClose={() => {
+                    setIsEventModalOpen(false);
+                    setEditingEvent(null);
+                }}
+                onSubmit={handleModalSubmit}
+                editingEvent={editingEvent}
+                clubId={club?.id}
+                clubName={club?.name}
+                clubLogoUrl={club?.logo_url || undefined}
+                collegeName={club?.college_name}
+                collegeId={club?.college_id}
+                initialStatus={initialModalStatus}
+            />
 
-                        <form onSubmit={handleSaveEvent} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Event Title *
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={eventForm.title}
-                                    onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
-                                    placeholder="e.g. Intro to Web3 & Smart Contracts Workshop"
-                                    className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold"
-                                />
-                            </div>
+            {/* Event Applications Spreadsheet Modal */}
+            <EventApplicationsModal
+                isOpen={Boolean(viewingApplicationsEvent)}
+                onClose={() => setViewingApplicationsEvent(null)}
+                eventId={viewingApplicationsEvent?.id || null}
+                eventTitle={viewingApplicationsEvent?.title}
+            />
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Starts At *
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        required
-                                        value={eventForm.startsAt}
-                                        onChange={(e) => setEventForm({ ...eventForm, startsAt: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Ends At (Optional)
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        value={eventForm.endsAt}
-                                        onChange={(e) => setEventForm({ ...eventForm, endsAt: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                    />
-                                </div>
-                            </div>
+            {/* Event Security Confirmation Challenge Modal */}
+            <EventSecurityConfirmModal
+                isOpen={Boolean(securityConfirmTarget)}
+                onClose={() => setSecurityConfirmTarget(null)}
+                event={securityConfirmTarget?.event || null}
+                action={securityConfirmTarget?.action || null}
+                onConfirm={handleExecuteSecurityConfirm}
+            />
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Location Type
-                                    </label>
-                                    <NeoSelect
-                                        value={eventForm.locationType}
-                                        onChange={(val) => setEventForm({ ...eventForm, locationType: val as any })}
-                                        options={[
-                                            { value: "in_person", label: "In-Person (Campus)" },
-                                            { value: "virtual", label: "Virtual (Online Link)" },
-                                            { value: "hybrid", label: "Hybrid" },
-                                        ]}
-                                        size="sm"
-                                        className="w-full"
-                                        triggerClassName="h-9 font-bold bg-[#FAF6EE] text-xs"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Venue or Location Details
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={eventForm.venueOrLocation}
-                                        onChange={(e) => setEventForm({ ...eventForm, venueOrLocation: e.target.value })}
-                                        placeholder="e.g. Auditorium Hall B / Zoom link"
-                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Registration / RSVP URL
-                                </label>
-                                <input
-                                    type="url"
-                                    value={eventForm.registrationUrl}
-                                    onChange={(e) => setEventForm({ ...eventForm, registrationUrl: e.target.value })}
-                                    placeholder="https://forms.gle/... or https://unstop.com/..."
-                                    className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Cover Image URL
-                                </label>
-                                <input
-                                    type="url"
-                                    value={eventForm.coverImageUrl}
-                                    onChange={(e) => setEventForm({ ...eventForm, coverImageUrl: e.target.value })}
-                                    placeholder="https://.../poster.jpg"
-                                    className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Brief Summary (1-2 sentences)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={eventForm.summary}
-                                    onChange={(e) => setEventForm({ ...eventForm, summary: e.target.value })}
-                                    placeholder="A hands-on session covering problem solving techniques..."
-                                    className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Full Description & Agenda
-                                </label>
-                                <textarea
-                                    rows={3}
-                                    value={eventForm.description}
-                                    onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
-                                    placeholder="Prerequisites, schedule, speaker details, and certificate info..."
-                                    className="w-full p-3 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Publish Status
-                                </label>
-                                <NeoSelect
-                                    value={eventForm.status}
-                                    onChange={(val) => setEventForm({ ...eventForm, status: val as any })}
-                                    options={[
-                                        { value: "published", label: "Published (Live for Registrations)" },
-                                        { value: "draft", label: "Draft (Saved internally)" },
-                                        { value: "cancelled", label: "Cancelled (Session Cancelled)" },
-                                    ]}
-                                    size="sm"
-                                    className="w-full"
-                                    triggerClassName="h-9 font-bold bg-[#FAF6EE] text-xs"
-                                />
-                            </div>
-
-                            <div className="pt-3 border-t-2 border-black/10 flex items-center justify-end gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEventModalOpen(false)}
-                                    className="px-4 py-2 rounded-xl border-2 border-black text-xs font-bold hover:bg-neutral-100 cursor-pointer"
-                                >
-                                    Cancel
-                                </button>
-                                <OrbixButton
-                                    type="submit"
-                                    loading={isSavingEvent}
-                                    loadingLabel="Saving Event..."
-                                    variant="lime"
-                                >
-                                    {editingEventId ? "Update Event" : "Create Event"}
-                                </OrbixButton>
-                            </div>
-                        </form>
-                    </div>
-                </div>,
-                document.body
-            )}
+            {/* Event Analytics Modal */}
+            <EventAnalyticsModal
+                isOpen={Boolean(analyticsEvent)}
+                onClose={() => setAnalyticsEvent(null)}
+                eventId={analyticsEvent?.id || null}
+                eventTitle={analyticsEvent?.title}
+                onOpenApplicationsSheet={() => {
+                    if (analyticsEvent) {
+                        setViewingApplicationsEvent(analyticsEvent);
+                        setAnalyticsEvent(null);
+                    }
+                }}
+            />
         </div>
     );
 }

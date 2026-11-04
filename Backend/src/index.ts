@@ -3,6 +3,7 @@ import 'dotenv/config';
 import express, { type Express, type Request, type Response } from 'express';
 import cookieParser from 'cookie-parser';
 import authRouter from './Routes/auth/auth.js';
+import { oauthRouter } from './Routes/auth/oauthRoutes.js';
 import portalsRouter from './Routes/portals/portals.js';
 import profileRouter from './Routes/profile/profile.js';
 import leaderboardRouter from './Routes/leaderboard/leaderboard.js';
@@ -66,6 +67,8 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
 });
 
 app.use('/api', authRouter);
+app.use('/api/auth', oauthRouter);
+app.use('/auth', oauthRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/portals', portalsRouter);
 app.use('/api/leaderboard', leaderboardRouter);

@@ -127,6 +127,12 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMPTZ NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_two_factor_enabled BOOLEAN DEFAULT false;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled_at TIMESTAMPTZ NULL;
+            ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS github_id VARCHAR(255) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(50) DEFAULT 'local';
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id) WHERE github_id IS NOT NULL;
             CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users (LOWER(TRIM(phone))) WHERE phone IS NOT NULL AND TRIM(phone) != '';
             CREATE INDEX IF NOT EXISTS idx_users_two_factor ON users (is_two_factor_enabled) WHERE is_two_factor_enabled = true;
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -597,6 +603,18 @@ export const testDatabaseConnection = async () => {
             CREATE INDEX IF NOT EXISTS idx_relationships_high_pending 
                 ON user_relationships(user_high_id, requested_by, created_at DESC) 
                 WHERE status = 'pending';
+
+            -- Ensure club_events location_type constraint permits 'in_person', 'online', 'virtual', 'hybrid'
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'club_events'
+                ) THEN
+                    ALTER TABLE public.club_events DROP CONSTRAINT IF EXISTS club_events_location_type_check;
+                    ALTER TABLE public.club_events ADD CONSTRAINT club_events_location_type_check
+                        CHECK (location_type IN ('in_person', 'online', 'virtual', 'hybrid'));
+                END IF;
+            END $$;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");
     } catch (error) {
@@ -611,7 +629,7 @@ export const testDatabaseConnection = async () => {
 const isRetryableError = (error: any): boolean => {
     if (!error) return false;
     const msg = String(error.message || "").toLowerCase();
-    const code = String(error.code || "");
+    const code = String(error.code || "").toUpperCase();
     return (
         msg.includes("timeout") ||
         msg.includes("connection terminated") ||
@@ -619,6 +637,16 @@ const isRetryableError = (error: any): boolean => {
         msg.includes("econnreset") ||
         msg.includes("etimedout") ||
         msg.includes("epipe") ||
+        msg.includes("enotfound") ||
+        msg.includes("eaddrnotavail") ||
+        msg.includes("econnrefused") ||
+        msg.includes("ehostunreach") ||
+        code === "ENOTFOUND" ||
+        code === "EADDRNOTAVAIL" ||
+        code === "ECONNRESET" ||
+        code === "ETIMEDOUT" ||
+        code === "ECONNREFUSED" ||
+        code === "EHOSTUNREACH" ||
         code === "57P01" || // admin_shutdown
         code === "57P02" || // crash_shutdown
         code === "57P03" || // cannot_connect_now

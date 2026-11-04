@@ -13,6 +13,7 @@ import { OrbixButton } from "../../components/OrbixButton";
 import { useToast } from "../../context/ToastContext";
 import { NeoSelect } from "../../components/NeoSelect";
 import { NeoCheckbox } from "../../components/NeoCheckbox";
+import { NeoDateTimePicker } from "../../components/NeoDateTimePicker";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
 interface ReviewerApplication {
@@ -603,19 +604,16 @@ export default function ClubReviewerQueuePage() {
 
                                                 {/* Last Contacted Date */}
                                                 <div className="pt-1">
-                                                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-600 mb-1">
-                                                        Last College Contact Date
-                                                    </label>
-                                                    <input
-                                                        type="date"
+                                                    <NeoDateTimePicker
+                                                        mode="date"
+                                                        label="Last College Contact Date"
                                                         value={editForm.lastCollegeContactedAt}
-                                                        onChange={(e) =>
+                                                        onChange={(val) =>
                                                             setEditForm({
                                                                 ...editForm,
-                                                                lastCollegeContactedAt: e.target.value,
+                                                                lastCollegeContactedAt: val,
                                                             })
                                                         }
-                                                        className="w-full h-8 px-2.5 rounded-xl bg-white border border-black/30 text-xs font-mono font-bold"
                                                     />
                                                 </div>
                                             </div>

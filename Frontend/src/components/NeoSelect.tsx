@@ -26,6 +26,7 @@ export interface NeoSelectProps {
     error?: string;
     "aria-label"?: string;
     size?: "sm" | "md" | "lg";
+    placement?: "bottom" | "top" | "auto";
 }
 
 /**
@@ -51,6 +52,7 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
     error,
     "aria-label": ariaLabel,
     size = "md",
+    placement = "auto",
 }) => {
     const generatedId = useId();
     const id = propId || generatedId;
@@ -88,9 +90,28 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
 
     const [isOpen, setIsOpen] = useState(false);
     const [highlightedIndex, setHighlightedIndex] = useState(-1);
+    const [autoPlacement, setAutoPlacement] = useState<"top" | "bottom">("bottom");
     const containerRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const listboxRef = useRef<HTMLUListElement>(null);
+
+    // Compute dynamic placement
+    useEffect(() => {
+        if (isOpen && placement === "auto") {
+            if (triggerRef.current) {
+                const rect = triggerRef.current.getBoundingClientRect();
+                const spaceBelow = window.innerHeight - rect.bottom;
+                if (spaceBelow < 220 && rect.top > 220) {
+                    setAutoPlacement("top");
+                } else {
+                    setAutoPlacement("bottom");
+                }
+            }
+        }
+    }, [isOpen, placement]);
+
+    const effectivePlacement =
+        placement === "top" ? "top" : placement === "bottom" ? "bottom" : autoPlacement;
 
     // Selected option object
     const selectedOption = parsedOptions.find((opt) => String(opt.value) === String(currentValue));
@@ -287,7 +308,11 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
                     role="listbox"
                     aria-activedescendant={highlightedIndex >= 0 ? `${listboxId}-opt-${highlightedIndex}` : undefined}
                     tabIndex={-1}
-                    className={`absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl sm:rounded-2xl bg-white border-2 border-black shadow-[5px_5px_0px_#000] p-1.5 space-y-1 overflow-y-auto max-h-60 animate-fadeIn ${dropdownClassName}`}
+                    className={`absolute left-0 right-0 ${
+                        effectivePlacement === "top"
+                            ? "bottom-full mb-1.5"
+                            : "top-full mt-1.5"
+                    } z-50 rounded-xl sm:rounded-2xl bg-white border-2 border-black shadow-[5px_5px_0px_#000] p-1.5 space-y-1 overflow-y-auto max-h-60 animate-fadeIn ${dropdownClassName}`}
                 >
                     {parsedOptions.length === 0 ? (
                         <li className="px-3 py-2 text-xs font-bold text-neutral-500 text-center select-none">
@@ -315,7 +340,7 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
                                         opt.disabled
                                             ? "opacity-40 cursor-not-allowed"
                                             : isSelected
-                                            ? "bg-[#FFE566] text-black font-black border border-black shadow-[1px_1px_0px_#000]"
+                                            ? "bg-[#a2ff86] text-black font-black border border-black shadow-[1px_1px_0px_#000]"
                                             : isHighlighted
                                             ? "bg-[#FAF6EE] text-black font-bold"
                                             : "text-neutral-800 font-bold hover:bg-[#FAF6EE] hover:text-black"

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { User, Users } from "lucide-react";
+import { useToast } from "../../../context/ToastContext";
 import { AuthLayout } from "../AuthLayout";
 import SignupForm from "./Form";
 import ClubSignupForm from "./ClubSignupForm";
@@ -9,10 +10,21 @@ import { ClubRegistrationModal } from "./ClubRegistrationModal";
 export default function SignUpPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const tabParam = searchParams.get("tab");
+    const errorParam = searchParams.get("error");
+    const toast = useToast();
     const [registrationMode, setRegistrationMode] = useState<"personal" | "club">(
         tabParam === "club" ? "club" : "personal"
     );
     const [isClubModalOpen, setIsClubModalOpen] = useState(false);
+
+    useEffect(() => {
+        if (errorParam) {
+            toast.error(decodeURIComponent(errorParam), { title: "Authentication Notice" });
+            const nextParams = new URLSearchParams(searchParams);
+            nextParams.delete("error");
+            setSearchParams(nextParams, { replace: true });
+        }
+    }, [errorParam]);
 
     useEffect(() => {
         if (tabParam === "club") {

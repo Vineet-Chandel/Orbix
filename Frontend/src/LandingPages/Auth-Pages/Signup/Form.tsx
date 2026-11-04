@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     Mail,
     RotateCcw,
@@ -19,6 +19,7 @@ import { NeoCheckbox } from "../../../components/NeoCheckbox";
 
 export default function SignupForm() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const toast = useToast();
     const dispatch = useAppDispatch();
 
@@ -358,7 +359,8 @@ export default function SignupForm() {
             toast.success("Account registered and email verified! Welcome to Orbix.", {
                 title: "Welcome to Orbix! ✓",
             });
-            navigate("/onboarding");
+            const redirectParam = searchParams.get("redirect");
+            navigate(redirectParam ? `/onboarding?redirect=${encodeURIComponent(redirectParam)}` : "/onboarding");
 
         } catch (err: any) {
             console.error("Verification and signup error:", err);

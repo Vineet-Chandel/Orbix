@@ -2091,6 +2091,19 @@ clubRouter.get("/session-state", authenticate, async (req: Request, res: Respons
 
 
 /**
+ * Normalizes event location type for DB storage.
+ * Maps 'virtual' or 'online' to 'online' (satisfying legacy check constraints)
+ * while the SELECT queries map 'online' back to 'virtual' for frontend consumers.
+ */
+const normalizeLocationTypeForDb = (type?: string): string => {
+    if (!type) return "in_person";
+    const lower = type.toLowerCase().trim();
+    if (lower === "virtual" || lower === "online") return "online";
+    if (lower === "hybrid") return "hybrid";
+    return "in_person";
+};
+
+/**
  * GET /api/club/events
  * Authenticated endpoint for the club to fetch all its events (draft, published, cancelled).
  */
@@ -2116,7 +2129,7 @@ clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
                 starts_at AS "startsAt",
                 ends_at AS "endsAt",
                 timezone,
-                location_type AS "locationType",
+                CASE WHEN location_type = 'online' THEN 'virtual' ELSE location_type END AS "locationType",
                 venue_or_location AS "venueOrLocation",
                 registration_url AS "registrationUrl",
                 cover_image_url AS "coverImageUrl",
@@ -2198,6 +2211,7 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
 
         const isPublished = status === "published";
         const publishedAt = isPublished ? new Date().toISOString() : null;
+        const dbLocationType = normalizeLocationTypeForDb(locationType);
 
         const insertRes = await query(
             `INSERT INTO club_events (
@@ -2228,7 +2242,7 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
                 starts_at AS "startsAt",
                 ends_at AS "endsAt",
                 timezone,
-                location_type AS "locationType",
+                CASE WHEN location_type = 'online' THEN 'virtual' ELSE location_type END AS "locationType",
                 venue_or_location AS "venueOrLocation",
                 registration_url AS "registrationUrl",
                 cover_image_url AS "coverImageUrl",
@@ -2244,7 +2258,7 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
                 new Date(startsAt).toISOString(),
                 endsAt ? new Date(endsAt).toISOString() : null,
                 timezone,
-                locationType,
+                dbLocationType,
                 venueOrLocation || null,
                 registrationUrl || null,
                 coverImageUrl || null,
@@ -2307,10 +2321,40 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
 
         const current = existingEvent.rows[0];
         const newStatus = status || current.status;
+
+        // Security check: Moving to Draft or Cancelling requires confirmation text and club account password
+        if (status && (status === "draft" || status === "cancelled") && current.status !== status) {
+            const { password, confirmationText } = req.body;
+            if (!password) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Club account password is required to transform event status to ${status}.`,
+                });
+            }
+
+            const expectedPhrase = `delete ${current.title.trim()}`.toLowerCase();
+            if (!confirmationText || confirmationText.trim().toLowerCase() !== expectedPhrase) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Confirmation text must match: delete ${current.title.trim()}`,
+                });
+            }
+
+            const userRes = await query(`SELECT password FROM users WHERE id = $1 LIMIT 1;`, [userId]);
+            if (!userRes.rows[0]?.password) {
+                return res.status(401).json({ success: false, message: "User credentials not found." });
+            }
+            const isMatch = await bcrypt.compare(password, userRes.rows[0].password);
+            if (!isMatch) {
+                return res.status(401).json({ success: false, message: "Incorrect club account password. Authentication failed." });
+            }
+        }
+
         let publishedAt = current.published_at;
         if (newStatus === "published" && current.status !== "published") {
             publishedAt = new Date().toISOString();
         }
+        const dbLocationType = locationType !== undefined ? normalizeLocationTypeForDb(locationType) : undefined;
 
         const updateRes = await query(
             `UPDATE club_events
@@ -2339,7 +2383,7 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                 starts_at AS "startsAt",
                 ends_at AS "endsAt",
                 timezone,
-                location_type AS "locationType",
+                CASE WHEN location_type = 'online' THEN 'virtual' ELSE location_type END AS "locationType",
                 venue_or_location AS "venueOrLocation",
                 registration_url AS "registrationUrl",
                 cover_image_url AS "coverImageUrl",
@@ -2353,7 +2397,7 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                 startsAt ? new Date(startsAt).toISOString() : null,
                 endsAt ? new Date(endsAt).toISOString() : null,
                 timezone || null,
-                locationType || null,
+                dbLocationType !== undefined ? dbLocationType : null,
                 venueOrLocation !== undefined ? venueOrLocation : null,
                 registrationUrl !== undefined ? registrationUrl : null,
                 coverImageUrl !== undefined ? coverImageUrl : null,
@@ -2390,6 +2434,39 @@ clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Re
         );
         if (!clubRes.rows[0]) {
             return res.status(404).json({ success: false, message: "Verified club not found." });
+        }
+
+        const existingEvent = await query(
+            `SELECT id, title FROM club_events WHERE id = $1 AND club_id = $2 LIMIT 1;`,
+            [eventId, clubRes.rows[0].id]
+        );
+        if (!existingEvent.rows[0]) {
+            return res.status(404).json({ success: false, message: "Event not found or not owned by this club." });
+        }
+
+        const { password, confirmationText } = req.body || {};
+        if (!password) {
+            return res.status(400).json({
+                success: false,
+                message: "Club account password is required to delete an event.",
+            });
+        }
+
+        const expectedPhrase = `delete ${existingEvent.rows[0].title.trim()}`.toLowerCase();
+        if (!confirmationText || confirmationText.trim().toLowerCase() !== expectedPhrase) {
+            return res.status(400).json({
+                success: false,
+                message: `Confirmation text must match: delete ${existingEvent.rows[0].title.trim()}`,
+            });
+        }
+
+        const userRes = await query(`SELECT password FROM users WHERE id = $1 LIMIT 1;`, [userId]);
+        if (!userRes.rows[0]?.password) {
+            return res.status(401).json({ success: false, message: "User credentials not found." });
+        }
+        const isMatch = await bcrypt.compare(password, userRes.rows[0].password);
+        if (!isMatch) {
+            return res.status(401).json({ success: false, message: "Incorrect club account password. Authentication failed." });
         }
 
         const deleteRes = await query(
@@ -2578,17 +2655,237 @@ clubRouter.get("/:clubId/my-conversation", authenticate, async (req: Request, re
 });
 
 /**
+ * GET /api/club/college-events
+ * Returns published events organized by clubs for the student's college, with like state and registration status.
+ */
+clubRouter.get("/college-events", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user!.id;
+        const requestedCollegeId = (req.query.collegeId as string) || undefined;
+        const requestedCollegeName = (req.query.collegeName as string) || undefined;
+        const timeFilter = (req.query.timeFilter as string) || "all"; // 'all' | 'upcoming' | 'today' | 'past'
+        const clubId = (req.query.clubId as string) || undefined;
+        const search = ((req.query.search as string) || "").trim();
+
+        // Retrieve user college
+        const userRes = await query(
+            `SELECT college_id, college_name FROM users WHERE id = $1 LIMIT 1;`,
+            [userId]
+        );
+        const userCollegeId = requestedCollegeId || userRes.rows[0]?.college_id || null;
+        const userCollegeName = requestedCollegeName || userRes.rows[0]?.college_name || null;
+
+        let sql = `
+            SELECT
+                e.id,
+                e.club_id AS "clubId",
+                e.title,
+                e.slug,
+                e.summary,
+                e.description,
+                e.starts_at AS "startsAt",
+                e.ends_at AS "endsAt",
+                e.timezone,
+                CASE WHEN e.location_type = 'online' THEN 'virtual' ELSE e.location_type END AS "locationType",
+                e.venue_or_location AS "venueOrLocation",
+                e.registration_url AS "registrationUrl",
+                e.cover_image_url AS "coverImageUrl",
+                e.status,
+                e.published_at AS "publishedAt",
+                e.created_at AS "createdAt",
+                vc.name AS "clubName",
+                vc.slug AS "clubSlug",
+                COALESCE(vc.logo_url, '') AS "clubLogoUrl",
+                COALESCE(vc.cover_image_url, '') AS "clubBannerUrl",
+                vc.college_id AS "collegeId",
+                vc.college_name AS "collegeName",
+                vc.category AS "clubCategory",
+                (SELECT COUNT(*)::int FROM club_event_likes WHERE event_id = e.id) AS "likesCount",
+                EXISTS(SELECT 1 FROM club_event_likes WHERE event_id = e.id AND user_id = $1) AS "hasLiked",
+                EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $1 AND status != 'cancelled') AS "isRegistered",
+                (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $1 ORDER BY registered_at DESC LIMIT 1) AS "registrationStatus",
+                (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $1 AND status != 'cancelled' ORDER BY registered_at DESC LIMIT 1) AS "ticketCode",
+                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status != 'cancelled') AS "registrationsCount"
+            FROM club_events e
+            JOIN verified_clubs vc ON vc.id = e.club_id
+            WHERE e.status = 'published' AND vc.is_active = true
+        `;
+        const params: any[] = [userId];
+
+        if (userCollegeId || userCollegeName) {
+            params.push(userCollegeId, userCollegeName);
+            sql += ` AND (
+                ($${params.length - 1}::uuid IS NOT NULL AND vc.college_id = $${params.length - 1}::uuid)
+                OR ($${params.length}::text IS NOT NULL AND LOWER(vc.college_name) = LOWER($${params.length}))
+            )`;
+        }
+
+        if (clubId) {
+            params.push(clubId);
+            sql += ` AND e.club_id = $${params.length}`;
+        }
+
+        if (timeFilter === "upcoming") {
+            sql += ` AND e.starts_at >= NOW()`;
+        } else if (timeFilter === "past") {
+            sql += ` AND e.starts_at < NOW()`;
+        } else if (timeFilter === "today") {
+            sql += ` AND DATE(e.starts_at) = CURRENT_DATE`;
+        }
+
+        if (search) {
+            params.push(`%${search.toLowerCase()}%`);
+            sql += ` AND (LOWER(e.title) LIKE $${params.length} OR LOWER(COALESCE(e.summary, '')) LIKE $${params.length} OR LOWER(COALESCE(e.venue_or_location, '')) LIKE $${params.length} OR LOWER(vc.name) LIKE $${params.length})`;
+        }
+
+        sql += timeFilter === "past" ? ` ORDER BY e.starts_at DESC` : ` ORDER BY e.starts_at ASC`;
+
+        const eventsRes = await query(sql, params);
+
+        return res.json({
+            success: true,
+            collegeName: userCollegeName || "Your College",
+            collegeId: userCollegeId,
+            events: eventsRes.rows,
+        });
+    } catch (err: any) {
+        console.error("GET /api/club/college-events error:", err);
+        return res.status(500).json({ success: false, message: "Failed to retrieve college events." });
+    }
+});
+
+/**
+ * GET /api/club/public-events/:eventId
+ * Returns public event details, including host club, college affiliation, and registration state if logged in.
+ */
+clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user?.id || null;
+
+        const eventRes = await query(
+            `SELECT
+                e.id,
+                e.club_id AS "clubId",
+                e.title,
+                e.slug,
+                e.summary,
+                e.description,
+                e.starts_at AS "startsAt",
+                e.ends_at AS "endsAt",
+                e.timezone,
+                CASE WHEN e.location_type = 'online' THEN 'virtual' ELSE e.location_type END AS "locationType",
+                e.venue_or_location AS "venueOrLocation",
+                e.registration_url AS "registrationUrl",
+                e.cover_image_url AS "coverImageUrl",
+                e.status,
+                e.published_at AS "publishedAt",
+                e.created_at AS "createdAt",
+                vc.name AS "clubName",
+                vc.slug AS "clubSlug",
+                COALESCE(vc.logo_url, '') AS "clubLogoUrl",
+                COALESCE(vc.cover_image_url, '') AS "clubBannerUrl",
+                vc.college_id AS "collegeId",
+                vc.college_name AS "collegeName",
+                vc.category AS "clubCategory",
+                (SELECT COUNT(*)::int FROM club_event_likes WHERE event_id = e.id) AS "likesCount",
+                CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_likes WHERE event_id = e.id AND user_id = $2::uuid) ELSE false END AS "hasLiked",
+                CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status != 'cancelled') ELSE false END AS "isRegistered",
+                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "registrationStatus",
+                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status != 'cancelled' ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "ticketCode",
+                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status != 'cancelled') AS "registrationsCount"
+            FROM club_events e
+            JOIN verified_clubs vc ON vc.id = e.club_id
+            WHERE e.id = $1 AND e.status = 'published'
+            LIMIT 1;`,
+            [eventId, userId]
+        );
+
+        if (!eventRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "Event not found or not published." });
+        }
+
+        return res.json({ success: true, event: eventRes.rows[0] });
+    } catch (err: any) {
+        console.error("GET /api/club/public-events/:eventId error:", err);
+        return res.status(500).json({ success: false, message: "Failed to load event details." });
+    }
+});
+
+/**
+ * POST /api/club/events/:eventId/like
+ * Toggles student heart / appreciation for an event.
+ */
+clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user!.id;
+
+        const checkEvent = await query(`SELECT id FROM club_events WHERE id = $1 LIMIT 1;`, [eventId]);
+        if (!checkEvent.rows[0]) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
+
+        const existing = await query(
+            `SELECT id FROM club_event_likes WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
+            [eventId, userId]
+        );
+
+        let liked = false;
+        if (existing.rows[0]) {
+            await query(
+                `DELETE FROM club_event_likes WHERE event_id = $1 AND user_id = $2;`,
+                [eventId, userId]
+            );
+            liked = false;
+        } else {
+            await query(
+                `INSERT INTO club_event_likes (event_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING;`,
+                [eventId, userId]
+            );
+            liked = true;
+        }
+
+        const countRes = await query(
+            `SELECT COUNT(*)::int AS count FROM club_event_likes WHERE event_id = $1;`,
+            [eventId]
+        );
+        const likesCount = countRes.rows[0]?.count || 0;
+
+        return res.json({
+            success: true,
+            liked,
+            likesCount,
+        });
+    } catch (err: any) {
+        console.error("Event like toggle error:", err);
+        return res.status(500).json({ success: false, message: "Failed to update appreciation." });
+    }
+});
+
+/**
  * POST /api/club/events/:eventId/register
- * Registers authenticated user for a club event.
+ * Registers / applies authenticated user for a club event with student details.
  * Enforces block check: blocked users CANNOT register or RSVP.
  */
 clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
         const userId = req.user!.id;
+        const {
+            applicantName,
+            applicantEmail,
+            department,
+            yearOfStudy,
+            rollNumber,
+            phoneNumber,
+            notes,
+            answers,
+        } = req.body || {};
 
         const eventRes = await query(
-            `SELECT e.id, e.club_id, e.title, e.status, vc.name AS "clubName"
+            `SELECT e.id, e.club_id, e.title, e.status, vc.name AS "clubName",
+                    vc.college_id AS "eventCollegeId", vc.college_name AS "eventCollegeName"
              FROM club_events e
              JOIN verified_clubs vc ON vc.id = e.club_id
              WHERE e.id = $1
@@ -2601,6 +2898,10 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
         }
         const event = eventRes.rows[0];
 
+        if (event.status !== "published") {
+            return res.status(400).json({ success: false, message: "Registration is not open for this event." });
+        }
+
         // 1. Enforce Block Check
         const mod = await getClubModerationState(event.club_id, userId);
         if (mod.isBlocked) {
@@ -2611,7 +2912,47 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
             });
         }
 
-        // 2. Check existing registration
+        // Fetch user default info and verified college affiliation
+        const userRes = await query(
+            `SELECT u.username, u.email, u.firstname, u.lastname, u.college_id AS "userCollegeId",
+                    inst.official_name AS "userCollegeName"
+             FROM users u
+             LEFT JOIN institutions inst ON inst.id = u.college_id
+             WHERE u.id = $1 LIMIT 1;`,
+            [userId]
+        );
+        const userRow = userRes.rows[0];
+
+        // 2. Enforce Campus Affiliation Check:
+        // Users can only register for events belonging to their own college campus!
+        if (event.eventCollegeId) {
+            if (!userRow?.userCollegeId) {
+                return res.status(403).json({
+                    success: false,
+                    code: "COLLEGE_REQUIRED",
+                    message: `This event is exclusively restricted to students of ${event.eventCollegeName || "the host campus"}. Please link and verify your college affiliation in your profile first.`,
+                    eventCollegeName: event.eventCollegeName,
+                });
+            }
+
+            if (String(userRow.userCollegeId).trim().toLowerCase() !== String(event.eventCollegeId).trim().toLowerCase()) {
+                return res.status(403).json({
+                    success: false,
+                    code: "DIFFERENT_COLLEGE_RESTRICTED",
+                    message: `This event is exclusively restricted to students of ${event.eventCollegeName || "the host campus"}. You are affiliated with ${userRow.userCollegeName || "a different institution"}.`,
+                    eventCollegeName: event.eventCollegeName,
+                    userCollegeName: userRow.userCollegeName,
+                });
+            }
+        }
+
+        const defaultName = userRow?.firstname
+            ? `${userRow.firstname} ${userRow.lastname || ""}`.trim()
+            : userRow?.username || "Student";
+        const finalName = (applicantName && typeof applicantName === "string" ? applicantName.trim() : "") || defaultName;
+        const finalEmail = (applicantEmail && typeof applicantEmail === "string" ? applicantEmail.trim() : "") || userRow?.email || "";
+
+        // 3. Check existing registration
         const existingReg = await query(
             `SELECT id, status, ticket_code FROM club_event_registrations WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
             [eventId, userId]
@@ -2624,6 +2965,39 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                     message: "Access Restricted: You don't have permission to access this event.",
                 });
             }
+            if (existingReg.rows[0].status === "cancelled") {
+                // Reactivate registration
+                const reactivated = await query(
+                    `UPDATE club_event_registrations
+                     SET status = 'registered',
+                         applicant_name = COALESCE($1, applicant_name),
+                         applicant_email = COALESCE($2, applicant_email),
+                         department = COALESCE($3, department),
+                         year_of_study = COALESCE($4, year_of_study),
+                         roll_number = COALESCE($5, roll_number),
+                         phone_number = COALESCE($6, phone_number),
+                         notes = COALESCE($7, notes),
+                         registered_at = NOW(),
+                         updated_at = NOW()
+                     WHERE id = $8
+                     RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt";`,
+                    [
+                        finalName,
+                        finalEmail,
+                        department || null,
+                        yearOfStudy || null,
+                        rollNumber || null,
+                        phoneNumber || null,
+                        notes || null,
+                        existingReg.rows[0].id,
+                    ]
+                );
+                return res.json({
+                    success: true,
+                    message: `Registration reactivated for ${event.title}!`,
+                    registration: reactivated.rows[0],
+                });
+            }
             return res.status(200).json({
                 success: true,
                 message: "You are already registered for this event.",
@@ -2631,12 +3005,39 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
             });
         }
 
-        // 3. Register user
+        // 3. Register user with applicant details
         const regRes = await query(
-            `INSERT INTO club_event_registrations (event_id, club_id, user_id, status, registered_at, created_at, updated_at)
-             VALUES ($1, $2, $3, 'registered', NOW(), NOW(), NOW())
-             RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt";`,
-            [eventId, event.club_id, userId]
+            `INSERT INTO club_event_registrations (
+                event_id,
+                club_id,
+                user_id,
+                status,
+                applicant_name,
+                applicant_email,
+                department,
+                year_of_study,
+                roll_number,
+                phone_number,
+                notes,
+                answers,
+                registered_at,
+                created_at,
+                updated_at
+            ) VALUES ($1, $2, $3, 'registered', $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW(), NOW())
+            RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt";`,
+            [
+                eventId,
+                event.club_id,
+                userId,
+                finalName,
+                finalEmail,
+                department || null,
+                yearOfStudy || null,
+                rollNumber || null,
+                phoneNumber || null,
+                notes || null,
+                answers ? JSON.stringify(answers) : "{}",
+            ]
         );
 
         return res.status(201).json({
@@ -2647,6 +3048,284 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
     } catch (err: any) {
         console.error("Event registration error:", err);
         return res.status(500).json({ success: false, message: "Failed to register for event." });
+    }
+});
+
+/**
+ * POST /api/club/events/:eventId/cancel
+ * Student cancels their event registration.
+ */
+clubRouter.post("/events/:eventId/cancel", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user!.id;
+
+        const updateRes = await query(
+            `UPDATE club_event_registrations
+             SET status = 'cancelled', updated_at = NOW()
+             WHERE event_id = $1 AND user_id = $2 AND status != 'cancelled'
+             RETURNING id, event_id, status;`,
+            [eventId, userId]
+        );
+
+        if (!updateRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "No active registration found to cancel." });
+        }
+
+        return res.json({ success: true, message: "Registration cancelled successfully." });
+    } catch (err: any) {
+        console.error("Cancel registration error:", err);
+        return res.status(500).json({ success: false, message: "Failed to cancel registration." });
+    }
+});
+
+/**
+ * GET /api/club/user/applications
+ * Returns all event applications/registrations for the logged-in student.
+ */
+clubRouter.get("/user/applications", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user!.id;
+
+        const appsRes = await query(
+            `SELECT
+                r.id,
+                r.event_id AS "eventId",
+                r.club_id AS "clubId",
+                r.status,
+                r.registered_at AS "registeredAt",
+                r.checked_in_at AS "checkedInAt",
+                r.ticket_code AS "ticketCode",
+                r.applicant_name AS "applicantName",
+                r.applicant_email AS "applicantEmail",
+                r.department,
+                r.year_of_study AS "yearOfStudy",
+                r.roll_number AS "rollNumber",
+                r.phone_number AS "phoneNumber",
+                r.notes,
+                e.title AS "eventTitle",
+                e.slug AS "eventSlug",
+                e.summary AS "eventSummary",
+                e.description AS "eventDescription",
+                e.starts_at AS "startsAt",
+                e.ends_at AS "endsAt",
+                e.timezone,
+                CASE WHEN e.location_type = 'online' THEN 'virtual' ELSE e.location_type END AS "locationType",
+                e.venue_or_location AS "venueOrLocation",
+                e.cover_image_url AS "coverImageUrl",
+                e.status AS "eventStatus",
+                vc.name AS "clubName",
+                vc.slug AS "clubSlug",
+                COALESCE(vc.logo_url, '') AS "clubLogoUrl",
+                vc.college_name AS "collegeName"
+             FROM club_event_registrations r
+             JOIN club_events e ON e.id = r.event_id
+             JOIN verified_clubs vc ON vc.id = r.club_id
+             WHERE r.user_id = $1
+             ORDER BY r.registered_at DESC;`,
+            [userId]
+        );
+
+        return res.json({
+            success: true,
+            applications: appsRes.rows,
+        });
+    } catch (err: any) {
+        console.error("Fetch user applications error:", err);
+        return res.status(500).json({ success: false, message: "Failed to load event applications." });
+    }
+});
+
+/**
+ * GET /api/club/events/:eventId/applications
+ * Returns all student applications for a club event in an Excel spreadsheet-compatible format for staff.
+ */
+clubRouter.get("/events/:eventId/applications", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user!.id;
+
+        // Verify event and staff permission
+        const eventRes = await query(
+            `SELECT e.id, e.club_id, e.title, e.starts_at, e.venue_or_location, vc.name AS "clubName"
+             FROM club_events e
+             JOIN verified_clubs vc ON vc.id = e.club_id
+             WHERE e.id = $1 LIMIT 1;`,
+            [eventId]
+        );
+        if (!eventRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
+        const event = eventRes.rows[0];
+
+        const staffClub = await getStaffClub(userId, event.club_id);
+        if (!staffClub) {
+            return res.status(403).json({ success: false, message: "Access forbidden: you cannot manage applications for this event." });
+        }
+
+        const applicantsRes = await query(
+            `SELECT
+                r.id,
+                r.user_id AS "userId",
+                COALESCE(r.applicant_name, TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), u.username) AS "applicantName",
+                COALESCE(r.applicant_email, u.email) AS "applicantEmail",
+                u.username,
+                COALESCE(u.photo_url, u.avatar_url) AS "avatarUrl",
+                COALESCE(r.department, '') AS "department",
+                COALESCE(r.year_of_study, '') AS "yearOfStudy",
+                COALESCE(r.roll_number, '') AS "rollNumber",
+                COALESCE(r.phone_number, '') AS "phoneNumber",
+                r.ticket_code AS "ticketCode",
+                r.status,
+                r.registered_at AS "registeredAt",
+                r.checked_in_at AS "checkedInAt",
+                COALESCE(r.notes, '') AS "notes"
+             FROM club_event_registrations r
+             JOIN users u ON u.id = r.user_id
+             WHERE r.event_id = $1 AND r.club_id = $2
+             ORDER BY r.registered_at DESC;`,
+            [eventId, event.club_id]
+        );
+
+        const rows = applicantsRes.rows;
+        const summary = {
+            total: rows.length,
+            registered: rows.filter((r) => r.status === "registered").length,
+            attended: rows.filter((r) => r.status === "attended").length,
+            waitlisted: rows.filter((r) => r.status === "waitlisted").length,
+            cancelled: rows.filter((r) => r.status === "cancelled").length,
+        };
+
+        return res.json({
+            success: true,
+            event: {
+                id: event.id,
+                title: event.title,
+                startsAt: event.starts_at,
+                venue: event.venue_or_location,
+                clubName: event.clubName,
+            },
+            summary,
+            applications: rows,
+        });
+    } catch (err: any) {
+        console.error("Fetch event applications error:", err);
+        return res.status(500).json({ success: false, message: "Failed to load event applications." });
+    }
+});
+
+/**
+ * PATCH /api/club/events/:eventId/applications/:registrationId
+ * Updates status of an applicant (registered, attended, waitlisted, cancelled).
+ */
+clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { eventId, registrationId } = req.params;
+        const { status } = req.body;
+        const userId = req.user!.id;
+
+        if (!status || !["registered", "attended", "waitlisted", "cancelled"].includes(status)) {
+            return res.status(400).json({ success: false, message: "Valid status is required ('registered', 'attended', 'waitlisted', 'cancelled')." });
+        }
+
+        const eventRes = await query(`SELECT club_id FROM club_events WHERE id = $1 LIMIT 1;`, [eventId]);
+        if (!eventRes.rows[0]) return res.status(404).json({ success: false, message: "Event not found." });
+
+        const staffClub = await getStaffClub(userId, eventRes.rows[0].club_id);
+        if (!staffClub) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const updateRes = await query(
+            `UPDATE club_event_registrations
+             SET status = $1,
+                 checked_in_at = CASE WHEN $1 = 'attended' AND checked_in_at IS NULL THEN NOW() ELSE checked_in_at END,
+                 updated_at = NOW()
+             WHERE id = $2 AND event_id = $3
+             RETURNING id, status, checked_in_at AS "checkedInAt", updated_at AS "updatedAt";`,
+            [status, registrationId, eventId]
+        );
+
+        if (!updateRes.rows[0]) return res.status(404).json({ success: false, message: "Registration record not found." });
+
+        return res.json({ success: true, message: "Applicant status updated.", registration: updateRes.rows[0] });
+    } catch (err: any) {
+        console.error("Update applicant status error:", err);
+        return res.status(500).json({ success: false, message: "Failed to update status." });
+    }
+});
+
+/**
+ * GET /api/club/events/:eventId/applications/export
+ * Downloads the applications list as an Excel-compatible RFC-4180 CSV with UTF-8 BOM.
+ */
+clubRouter.get("/events/:eventId/applications/export", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const userId = req.user!.id;
+
+        const eventRes = await query(
+            `SELECT e.id, e.club_id, e.title, vc.name AS "clubName"
+             FROM club_events e
+             JOIN verified_clubs vc ON vc.id = e.club_id
+             WHERE e.id = $1 LIMIT 1;`,
+            [eventId]
+        );
+        if (!eventRes.rows[0]) return res.status(404).send("Event not found.");
+
+        const staffClub = await getStaffClub(userId, eventRes.rows[0].club_id);
+        if (!staffClub) return res.status(403).send("Forbidden.");
+
+        const applicantsRes = await query(
+            `SELECT
+                r.ticket_code,
+                COALESCE(r.applicant_name, TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), u.username) AS name,
+                u.username,
+                COALESCE(r.applicant_email, u.email) AS email,
+                COALESCE(r.department, '') AS department,
+                COALESCE(r.year_of_study, '') AS year_of_study,
+                COALESCE(r.roll_number, '') AS roll_number,
+                COALESCE(r.phone_number, '') AS phone,
+                r.status,
+                r.registered_at,
+                r.checked_in_at,
+                COALESCE(r.notes, '') AS notes
+             FROM club_event_registrations r
+             JOIN users u ON u.id = r.user_id
+             WHERE r.event_id = $1 AND r.club_id = $2
+             ORDER BY r.registered_at ASC;`,
+            [eventId, eventRes.rows[0].club_id]
+        );
+
+        const escapeCsv = (val: any) => {
+            if (val === null || val === undefined) return '""';
+            const str = String(val).replace(/"/g, '""');
+            return `"${str}"`;
+        };
+
+        const headers = ["Ticket Code", "Name", "Username", "Email", "Department", "Year of Study", "Roll Number", "Phone", "Status", "Registered At", "Checked In At", "Notes"];
+        const rows = applicantsRes.rows.map((r) => [
+            escapeCsv(r.ticket_code),
+            escapeCsv(r.name),
+            escapeCsv(r.username),
+            escapeCsv(r.email),
+            escapeCsv(r.department),
+            escapeCsv(r.year_of_study),
+            escapeCsv(r.roll_number),
+            escapeCsv(r.phone),
+            escapeCsv(r.status),
+            escapeCsv(r.registered_at ? new Date(r.registered_at).toISOString() : ""),
+            escapeCsv(r.checked_in_at ? new Date(r.checked_in_at).toISOString() : ""),
+            escapeCsv(r.notes),
+        ].join(","));
+
+        const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+        const safeTitle = (eventRes.rows[0].title || "event").replace(/[^a-zA-Z0-9_-]/g, "_");
+
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${safeTitle}_applications.csv"`);
+        return res.status(200).send(csvContent);
+    } catch (err: any) {
+        console.error("Export applications error:", err);
+        return res.status(500).send("Export failed.");
     }
 });
 
