@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useId } from "react";
-import { createPortal } from "react-dom";
 import {
     X,
     Calendar,
@@ -21,6 +20,7 @@ import {
     requestClubUploadSignature,
     uploadClubImageToCloudinary,
 } from "../../utils/clubProfileApi";
+import { ClubMarkdownEditor } from "./Profile/ClubMarkdownEditor";
 import type { ClubEvent, CreateClubEventPayload, ClubEventStatus } from "../../store/clubEventsSlice";
 
 export interface ClubEventModalProps {
@@ -34,6 +34,7 @@ export interface ClubEventModalProps {
     collegeName?: string;
     collegeId?: string | null;
     initialStatus?: ClubEventStatus;
+    onOpenMobileSidebar?: () => void;
 }
 
 interface FormState {
@@ -70,6 +71,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     clubLogoUrl,
     collegeName = "Pranveer Singh Institute of Technology, Kanpur",
     initialStatus = "published",
+    onOpenMobileSidebar,
 }) => {
     const toast = useToast();
     const modalId = useId();
@@ -295,34 +297,47 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         onSubmit(payload, Boolean(editingEvent), editingEvent?.id);
     };
 
-    if (!isOpen || typeof document === "undefined") return null;
+    if (!isOpen) return null;
 
-    return createPortal(
+    return (
         <div
             id={modalId}
-            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-[#FAF6EE] flex flex-col w-screen h-screen overflow-hidden text-black animate-in fade-in duration-150"
-            role="dialog"
-            aria-modal="true"
+            className="w-full flex-1 flex flex-col min-h-0 text-black animate-in fade-in duration-150 space-y-6"
         >
-            {/* Top Fullscreen Header */}
-            <header className="h-16 sm:h-20 bg-[#FAF6EE] border-b-2 border-black px-4 sm:px-8 flex items-center justify-between shrink-0 shadow-[0_2px_0px_#000]">
+            {/* Top Workspace Header Bar matching Event Details */}
+            <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                    {onOpenMobileSidebar && (
+                        <button
+                            type="button"
+                            onClick={onOpenMobileSidebar}
+                            className="lg:hidden p-2 bg-white text-black rounded-lg border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 cursor-pointer shrink-0"
+                            aria-label="Open sidebar"
+                        >
+                            <svg className="w-4 h-4 stroke-[2.5]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <line x1="3" y1="12" x2="21" y2="12" />
+                                <line x1="3" y1="6" x2="21" y2="6" />
+                                <line x1="3" y1="18" x2="21" y2="18" />
+                            </svg>
+                        </button>
+                    )}
+
                     <button
                         type="button"
                         onClick={onClose}
                         disabled={isUploadingBanner}
-                        className="p-2 sm:px-3 sm:py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                        className="p-2 sm:px-3 sm:py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
                         title="Back to Events"
                     >
                         <ArrowLeft className="w-4 h-4" />
                         <span className="hidden sm:inline">Back to Events</span>
                     </button>
 
-                    <div className="h-6 w-[2px] bg-black/20 hidden sm:block" />
+                    <div className="h-6 w-[2px] bg-black/20 hidden sm:block shrink-0" />
 
                     <div className="truncate">
                         <div className="flex items-center gap-2">
-                            <h2 className="text-base sm:text-lg font-black text-black truncate">
+                            <h2 className="text-base sm:text-lg lg:text-xl font-black text-black tracking-tight truncate">
                                 {editingEvent ? "Edit Club Event" : "Create New Club Event"}
                             </h2>
                             <span
@@ -358,17 +373,17 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         onClick={handleSubmit}
                         variant="lime"
                         disabled={isUploadingBanner}
-                        className="px-4 sm:px-6 py-2 text-xs font-black"
+                        className="px-4 sm:px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000]"
                     >
                         {editingEvent ? "Save Changes" : "Create Event"}
                     </OrbixButton>
                 </div>
-            </header>
+            </div>
 
-            {/* Modal Body: 50% Left Form / 50% Right Banner & Live Preview */}
-            <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+            {/* Workspace Body: 50% Left Form / 50% Right Banner & Live Preview */}
+            <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden flex flex-col lg:flex-row">
                 {/* 50% LEFT COLUMN: Input Form with Valid Details Validation */}
-                <div className="w-full lg:w-1/2 h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 border-b-2 lg:border-b-0 lg:border-r-2 border-black bg-[#FAF6EE]/40">
+                <div className="w-full lg:w-1/2 p-4 sm:p-6 lg:p-8 space-y-6 border-b-3 lg:border-b-0 lg:border-r-3 border-black bg-[#FAF6EE]/30">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
@@ -590,15 +605,19 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 
                         {/* 6. Full Description & Agenda */}
                         <div>
-                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                Full Description & Agenda
-                            </label>
-                            <textarea
-                                rows={4}
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                    Full Description & Agenda
+                                </label>
+                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-[#FAF6EE] border border-black/40 text-neutral-700">
+                                    Markdown Supported
+                                </span>
+                            </div>
+                            <ClubMarkdownEditor
                                 value={form.description}
-                                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                                placeholder="Prerequisites, schedule, guest speaker details, certifications, and prizes..."
-                                className="w-full p-3.5 rounded-xl bg-white border-2 border-black text-xs font-medium text-black shadow-[2px_2px_0px_#000] focus:outline-hidden focus:ring-2 focus:ring-[#a2ff86]"
+                                onChange={(val) => setForm({ ...form, description: val })}
+                                placeholder="Prerequisites, schedule, speaker profiles, certifications, guidelines, and competition prizes..."
+                                minHeight="min-h-[220px]"
                             />
                         </div>
 
@@ -806,8 +825,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     {editingEvent ? "Update Event" : "Create Event"}
                 </OrbixButton>
             </div>
-        </div>,
-        document.body
+        </div>
     );
 };
 

@@ -18,6 +18,7 @@ export type SidebarTab =
     | "clubs"
     | "college-events"
     | "applications"
+    | "activity"
     | "connect-platform"
     | "profile"
     | "resume"
@@ -63,7 +64,8 @@ export const Sidebar = ({
             location.pathname.startsWith("/events") ||
             location.pathname.startsWith("/clubs") ||
             location.pathname.startsWith("/college-events") ||
-            location.pathname.startsWith("/applications")
+            location.pathname.startsWith("/applications") ||
+            location.pathname.startsWith("/activity")
         ) {
             return "events";
         }
@@ -88,10 +90,12 @@ export const Sidebar = ({
             activeTab === "clubs" ||
             activeTab === "college-events" ||
             activeTab === "applications" ||
+            activeTab === "activity" ||
             location.pathname.startsWith("/events") ||
             location.pathname.startsWith("/clubs") ||
             location.pathname.startsWith("/college-events") ||
-            location.pathname.startsWith("/applications")
+            location.pathname.startsWith("/applications") ||
+            location.pathname.startsWith("/activity")
         ) {
             setOpenSection("events");
         } else if (
@@ -346,8 +350,8 @@ export const Sidebar = ({
             isComingSoon: false,
         },
         {
-            id: "applications" as SidebarTab,
-            label: "Applications",
+            id: "activity" as SidebarTab,
+            label: "Activity",
             icon: (
                 <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
@@ -355,7 +359,7 @@ export const Sidebar = ({
                     <path d="m9 14 2 2 4-4" />
                 </svg>
             ),
-            path: "/applications",
+            path: "/activity",
             isComingSoon: false,
         },
     ];
@@ -440,6 +444,7 @@ export const Sidebar = ({
         const isCurrentActive =
             activeTab === item.id ||
             (item.path && location.pathname === item.path) ||
+            (item.id === "activity" && (location.pathname.startsWith("/activity") || location.pathname.startsWith("/applications") || activeTab === "applications")) ||
             (item.id === "docs" && location.pathname.startsWith("/docs")) ||
             (item.id === "blogs" && (location.pathname.startsWith("/blogs") || location.pathname.startsWith("/blog")));
 

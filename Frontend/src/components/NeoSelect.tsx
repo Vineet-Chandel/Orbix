@@ -312,7 +312,7 @@ export const NeoSelect: React.FC<NeoSelectProps> = ({
                         effectivePlacement === "top"
                             ? "bottom-full mb-1.5"
                             : "top-full mt-1.5"
-                    } z-50 rounded-xl sm:rounded-2xl bg-white border-2 border-black shadow-[5px_5px_0px_#000] p-1.5 space-y-1 overflow-y-auto max-h-60 animate-fadeIn ${dropdownClassName}`}
+                    } z-[100] rounded-xl sm:rounded-2xl bg-white border-2 border-black shadow-[5px_5px_0px_#000] p-1.5 space-y-1 overflow-y-auto max-h-60 animate-fadeIn ${dropdownClassName}`}
                 >
                     {parsedOptions.length === 0 ? (
                         <li className="px-3 py-2 text-xs font-bold text-neutral-500 text-center select-none">

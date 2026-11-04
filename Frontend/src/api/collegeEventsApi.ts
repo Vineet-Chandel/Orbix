@@ -25,9 +25,11 @@ export interface CollegeEventItem {
     likesCount: number;
     hasLiked: boolean;
     isRegistered: boolean;
-    registrationStatus: "registered" | "attended" | "waitlisted" | "cancelled" | null;
+    isPending?: boolean;
+    registrationStatus: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled" | null;
     ticketCode: string | null;
     registrationsCount: number;
+    totalApplicationsCount?: number;
 }
 
 export interface CollegeEventsResponse {
@@ -51,10 +53,12 @@ export interface StudentApplicationItem {
     id: string;
     eventId: string;
     clubId: string;
-    status: "registered" | "attended" | "waitlisted" | "cancelled";
+    status: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled";
     registeredAt: string;
     checkedInAt: string | null;
-    ticketCode: string;
+    reviewedAt?: string | null;
+    reviewNotes?: string | null;
+    ticketCode: string | null;
     applicantName: string;
     applicantEmail: string;
     department: string | null;
@@ -91,9 +95,11 @@ export interface ClubEventApplicantRow {
     rollNumber: string;
     phoneNumber: string;
     ticketCode: string;
-    status: "registered" | "attended" | "waitlisted" | "cancelled";
+    status: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled";
     registeredAt: string;
     checkedInAt: string | null;
+    reviewedAt?: string | null;
+    reviewNotes?: string | null;
     notes: string;
 }
 
@@ -108,9 +114,11 @@ export interface ClubEventApplicationsResponse {
     };
     summary: {
         total: number;
+        pending: number;
         registered: number;
         attended: number;
         waitlisted: number;
+        rejected: number;
         cancelled: number;
     };
     applications: ClubEventApplicantRow[];
@@ -122,7 +130,7 @@ export interface ClubEventApplicationsResponse {
 export async function fetchCollegeEvents(options?: {
     collegeId?: string;
     collegeName?: string;
-    timeFilter?: "all" | "upcoming" | "today" | "past";
+    timeFilter?: "all" | "live" | "upcoming" | "today" | "completed" | "past";
     clubId?: string;
     search?: string;
 }): Promise<CollegeEventsResponse> {
@@ -231,13 +239,14 @@ export async function fetchClubEventApplications(
 export async function updateApplicantStatus(
     eventId: string,
     registrationId: string,
-    status: "registered" | "attended" | "waitlisted" | "cancelled"
+    status: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled",
+    reviewNotes?: string
 ): Promise<void> {
     const res = await fetch(`/api/club/events/${eventId}/applications/${registrationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, reviewNotes }),
     });
     const data = await res.json();
     if (!res.ok || !data.success) {

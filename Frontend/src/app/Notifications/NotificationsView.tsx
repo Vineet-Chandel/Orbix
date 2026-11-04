@@ -326,7 +326,7 @@ export const NotificationsView: React.FC = () => {
             });
             const data = await res.json();
             if (!res.ok) {
-                alert(data.message || "Failed to accept invitation.");
+                toast.error(data.message || "Failed to accept invitation.");
                 return;
             }
 
@@ -360,7 +360,7 @@ export const NotificationsView: React.FC = () => {
             });
             const data = await res.json();
             if (!res.ok) {
-                alert(data.message || "Failed to decline invitation.");
+                toast.error(data.message || "Failed to decline invitation.");
                 return;
             }
 

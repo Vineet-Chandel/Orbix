@@ -225,7 +225,7 @@ export const ClubCard: React.FC<ClubCardProps> = ({
                         onClick={() => onSelect && onSelect(club)}
                         className="flex-1 py-2 px-3 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
-                        <span>Explore Chapter</span>
+                        <span>Explore</span>
                         <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
                     </button>
 

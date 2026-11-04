@@ -1,5 +1,6 @@
 /// <reference path="../../types/express.d.ts" />
 import express, { type Request, type Response, type NextFunction } from "express";
+import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { pool, query } from "../../database/client.js";
@@ -2154,9 +2155,11 @@ clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
                 e.published_at AS "publishedAt",
                 e.created_at AS "createdAt",
                 e.updated_at AS "updatedAt",
-                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('registered', 'attended', 'waitlisted')), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('registered', 'attended')), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'pending'), 0) AS "pendingCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status NOT IN ('cancelled', 'blocked')), 0) AS "totalApplicationsCount",
                 COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'attended'), 0) AS "attendeesCount",
-                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('cancelled', 'blocked')), 0) AS "rejectedCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('rejected', 'cancelled', 'blocked')), 0) AS "rejectedCount",
                 COALESCE((SELECT COUNT(*)::int FROM club_event_likes cel WHERE cel.event_id = e.id), 0) AS "likesCount"
              FROM club_events e
              WHERE e.club_id = $1
@@ -2227,9 +2230,11 @@ clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Respo
                 e.published_at AS "publishedAt",
                 e.created_at AS "createdAt",
                 e.updated_at AS "updatedAt",
-                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('registered', 'attended', 'waitlisted')), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('registered', 'attended')), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'pending'), 0) AS "pendingCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status NOT IN ('cancelled', 'blocked')), 0) AS "totalApplicationsCount",
                 COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'attended'), 0) AS "attendeesCount",
-                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('cancelled', 'blocked')), 0) AS "rejectedCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('rejected', 'cancelled', 'blocked')), 0) AS "rejectedCount",
                 COALESCE((SELECT COUNT(*)::int FROM club_event_likes cel WHERE cel.event_id = e.id), 0) AS "likesCount"
              FROM club_events e
              WHERE e.id = $1 AND e.club_id = $2
@@ -2551,9 +2556,11 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                 e.published_at AS "publishedAt",
                 e.created_at AS "createdAt",
                 e.updated_at AS "updatedAt",
-                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('registered', 'attended', 'waitlisted')), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('registered', 'attended')), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'pending'), 0) AS "pendingCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status NOT IN ('cancelled', 'blocked')), 0) AS "totalApplicationsCount",
                 COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'attended'), 0) AS "attendeesCount",
-                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('cancelled', 'blocked')), 0) AS "rejectedCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('rejected', 'cancelled', 'blocked')), 0) AS "rejectedCount",
                 COALESCE((SELECT COUNT(*)::int FROM club_event_likes cel WHERE cel.event_id = e.id), 0) AS "likesCount"
              FROM club_events e
              WHERE e.id = $1 AND e.club_id = $2
@@ -2844,22 +2851,110 @@ clubRouter.get("/:clubId/my-conversation", authenticate, async (req: Request, re
  * GET /api/club/college-events
  * Returns published events organized by clubs for the student's college, with like state and registration status.
  */
-clubRouter.get("/college-events", authenticate, async (req: Request, res: Response) => {
+clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res: Response) => {
     try {
-        const userId = req.user!.id;
+        const userId = req.user?.id || null;
         const requestedCollegeId = (req.query.collegeId as string) || undefined;
         const requestedCollegeName = (req.query.collegeName as string) || undefined;
-        const timeFilter = (req.query.timeFilter as string) || "all"; // 'all' | 'upcoming' | 'today' | 'past'
+        const timeFilter = (req.query.timeFilter as string) || "all"; // 'all' | 'live' | 'upcoming' | 'today' | 'completed' | 'past'
         const clubId = (req.query.clubId as string) || undefined;
         const search = ((req.query.search as string) || "").trim();
 
         // Retrieve user college
-        const userRes = await query(
-            `SELECT college_id, college_name FROM users WHERE id = $1 LIMIT 1;`,
-            [userId]
-        );
-        const userCollegeId = requestedCollegeId || userRes.rows[0]?.college_id || null;
-        const userCollegeName = requestedCollegeName || userRes.rows[0]?.college_name || null;
+        const isValidUuid = (val: any): boolean =>
+            typeof val === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(val.trim());
+
+        let userCollegeId: string | null =
+            requestedCollegeId && isValidUuid(requestedCollegeId) ? requestedCollegeId.trim() : null;
+        let userCollegeName: string | null =
+            requestedCollegeName &&
+            requestedCollegeName.trim() &&
+            requestedCollegeName !== "undefined" &&
+            requestedCollegeName !== "null"
+                ? requestedCollegeName.trim()
+                : null;
+
+        // 1. Retrieve user college from profile if user is authenticated and either collegeId or collegeName is missing
+        if (userId && (!userCollegeId || !userCollegeName)) {
+            try {
+                const userRes = await query(
+                    `SELECT u.college, u.college_id, inst.official_name AS institution_name
+                     FROM users u
+                     LEFT JOIN institutions inst ON inst.id = u.college_id
+                     WHERE u.id = $1 LIMIT 1;`,
+                    [userId]
+                );
+                const userRow = userRes.rows[0];
+                if (userRow) {
+                    if (!userCollegeId && isValidUuid(userRow.college_id)) {
+                        userCollegeId = userRow.college_id;
+                    }
+                    if (!userCollegeName) {
+                        userCollegeName = userRow.institution_name || userRow.college || null;
+                    }
+                }
+            } catch {
+                // Ignore fallback error
+            }
+        }
+
+        // 2. If caller is logged in as / associated with a club, fall back to the club's college
+        if (userId && (!userCollegeId || !userCollegeName)) {
+            try {
+                const clubRes = await query(
+                    `SELECT vc.college_id, vc.college_name
+                     FROM verified_clubs vc
+                     WHERE vc.auth_user_id = $1
+                     UNION
+                     SELECT vc.college_id, vc.college_name
+                     FROM verified_clubs vc
+                     JOIN club_members cm ON cm.club_id = vc.id
+                     WHERE cm.user_id = $1 AND cm.status = 'active'
+                     LIMIT 1;`,
+                    [userId]
+                );
+                if (clubRes.rows.length > 0) {
+                    if (!userCollegeId && isValidUuid(clubRes.rows[0].college_id)) {
+                        userCollegeId = clubRes.rows[0].college_id;
+                    }
+                    if (!userCollegeName) {
+                        userCollegeName = clubRes.rows[0].college_name || null;
+                    }
+                }
+            } catch {
+                // Ignore fallback error
+            }
+        }
+
+        // 3. If collegeId exists but collegeName is missing, resolve official name
+        if (userCollegeId && (!userCollegeName || !userCollegeName.trim())) {
+            try {
+                const instRes = await query(
+                    `SELECT official_name FROM institutions WHERE id = $1 LIMIT 1;`,
+                    [userCollegeId]
+                );
+                if (instRes.rows.length > 0 && instRes.rows[0].official_name) {
+                    userCollegeName = instRes.rows[0].official_name;
+                }
+            } catch {
+                // Ignore fallback error
+            }
+        }
+
+        // 4. If collegeName exists but collegeId is missing, resolve UUID
+        if (userCollegeName && !userCollegeId) {
+            try {
+                const instRes = await query(
+                    `SELECT id FROM institutions WHERE LOWER(TRIM(official_name)) = LOWER(TRIM($1)) LIMIT 1;`,
+                    [userCollegeName]
+                );
+                if (instRes.rows.length > 0 && isValidUuid(instRes.rows[0].id)) {
+                    userCollegeId = instRes.rows[0].id;
+                }
+            } catch {
+                // Ignore fallback error
+            }
+        }
 
         let sql = `
             SELECT
@@ -2887,11 +2982,13 @@ clubRouter.get("/college-events", authenticate, async (req: Request, res: Respon
                 vc.college_name AS "collegeName",
                 vc.category AS "clubCategory",
                 (SELECT COUNT(*)::int FROM club_event_likes WHERE event_id = e.id) AS "likesCount",
-                EXISTS(SELECT 1 FROM club_event_likes WHERE event_id = e.id AND user_id = $1) AS "hasLiked",
-                EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $1 AND status != 'cancelled') AS "isRegistered",
-                (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $1 ORDER BY registered_at DESC LIMIT 1) AS "registrationStatus",
-                (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $1 AND status != 'cancelled' ORDER BY registered_at DESC LIMIT 1) AS "ticketCode",
-                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status != 'cancelled') AS "registrationsCount"
+                CASE WHEN $1::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_likes WHERE event_id = e.id AND user_id = $1::uuid) ELSE false END AS "hasLiked",
+                CASE WHEN $1::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status IN ('registered', 'attended')) ELSE false END AS "isRegistered",
+                CASE WHEN $1::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status = 'pending') ELSE false END AS "isPending",
+                CASE WHEN $1::uuid IS NOT NULL THEN (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status != 'cancelled' ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "registrationStatus",
+                CASE WHEN $1::uuid IS NOT NULL THEN (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $1::uuid AND status IN ('registered', 'attended') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "ticketCode",
+                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status IN ('registered', 'attended')) AS "registrationsCount",
+                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount"
             FROM club_events e
             JOIN verified_clubs vc ON vc.id = e.club_id
             WHERE e.status IN ('published', 'completed') AND vc.is_active = true
@@ -2906,17 +3003,17 @@ clubRouter.get("/college-events", authenticate, async (req: Request, res: Respon
             )`;
         }
 
-        if (clubId) {
-            params.push(clubId);
+        if (clubId && isValidUuid(clubId)) {
+            params.push(clubId.trim());
             sql += ` AND e.club_id = $${params.length}`;
         }
 
-        if (timeFilter === "upcoming") {
-            sql += ` AND e.starts_at >= NOW()`;
-        } else if (timeFilter === "past") {
-            sql += ` AND e.starts_at < NOW()`;
+        if (timeFilter === "upcoming" || timeFilter === "live") {
+            sql += ` AND (COALESCE(e.ends_at, e.starts_at) >= NOW() AND e.status != 'completed')`;
+        } else if (timeFilter === "past" || timeFilter === "completed") {
+            sql += ` AND (COALESCE(e.ends_at, e.starts_at) < NOW() OR e.status = 'completed')`;
         } else if (timeFilter === "today") {
-            sql += ` AND DATE(e.starts_at) = CURRENT_DATE`;
+            sql += ` AND (DATE(e.starts_at) = CURRENT_DATE OR (e.starts_at <= NOW() AND COALESCE(e.ends_at, e.starts_at) >= NOW()))`;
         }
 
         if (search) {
@@ -2924,7 +3021,7 @@ clubRouter.get("/college-events", authenticate, async (req: Request, res: Respon
             sql += ` AND (LOWER(e.title) LIKE $${params.length} OR LOWER(COALESCE(e.summary, '')) LIKE $${params.length} OR LOWER(COALESCE(e.venue_or_location, '')) LIKE $${params.length} OR LOWER(vc.name) LIKE $${params.length})`;
         }
 
-        sql += timeFilter === "past" ? ` ORDER BY e.starts_at DESC` : ` ORDER BY e.starts_at ASC`;
+        sql += (timeFilter === "past" || timeFilter === "completed") ? ` ORDER BY e.starts_at DESC` : ` ORDER BY e.starts_at ASC`;
 
         const eventsRes = await query(sql, params);
 
@@ -2976,10 +3073,12 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
                 vc.category AS "clubCategory",
                 (SELECT COUNT(*)::int FROM club_event_likes WHERE event_id = e.id) AS "likesCount",
                 CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_likes WHERE event_id = e.id AND user_id = $2::uuid) ELSE false END AS "hasLiked",
-                CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status != 'cancelled') ELSE false END AS "isRegistered",
-                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "registrationStatus",
-                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status != 'cancelled' ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "ticketCode",
-                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status != 'cancelled') AS "registrationsCount"
+                CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status IN ('registered', 'attended')) ELSE false END AS "isRegistered",
+                CASE WHEN $2::uuid IS NOT NULL THEN EXISTS(SELECT 1 FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status = 'pending') ELSE false END AS "isPending",
+                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT status FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status != 'cancelled' ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "registrationStatus",
+                CASE WHEN $2::uuid IS NOT NULL THEN (SELECT ticket_code FROM club_event_registrations WHERE event_id = e.id AND user_id = $2::uuid AND status IN ('registered', 'attended') ORDER BY registered_at DESC LIMIT 1) ELSE NULL END AS "ticketCode",
+                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status IN ('registered', 'attended')) AS "registrationsCount",
+                (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status NOT IN ('cancelled', 'blocked')) AS "totalApplicationsCount"
             FROM club_events e
             JOIN verified_clubs vc ON vc.id = e.club_id
             WHERE e.id = $1 AND e.status IN ('published', 'completed')
@@ -3151,11 +3250,25 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                     message: "Access Restricted: You don't have permission to access this event.",
                 });
             }
-            if (existingReg.rows[0].status === "cancelled") {
-                // Reactivate registration
+            if (existingReg.rows[0].status === "pending") {
+                return res.status(200).json({
+                    success: true,
+                    message: "Your application is currently pending review by the club coordinators.",
+                    registration: existingReg.rows[0],
+                });
+            }
+            if (existingReg.rows[0].status === "registered" || existingReg.rows[0].status === "attended") {
+                return res.status(200).json({
+                    success: true,
+                    message: "You are already registered for this event.",
+                    registration: existingReg.rows[0],
+                });
+            }
+            if (existingReg.rows[0].status === "cancelled" || existingReg.rows[0].status === "rejected") {
+                // Reactivate application into pending review
                 const reactivated = await query(
                     `UPDATE club_event_registrations
-                     SET status = 'registered',
+                     SET status = 'pending',
                          applicant_name = COALESCE($1, applicant_name),
                          applicant_email = COALESCE($2, applicant_email),
                          department = COALESCE($3, department),
@@ -3164,6 +3277,9 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                          phone_number = COALESCE($6, phone_number),
                          notes = COALESCE($7, notes),
                          registered_at = NOW(),
+                         reviewed_at = NULL,
+                         reviewed_by_user_id = NULL,
+                         review_notes = NULL,
                          updated_at = NOW()
                      WHERE id = $8
                      RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt";`,
@@ -3180,18 +3296,13 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                 );
                 return res.json({
                     success: true,
-                    message: `Registration reactivated for ${event.title}!`,
+                    message: `Application submitted for review for ${event.title}!`,
                     registration: reactivated.rows[0],
                 });
             }
-            return res.status(200).json({
-                success: true,
-                message: "You are already registered for this event.",
-                registration: existingReg.rows[0],
-            });
         }
 
-        // 3. Register user with applicant details
+        // 3. Register user application with status 'pending'
         const regRes = await query(
             `INSERT INTO club_event_registrations (
                 event_id,
@@ -3209,7 +3320,7 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                 registered_at,
                 created_at,
                 updated_at
-            ) VALUES ($1, $2, $3, 'registered', $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW(), NOW())
+            ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW(), NOW())
             RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt";`,
             [
                 eventId,
@@ -3228,7 +3339,7 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
 
         return res.status(201).json({
             success: true,
-            message: `Successfully registered for ${event.title}!`,
+            message: `Application submitted for ${event.title}! The club coordinators will review your application.`,
             registration: regRes.rows[0],
         });
     } catch (err: any) {
@@ -3281,7 +3392,9 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
                 r.status,
                 r.registered_at AS "registeredAt",
                 r.checked_in_at AS "checkedInAt",
-                r.ticket_code AS "ticketCode",
+                r.reviewed_at AS "reviewedAt",
+                r.review_notes AS "reviewNotes",
+                CASE WHEN r.status IN ('registered', 'attended') THEN r.ticket_code ELSE NULL END AS "ticketCode",
                 r.applicant_name AS "applicantName",
                 r.applicant_email AS "applicantEmail",
                 r.department,
@@ -3356,7 +3469,7 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
                 COALESCE(r.applicant_name, TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), u.username) AS "applicantName",
                 COALESCE(r.applicant_email, u.email) AS "applicantEmail",
                 u.username,
-                COALESCE(u.photo_url, u.avatar_url) AS "avatarUrl",
+                COALESCE(u.photo_url, u.avatar_url, 'https://res.cloudinary.com/dj0ivep44/image/upload/v1793017168/avatar_pasprg.png') AS "avatarUrl",
                 COALESCE(r.department, '') AS "department",
                 COALESCE(r.year_of_study, '') AS "yearOfStudy",
                 COALESCE(r.roll_number, '') AS "rollNumber",
@@ -3365,6 +3478,8 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
                 r.status,
                 r.registered_at AS "registeredAt",
                 r.checked_in_at AS "checkedInAt",
+                r.reviewed_at AS "reviewedAt",
+                r.review_notes AS "reviewNotes",
                 COALESCE(r.notes, '') AS "notes"
              FROM club_event_registrations r
              JOIN users u ON u.id = r.user_id
@@ -3376,9 +3491,11 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
         const rows = applicantsRes.rows;
         const summary = {
             total: rows.length,
+            pending: rows.filter((r) => r.status === "pending").length,
             registered: rows.filter((r) => r.status === "registered").length,
             attended: rows.filter((r) => r.status === "attended").length,
             waitlisted: rows.filter((r) => r.status === "waitlisted").length,
+            rejected: rows.filter((r) => r.status === "rejected").length,
             cancelled: rows.filter((r) => r.status === "cancelled").length,
         };
 
@@ -3402,37 +3519,113 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
 
 /**
  * PATCH /api/club/events/:eventId/applications/:registrationId
- * Updates status of an applicant (registered, attended, waitlisted, cancelled).
+ * Updates status of an applicant (pending, registered, attended, waitlisted, rejected, cancelled).
  */
 clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId, registrationId } = req.params;
-        const { status } = req.body;
+        const { status, reviewNotes } = req.body;
         const userId = req.user!.id;
 
-        if (!status || !["registered", "attended", "waitlisted", "cancelled"].includes(status)) {
-            return res.status(400).json({ success: false, message: "Valid status is required ('registered', 'attended', 'waitlisted', 'cancelled')." });
+        const allowedStatuses = ["pending", "registered", "attended", "waitlisted", "rejected", "cancelled"];
+        if (!status || !allowedStatuses.includes(status)) {
+            return res.status(400).json({
+                success: false,
+                message: `Valid status is required (${allowedStatuses.join(", ")}).`,
+            });
         }
 
-        const eventRes = await query(`SELECT club_id FROM club_events WHERE id = $1 LIMIT 1;`, [eventId]);
+        const eventRes = await query(
+            `SELECT e.id, e.club_id, e.title, vc.name AS "clubName"
+             FROM club_events e
+             JOIN verified_clubs vc ON vc.id = e.club_id
+             WHERE e.id = $1 LIMIT 1;`,
+            [eventId]
+        );
         if (!eventRes.rows[0]) return res.status(404).json({ success: false, message: "Event not found." });
 
         const staffClub = await getStaffClub(userId, eventRes.rows[0].club_id);
         if (!staffClub) return res.status(403).json({ success: false, message: "Access forbidden." });
 
+        const isAttended = status === "attended";
         const updateRes = await query(
             `UPDATE club_event_registrations
-             SET status = $1,
-                 checked_in_at = CASE WHEN $1 = 'attended' AND checked_in_at IS NULL THEN NOW() ELSE checked_in_at END,
+             SET status = $1::varchar,
+                 reviewed_at = NOW(),
+                 reviewed_by_user_id = $2::uuid,
+                 review_notes = COALESCE($3, review_notes),
+                 checked_in_at = CASE WHEN $6::boolean = true AND checked_in_at IS NULL THEN NOW() ELSE checked_in_at END,
                  updated_at = NOW()
-             WHERE id = $2 AND event_id = $3
-             RETURNING id, status, checked_in_at AS "checkedInAt", updated_at AS "updatedAt";`,
-            [status, registrationId, eventId]
+             WHERE id = $4::uuid AND event_id = $5::uuid
+             RETURNING id, user_id AS "userId", status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
+            [status, userId, reviewNotes || null, registrationId, eventId, isAttended]
         );
 
         if (!updateRes.rows[0]) return res.status(404).json({ success: false, message: "Registration record not found." });
 
-        return res.json({ success: true, message: "Applicant status updated.", registration: updateRes.rows[0] });
+        const updatedRow = updateRes.rows[0];
+
+        // Send real-time notification to applicant on status change
+        try {
+            const applicantUserRes = await query(`SELECT id, username FROM users WHERE id = $1::uuid LIMIT 1;`, [updatedRow.userId]);
+            if (applicantUserRes.rows[0]) {
+                const appUser = applicantUserRes.rows[0];
+                const eventTitle = eventRes.rows[0].title;
+                const clubName = eventRes.rows[0].clubName;
+
+                if (status === "registered") {
+                    await query(
+                        `INSERT INTO user_notifications (
+                            user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
+                        ) VALUES (
+                            $1::uuid, $1::uuid, $2,
+                            'Application Accepted! 🎉',
+                            $3,
+                            'club_event',
+                            'application_approved',
+                            $4::jsonb,
+                            $5,
+                            false,
+                            NOW()
+                        ) ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
+                        [
+                            appUser.id,
+                            appUser.username,
+                            `Your application for "${eventTitle}" was accepted by ${clubName}. Your session entry pass is now active!`,
+                            JSON.stringify({ eventId, ticketCode: updatedRow.ticketCode, clubName }),
+                            `app-approved-${registrationId}-${Date.now()}`,
+                        ]
+                    );
+                } else if (status === "rejected") {
+                    await query(
+                        `INSERT INTO user_notifications (
+                            user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
+                        ) VALUES (
+                            $1::uuid, $1::uuid, $2,
+                            'Application Update',
+                            $3,
+                            'club_event',
+                            'application_rejected',
+                            $4::jsonb,
+                            $5,
+                            false,
+                            NOW()
+                        ) ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
+                        [
+                            appUser.id,
+                            appUser.username,
+                            `Your application for "${eventTitle}" was not selected by ${clubName}.`,
+                            JSON.stringify({ eventId, clubName }),
+                            `app-rejected-${registrationId}-${Date.now()}`,
+                        ]
+                    );
+                }
+            }
+        } catch (notifErr) {
+            console.warn("Applicant notification warning (non-fatal):", notifErr);
+        }
+
+        return res.json({ success: true, message: `Applicant status updated to ${status}.`, registration: updatedRow });
     } catch (err: any) {
         console.error("Update applicant status error:", err);
         return res.status(500).json({ success: false, message: "Failed to update status." });
@@ -3466,12 +3659,14 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
                 COALESCE(r.applicant_name, TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), u.username) AS name,
                 u.username,
                 COALESCE(r.applicant_email, u.email) AS email,
+                COALESCE(u.photo_url, u.avatar_url, '') AS avatar_url,
                 COALESCE(r.department, '') AS department,
                 COALESCE(r.year_of_study, '') AS year_of_study,
                 COALESCE(r.roll_number, '') AS roll_number,
                 COALESCE(r.phone_number, '') AS phone,
                 r.status,
                 r.registered_at,
+                r.reviewed_at,
                 r.checked_in_at,
                 COALESCE(r.notes, '') AS notes
              FROM club_event_registrations r
@@ -3487,18 +3682,35 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
             return `"${str}"`;
         };
 
-        const headers = ["Ticket Code", "Name", "Username", "Email", "Department", "Year of Study", "Roll Number", "Phone", "Status", "Registered At", "Checked In At", "Notes"];
+        const headers = [
+            "Ticket Code",
+            "Name",
+            "Username",
+            "Email",
+            "Profile Photo URL",
+            "Department",
+            "Year of Study",
+            "Roll Number",
+            "Phone",
+            "Status",
+            "Applied At",
+            "Reviewed At",
+            "Checked In At",
+            "Notes",
+        ];
         const rows = applicantsRes.rows.map((r) => [
             escapeCsv(r.ticket_code),
             escapeCsv(r.name),
             escapeCsv(r.username),
             escapeCsv(r.email),
+            escapeCsv(r.avatar_url),
             escapeCsv(r.department),
             escapeCsv(r.year_of_study),
             escapeCsv(r.roll_number),
             escapeCsv(r.phone),
-            escapeCsv(r.status),
+            escapeCsv(r.status === "registered" ? "accepted" : r.status),
             escapeCsv(r.registered_at ? new Date(r.registered_at).toISOString() : ""),
+            escapeCsv(r.reviewed_at ? new Date(r.reviewed_at).toISOString() : ""),
             escapeCsv(r.checked_in_at ? new Date(r.checked_in_at).toISOString() : ""),
             escapeCsv(r.notes),
         ].join(","));
@@ -3883,6 +4095,637 @@ clubRouter.get("/moderation/list", authenticate, async (req: Request, res: Respo
         return res.json({ success: true, count: list.length, list });
     } catch (err: any) {
         return res.status(500).json({ success: false, message: "Failed to list moderation list." });
+    }
+});
+
+// ============================================================================
+// CERTIFICATES & CREDENTIAL ISSUANCE SYSTEM
+// High-throughput, production-grade certificate management with strict eligibility
+// ============================================================================
+
+/**
+ * GET /api/club/certificates/events
+ * Returns the club's events for selecting in event-based certificate issuance.
+ */
+clubRouter.get("/certificates/events", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const eventsRes = await query(
+            `SELECT
+                e.id,
+                e.title,
+                e.slug,
+                e.starts_at AS "startsAt",
+                e.status,
+                e.venue_or_location AS "venueOrLocation",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations r WHERE r.event_id = e.id AND r.status = 'attended'), 0) AS "attendeesCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations r WHERE r.event_id = e.id AND r.status != 'cancelled'), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_certificates c WHERE c.event_id = e.id), 0) AS "certificatesIssuedCount"
+             FROM club_events e
+             WHERE e.club_id = $1
+             ORDER BY e.starts_at DESC;`,
+            [club.id]
+        );
+
+        return res.json({ success: true, events: eventsRes.rows });
+    } catch (err: any) {
+        console.error("Fetch certificate events error:", err);
+        return res.status(500).json({ success: false, message: "Failed to load events for certificates." });
+    }
+});
+
+/**
+ * GET /api/club/certificates/event/:eventId/recipients
+ * Returns all participants/attendees for a specific event with attendance and certificate status.
+ */
+clubRouter.get("/certificates/event/:eventId/recipients", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const eventRes = await query(`SELECT id, title, starts_at FROM club_events WHERE id = $1 AND club_id = $2 LIMIT 1;`, [eventId, club.id]);
+        if (!eventRes.rows[0]) return res.status(404).json({ success: false, message: "Event not found for this club." });
+
+        const recipientsRes = await query(
+            `SELECT
+                r.id AS "registrationId",
+                u.id AS "userId",
+                COALESCE(r.applicant_name, TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), u.username) AS name,
+                COALESCE(r.applicant_email, u.email) AS email,
+                u.username,
+                COALESCE(u.photo_url, u.avatar_url) AS "avatarUrl",
+                r.status,
+                r.ticket_code AS "ticketCode",
+                r.checked_in_at AS "checkedInAt",
+                COALESCE(r.department, '') AS department,
+                COALESCE(r.year_of_study, '') AS "yearOfStudy",
+                COALESCE(r.roll_number, '') AS "rollNumber",
+                EXISTS(SELECT 1 FROM club_certificates cc WHERE cc.event_id = $1 AND cc.user_id = u.id) AS "alreadyHasCert"
+             FROM club_event_registrations r
+             JOIN users u ON u.id = r.user_id
+             WHERE r.event_id = $1 AND r.club_id = $2
+             ORDER BY CASE WHEN r.status = 'attended' THEN 0 WHEN r.status = 'registered' THEN 1 ELSE 2 END, r.registered_at ASC;`,
+            [eventId, club.id]
+        );
+
+        return res.json({
+            success: true,
+            event: eventRes.rows[0],
+            recipients: recipientsRes.rows,
+        });
+    } catch (err: any) {
+        console.error("Fetch event recipients error:", err);
+        return res.status(500).json({ success: false, message: "Failed to load event participants." });
+    }
+});
+
+/**
+ * GET /api/club/certificates/eligible-recipients
+ * Returns connected and credible students for the club:
+ * 1. Same college campus as club
+ * 2. Attended or registered for club events
+ * 3. Active club team members / coordinators
+ * Enriched with credibility metrics (attended count, team role, affiliation).
+ */
+clubRouter.get("/certificates/eligible-recipients", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { search = "", category = "all" } = req.query as { search?: string; category?: string };
+
+        const eligibleRes = await query(
+            `WITH club_info AS (
+                SELECT id, college_id, auth_user_id FROM verified_clubs WHERE id = $1
+            )
+            SELECT DISTINCT
+                u.id,
+                COALESCE(TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), u.username) AS name,
+                u.username,
+                u.email,
+                COALESCE(u.photo_url, u.avatar_url) AS "avatarUrl",
+                u.college_id AS "collegeId",
+                c.name AS "collegeName",
+                (u.college_id IS NOT NULL AND u.college_id = ci.college_id) AS "isSameCollege",
+                COALESCE(att.attended_count, 0) AS "eventsAttendedCount",
+                COALESCE(reg.registered_count, 0) AS "eventsRegisteredCount",
+                CASE WHEN tm.id IS NOT NULL OR u.id = ci.auth_user_id THEN true ELSE false END AS "isTeamMember",
+                COALESCE(tm.role_title, CASE WHEN u.id = ci.auth_user_id THEN 'Club Lead' ELSE NULL END) AS "teamRole",
+                latest.latest_event_title AS "latestEventTitle",
+                latest.latest_event_date AS "latestEventDate",
+                COALESCE(cert_count.total_certs, 0) AS "existingCertsCount"
+            FROM users u
+            CROSS JOIN club_info ci
+            LEFT JOIN colleges c ON u.college_id = c.id
+            LEFT JOIN (
+                SELECT user_id, COUNT(*)::int AS attended_count
+                FROM club_event_registrations
+                WHERE club_id = $1 AND status = 'attended'
+                GROUP BY user_id
+            ) att ON att.user_id = u.id
+            LEFT JOIN (
+                SELECT user_id, COUNT(*)::int AS registered_count
+                FROM club_event_registrations
+                WHERE club_id = $1 AND status != 'cancelled'
+                GROUP BY user_id
+            ) reg ON reg.user_id = u.id
+            LEFT JOIN (
+                SELECT DISTINCT ON (user_id) user_id, title AS role_title, id
+                FROM club_team_members
+                WHERE club_id = $1 AND status = 'active'
+                ORDER BY user_id, created_at DESC
+            ) tm ON tm.user_id = u.id
+            LEFT JOIN (
+                SELECT DISTINCT ON (r.user_id) r.user_id, e.title AS latest_event_title, e.starts_at AS latest_event_date
+                FROM club_event_registrations r
+                JOIN club_events e ON e.id = r.event_id
+                WHERE r.club_id = $1 AND r.status IN ('registered', 'attended')
+                ORDER BY r.user_id, r.registered_at DESC
+            ) latest ON latest.user_id = u.id
+            LEFT JOIN (
+                SELECT user_id, COUNT(*)::int AS total_certs
+                FROM club_certificates
+                WHERE club_id = $1
+                GROUP BY user_id
+            ) cert_count ON cert_count.user_id = u.id
+            WHERE (
+                (u.college_id IS NOT NULL AND u.college_id = ci.college_id)
+                OR COALESCE(reg.registered_count, 0) > 0
+                OR tm.id IS NOT NULL
+                OR u.id = ci.auth_user_id
+            )
+            ORDER BY "eventsAttendedCount" DESC, "isTeamMember" DESC, name ASC
+            LIMIT 300;`,
+            [club.id]
+        );
+
+        let list = eligibleRes.rows.map((row) => {
+            // Determine credibility category & score
+            let credibilityCategory = "campus_student";
+            let credibilityBadge = "Campus Verified";
+            let credibilityRank = 1;
+
+            if (row.eventsAttendedCount > 0) {
+                credibilityCategory = "event_attendee";
+                credibilityBadge = row.eventsAttendedCount > 1
+                    ? `Top Participant (${row.eventsAttendedCount} Events)`
+                    : `Verified Attendee (1 Event)`;
+                credibilityRank = 3;
+            } else if (row.isTeamMember) {
+                credibilityCategory = "team_member";
+                credibilityBadge = `Team (${row.teamRole || "Core"})`;
+                credibilityRank = 2;
+            } else if (row.eventsRegisteredCount > 0) {
+                credibilityCategory = "event_registered";
+                credibilityBadge = "Registered Participant";
+                credibilityRank = 1.5;
+            }
+
+            return {
+                ...row,
+                credibilityCategory,
+                credibilityBadge,
+                credibilityRank,
+            };
+        });
+
+        // Filter by category if requested
+        if (category === "attendees") {
+            list = list.filter((item) => item.eventsAttendedCount > 0);
+        } else if (category === "team") {
+            list = list.filter((item) => item.isTeamMember);
+        } else if (category === "campus") {
+            list = list.filter((item) => item.isSameCollege);
+        }
+
+        // Filter by search query
+        if (search.trim()) {
+            const q = search.toLowerCase();
+            list = list.filter(
+                (item) =>
+                    item.name.toLowerCase().includes(q) ||
+                    item.username.toLowerCase().includes(q) ||
+                    item.email.toLowerCase().includes(q)
+            );
+        }
+
+        return res.json({
+            success: true,
+            totalEligible: list.length,
+            recipients: list,
+        });
+    } catch (err: any) {
+        console.error("Fetch eligible certificate recipients error:", err);
+        return res.status(500).json({ success: false, message: "Failed to load eligible students." });
+    }
+});
+
+/**
+ * POST /api/club/certificates/issue
+ * Production-grade bulk certificate issuance:
+ * - Strictly enforces eligibility: recipient must be from same college, attended an event, or be a team member
+ * - Generates unique verifiable credential code: ORB-[CLUB]-[YEAR]-[HASH]
+ * - Creates in-app notifications in user_notifications
+ * - Protected by database transactions
+ */
+clubRouter.post("/certificates/issue", authenticate, async (req: Request, res: Response) => {
+    try {
+        const staffUserId = req.user!.id;
+        const club = await getStaffClub(staffUserId);
+        if (!club) {
+            return res.status(403).json({ success: false, message: "Access forbidden: you do not have staff permissions for this club." });
+        }
+
+        const {
+            recipientUserIds,
+            eventId,
+            title,
+            certificateType = "participation",
+            description,
+            signerName,
+            signerRole,
+        } = req.body;
+
+        if (!Array.isArray(recipientUserIds) || recipientUserIds.length === 0) {
+            return res.status(400).json({ success: false, message: "At least one recipient user ID must be provided." });
+        }
+
+        if (!title || typeof title !== "string" || title.trim().length < 3) {
+            return res.status(400).json({ success: false, message: "A valid certificate title is required (minimum 3 characters)." });
+        }
+
+        const validTypes = ["participation", "excellence", "merit", "contributor", "organizer", "appreciation"];
+        if (!validTypes.includes(certificateType)) {
+            return res.status(400).json({ success: false, message: `Invalid certificate type. Allowed types: ${validTypes.join(", ")}` });
+        }
+
+        // If eventId provided, verify it belongs to this club
+        let eventTitle: string | null = null;
+        if (eventId) {
+            const evCheck = await query(`SELECT title FROM club_events WHERE id = $1 AND club_id = $2 LIMIT 1;`, [eventId, club.id]);
+            if (!evCheck.rows[0]) {
+                return res.status(400).json({ success: false, message: "Specified event does not belong to this club." });
+            }
+            eventTitle = evCheck.rows[0].title;
+        }
+
+        // STRICT SECURITY ENFORCEMENT: Filter and verify all recipientUserIds
+        // User MUST be:
+        // 1) From the same college as the club (users.college_id = verified_clubs.college_id)
+        // 2) OR registered / attended at least one event of this club
+        // 3) OR an active team member / coordinator of this club
+        // 4) OR the club owner
+        const eligibleUsersRes = await query(
+            `SELECT
+                u.id,
+                u.email,
+                u.username,
+                COALESCE(TRIM(CONCAT(u.firstname, ' ', COALESCE(u.lastname, ''))), u.username) AS name
+             FROM users u
+             WHERE u.id = ANY($1::uuid[])
+               AND (
+                 (u.college_id IS NOT NULL AND u.college_id = (SELECT college_id FROM verified_clubs WHERE id = $2))
+                 OR EXISTS (SELECT 1 FROM club_event_registrations cer WHERE cer.club_id = $2 AND cer.user_id = u.id)
+                 OR EXISTS (SELECT 1 FROM club_team_members ctm WHERE ctm.club_id = $2 AND ctm.user_id = u.id)
+                 OR EXISTS (SELECT 1 FROM club_memberships cm WHERE cm.club_id = $2 AND cm.user_id = u.id)
+                 OR u.id = (SELECT auth_user_id FROM verified_clubs WHERE id = $2)
+               );`,
+            [recipientUserIds, club.id]
+        );
+
+        const eligibleUsers = eligibleUsersRes.rows;
+        if (eligibleUsers.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: "None of the selected recipients meet the eligibility requirements (must belong to your campus, have attended your events, or be a team member).",
+            });
+        }
+
+        const clubSlugPrefix = (club.slug || club.name || "ORB")
+            .replace(/[^a-zA-Z0-9]/g, "")
+            .slice(0, 5)
+            .toUpperCase() || "ORB";
+        const currentYear = new Date().getFullYear();
+
+        const issuedCertificates: any[] = [];
+        const finalSignerName = signerName?.trim() || club.name || "Club Coordinator";
+        const finalSignerRole = signerRole?.trim() || "Lead Coordinator";
+        const cleanTitle = title.trim();
+        const cleanDesc = description?.trim() || (
+            eventId && eventTitle
+                ? `Awarded for active participation and outstanding commitment in "${eventTitle}" organized by ${club.name}.`
+                : `Awarded in recognition of meritorious contribution, commitment, and skill demonstrated with ${club.name}.`
+        );
+
+        // Transactional batch insert
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN");
+
+            for (const user of eligibleUsers) {
+                // Generate a cryptographically secure, unique credential code
+                const randomHex = crypto.randomBytes(3).toString("hex").toUpperCase();
+                const credentialCode = `ORB-${clubSlugPrefix}-${currentYear}-${randomHex}`;
+
+                const certInsertRes = await client.query(
+                    `INSERT INTO club_certificates (
+                        club_id,
+                        user_id,
+                        event_id,
+                        title,
+                        certificate_type,
+                        recipient_name,
+                        recipient_email,
+                        description,
+                        credential_code,
+                        signer_name,
+                        signer_role,
+                        issued_by_user_id,
+                        issue_date,
+                        metadata
+                    ) VALUES (
+                        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), $13::jsonb
+                    )
+                    ON CONFLICT (club_id, user_id, COALESCE(event_id, '00000000-0000-0000-0000-000000000000'::uuid), certificate_type, title)
+                    DO UPDATE SET
+                        description = EXCLUDED.description,
+                        signer_name = EXCLUDED.signer_name,
+                        signer_role = EXCLUDED.signer_role,
+                        updated_at = NOW()
+                    RETURNING id, credential_code, title, certificate_type, issue_date;`,
+                    [
+                        club.id,
+                        user.id,
+                        eventId || null,
+                        cleanTitle,
+                        certificateType,
+                        user.name,
+                        user.email,
+                        cleanDesc,
+                        credentialCode,
+                        finalSignerName,
+                        finalSignerRole,
+                        staffUserId,
+                        JSON.stringify({
+                            clubName: club.name,
+                            clubSlug: club.slug,
+                            collegeName: club.college_name,
+                            eventTitle: eventTitle,
+                        }),
+                    ]
+                );
+
+                const cert = certInsertRes.rows[0];
+                issuedCertificates.push({
+                    id: cert.id,
+                    recipientId: user.id,
+                    recipientName: user.name,
+                    credentialCode: cert.credential_code,
+                });
+
+                // Immediately create notification for the student in user_notifications
+                const notifTitle = `🎓 Certificate Awarded!`;
+                const notifBody = `${club.name} has awarded you the "${cleanTitle}" certificate.`;
+                const notifMetadata = JSON.stringify({
+                    type: "club_certificate",
+                    certificateId: cert.id,
+                    credentialCode: cert.credential_code,
+                    clubId: club.id,
+                    clubName: club.name,
+                    clubSlug: club.slug,
+                    eventId: eventId || null,
+                    eventTitle: eventTitle || null,
+                    certificateType,
+                    title: cleanTitle,
+                    issueDate: cert.issue_date,
+                });
+
+                await client.query(
+                    `INSERT INTO user_notifications (
+                        user_id,
+                        recipient_id,
+                        username,
+                        title,
+                        body,
+                        type,
+                        notification_type,
+                        metadata,
+                        idempotency_key,
+                        is_read,
+                        created_at
+                    ) VALUES (
+                        $1, $1, $2,
+                        $3, $4,
+                        'club_certificate',
+                        'certificate_awarded',
+                        $5::jsonb,
+                        $6,
+                        false,
+                        NOW()
+                    )
+                    ON CONFLICT (idempotency_key) DO UPDATE SET
+                        title = EXCLUDED.title,
+                        body = EXCLUDED.body,
+                        metadata = EXCLUDED.metadata;`,
+                    [
+                        user.id,
+                        user.username,
+                        notifTitle,
+                        notifBody,
+                        notifMetadata,
+                        `cert-${cert.id}`,
+                    ]
+                );
+            }
+
+            await client.query("COMMIT");
+        } catch (txnErr) {
+            await client.query("ROLLBACK");
+            throw txnErr;
+        } finally {
+            client.release();
+        }
+
+        const skippedCount = recipientUserIds.length - eligibleUsers.length;
+
+        return res.json({
+            success: true,
+            message: `Successfully issued ${issuedCertificates.length} certificate(s).`,
+            issuedCount: issuedCertificates.length,
+            skippedCount,
+            certificates: issuedCertificates,
+        });
+    } catch (err: any) {
+        console.error("Issue certificates error:", err);
+        return res.status(500).json({ success: false, message: err.message || "Failed to issue certificates." });
+    }
+});
+
+/**
+ * GET /api/club/certificates/issued
+ * Returns all certificates issued by the authenticated staff's club.
+ */
+clubRouter.get("/certificates/issued", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const certsRes = await query(
+            `SELECT
+                c.id,
+                c.title,
+                c.certificate_type AS "certificateType",
+                c.recipient_name AS "recipientName",
+                c.recipient_email AS "recipientEmail",
+                c.description,
+                c.credential_code AS "credentialCode",
+                c.signer_name AS "signerName",
+                c.signer_role AS "signerRole",
+                c.issue_date AS "issueDate",
+                c.event_id AS "eventId",
+                e.title AS "eventTitle",
+                u.username AS "recipientUsername",
+                COALESCE(u.photo_url, u.avatar_url) AS "recipientAvatarUrl"
+             FROM club_certificates c
+             JOIN users u ON u.id = c.user_id
+             LEFT JOIN club_events e ON e.id = c.event_id
+             WHERE c.club_id = $1
+             ORDER BY c.issue_date DESC;`,
+            [club.id]
+        );
+
+        return res.json({ success: true, count: certsRes.rows.length, certificates: certsRes.rows });
+    } catch (err: any) {
+        console.error("Fetch issued certificates error:", err);
+        return res.status(500).json({ success: false, message: "Failed to load issued certificates." });
+    }
+});
+
+/**
+ * DELETE /api/club/certificates/:certificateId
+ * Revokes or deletes an issued certificate.
+ */
+clubRouter.delete("/certificates/:certificateId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { certificateId } = req.params;
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const delRes = await query(
+            `DELETE FROM club_certificates WHERE id = $1 AND club_id = $2 RETURNING id;`,
+            [certificateId, club.id]
+        );
+
+        if (!delRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "Certificate not found or already deleted." });
+        }
+
+        return res.json({ success: true, message: "Certificate revoked successfully." });
+    } catch (err: any) {
+        console.error("Delete certificate error:", err);
+        return res.status(500).json({ success: false, message: "Failed to delete certificate." });
+    }
+});
+
+/**
+ * GET /api/club/user/certificates
+ * Returns all verified certificates awarded to the authenticated student/user.
+ */
+clubRouter.get("/user/certificates", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user!.id;
+
+        const certsRes = await query(
+            `SELECT
+                c.id,
+                c.club_id AS "clubId",
+                vc.name AS "clubName",
+                vc.slug AS "clubSlug",
+                COALESCE(vc.logo_url, '') AS "clubLogoUrl",
+                vc.college_name AS "collegeName",
+                c.event_id AS "eventId",
+                e.title AS "eventTitle",
+                e.starts_at AS "eventDate",
+                c.title,
+                c.certificate_type AS "certificateType",
+                c.recipient_name AS "recipientName",
+                c.recipient_email AS "recipientEmail",
+                c.description,
+                c.credential_code AS "credentialCode",
+                c.signer_name AS "signerName",
+                c.signer_role AS "signerRole",
+                c.issue_date AS "issueDate",
+                c.metadata,
+                c.created_at AS "createdAt"
+             FROM club_certificates c
+             JOIN verified_clubs vc ON vc.id = c.club_id
+             LEFT JOIN club_events e ON e.id = c.event_id
+             WHERE c.user_id = $1
+             ORDER BY c.issue_date DESC;`,
+            [userId]
+        );
+
+        return res.json({ success: true, certificates: certsRes.rows });
+    } catch (err: any) {
+        console.error("Fetch user certificates error:", err);
+        return res.status(500).json({ success: false, message: "Failed to retrieve certificates." });
+    }
+});
+
+/**
+ * GET /api/club/certificates/verify/:credentialCode
+ * Public verification endpoint for any certificate code.
+ */
+clubRouter.get("/certificates/verify/:credentialCode", optionalAuthenticate, async (req: Request, res: Response) => {
+    try {
+        const { credentialCode } = req.params;
+
+        const certRes = await query(
+            `SELECT
+                c.id,
+                c.title,
+                c.certificate_type AS "certificateType",
+                c.recipient_name AS "recipientName",
+                c.credential_code AS "credentialCode",
+                c.issue_date AS "issueDate",
+                c.signer_name AS "signerName",
+                c.signer_role AS "signerRole",
+                c.description,
+                c.metadata,
+                vc.id AS "clubId",
+                vc.name AS "clubName",
+                vc.slug AS "clubSlug",
+                vc.college_name AS "collegeName",
+                COALESCE(vc.logo_url, '') AS "clubLogoUrl",
+                e.title AS "eventTitle",
+                e.starts_at AS "eventStartsAt"
+             FROM club_certificates c
+             JOIN verified_clubs vc ON vc.id = c.club_id
+             LEFT JOIN club_events e ON e.id = c.event_id
+             WHERE LOWER(c.credential_code) = LOWER($1)
+             LIMIT 1;`,
+            [credentialCode]
+        );
+
+        if (!certRes.rows[0]) {
+            return res.status(404).json({
+                success: false,
+                verified: false,
+                message: "Certificate not found. The credential code may be invalid or revoked.",
+            });
+        }
+
+        return res.json({
+            success: true,
+            verified: true,
+            certificate: certRes.rows[0],
+        });
+    } catch (err: any) {
+        console.error("Verify certificate error:", err);
+        return res.status(500).json({ success: false, message: "Verification failed." });
     }
 });
 

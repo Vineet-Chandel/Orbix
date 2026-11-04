@@ -622,6 +622,48 @@ export const testDatabaseConnection = async () => {
                     ALTER TABLE public.verified_clubs 
                         ADD COLUMN IF NOT EXISTS category_updated_at TIMESTAMPTZ;
                 END IF;
+
+                -- Ensure club_event_registrations status constraint supports full approval flow
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'club_event_registrations'
+                ) THEN
+                    ALTER TABLE public.club_event_registrations DROP CONSTRAINT IF EXISTS club_event_registrations_status_check;
+                    ALTER TABLE public.club_event_registrations ADD CONSTRAINT club_event_registrations_status_check
+                        CHECK (status IN ('pending', 'registered', 'attended', 'waitlisted', 'rejected', 'cancelled', 'blocked'));
+                    ALTER TABLE public.club_event_registrations ALTER COLUMN status SET DEFAULT 'pending';
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS reviewed_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL;
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS review_notes TEXT;
+                    CREATE INDEX IF NOT EXISTS idx_club_event_registrations_status ON public.club_event_registrations(event_id, status);
+                END IF;
+
+                -- Ensure club_certificates table exists
+                CREATE TABLE IF NOT EXISTS public.club_certificates (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    event_id UUID REFERENCES public.club_events(id) ON DELETE SET NULL,
+                    title VARCHAR(255) NOT NULL,
+                    certificate_type VARCHAR(50) NOT NULL DEFAULT 'participation' CHECK (
+                        certificate_type IN ('participation', 'excellence', 'merit', 'contributor', 'organizer', 'appreciation')
+                    ),
+                    recipient_name VARCHAR(255) NOT NULL,
+                    recipient_email VARCHAR(255),
+                    description TEXT,
+                    credential_code VARCHAR(64) NOT NULL UNIQUE,
+                    signer_name VARCHAR(150),
+                    signer_role VARCHAR(150),
+                    issued_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    issue_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    metadata JSONB DEFAULT '{}'::jsonb,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_user ON public.club_certificates(user_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_club ON public.club_certificates(club_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_event ON public.club_certificates(event_id);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_code ON public.club_certificates(credential_code);
             END $$;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");

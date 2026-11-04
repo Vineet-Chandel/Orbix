@@ -4,12 +4,11 @@ import {
     X,
     Clock,
     MapPin,
-    CheckCircle2,
-    Copy,
     Ticket,
     ShieldAlert,
 } from "lucide-react";
 import { OrbixButton } from "../../components/ui/loader";
+import { NeoSelect } from "../../components/NeoSelect";
 import { useToast } from "../../context/ToastContext";
 import { applyForEvent, type CollegeEventItem } from "../../api/collegeEventsApi";
 import { useAppSelector } from "../../store";
@@ -39,8 +38,8 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
     const [notes, setNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-    // Success State
-    const [ticketCode, setTicketCode] = useState<string | null>(null);
+    // Submission Status
+    const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
     useEffect(() => {
         if (isOpen && event) {
@@ -54,7 +53,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
             setRollNumber("");
             setPhoneNumber("");
             setNotes("");
-            setTicketCode(event.ticketCode || null);
+            setSubmittedSuccess(false);
         }
     }, [isOpen, event, user]);
 
@@ -73,7 +72,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
 
         try {
             setIsSubmitting(true);
-            const res = await applyForEvent(event.id, {
+            await applyForEvent(event.id, {
                 applicantName: applicantName.trim(),
                 applicantEmail: applicantEmail.trim(),
                 department: department.trim() || undefined,
@@ -83,28 +82,21 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                 notes: notes.trim() || undefined,
             });
 
-            const code = res.registration?.ticketCode || "ORB-CONFIRMED";
-            setTicketCode(code);
-            toast.success(`You are registered for ${event.title}!`, { title: "Registration Confirmed" });
+            setSubmittedSuccess(true);
+            toast.success(`Application submitted for ${event.title}!`, { title: "Application Forwarded" });
 
             onSuccess({
                 ...event,
-                isRegistered: true,
-                registrationStatus: "registered",
-                ticketCode: code,
-                registrationsCount: (event.registrationsCount || 0) + 1,
+                isRegistered: false,
+                isPending: true,
+                registrationStatus: "pending",
+                ticketCode: null,
+                totalApplicationsCount: (event.totalApplicationsCount || 0) + 1,
             });
         } catch (err: any) {
-            toast.error(err.message || "Failed to register for this event.");
+            toast.error(err.message || "Failed to submit application for this event.");
         } finally {
             setIsSubmitting(false);
-        }
-    };
-
-    const handleCopyTicket = () => {
-        if (ticketCode) {
-            navigator.clipboard.writeText(ticketCode);
-            toast.success("Ticket pass code copied to clipboard!");
         }
     };
 
@@ -135,7 +127,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                         </div>
                         <div>
                             <h3 className="text-base font-black text-black">
-                                {ticketCode ? "Your Event Registration Pass" : "Register for Campus Event"}
+                                {submittedSuccess ? "Your Event Registration Application" : "Register for Campus Event"}
                             </h3>
                             <p className="text-[11px] font-bold text-neutral-500">
                                 Organized by {event.clubName}
@@ -182,48 +174,44 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                     </div>
                 </div>
 
-                {ticketCode ? (
-                    /* Ticket Confirmation View */
+                {submittedSuccess ? (
+                    /* Application Forwarded to Club View */
                     <div className="p-6 space-y-5 text-center">
-                        <div className="w-14 h-14 rounded-2xl bg-emerald-300 border-2 border-black flex items-center justify-center mx-auto shadow-[3px_3px_0px_#000]">
-                            <CheckCircle2 className="w-8 h-8 text-black stroke-[2.5]" />
+                        <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center mx-auto shadow-[3px_3px_0px_#000]">
+                            <Clock className="w-8 h-8 text-black stroke-[2.5]" />
                         </div>
 
                         <div className="space-y-1">
-                            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000]">
-                                Registration Confirmed
+                            <span className="text-[10px] font-black uppercase tracking-wider text-amber-950 bg-amber-100 px-2.5 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000]">
+                                Application Forwarded · Under Review
                             </span>
                             <h4 className="text-lg font-black text-black pt-1">
-                                You&apos;re officially registered!
+                                Application Sent to {event.clubName}!
                             </h4>
-                            <p className="text-xs text-neutral-600 font-medium max-w-sm mx-auto">
-                                Show this ticket pass code at the session check-in or keep it for your entry records.
+                            <p className="text-xs text-neutral-600 font-medium max-w-sm mx-auto leading-relaxed">
+                                Your application has been routed to the host club coordinators. Once they verify your details and approve your entry, your session pass will be activated.
                             </p>
                         </div>
 
-                        {/* Digital Ticket Box */}
-                        <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-left space-y-3 relative overflow-hidden">
+                        {/* Application Summary Box */}
+                        <div className="p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[4px_4px_0px_#000] text-left space-y-3 relative overflow-hidden">
                             <div className="flex items-center justify-between pb-2 border-b-2 border-dashed border-black/20">
                                 <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
-                                    Official Ticket Code
+                                    Current Status
                                 </span>
-                                <span className="text-[10px] font-black text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-black/30">
-                                    Active Pass
+                                <span className="text-[10px] font-black text-amber-950 bg-[#FFE566] px-2 py-0.5 rounded border border-black/30">
+                                    Pending Club Review
                                 </span>
                             </div>
 
-                            <div className="flex items-center justify-between gap-3">
-                                <span className="text-lg sm:text-xl font-black font-mono tracking-wider text-black">
-                                    {ticketCode}
-                                </span>
-                                <button
-                                    type="button"
-                                    onClick={handleCopyTicket}
-                                    className="px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-1 cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                                >
-                                    <Copy className="w-3.5 h-3.5" />
-                                    <span>Copy</span>
-                                </button>
+                            <div className="space-y-1">
+                                <div className="text-sm font-black text-black">
+                                    {applicantName}
+                                </div>
+                                <div className="text-[11px] font-bold text-neutral-600 flex items-center justify-between">
+                                    <span>{department || "General"} · {yearOfStudy}</span>
+                                    <span>{applicantEmail}</span>
+                                </div>
                             </div>
 
                             <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[11px] font-bold text-neutral-600">
@@ -236,7 +224,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="w-full py-2.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] cursor-pointer"
+                                className="w-full py-2.5 rounded-xl bg-black text-[#FFE566] hover:bg-neutral-900 border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] cursor-pointer"
                             >
                                 Done & Return to Events
                             </button>
@@ -322,17 +310,18 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                                 <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
                                     Year of Study
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={yearOfStudy}
-                                    onChange={(e) => setYearOfStudy(e.target.value)}
-                                    className="w-full px-3 py-2 rounded-xl bg-white border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
+                                    onChange={(val) => setYearOfStudy(val)}
+                                    size="sm"
+                                    triggerClassName="!bg-white !rounded-xl !py-2 text-xs !shadow-[1px_1px_0px_#000]"
                                 >
                                     <option value="1st Year">1st Year</option>
                                     <option value="2nd Year">2nd Year</option>
                                     <option value="3rd Year">3rd Year</option>
                                     <option value="4th Year / Final">4th Year / Final</option>
                                     <option value="Postgraduate / Masters">Postgraduate / Masters</option>
-                                </select>
+                                </NeoSelect>
                             </div>
                         </div>
 
@@ -389,10 +378,10 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                                 type="submit"
                                 variant="lime"
                                 loading={isSubmitting}
-                                loadingLabel="Registering..."
+                                loadingLabel="Submitting Application..."
                                 className="px-5 py-2 text-xs font-black"
                             >
-                                Confirm Registration
+                                Submit Application
                             </OrbixButton>
                         </div>
                     </form>

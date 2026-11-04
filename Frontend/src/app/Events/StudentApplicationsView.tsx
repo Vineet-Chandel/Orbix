@@ -19,6 +19,7 @@ import {
 } from "../../api/collegeEventsApi";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { OrbixLoader } from "../../components/ui/loader";
+import { ConfirmationModal } from "../../components/ConfirmationModal";
 
 interface StudentApplicationsViewProps {
     onOpenMobileSidebar?: () => void;
@@ -30,9 +31,11 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
     const toast = useToast();
     const [applications, setApplications] = useState<StudentApplicationItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [statusFilter, setStatusFilter] = useState<"all" | "registered" | "attended" | "cancelled">("all");
+    const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "registered" | "attended" | "rejected" | "cancelled">("all");
     const [searchQuery, setSearchQuery] = useState("");
     const [cancellingId, setCancellingId] = useState<string | null>(null);
+    const [withdrawTargetApp, setWithdrawTargetApp] = useState<StudentApplicationItem | null>(null);
+    const [isWithdrawing, setIsWithdrawing] = useState(false);
 
     const loadApplications = async () => {
         setLoading(true);
@@ -51,26 +54,29 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
         loadApplications();
     }, []);
 
-    const handleCopyTicket = (code: string) => {
+    const handleCopyTicket = (code?: string | null) => {
+        if (!code) return;
         navigator.clipboard.writeText(code);
         toast.success("Ticket code copied to clipboard!");
     };
 
-    const handleCancelRegistration = async (app: StudentApplicationItem) => {
-        if (!confirm(`Are you sure you want to cancel your registration for "${app.eventTitle}"?`)) {
-            return;
-        }
+    const handleConfirmWithdraw = async () => {
+        if (!withdrawTargetApp) return;
+        const target = withdrawTargetApp;
 
         try {
-            setCancellingId(app.id);
-            await cancelEventRegistration(app.eventId);
-            toast.success("Registration cancelled.");
+            setIsWithdrawing(true);
+            setCancellingId(target.id);
+            await cancelEventRegistration(target.eventId);
+            toast.success(`Registration for "${target.eventTitle}" cancelled.`);
             setApplications((prev) =>
-                prev.map((a) => (a.id === app.id ? { ...a, status: "cancelled" } : a))
+                prev.map((a) => (a.id === target.id ? { ...a, status: "cancelled" } : a))
             );
+            setWithdrawTargetApp(null);
         } catch (err: any) {
             toast.error(err.message || "Failed to cancel registration.");
         } finally {
+            setIsWithdrawing(false);
             setCancellingId(null);
         }
     };
@@ -101,7 +107,7 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                 (a) =>
                     a.eventTitle.toLowerCase().includes(q) ||
                     a.clubName.toLowerCase().includes(q) ||
-                    a.ticketCode.toLowerCase().includes(q) ||
+                    (a.ticketCode && a.ticketCode.toLowerCase().includes(q)) ||
                     (a.department && a.department.toLowerCase().includes(q))
             );
         }
@@ -327,6 +333,18 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                                 className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between space-y-4"
                             >
                                 <div className="space-y-3">
+                                    {/* Event Banner */}
+                                    {app.coverImageUrl && (
+                                        <div className="w-full h-32 sm:h-40 rounded-xl border-2 border-black overflow-hidden relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                            <img
+                                                src={app.coverImageUrl}
+                                                alt={app.eventTitle}
+                                                className="w-full h-full object-cover"
+                                                loading="lazy"
+                                            />
+                                        </div>
+                                    )}
+
                                     {/* Top Event Meta */}
                                     <div className="flex items-center justify-between gap-2">
                                         <div className="flex items-center gap-2">
@@ -350,14 +368,20 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                                                     ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
                                                     : app.status === "attended"
                                                     ? "bg-purple-300 text-black shadow-[1px_1px_0px_#000]"
+                                                    : app.status === "pending"
+                                                    ? "bg-amber-300 text-black shadow-[1px_1px_0px_#000]"
                                                     : "bg-rose-200 text-black shadow-[1px_1px_0px_#000]"
                                             }`}
                                         >
                                             {app.status === "registered"
-                                                ? "Confirmed Pass"
+                                                ? "Accepted / Pass Active"
                                                 : app.status === "attended"
                                                 ? "Attended"
-                                                : "Cancelled"}
+                                                : app.status === "pending"
+                                                ? "Pending Review"
+                                                : app.status === "rejected"
+                                                ? "Not Selected"
+                                                : "Withdrawn"}
                                         </span>
                                     </div>
 
@@ -387,25 +411,37 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                                     {/* Digital Ticket Pass Card */}
                                     <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-dashed border-black/40 space-y-2">
                                         <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-neutral-500">
-                                            <span>Ticket Pass Code</span>
+                                            <span>{app.status === "registered" || app.status === "attended" ? "Ticket Pass Code" : "Application Status"}</span>
                                             <span>
-                                                Registered: {new Date(app.registeredAt).toLocaleDateString()}
+                                                Applied: {new Date(app.registeredAt).toLocaleDateString()}
                                             </span>
                                         </div>
 
-                                        <div className="flex items-center justify-between gap-3">
-                                            <span className="text-base sm:text-lg font-mono font-black tracking-wider text-black">
-                                                {app.ticketCode}
-                                            </span>
-                                            <button
-                                                type="button"
-                                                onClick={() => handleCopyTicket(app.ticketCode)}
-                                                className="px-2.5 py-1 rounded-lg bg-white hover:bg-neutral-100 border border-black text-xs font-black shadow-[1px_1px_0px_#000] flex items-center gap-1 cursor-pointer"
-                                            >
-                                                <Copy className="w-3 h-3" />
-                                                <span>Copy</span>
-                                            </button>
-                                        </div>
+                                        {app.status === "registered" || app.status === "attended" ? (
+                                            <div className="flex items-center justify-between gap-3">
+                                                <span className="text-base sm:text-lg font-mono font-black tracking-wider text-black">
+                                                    {app.ticketCode}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleCopyTicket(app.ticketCode)}
+                                                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-neutral-100 border border-black text-xs font-black shadow-[1px_1px_0px_#000] flex items-center gap-1 cursor-pointer"
+                                                >
+                                                    <Copy className="w-3 h-3" />
+                                                    <span>Copy</span>
+                                                </button>
+                                            </div>
+                                        ) : app.status === "pending" ? (
+                                            <div className="text-amber-900 font-bold text-xs py-1 flex items-center gap-1.5">
+                                                <Clock className="w-3.5 h-3.5 text-amber-700" />
+                                                <span>Awaiting coordinator review · Ticket pass will generate once approved.</span>
+                                            </div>
+                                        ) : (
+                                            <div className="text-rose-900 font-bold text-xs py-1 flex items-center gap-1.5">
+                                                <Ban className="w-3.5 h-3.5 text-rose-700" />
+                                                <span>Application not selected by organizers.</span>
+                                            </div>
+                                        )}
 
                                         {app.checkedInAt && (
                                             <div className="text-[10px] font-bold text-emerald-800 flex items-center gap-1 pt-1 border-t border-black/10">
@@ -435,11 +471,11 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                                     {app.status === "registered" && (
                                         <button
                                             type="button"
-                                            disabled={cancellingId === app.id}
-                                            onClick={() => handleCancelRegistration(app)}
+                                            disabled={cancellingId === app.id || isWithdrawing}
+                                            onClick={() => setWithdrawTargetApp(app)}
                                             className="px-3 py-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border-2 border-black text-xs font-black shadow-[1px_1px_0px_#000] cursor-pointer disabled:opacity-50"
                                         >
-                                            {cancellingId === app.id ? "Cancelling..." : "Cancel Pass"}
+                                            {cancellingId === app.id ? "Cancelling..." : "Withdraw Pass"}
                                         </button>
                                     )}
                                 </div>
@@ -448,6 +484,46 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                     </div>
                 )}
             </div>
+
+            {/* Withdraw Application Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={Boolean(withdrawTargetApp)}
+                onClose={() => {
+                    if (!isWithdrawing) setWithdrawTargetApp(null);
+                }}
+                onConfirm={handleConfirmWithdraw}
+                title="Withdraw Event Pass"
+                description={
+                    withdrawTargetApp ? (
+                        <div className="space-y-3">
+                            <p className="text-xs sm:text-sm font-medium text-neutral-700 leading-relaxed">
+                                Are you sure you want to withdraw your pass for{" "}
+                                <strong className="text-black font-black">"{withdrawTargetApp.eventTitle}"</strong>?
+                            </p>
+                            <div className="p-3 bg-rose-50 border-2 border-black rounded-xl text-xs space-y-1.5 font-bold text-rose-950">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-neutral-500 font-mono text-[10px] uppercase">Host Club:</span>
+                                    <span className="text-black">{withdrawTargetApp.clubName}</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <span className="text-neutral-500 font-mono text-[10px] uppercase">Access Ticket:</span>
+                                    <span className="font-mono text-black">{withdrawTargetApp.ticketCode}</span>
+                                </div>
+                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200">
+                                    ⚠️ Your pass will be cancelled immediately and cannot be recovered.
+                                </p>
+                            </div>
+                        </div>
+                    ) : undefined
+                }
+                variant="danger"
+                confirmText="Withdraw Pass"
+                confirmLabel={isWithdrawing ? "Withdrawing..." : "Withdraw Pass"}
+                cancelText="Keep Pass"
+                isLoading={isWithdrawing}
+                requiredInputText="WITHDRAW"
+                inputPlaceholder='Type "WITHDRAW" to confirm'
+            />
 
             {/* Bottom Illustration */}
             <SectionBottomIllustration alt="Orbix event passes illustration" />

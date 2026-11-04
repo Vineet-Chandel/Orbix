@@ -62,10 +62,7 @@ export const ClubMarkdownEditor: React.FC<ClubMarkdownEditorProps> = ({
     };
 
     const handleInsertLink = () => {
-        const url = prompt("Enter link URL:", "https://");
-        if (url) {
-            applyFormat("[", `](${url})`, "Link text");
-        }
+        applyFormat("[", "](https://example.com)", "Link text");
     };
 
     const handleInsertTable = () => {

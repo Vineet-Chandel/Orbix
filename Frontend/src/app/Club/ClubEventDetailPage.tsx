@@ -24,6 +24,7 @@ import {
     Copy,
     Check,
     RefreshCw,
+    Award,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -43,6 +44,7 @@ import {
 } from "../../api/collegeEventsApi";
 import { ClubEventModal } from "./ClubEventModal";
 import { EventSecurityConfirmModal } from "./EventSecurityConfirmModal";
+import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
 import { EventLiveListingCard } from "../../components/EventLiveListingCard";
 import { OrbixLoader } from "../../components/ui/loader";
 
@@ -86,6 +88,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
     // Modal states
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [isCertStudioOpen, setIsCertStudioOpen] = useState(false);
     const [securityTarget, setSecurityTarget] = useState<{
         action: "draft" | "cancelled" | "delete";
     } | null>(null);
@@ -95,7 +98,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [loadingApps, setLoadingApps] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState<
-        "all" | "registered" | "attended" | "waitlisted" | "cancelled"
+        "all" | "pending" | "registered" | "attended" | "rejected" | "cancelled"
     >("all");
     const [updatingApplicantId, setUpdatingApplicantId] = useState<string | null>(null);
     const [copiedShareLink, setCopiedShareLink] = useState(false);
@@ -272,16 +275,24 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         }
     };
 
-    // Handle Applicant Status Toggle (Check-in / Attended / Waitlisted / Cancelled)
+    // Handle Applicant Status Toggle (Accept / Reject / Check-in / Attended / Waitlisted / Cancelled)
     const handleApplicantStatusChange = async (
         applicant: ClubEventApplicantRow,
-        nextStatus: "registered" | "attended" | "waitlisted" | "cancelled"
+        nextStatus: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled"
     ) => {
         if (!event) return;
         try {
             setUpdatingApplicantId(applicant.id);
             await updateApplicantStatus(event.id, applicant.id, nextStatus);
-            toast.success(`Applicant status updated to ${nextStatus}.`);
+            const actionWord =
+                nextStatus === "registered"
+                    ? "accepted"
+                    : nextStatus === "rejected"
+                    ? "rejected"
+                    : nextStatus === "attended"
+                    ? "checked-in"
+                    : nextStatus;
+            toast.success(`Applicant ${applicant.applicantName} marked as ${actionWord}.`);
 
             setAppsData((prev) => {
                 if (!prev) return prev;
@@ -297,10 +308,13 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                 return {
                     ...prev,
                     summary: {
+                        ...prev.summary,
                         total: updatedApps.length,
+                        pending: updatedApps.filter((a) => a.status === "pending").length,
                         registered: updatedApps.filter((a) => a.status === "registered").length,
                         attended: updatedApps.filter((a) => a.status === "attended").length,
                         waitlisted: updatedApps.filter((a) => a.status === "waitlisted").length,
+                        rejected: updatedApps.filter((a) => a.status === "rejected").length,
                         cancelled: updatedApps.filter((a) => a.status === "cancelled").length,
                     },
                     applications: updatedApps,
@@ -455,6 +469,24 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const hostClubName = clubInfo?.name || clubState.club?.name || "Verified Club";
     const collegeAffiliation = clubInfo?.college_name || clubState.club?.collegeName || "Campus Community";
     const clubLogo = clubInfo?.logo_url || clubState.club?.logoUrl;
+
+    if (isEditModalOpen) {
+        return (
+            <ClubEventModal
+                isOpen={isEditModalOpen}
+                onClose={() => setIsEditModalOpen(false)}
+                onSubmit={handleEditSubmit}
+                editingEvent={event}
+                clubId={clubInfo?.id || clubState.club?.id}
+                clubName={hostClubName}
+                clubLogoUrl={clubLogo}
+                collegeName={collegeAffiliation}
+                collegeId={clubInfo?.college_id || (clubState.club as any)?.college_id}
+                initialStatus={event.status}
+                onOpenMobileSidebar={onOpenMobileSidebar}
+            />
+        );
+    }
 
     return (
         <div className="space-y-6 text-black">
@@ -683,28 +715,34 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                 {activeTab === "roster" && (
                     <div className="space-y-4">
                         {/* Summary Metrics Row */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                                <span className="text-[10px] font-black uppercase text-neutral-500">Total RSVPs</span>
+                                <span className="text-[10px] font-black uppercase text-neutral-500">Total Signups</span>
                                 <div className="text-2xl font-black text-black mt-1">
                                     {appsData?.summary.total || 0}
                                 </div>
                             </div>
                             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                                <span className="text-[10px] font-black uppercase text-neutral-500">Confirmed</span>
+                                <span className="text-[10px] font-black uppercase text-amber-700">Pending Review</span>
+                                <div className="text-2xl font-black text-amber-600 mt-1">
+                                    {appsData?.summary.pending || 0}
+                                </div>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
+                                <span className="text-[10px] font-black uppercase text-emerald-700">Accepted / Pass</span>
                                 <div className="text-2xl font-black text-emerald-600 mt-1">
                                     {appsData?.summary.registered || 0}
                                 </div>
                             </div>
                             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                                <span className="text-[10px] font-black uppercase text-neutral-500">Checked-In</span>
+                                <span className="text-[10px] font-black uppercase text-sky-700">Checked-In</span>
                                 <div className="text-2xl font-black text-[#0284c7] mt-1">
                                     {appsData?.summary.attended || 0}
                                 </div>
                             </div>
-                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
+                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] col-span-2 sm:col-span-1">
                                 <span className="text-[10px] font-black uppercase text-neutral-500">Turnout Rate</span>
-                                <div className="text-2xl font-black text-amber-600 mt-1">
+                                <div className="text-2xl font-black text-purple-700 mt-1">
                                     {analytics.turnoutRate}%
                                 </div>
                             </div>
@@ -727,20 +765,33 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             {/* Filter Chips & Export */}
                             <div className="flex items-center gap-2 flex-wrap">
                                 <div className="flex items-center gap-1 bg-[#FAF6EE] p-1 rounded-xl border border-black">
-                                    {(["all", "registered", "attended", "cancelled"] as const).map((status) => (
-                                        <button
-                                            key={status}
-                                            type="button"
-                                            onClick={() => setStatusFilter(status)}
-                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-black capitalize transition-all cursor-pointer ${
-                                                statusFilter === status
-                                                    ? "bg-black text-[#FFE566] shadow-[1px_1px_0px_#000]"
-                                                    : "text-neutral-700 hover:bg-neutral-200"
-                                            }`}
-                                        >
-                                            {status}
-                                        </button>
-                                    ))}
+                                    {(["all", "pending", "registered", "attended", "rejected"] as const).map((status) => {
+                                        const label =
+                                            status === "all"
+                                                ? `All (${appsData?.summary.total || 0})`
+                                                : status === "pending"
+                                                ? `Pending (${appsData?.summary.pending || 0})`
+                                                : status === "registered"
+                                                ? `Accepted (${appsData?.summary.registered || 0})`
+                                                : status === "attended"
+                                                ? `Attended (${appsData?.summary.attended || 0})`
+                                                : `Rejected (${appsData?.summary.rejected || 0})`;
+
+                                        return (
+                                            <button
+                                                key={status}
+                                                type="button"
+                                                onClick={() => setStatusFilter(status)}
+                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                                                    statusFilter === status
+                                                        ? "bg-black text-[#FFE566] shadow-[1px_1px_0px_#000]"
+                                                        : "text-neutral-700 hover:bg-neutral-200"
+                                                }`}
+                                            >
+                                                {label}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
 
                                 <a
@@ -793,7 +844,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                 <th className="py-3 px-4">Year</th>
                                                 <th className="py-3 px-4">Applied At</th>
                                                 <th className="py-3 px-4">Status</th>
-                                                <th className="py-3 px-4 text-right">Attendance Action</th>
+                                                <th className="py-3 px-4 text-right">Review & Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y border-black/10">
@@ -803,16 +854,44 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                     className="hover:bg-neutral-50/80 transition-colors"
                                                 >
                                                     <td className="py-3 px-4 font-bold">
-                                                        <div className="flex items-center gap-2">
-                                                            <div className="w-7 h-7 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center font-black text-[11px] shrink-0 border border-black">
+                                                        <div className="flex items-center gap-2.5">
+                                                            {app.avatarUrl ? (
+                                                                <img
+                                                                    src={app.avatarUrl}
+                                                                    alt={app.applicantName}
+                                                                    className="w-8 h-8 rounded-full border border-black object-cover shrink-0 shadow-[1px_1px_0px_#000]"
+                                                                    onError={(e) => {
+                                                                        e.currentTarget.style.display = "none";
+                                                                        const fallback = e.currentTarget.nextElementSibling;
+                                                                        if (fallback) (fallback as HTMLElement).style.display = "flex";
+                                                                    }}
+                                                                />
+                                                            ) : null}
+                                                            <div
+                                                                className={`w-8 h-8 rounded-full bg-black text-[#a2ff86] items-center justify-center font-black text-[11px] shrink-0 border border-black shadow-[1px_1px_0px_#000] ${
+                                                                    app.avatarUrl ? "hidden" : "flex"
+                                                                }`}
+                                                            >
                                                                 {(app.applicantName || "S").slice(0, 2).toUpperCase()}
                                                             </div>
-                                                            <div>
-                                                                <div className="text-black font-black">
+                                                            <div className="min-w-0">
+                                                                <div className="text-black font-black truncate">
                                                                     {app.applicantName}
                                                                 </div>
-                                                                <div className="text-[10px] text-neutral-500 font-normal">
-                                                                    {app.applicantEmail || `@${app.username || "student"}`}
+                                                                <div className="text-[10px] text-neutral-500 font-normal truncate flex items-center gap-1">
+                                                                    {app.username ? (
+                                                                        <a
+                                                                            href={`/profile/${app.username}`}
+                                                                            target="_blank"
+                                                                            rel="noopener noreferrer"
+                                                                            className="hover:underline text-indigo-700 font-bold"
+                                                                            title="Inspect student profile"
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            @{app.username}
+                                                                        </a>
+                                                                    ) : null}
+                                                                    {app.applicantEmail && <span>· {app.applicantEmail}</span>}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -836,40 +915,96 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                     </td>
                                                     <td className="py-3 px-4">
                                                         <span
-                                                            className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border shadow-[1px_1px_0px_#000] inline-block ${
                                                                 app.status === "attended"
                                                                     ? "bg-sky-100 text-sky-950 border-sky-800"
                                                                     : app.status === "registered"
                                                                     ? "bg-emerald-100 text-emerald-950 border-emerald-800"
+                                                                    : app.status === "pending"
+                                                                    ? "bg-amber-100 text-amber-950 border-amber-800"
                                                                     : app.status === "waitlisted"
                                                                     ? "bg-amber-100 text-amber-950 border-amber-800"
                                                                     : "bg-rose-100 text-rose-950 border-rose-800"
                                                             }`}
                                                         >
-                                                            {app.status}
+                                                            {app.status === "registered"
+                                                                ? "Accepted / Active"
+                                                                : app.status === "pending"
+                                                                ? "Pending Review"
+                                                                : app.status}
                                                         </span>
                                                     </td>
                                                     <td className="py-3 px-4 text-right">
-                                                        {app.status !== "attended" ? (
-                                                            <button
-                                                                type="button"
-                                                                disabled={updatingApplicantId === app.id}
-                                                                onClick={() => handleApplicantStatusChange(app, "attended")}
-                                                                className="px-2.5 py-1 rounded-lg bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-[11px] border border-black shadow-[1px_1px_0px_#000] cursor-pointer inline-flex items-center gap-1 active:translate-x-[0.5px] active:translate-y-[0.5px]"
-                                                            >
-                                                                <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
-                                                                <span>Check-in</span>
-                                                            </button>
-                                                        ) : (
-                                                            <button
-                                                                type="button"
-                                                                disabled={updatingApplicantId === app.id}
-                                                                onClick={() => handleApplicantStatusChange(app, "registered")}
-                                                                className="px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-[11px] border border-black cursor-pointer inline-flex items-center gap-1"
-                                                            >
-                                                                <span>Undo</span>
-                                                            </button>
-                                                        )}
+                                                        <div className="flex items-center justify-end gap-1.5">
+                                                            {app.status === "pending" ? (
+                                                                <>
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={updatingApplicantId === app.id}
+                                                                        onClick={() => handleApplicantStatusChange(app, "registered")}
+                                                                        className="px-2.5 py-1 rounded-lg bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-[11px] border border-black shadow-[1px_1px_0px_#000] cursor-pointer inline-flex items-center gap-1 active:translate-x-[0.5px] active:translate-y-[0.5px]"
+                                                                        title="Accept application and activate event entry pass"
+                                                                    >
+                                                                        <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
+                                                                        <span>Accept</span>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={updatingApplicantId === app.id}
+                                                                        onClick={() => handleApplicantStatusChange(app, "rejected")}
+                                                                        className="px-2 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-900 font-black text-[11px] border border-rose-800 shadow-[1px_1px_0px_#000] cursor-pointer inline-flex items-center gap-1 active:translate-x-[0.5px] active:translate-y-[0.5px]"
+                                                                        title="Reject application"
+                                                                    >
+                                                                        <XCircle className="w-3 h-3 stroke-[2.5]" />
+                                                                        <span>Reject</span>
+                                                                    </button>
+                                                                </>
+                                                            ) : app.status === "registered" ? (
+                                                                <>
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={updatingApplicantId === app.id}
+                                                                        onClick={() => handleApplicantStatusChange(app, "attended")}
+                                                                        className="px-2.5 py-1 rounded-lg bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-[11px] border border-black shadow-[1px_1px_0px_#000] cursor-pointer inline-flex items-center gap-1 active:translate-x-[0.5px] active:translate-y-[0.5px]"
+                                                                        title="Check in attendee at session entrance"
+                                                                    >
+                                                                        <CheckCircle2 className="w-3 h-3 stroke-[2.5]" />
+                                                                        <span>Check-in</span>
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        disabled={updatingApplicantId === app.id}
+                                                                        onClick={() => handleApplicantStatusChange(app, "rejected")}
+                                                                        className="px-2 py-1 rounded-lg bg-neutral-100 hover:bg-rose-50 text-neutral-600 hover:text-rose-700 font-bold text-[10px] border border-black/40 cursor-pointer inline-flex items-center gap-0.5"
+                                                                        title="Revoke and reject application"
+                                                                    >
+                                                                        <XCircle className="w-3 h-3" />
+                                                                        <span>Revoke</span>
+                                                                    </button>
+                                                                </>
+                                                            ) : app.status === "attended" ? (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={updatingApplicantId === app.id}
+                                                                    onClick={() => handleApplicantStatusChange(app, "registered")}
+                                                                    className="px-2.5 py-1 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold text-[11px] border border-black cursor-pointer inline-flex items-center gap-1"
+                                                                    title="Undo check-in status"
+                                                                >
+                                                                    <span>Undo</span>
+                                                                </button>
+                                                            ) : app.status === "rejected" ? (
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={updatingApplicantId === app.id}
+                                                                    onClick={() => handleApplicantStatusChange(app, "registered")}
+                                                                    className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-[11px] border border-emerald-800 cursor-pointer inline-flex items-center gap-1"
+                                                                    title="Re-accept application"
+                                                                >
+                                                                    <CheckCircle2 className="w-3 h-3" />
+                                                                    <span>Re-Accept</span>
+                                                                </button>
+                                                            ) : null}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -1156,6 +1291,32 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             </div>
                         </div>
 
+                        {/* 2.5 Issue Participation & Turnout Certificates */}
+                        <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="space-y-1 max-w-xl">
+                                <div className="flex items-center gap-2">
+                                    <Award className="w-4 h-4 text-black stroke-[2.5]" />
+                                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
+                                        Participation & Merit Certificates
+                                    </h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Issue verifiable credentials to students who attended or registered for "{event.title}". Dispatches in-app notifications to each recipient's Activity portfolio.
+                                </p>
+                            </div>
+
+                            <div className="w-full md:w-60 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCertStudioOpen(true)}
+                                    className="w-full py-3 px-4 rounded-2xl bg-[#a2ff86] hover:bg-[#8ee673] text-black text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                >
+                                    <Award className="w-4 h-4 stroke-[2.5]" />
+                                    <span>Issue Certificates</span>
+                                </button>
+                            </div>
+                        </div>
+
                         {/* 3. Delete Event... with Danger Zone Guidelines */}
                         <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF1F2] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="space-y-1 max-w-xl">
@@ -1185,20 +1346,6 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                     </div>
                 </div>
 
-            {/* ATTACHED EDIT EVENT MODAL */}
-            <ClubEventModal
-                isOpen={isEditModalOpen}
-                onClose={() => setIsEditModalOpen(false)}
-                onSubmit={handleEditSubmit}
-                editingEvent={event}
-                clubId={clubInfo?.id || clubState.club?.id}
-                clubName={hostClubName}
-                clubLogoUrl={clubLogo}
-                collegeName={collegeAffiliation}
-                collegeId={clubInfo?.college_id || (clubState.club as any)?.college_id}
-                initialStatus={event.status}
-            />
-
             {/* ATTACHED HIGH-SECURITY CONFIRMATION CHALLENGE MODAL */}
             <EventSecurityConfirmModal
                 isOpen={Boolean(securityTarget)}
@@ -1206,6 +1353,13 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                 event={event}
                 action={securityTarget?.action || null}
                 onConfirm={handleExecuteSecurityAction}
+            />
+
+            {/* ATTACHED CERTIFICATE ISSUANCE STUDIO */}
+            <ClubCertificateStudioModal
+                isOpen={isCertStudioOpen}
+                onClose={() => setIsCertStudioOpen(false)}
+                preselectedEventId={event.id}
             />
         </div>
     );

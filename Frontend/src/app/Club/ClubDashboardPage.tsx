@@ -17,6 +17,7 @@ import {
     Mail,
     Settings,
     TrendingUp,
+    Award,
 } from "lucide-react";
 import {
     useAppDispatch,
@@ -45,6 +46,7 @@ import { ClubProfileManager } from "./Profile/ClubProfileManager";
 import { ClubSettingsView } from "./Settings/ClubSettingsView";
 import { OtherClubsSection } from "./OtherClubsSection";
 import { ClubEventDetailWorkspace } from "./ClubEventDetailPage";
+import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
 import { OrbixLoader } from "../../components/ui/loader";
 
 interface VerifiedClub {
@@ -123,6 +125,7 @@ export default function ClubDashboardPage() {
         if (pathname.startsWith("/club/team")) return "team";
         if (pathname.startsWith("/club/events")) return "events";
         if (pathname.startsWith("/club/analytics") || pathname.startsWith("/club/trends")) return "analytics";
+        if (pathname.startsWith("/club/certificates")) return "certificates";
         if (pathname.startsWith("/club/profile") || pathname.startsWith("/club/manage-profile")) return "profile";
         if (pathname.startsWith("/club/clubs") || pathname.startsWith("/club/campus-clubs") || pathname.startsWith("/club/other-clubs")) return "clubs";
         if (pathname.startsWith("/club/settings")) return "settings";
@@ -134,6 +137,7 @@ export default function ClubDashboardPage() {
         team: "/club/team",
         events: "/club/events",
         analytics: "/club/analytics",
+        certificates: "/club/certificates",
         profile: "/club/profile",
         clubs: "/club/clubs",
         settings: "/club/settings",
@@ -215,6 +219,7 @@ export default function ClubDashboardPage() {
     const [editingEvent, setEditingEvent] = useState<ClubEvent | null>(null);
     const [initialModalStatus, setInitialModalStatus] = useState<ClubEventStatus>("published");
     const [eventFilter, setEventFilter] = useState<ClubEventFilter>("all");
+    const [isCertStudioOpen, setIsCertStudioOpen] = useState(false);
 
     // In-flight request guards to prevent duplicate concurrent network calls (e.g. StrictMode, rapid switches)
     const isFetchingClubRef = useRef(false);
@@ -301,12 +306,16 @@ export default function ClubDashboardPage() {
     const openCreateEventModal = (initialStatus: ClubEventStatus = "published") => {
         setEditingEvent(null);
         setInitialModalStatus(initialStatus);
+        setActiveTabState("events");
+        navigate("/club/events");
         setIsEventModalOpen(true);
     };
 
     // Open Event Edit Modal
     const handleEditEvent = (ev: ClubEvent) => {
         setEditingEvent(ev);
+        setActiveTabState("events");
+        navigate("/club/events");
         setIsEventModalOpen(true);
     };
 
@@ -471,7 +480,7 @@ export default function ClubDashboardPage() {
                 >
                     <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                         {/* Dynamic Header Bar tailored to each tab */}
-                        {(!eventId || activeTab !== "events") && (
+                        {((!eventId && !isEventModalOpen) || activeTab !== "events") && (
                             <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             {/* Left: Mobile Toggle & Tab-Specific Title & Badges */}
                             <div className="space-y-1">
@@ -524,6 +533,17 @@ export default function ClubDashboardPage() {
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
                                                 Trends & Analytics
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "certificates" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Award className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Certificates & Credentials
                                             </h1>
                                         </div>
                                     )}
@@ -612,6 +632,17 @@ export default function ClubDashboardPage() {
                                         </>
                                     )}
 
+                                    {activeTab === "certificates" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Official Credentials
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Issue verifiable participation & merit credentials to campus students
+                                            </span>
+                                        </>
+                                    )}
+
                                     {activeTab === "profile" && (
                                         <>
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
@@ -662,6 +693,17 @@ export default function ClubDashboardPage() {
                                     >
                                         <Plus className="w-4 h-4 stroke-[2.5]" />
                                         <span>Create New Event</span>
+                                    </button>
+                                )}
+
+                                {activeTab === "certificates" && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCertStudioOpen(true)}
+                                        className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                    >
+                                        <Award className="w-4 h-4 stroke-[2.5]" />
+                                        <span>Issue Certificates</span>
                                     </button>
                                 )}
 
@@ -1020,6 +1062,23 @@ export default function ClubDashboardPage() {
                                     onBack={() => navigate("/club/events")}
                                     onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                                 />
+                            ) : isEventModalOpen ? (
+                                <ClubEventModal
+                                    isOpen={isEventModalOpen}
+                                    onClose={() => {
+                                        setIsEventModalOpen(false);
+                                        setEditingEvent(null);
+                                    }}
+                                    onSubmit={handleModalSubmit}
+                                    editingEvent={editingEvent}
+                                    clubId={club?.id}
+                                    clubName={club?.name}
+                                    clubLogoUrl={club?.logo_url || undefined}
+                                    collegeName={club?.college_name}
+                                    collegeId={club?.college_id}
+                                    initialStatus={initialModalStatus}
+                                    onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                                />
                             ) : (
                                 <div className="space-y-6">
                                     {/* Filter Pills Bar */}
@@ -1251,6 +1310,80 @@ export default function ClubDashboardPage() {
                             </div>
                         )}
 
+                        {/* TAB: CERTIFICATES & CREDENTIALS STUDIO */}
+                        {activeTab === "certificates" && (
+                            <div className="space-y-6">
+                                <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row items-center justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                                Official Credential Studio
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-500">
+                                                Cryptographically Signed · Strict Eligibility Enforced
+                                            </span>
+                                        </div>
+                                        <h2 className="text-xl sm:text-2xl font-black text-black">
+                                            Campus Certificates & Turnout Recognition
+                                        </h2>
+                                        <p className="text-xs sm:text-sm font-bold text-neutral-600 max-w-2xl">
+                                            Issue verified achievement and participation certificates directly to campus students and event attendees. Dispatches automated in-app notifications to each recipient.
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCertStudioOpen(true)}
+                                        className="px-5 py-3 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-3 border-black font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] flex items-center gap-2 transition-transform active:translate-x-0.5 active:translate-y-0.5 shrink-0"
+                                    >
+                                        <Award className="w-5 h-5 stroke-[2.5]" />
+                                        <span>+ Launch Issuance Studio</span>
+                                    </button>
+                                </div>
+
+                                {/* Quick Launch Cards for the Two Perspectives */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div
+                                        onClick={() => setIsCertStudioOpen(true)}
+                                        className="p-6 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all cursor-pointer space-y-3 group"
+                                    >
+                                        <div className="w-12 h-12 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                            <CalendarDays className="w-6 h-6 text-black" />
+                                        </div>
+                                        <h3 className="text-lg font-black text-black group-hover:text-neutral-800 flex items-center justify-between">
+                                            <span>1. Event Participation Turnout</span>
+                                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                                        </h3>
+                                        <p className="text-xs font-medium text-neutral-600 leading-relaxed">
+                                            Select a completed or live event, review verified attendees and checked-in students, and issue participation or merit certificates with 1-click batch delivery.
+                                        </p>
+                                        <div className="pt-2 text-xs font-black text-black flex items-center gap-1">
+                                            <span>Select Event Roster</span> &rarr;
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        onClick={() => setIsCertStudioOpen(true)}
+                                        className="p-6 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all cursor-pointer space-y-3 group"
+                                    >
+                                        <div className="w-12 h-12 rounded-xl bg-[#FFDE59] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                            <ShieldCheck className="w-6 h-6 text-black" />
+                                        </div>
+                                        <h3 className="text-lg font-black text-black group-hover:text-neutral-800 flex items-center justify-between">
+                                            <span>2. Credible Campus Network</span>
+                                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                                        </h3>
+                                        <p className="text-xs font-medium text-neutral-600 leading-relaxed">
+                                            Categorize students by credibility (attended sessions count, team contributors, campus verified). Hand-pick standout individuals for excellence & appreciation awards.
+                                        </p>
+                                        <div className="pt-2 text-xs font-black text-black flex items-center gap-1">
+                                            <span>Browse Connected Students</span> &rarr;
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* TAB: CAMPUS CLUBS & DIRECTORY */}
                         {activeTab === "clubs" && (
                             <OtherClubsSection
@@ -1294,21 +1427,10 @@ export default function ClubDashboardPage() {
                 onUnreadCountChange={(newCount) => setInboxCounts((prev) => ({ ...prev, unreadCount: newCount }))}
             />
 
-            {/* Full-Screen Club Event Modal with Banner Import & 50/50 Layout */}
-            <ClubEventModal
-                isOpen={isEventModalOpen}
-                onClose={() => {
-                    setIsEventModalOpen(false);
-                    setEditingEvent(null);
-                }}
-                onSubmit={handleModalSubmit}
-                editingEvent={editingEvent}
-                clubId={club?.id}
-                clubName={club?.name}
-                clubLogoUrl={club?.logo_url || undefined}
-                collegeName={club?.college_name}
-                collegeId={club?.college_id}
-                initialStatus={initialModalStatus}
+            {/* Attached Certificate Issuance Studio Modal */}
+            <ClubCertificateStudioModal
+                isOpen={isCertStudioOpen}
+                onClose={() => setIsCertStudioOpen(false)}
             />
         </div>
     );

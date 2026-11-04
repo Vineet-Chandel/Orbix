@@ -136,6 +136,7 @@ const App = () => {
           <Route path="/club/events/:eventId" element={<ClubDashboardPage />} />
           <Route path="/club/analytics" element={<ClubDashboardPage />} />
           <Route path="/club/trends" element={<Navigate to="/club/analytics" replace />} />
+          <Route path="/club/certificates" element={<ClubDashboardPage />} />
           <Route path="/club/profile" element={<ClubDashboardPage />} />
           <Route path="/club/manage-profile" element={<Navigate to="/club/profile" replace />} />
           <Route path="/club/clubs" element={<ClubDashboardPage />} />
@@ -156,6 +157,7 @@ const App = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/clubs" element={<Dashboard />} />
             <Route path="/college-events" element={<Dashboard />} />
+            <Route path="/activity" element={<Dashboard />} />
             <Route path="/applications" element={<Dashboard />} />
             <Route path="/explore" element={<Dashboard />} />
             <Route path="/trends" element={<Dashboard />} />

@@ -16,7 +16,7 @@ import { ResumeManager } from "../Resume/ResumeManager";
 import { ExploreView } from "../Explore/ExploreView";
 import { StudentCampusClubsView } from "../Club/CollegeClubs/StudentCampusClubsView";
 import { CollegeEventsView } from "../Events/CollegeEventsView";
-import { StudentApplicationsView } from "../Events/StudentApplicationsView";
+import { StudentActivityView } from "../Events/StudentActivityView";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 
 export default function Dashboard() {
@@ -30,7 +30,7 @@ export default function Dashboard() {
     const getTabFromPath = (path: string): SidebarTab => {
         if (path === "/clubs" || path.startsWith("/clubs")) return "clubs";
         if (path.includes("/college-events") || path.includes("/college-event")) return "college-events";
-        if (path.includes("/applications") || path.includes("/application")) return "applications";
+        if (path.includes("/activity") || path.includes("/applications") || path.includes("/application")) return "activity";
         if (path.includes("/explore")) return "explore";
         if (path.includes("/trends") || path.includes("/reports")) return "trends";
         if (path.includes("/notifications") || path.includes("/inbox")) return "notifications";
@@ -140,7 +140,7 @@ export default function Dashboard() {
                     if (tab === "dashboard") navigate("/dashboard");
                     if (tab === "clubs") navigate("/clubs");
                     if (tab === "college-events") navigate("/college-events");
-                    if (tab === "applications") navigate("/applications");
+                    if (tab === "activity" || tab === "applications") navigate("/activity");
                     if (tab === "explore") navigate("/explore");
                     if (tab === "trends") navigate("/trends");
                     if (tab === "notifications") navigate("/notifications");
@@ -162,9 +162,9 @@ export default function Dashboard() {
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
                         <CollegeEventsView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
                     </div>
-                ) : activeTab === "applications" ? (
+                ) : activeTab === "activity" || activeTab === "applications" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
-                        <StudentApplicationsView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                        <StudentActivityView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
                     </div>
                 ) : activeTab === "clubs" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">

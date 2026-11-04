@@ -17,6 +17,7 @@ import {
     uploadClubImageToCloudinary,
     removeClubImage,
 } from "../../../utils/clubProfileApi";
+import { ConfirmationModal } from "../../../components/ConfirmationModal";
 
 interface StepBrandStoryProps {
     clubId?: string;
@@ -68,6 +69,16 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
 
     // Tag input
     const [tagInput, setTagInput] = useState("");
+
+    // Modal Confirmation Dialog state (replaces window.confirm)
+    const [confirmDialog, setConfirmDialog] = useState<{
+        isOpen: boolean;
+        title: string;
+        description: string;
+        confirmText?: string;
+        variant?: "danger" | "warning";
+        onConfirm: () => void;
+    } | null>(null);
 
     const logoInputRef = useRef<HTMLInputElement>(null);
     const coverInputRef = useRef<HTMLInputElement>(null);
@@ -125,30 +136,48 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
         }
     };
 
-    const handleRemoveLogo = async () => {
-        if (!window.confirm("Remove this club logo?")) return;
-        onLogoChange("");
-        if (clubId) {
-            try {
-                await removeClubImage("logo", clubId);
-            } catch (err) {
-                console.warn("Server logo removal log:", err);
-            }
-        }
-        toast.info("Logo removed.");
+    const handleRemoveLogo = () => {
+        setConfirmDialog({
+            isOpen: true,
+            title: "Remove Club Logo",
+            description: "Are you sure you want to remove this club avatar logo?",
+            confirmText: "Remove Logo",
+            variant: "danger",
+            onConfirm: async () => {
+                setConfirmDialog(null);
+                onLogoChange("");
+                if (clubId) {
+                    try {
+                        await removeClubImage("logo", clubId);
+                    } catch (err) {
+                        console.warn("Server logo removal log:", err);
+                    }
+                }
+                toast.info("Logo removed.");
+            },
+        });
     };
 
-    const handleRemoveCover = async () => {
-        if (!window.confirm("Remove this club banner?")) return;
-        onCoverImageChange("");
-        if (clubId) {
-            try {
-                await removeClubImage("banner", clubId);
-            } catch (err) {
-                console.warn("Server banner removal log:", err);
-            }
-        }
-        toast.info("Banner removed.");
+    const handleRemoveCover = () => {
+        setConfirmDialog({
+            isOpen: true,
+            title: "Remove Club Banner",
+            description: "Are you sure you want to remove this cover banner image?",
+            confirmText: "Remove Banner",
+            variant: "danger",
+            onConfirm: async () => {
+                setConfirmDialog(null);
+                onCoverImageChange("");
+                if (clubId) {
+                    try {
+                        await removeClubImage("banner", clubId);
+                    } catch (err) {
+                        console.warn("Server banner removal log:", err);
+                    }
+                }
+                toast.info("Banner removed.");
+            },
+        });
     };
 
     const handleAddTag = () => {
@@ -177,9 +206,19 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
 
     const handleApplyTemplate = () => {
         if (about.trim().length > 0) {
-            if (!window.confirm("Replace your current story text with the recommended template?")) {
-                return;
-            }
+            setConfirmDialog({
+                isOpen: true,
+                title: "Replace Story Text",
+                description: "Replace your current story text with the recommended template? Unsaved edits will be overwritten.",
+                confirmText: "Apply Template",
+                variant: "warning",
+                onConfirm: () => {
+                    setConfirmDialog(null);
+                    onAboutChange(TEMPLATE_STORY);
+                    toast.success("Template inserted!");
+                },
+            });
+            return;
         }
         onAboutChange(TEMPLATE_STORY);
         toast.success("Template inserted!");
@@ -507,6 +546,19 @@ export const StepBrandStory: React.FC<StepBrandStoryProps> = ({
                     </div>
                 )}
             </div>
+
+            {/* Confirmation Modal */}
+            {confirmDialog && (
+                <ConfirmationModal
+                    isOpen={confirmDialog.isOpen}
+                    onClose={() => setConfirmDialog(null)}
+                    onConfirm={confirmDialog.onConfirm}
+                    title={confirmDialog.title}
+                    description={confirmDialog.description}
+                    confirmText={confirmDialog.confirmText || "Confirm"}
+                    variant={confirmDialog.variant || "danger"}
+                />
+            )}
         </div>
     );
 };

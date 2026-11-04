@@ -19,6 +19,7 @@ import {
     type ClubEventApplicationsResponse,
 } from "../../api/collegeEventsApi";
 import { OrbixLoader } from "../../components/ui/loader";
+import { NeoSelect } from "../../components/NeoSelect";
 
 export interface EventApplicationsModalProps {
     isOpen: boolean;
@@ -37,7 +38,7 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
     const [data, setData] = useState<ClubEventApplicationsResponse | null>(null);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState<"all" | "registered" | "attended" | "waitlisted" | "cancelled">("all");
+    const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled">("all");
     const [updatingId, setUpdatingId] = useState<string | null>(null);
 
     const loadData = async () => {
@@ -65,13 +66,13 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
     // Handle Quick Status Change in spreadsheet
     const handleStatusChange = async (
         applicant: ClubEventApplicantRow,
-        nextStatus: "registered" | "attended" | "waitlisted" | "cancelled"
+        nextStatus: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled"
     ) => {
         if (!eventId) return;
         try {
             setUpdatingId(applicant.id);
             await updateApplicantStatus(eventId, applicant.id, nextStatus);
-            toast.success(`Applicant marked as ${nextStatus}.`);
+            toast.success(`Applicant marked as ${nextStatus === "registered" ? "accepted" : nextStatus}.`);
 
             setData((prev) => {
                 if (!prev) return prev;
@@ -87,10 +88,13 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                 return {
                     ...prev,
                     summary: {
+                        ...prev.summary,
                         total: updatedApps.length,
+                        pending: updatedApps.filter((a) => (a.status as any) === "pending").length,
                         registered: updatedApps.filter((a) => a.status === "registered").length,
                         attended: updatedApps.filter((a) => a.status === "attended").length,
                         waitlisted: updatedApps.filter((a) => a.status === "waitlisted").length,
+                        rejected: updatedApps.filter((a) => (a.status as any) === "rejected").length,
                         cancelled: updatedApps.filter((a) => a.status === "cancelled").length,
                     },
                     applications: updatedApps,
@@ -225,6 +229,17 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                             </button>
                             <button
                                 type="button"
+                                onClick={() => setStatusFilter("pending")}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black border-2 border-black cursor-pointer transition-all ${
+                                    statusFilter === "pending"
+                                        ? "bg-amber-300 text-black shadow-[2px_2px_0px_#000]"
+                                        : "bg-white text-black hover:bg-neutral-100"
+                                }`}
+                            >
+                                Pending ({data?.summary?.pending || 0})
+                            </button>
+                            <button
+                                type="button"
                                 onClick={() => setStatusFilter("registered")}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-black border-2 border-black cursor-pointer transition-all ${
                                     statusFilter === "registered"
@@ -232,7 +247,7 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                                         : "bg-white text-black hover:bg-neutral-100"
                                 }`}
                             >
-                                Confirmed ({data?.summary?.registered || 0})
+                                Accepted ({data?.summary?.registered || 0})
                             </button>
                             <button
                                 type="button"
@@ -247,25 +262,25 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setStatusFilter("waitlisted")}
+                                onClick={() => setStatusFilter("rejected")}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-black border-2 border-black cursor-pointer transition-all ${
-                                    statusFilter === "waitlisted"
-                                        ? "bg-amber-300 text-black shadow-[2px_2px_0px_#000]"
+                                    statusFilter === "rejected"
+                                        ? "bg-rose-300 text-black shadow-[2px_2px_0px_#000]"
                                         : "bg-white text-black hover:bg-neutral-100"
                                 }`}
                             >
-                                Waitlist ({data?.summary?.waitlisted || 0})
+                                Rejected ({data?.summary?.rejected || 0})
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setStatusFilter("cancelled")}
                                 className={`px-3 py-1.5 rounded-xl text-xs font-black border-2 border-black cursor-pointer transition-all ${
                                     statusFilter === "cancelled"
-                                        ? "bg-rose-300 text-black shadow-[2px_2px_0px_#000]"
+                                        ? "bg-neutral-300 text-black shadow-[2px_2px_0px_#000]"
                                         : "bg-white text-black hover:bg-neutral-100"
                                 }`}
                             >
-                                Cancelled ({data?.summary?.cancelled || 0})
+                                Withdrawn ({data?.summary?.cancelled || 0})
                             </button>
                         </div>
                     </div>
@@ -430,38 +445,63 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                                             </td>
 
                                             {/* Status Selector */}
-                                            <td className="p-2.5 border-r-2 border-black/15">
-                                                <select
+                                            <td className="p-2.5 border-r-2 border-black/15 min-w-[140px]">
+                                                <NeoSelect
                                                     value={app.status}
                                                     disabled={isUpdating}
-                                                    onChange={(e) =>
-                                                        handleStatusChange(app, e.target.value as any)
+                                                    onChange={(val) =>
+                                                        handleStatusChange(app, val as any)
                                                     }
-                                                    className={`w-full px-2 py-1 rounded-lg border-2 border-black text-xs font-black cursor-pointer shadow-[1px_1px_0px_#000] ${
+                                                    size="sm"
+                                                    triggerClassName={`!py-1 !h-8 text-xs font-black shadow-[1px_1px_0px_#000] ${
                                                         app.status === "registered"
-                                                            ? "bg-emerald-300 text-black"
+                                                            ? "!bg-emerald-300 text-black"
                                                             : app.status === "attended"
-                                                            ? "bg-purple-300 text-black"
+                                                            ? "!bg-purple-300 text-black"
+                                                            : app.status === "pending"
+                                                            ? "!bg-amber-300 text-black"
                                                             : app.status === "waitlisted"
-                                                            ? "bg-amber-300 text-black"
-                                                            : "bg-rose-200 text-black"
+                                                            ? "!bg-amber-200 text-black"
+                                                            : "!bg-rose-200 text-black"
                                                     }`}
+                                                    dropdownClassName="min-w-[140px]"
                                                 >
-                                                    <option value="registered">Confirmed</option>
+                                                    <option value="pending">Pending</option>
+                                                    <option value="registered">Accepted</option>
                                                     <option value="attended">Attended</option>
                                                     <option value="waitlisted">Waitlisted</option>
+                                                    <option value="rejected">Rejected</option>
                                                     <option value="cancelled">Cancelled</option>
-                                                </select>
+                                                </NeoSelect>
                                             </td>
 
-                                            {/* Quick Check-in Button */}
+                                            {/* Quick Actions */}
                                             <td className="p-2.5 text-center">
-                                                {app.status === "attended" ? (
+                                                {app.status === "pending" ? (
+                                                    <div className="flex items-center justify-center gap-1">
+                                                        <button
+                                                            type="button"
+                                                            disabled={isUpdating}
+                                                            onClick={() => handleStatusChange(app, "registered")}
+                                                            className="px-2 py-0.5 rounded bg-[#a2ff86] hover:bg-[#8ee673] border border-black text-[10px] font-black cursor-pointer shadow-[1px_1px_0px_#000]"
+                                                        >
+                                                            Accept
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            disabled={isUpdating}
+                                                            onClick={() => handleStatusChange(app, "rejected")}
+                                                            className="px-2 py-0.5 rounded bg-rose-200 hover:bg-rose-300 border border-black text-[10px] font-black cursor-pointer shadow-[1px_1px_0px_#000]"
+                                                        >
+                                                            Reject
+                                                        </button>
+                                                    </div>
+                                                ) : app.status === "attended" ? (
                                                     <span className="inline-flex items-center gap-1 text-[11px] font-black text-purple-900 bg-purple-100 px-2 py-0.5 rounded border border-black/20">
                                                         <CheckCircle2 className="w-3 h-3 text-purple-700" />
                                                         <span>Checked In</span>
                                                     </span>
-                                                ) : (
+                                                ) : app.status === "registered" ? (
                                                     <button
                                                         type="button"
                                                         disabled={isUpdating}
@@ -470,6 +510,17 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                                                     >
                                                         Check In
                                                     </button>
+                                                ) : app.status === "rejected" ? (
+                                                    <button
+                                                        type="button"
+                                                        disabled={isUpdating}
+                                                        onClick={() => handleStatusChange(app, "registered")}
+                                                        className="px-2 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 border border-black text-[10px] font-black cursor-pointer"
+                                                    >
+                                                        Re-Accept
+                                                    </button>
+                                                ) : (
+                                                    <span className="text-[10px] text-neutral-400 font-bold">—</span>
                                                 )}
                                             </td>
                                         </tr>
