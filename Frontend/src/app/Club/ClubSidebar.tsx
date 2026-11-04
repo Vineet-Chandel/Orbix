@@ -45,7 +45,7 @@ export const ClubSidebar = ({
     onClose,
     unreadInboxCount = 0,
     teamPendingCount = 0,
-    eventsCount = 0,
+    eventsCount: _eventsCount = 0,
     onOpenInbox,
     onSignOut,
 }: ClubSidebarProps) => {
@@ -86,7 +86,7 @@ export const ClubSidebar = ({
         <aside
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
-            className={`h-[calc(100vh-1rem)] sm:h-[calc(100vh-1.5rem)] flex flex-col justify-between rounded-2xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] border-2 border-black text-black px-2 py-2.5 sm:px-2 sm:py-3 select-none transition-[width,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-2 sm:top-3 left-2 sm:left-3 z-[60] will-change-[width] ${
+            className={`h-[calc(100vh-1rem)] sm:h-[calc(100vh-1.5rem)] flex flex-col justify-between rounded-2xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] border-3 border-black text-black px-2 py-2.5 sm:px-2 sm:py-3 select-none transition-[width,box-shadow] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] absolute top-2 sm:top-3 left-2 sm:left-3 z-[60] will-change-[width] ${
                 isExpanded
                     ? "w-64 sm:w-[264px] shadow-[6px_6px_0px_#000]"
                     : "w-[68px] sm:w-[72px] shadow-[4px_4px_0px_#000]"
@@ -298,11 +298,6 @@ export const ClubSidebar = ({
                                     >
                                         Events
                                     </span>
-                                    {eventsCount > 0 && (
-                                        <span className="px-1.5 py-0.5 rounded-full text-[10px] font-black bg-black text-[#FFE566] border border-black shadow-[1px_1px_0px_#000] flex-shrink-0 ml-2">
-                                            {eventsCount}
-                                        </span>
-                                    )}
                                 </div>
                             )}
                         </div>
@@ -535,11 +530,6 @@ export const ClubSidebar = ({
                                 <CalendarDays className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
                                 <span className="truncate">Events & Workshops</span>
                             </div>
-                            {eventsCount !== undefined && eventsCount > 0 && (
-                                <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                    {eventsCount}
-                                </span>
-                            )}
                         </Link>
 
                         <Link

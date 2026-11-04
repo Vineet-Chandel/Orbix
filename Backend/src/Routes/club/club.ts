@@ -2110,37 +2110,57 @@ const normalizeLocationTypeForDb = (type?: string): string => {
 clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
-        const clubRes = await query(
-            `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
-            [userId]
-        );
-        if (!clubRes.rows[0]) {
+        const requestedClubId = (req.query.clubId as string) || undefined;
+        let clubId: string | null = null;
+
+        if (userId) {
+            const staffClub = await getStaffClub(userId, requestedClubId);
+            if (staffClub) {
+                clubId = staffClub.id;
+            }
+        }
+
+        if (!clubId) {
+            const clubRes = await query(
+                `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                [userId]
+            );
+            if (clubRes.rows[0]) {
+                clubId = clubRes.rows[0].id;
+            }
+        }
+
+        if (!clubId) {
             return res.status(404).json({ success: false, message: "Verified club not found." });
         }
 
         const eventsRes = await query(
             `SELECT
-                id,
-                club_id AS "clubId",
-                title,
-                slug,
-                summary,
-                description,
-                starts_at AS "startsAt",
-                ends_at AS "endsAt",
-                timezone,
-                CASE WHEN location_type = 'online' THEN 'virtual' ELSE location_type END AS "locationType",
-                venue_or_location AS "venueOrLocation",
-                registration_url AS "registrationUrl",
-                cover_image_url AS "coverImageUrl",
-                status,
-                published_at AS "publishedAt",
-                created_at AS "createdAt",
-                updated_at AS "updatedAt"
-             FROM club_events
-             WHERE club_id = $1
-             ORDER BY starts_at ASC;`,
-            [clubRes.rows[0].id]
+                e.id,
+                e.club_id AS "clubId",
+                e.title,
+                e.slug,
+                e.summary,
+                e.description,
+                e.starts_at AS "startsAt",
+                e.ends_at AS "endsAt",
+                e.timezone,
+                CASE WHEN e.location_type = 'online' THEN 'virtual' ELSE e.location_type END AS "locationType",
+                e.venue_or_location AS "venueOrLocation",
+                e.registration_url AS "registrationUrl",
+                e.cover_image_url AS "coverImageUrl",
+                e.status,
+                e.published_at AS "publishedAt",
+                e.created_at AS "createdAt",
+                e.updated_at AS "updatedAt",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('registered', 'attended', 'waitlisted')), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'attended'), 0) AS "attendeesCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('cancelled', 'blocked')), 0) AS "rejectedCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_likes cel WHERE cel.event_id = e.id), 0) AS "likesCount"
+             FROM club_events e
+             WHERE e.club_id = $1
+             ORDER BY e.starts_at ASC;`,
+            [clubId]
         );
 
         return res.json({
@@ -2150,6 +2170,84 @@ clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
     } catch (err: any) {
         console.error("Get club events error:", err);
         return res.status(500).json({ success: false, message: "Failed to retrieve club events." });
+    }
+});
+
+/**
+ * GET /api/club/events/:eventId
+ * Authenticated endpoint for the club to fetch a specific event they own (draft, published, completed, cancelled).
+ * Strictly enforces that ONLY the club that owns the event can access it.
+ */
+clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        const { eventId } = req.params;
+
+        let club: any = null;
+        if (userId) {
+            const staffClub = await getStaffClub(userId);
+            if (staffClub) {
+                const clubDetails = await query(
+                    `SELECT id, name, slug, college_name, college_id, logo_url FROM verified_clubs WHERE id = $1 LIMIT 1;`,
+                    [staffClub.id]
+                );
+                club = clubDetails.rows[0];
+            }
+        }
+
+        if (!club) {
+            const clubRes = await query(
+                `SELECT id, name, slug, college_name, college_id, logo_url FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+                [userId]
+            );
+            club = clubRes.rows[0];
+        }
+
+        if (!club) {
+            return res.status(403).json({ success: false, message: "Only verified clubs can access this event management page." });
+        }
+
+        const eventRes = await query(
+            `SELECT
+                e.id,
+                e.club_id AS "clubId",
+                e.title,
+                e.slug,
+                e.summary,
+                e.description,
+                e.starts_at AS "startsAt",
+                e.ends_at AS "endsAt",
+                e.timezone,
+                CASE WHEN e.location_type = 'online' THEN 'virtual' ELSE e.location_type END AS "locationType",
+                e.venue_or_location AS "venueOrLocation",
+                e.registration_url AS "registrationUrl",
+                e.cover_image_url AS "coverImageUrl",
+                e.status,
+                e.published_at AS "publishedAt",
+                e.created_at AS "createdAt",
+                e.updated_at AS "updatedAt",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('registered', 'attended', 'waitlisted')), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'attended'), 0) AS "attendeesCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('cancelled', 'blocked')), 0) AS "rejectedCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_likes cel WHERE cel.event_id = e.id), 0) AS "likesCount"
+             FROM club_events e
+             WHERE e.id = $1 AND e.club_id = $2
+             LIMIT 1;`,
+            [eventId, club.id]
+        );
+
+        if (!eventRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "Event not found or you do not have permission to access it." });
+        }
+
+        return res.json({
+            success: true,
+            event: eventRes.rows[0],
+            club,
+        });
+    } catch (err: any) {
+        console.error("Get single club event error:", err);
+        return res.status(500).json({ success: false, message: "Failed to retrieve event details." });
     }
 });
 
@@ -2209,7 +2307,9 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
             candidateSlug = `${baseSlug}-${counter}`;
         }
 
-        const isPublished = status === "published";
+        const validStatuses = ["draft", "published", "completed", "cancelled"];
+        const finalStatus = validStatuses.includes(status) ? status : "draft";
+        const isPublished = finalStatus === "published" || finalStatus === "completed";
         const publishedAt = isPublished ? new Date().toISOString() : null;
         const dbLocationType = normalizeLocationTypeForDb(locationType);
 
@@ -2262,15 +2362,21 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
                 venueOrLocation || null,
                 registrationUrl || null,
                 coverImageUrl || null,
-                status,
+                finalStatus,
                 publishedAt,
             ]
         );
 
         return res.status(201).json({
             success: true,
-            message: `Event ${isPublished ? "published" : "created as draft"} successfully.`,
-            event: insertRes.rows[0],
+            message: `Event ${isPublished ? "published" : "created"} successfully.`,
+            event: {
+                ...insertRes.rows[0],
+                registrationsCount: 0,
+                attendeesCount: 0,
+                rejectedCount: 0,
+                likesCount: 0,
+            },
         });
     } catch (err: any) {
         console.error("Create event error:", err);
@@ -2320,6 +2426,10 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
         } = req.body;
 
         const current = existingEvent.rows[0];
+        const validStatuses = ["draft", "published", "completed", "cancelled"];
+        if (status && !validStatuses.includes(status)) {
+            return res.status(400).json({ success: false, message: `Invalid status: ${status}. Allowed: ${validStatuses.join(", ")}` });
+        }
         const newStatus = status || current.status;
 
         // Security check: Moving to Draft or Cancelling requires confirmation text and club account password
@@ -2351,7 +2461,7 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
         }
 
         let publishedAt = current.published_at;
-        if (newStatus === "published" && current.status !== "published") {
+        if ((newStatus === "published" || newStatus === "completed") && !current.published_at) {
             publishedAt = new Date().toISOString();
         }
         const dbLocationType = locationType !== undefined ? normalizeLocationTypeForDb(locationType) : undefined;
@@ -2373,23 +2483,7 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                 published_at = $12,
                 updated_at = NOW()
              WHERE id = $13 AND club_id = $14
-             RETURNING
-                id,
-                club_id AS "clubId",
-                title,
-                slug,
-                summary,
-                description,
-                starts_at AS "startsAt",
-                ends_at AS "endsAt",
-                timezone,
-                CASE WHEN location_type = 'online' THEN 'virtual' ELSE location_type END AS "locationType",
-                venue_or_location AS "venueOrLocation",
-                registration_url AS "registrationUrl",
-                cover_image_url AS "coverImageUrl",
-                status,
-                published_at AS "publishedAt",
-                updated_at AS "updatedAt";`,
+             RETURNING id;`,
             [
                 title ? title.trim() : null,
                 summary !== undefined ? summary : null,
@@ -2408,10 +2502,39 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
             ]
         );
 
+        const refreshedEvent = await query(
+            `SELECT
+                e.id,
+                e.club_id AS "clubId",
+                e.title,
+                e.slug,
+                e.summary,
+                e.description,
+                e.starts_at AS "startsAt",
+                e.ends_at AS "endsAt",
+                e.timezone,
+                CASE WHEN e.location_type = 'online' THEN 'virtual' ELSE e.location_type END AS "locationType",
+                e.venue_or_location AS "venueOrLocation",
+                e.registration_url AS "registrationUrl",
+                e.cover_image_url AS "coverImageUrl",
+                e.status,
+                e.published_at AS "publishedAt",
+                e.created_at AS "createdAt",
+                e.updated_at AS "updatedAt",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('registered', 'attended', 'waitlisted')), 0) AS "registrationsCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status = 'attended'), 0) AS "attendeesCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations cer WHERE cer.event_id = e.id AND cer.status IN ('cancelled', 'blocked')), 0) AS "rejectedCount",
+                COALESCE((SELECT COUNT(*)::int FROM club_event_likes cel WHERE cel.event_id = e.id), 0) AS "likesCount"
+             FROM club_events e
+             WHERE e.id = $1 AND e.club_id = $2
+             LIMIT 1;`,
+            [eventId, clubId]
+        );
+
         return res.json({
             success: true,
             message: "Event updated successfully.",
-            event: updateRes.rows[0],
+            event: refreshedEvent.rows[0],
         });
     } catch (err: any) {
         console.error("Update event error:", err);
@@ -2486,15 +2609,42 @@ clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Re
 });
 
 /**
+ * Set of reserved route prefixes that must never be treated as a club slug
+ */
+const RESERVED_CLUB_ROUTES = new Set([
+    "college-events",
+    "inbox",
+    "settings",
+    "profile",
+    "team",
+    "events",
+    "moderation",
+    "reviewer",
+    "user",
+    "check-availability",
+    "session-state",
+    "application-status",
+    "public-events",
+    "public",
+    "college-clubs",
+    "register",
+    "verify",
+]);
+
+/**
  * Public Club Profile Endpoint (No login required)
  * GET /public/:slug or GET /:slug
  */
-const handleGetPublicClub = async (req: Request, res: Response) => {
+const handleGetPublicClub = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const rawSlug = req.params.slug;
         const slug = Array.isArray(rawSlug) ? rawSlug[0] : rawSlug;
         if (!slug) {
             return res.status(400).json({ success: false, message: "Club slug is required." });
+        }
+
+        if (RESERVED_CLUB_ROUTES.has(slug.toLowerCase())) {
+            return next();
         }
 
         const profileData = await ClubProfileService.getPublicClubProfile(slug, req.user?.id);
@@ -2504,16 +2654,13 @@ const handleGetPublicClub = async (req: Request, res: Response) => {
             ...profileData,
         });
     } catch (err: any) {
-        console.error("Public club profile fetch error:", err);
+        console.error(`Public club profile fetch error for slug "${req.params.slug}":`, err);
         return res.status(err.statusCode || 500).json({
             success: false,
             message: err.message || "Failed to retrieve public club profile.",
         });
     }
 };
-
-clubRouter.get("/public/:slug", optionalAuthenticate, handleGetPublicClub);
-clubRouter.get("/:slug", optionalAuthenticate, handleGetPublicClub);
 
 // =========================================================================
 // CLUB INBOX & PUBLIC MESSAGING ENDPOINTS
@@ -2708,7 +2855,7 @@ clubRouter.get("/college-events", authenticate, async (req: Request, res: Respon
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status != 'cancelled') AS "registrationsCount"
             FROM club_events e
             JOIN verified_clubs vc ON vc.id = e.club_id
-            WHERE e.status = 'published' AND vc.is_active = true
+            WHERE e.status IN ('published', 'completed') AND vc.is_active = true
         `;
         const params: any[] = [userId];
 
@@ -2796,7 +2943,7 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
                 (SELECT COUNT(*)::int FROM club_event_registrations WHERE event_id = e.id AND status != 'cancelled') AS "registrationsCount"
             FROM club_events e
             JOIN verified_clubs vc ON vc.id = e.club_id
-            WHERE e.id = $1 AND e.status = 'published'
+            WHERE e.id = $1 AND e.status IN ('published', 'completed')
             LIMIT 1;`,
             [eventId, userId]
         );
@@ -3699,5 +3846,9 @@ clubRouter.get("/moderation/list", authenticate, async (req: Request, res: Respo
         return res.status(500).json({ success: false, message: "Failed to list moderation list." });
     }
 });
+
+// Wildcard public club profile routes placed at the bottom so they do not collide with specific endpoints
+clubRouter.get("/public/:slug", optionalAuthenticate, handleGetPublicClub);
+clubRouter.get("/:slug", optionalAuthenticate, handleGetPublicClub);
 
 export default clubRouter;

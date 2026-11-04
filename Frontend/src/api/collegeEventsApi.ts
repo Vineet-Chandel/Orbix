@@ -12,7 +12,7 @@ export interface CollegeEventItem {
     venueOrLocation: string | null;
     registrationUrl: string | null;
     coverImageUrl: string | null;
-    status: "published" | "draft" | "cancelled";
+    status: "published" | "completed" | "draft" | "cancelled";
     publishedAt: string | null;
     createdAt: string;
     clubName: string;

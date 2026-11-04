@@ -6,6 +6,7 @@ import {
     MapPin,
     AlertCircle,
     CheckCircle2,
+    CheckCheck,
     Sparkles,
     ArrowLeft,
     Info,
@@ -328,6 +329,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                 className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shrink-0 ${
                                     form.status === "published"
                                         ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
+                                        : form.status === "completed"
+                                        ? "bg-sky-300 text-black shadow-[1px_1px_0px_#000]"
                                         : form.status === "draft"
                                         ? "bg-amber-300 text-black shadow-[1px_1px_0px_#000]"
                                         : "bg-rose-300 text-black shadow-[1px_1px_0px_#000]"
@@ -335,6 +338,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             >
                                 {form.status === "published"
                                     ? "Live Stage"
+                                    : form.status === "completed"
+                                    ? "Completed Stage"
                                     : form.status === "draft"
                                     ? "Draft Stage"
                                     : "Cancelled Stage"}
@@ -603,7 +608,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                 Publication Stage
                             </label>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
                                 <button
                                     type="button"
                                     onClick={() => setForm({ ...form, status: "published" })}
@@ -619,6 +624,24 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     </div>
                                     <p className="text-[10px] text-neutral-700 mt-1 leading-snug">
                                         Live in directory & open for RSVPs
+                                    </p>
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() => setForm({ ...form, status: "completed" })}
+                                    className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all ${
+                                        form.status === "completed"
+                                            ? "bg-sky-300 border-black shadow-[2px_2px_0px_#000] font-black"
+                                            : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-black">Completed</span>
+                                        <CheckCheck className="w-3.5 h-3.5 text-sky-900" />
+                                    </div>
+                                    <p className="text-[10px] text-neutral-700 mt-1 leading-snug">
+                                        Finished session with historical roster
                                     </p>
                                 </button>
 

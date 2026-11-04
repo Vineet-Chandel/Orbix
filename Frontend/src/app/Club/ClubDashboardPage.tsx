@@ -1,29 +1,21 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation, useParams } from "react-router-dom";
 import {
     Calendar,
     CalendarDays,
     Plus,
     Edit3,
-    Trash2,
     Clock,
     MapPin,
     Bell,
     ExternalLink,
-    CheckCircle2,
-    Ban,
-    FileText,
     Users,
+    UserCheck,
     ShieldCheck,
     ArrowRight,
     Building2,
     Mail,
     Settings,
-    FileSpreadsheet,
-    MoreVertical,
-    BarChart3,
-    XCircle,
-    RotateCcw,
 } from "lucide-react";
 import {
     useAppDispatch,
@@ -33,11 +25,8 @@ import {
     fetchClubEvents,
     createClubEvent,
     updateClubEvent,
-    changeClubEventStatus,
-    deleteClubEvent,
     addEventOptimistic,
     updateEventOptimistic,
-    updateStatusOptimistic,
     type ClubEvent,
     type CreateClubEventPayload,
     type ClubEventStatus,
@@ -48,14 +37,13 @@ import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { ClubSidebar, type ClubTab } from "./ClubSidebar";
 import ClubInboxModal from "./ClubInboxModal";
 import { ClubEventModal } from "./ClubEventModal";
-import { EventApplicationsModal } from "./EventApplicationsModal";
-import { EventSecurityConfirmModal } from "./EventSecurityConfirmModal";
-import { EventAnalyticsModal } from "./EventAnalyticsModal";
+import { ClubEventAnalyticsSection } from "./ClubEventAnalyticsSection";
 import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
 import type { TeamStats } from "./Team/types";
 import { ClubProfileManager } from "./Profile/ClubProfileManager";
 import { ClubSettingsView } from "./Settings/ClubSettingsView";
 import { OtherClubsSection } from "./OtherClubsSection";
+import { ClubEventDetailWorkspace } from "./ClubEventDetailPage";
 import { OrbixLoader } from "../../components/ui/loader";
 
 interface VerifiedClub {
@@ -101,6 +89,7 @@ interface ClubStats {
 }
 
 export default function ClubDashboardPage() {
+    const { eventId } = useParams<{ eventId?: string }>();
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.user);
@@ -223,15 +212,6 @@ export default function ClubDashboardPage() {
     const [editingEvent, setEditingEvent] = useState<ClubEvent | null>(null);
     const [initialModalStatus, setInitialModalStatus] = useState<ClubEventStatus>("published");
     const [eventFilter, setEventFilter] = useState<ClubEventFilter>("all");
-    const [viewingApplicationsEvent, setViewingApplicationsEvent] = useState<ClubEvent | null>(null);
-
-    // Event Security Confirmation and Analytics Modals State
-    const [securityConfirmTarget, setSecurityConfirmTarget] = useState<{
-        event: ClubEvent;
-        action: "draft" | "cancelled" | "delete";
-    } | null>(null);
-    const [analyticsEvent, setAnalyticsEvent] = useState<ClubEvent | null>(null);
-    const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null);
 
     // In-flight request guards to prevent duplicate concurrent network calls (e.g. StrictMode, rapid switches)
     const isFetchingClubRef = useRef(false);
@@ -392,76 +372,9 @@ export default function ClubDashboardPage() {
         }
     };
 
-    // Handle Delete Event (Security challenge enforced: requires typing "delete <title>" + club password)
-    const handleDeleteEvent = (ev: ClubEvent) => {
-        setSecurityConfirmTarget({ event: ev, action: "delete" });
-    };
-
-    // Handle Quick Status Changes (Publish live directly; Draft / Cancel triggers security confirmation)
-    const handleSetEventStatus = (ev: ClubEvent, nextStatus: ClubEventStatus) => {
-        if (nextStatus === "draft" || nextStatus === "cancelled") {
-            setSecurityConfirmTarget({ event: ev, action: nextStatus });
-            return;
-        }
-
-        // Publishing does not require destructive security challenge
-        const previousStatus = ev.status;
-        dispatch(updateStatusOptimistic({ id: ev.id, status: nextStatus }));
-        toast.success("Event is now published live.", { title: "Status Updated" });
-
-        dispatch(changeClubEventStatus({ eventId: ev.id, status: nextStatus, previousStatus }))
-            .unwrap()
-            .catch((err: any) => {
-                toast.error(err?.message || "Failed to update status on server. Reverted.", {
-                    title: "Sync Error",
-                });
-            });
-    };
-
-    // Execute Security-Protected Action (Move to Draft, Cancel Event, or Permanently Delete)
-    const handleExecuteSecurityConfirm = async (password: string, confirmationText: string) => {
-        if (!securityConfirmTarget) return;
-        const { event, action } = securityConfirmTarget;
-
-        try {
-            if (action === "draft" || action === "cancelled") {
-                const previousStatus = event.status;
-                await dispatch(
-                    changeClubEventStatus({
-                        eventId: event.id,
-                        status: action,
-                        previousStatus,
-                        password,
-                        confirmationText,
-                    })
-                ).unwrap();
-
-                const statusLabel = action === "draft" ? "moved to draft" : "marked as cancelled";
-                toast.success(`Event "${event.title}" is now ${statusLabel}.`, { title: "Status Updated" });
-            } else if (action === "delete") {
-                await dispatch(
-                    deleteClubEvent({
-                        eventId: event.id,
-                        previousEvent: event,
-                        password,
-                        confirmationText,
-                    })
-                ).unwrap();
-
-                toast.success(`Event "${event.title}" permanently deleted.`, { title: "Deleted" });
-            }
-            setSecurityConfirmTarget(null);
-        } catch (err: any) {
-            const message =
-                err?.message ||
-                err?.payload?.message ||
-                "Authentication failed. Please verify your password credentials and confirmation phrase.";
-            throw new Error(message);
-        }
-    };
-
     // Event subsets
     const publishedEvents = useMemo(() => events.filter((e) => e.status === "published"), [events]);
+    const completedEvents = useMemo(() => events.filter((e) => e.status === "completed"), [events]);
     const draftEvents = useMemo(() => events.filter((e) => e.status === "draft"), [events]);
     const cancelledEvents = useMemo(() => events.filter((e) => e.status === "cancelled"), [events]);
 
@@ -551,11 +464,12 @@ export default function ClubDashboardPage() {
             <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
                 <section
                     aria-label="Orbix Club Space"
-                    className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                    className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-3 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
                     <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                         {/* Dynamic Header Bar tailored to each tab */}
-                        <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        {(!eventId || activeTab !== "events") && (
+                            <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             {/* Left: Mobile Toggle & Tab-Specific Title & Badges */}
                             <div className="space-y-1">
                                 <div className="flex items-center gap-3">
@@ -668,7 +582,7 @@ export default function ClubDashboardPage() {
                                                 Active Schedule
                                             </span>
                                             <span className="text-xs font-bold text-neutral-700">
-                                                · {events.length} Total Sessions · Manage published sessions, drafts, and meetups
+                                                · Manage published sessions, drafts, and meetups
                                             </span>
                                         </>
                                     )}
@@ -722,7 +636,7 @@ export default function ClubDashboardPage() {
                                         className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
                                     >
                                         <Plus className="w-4 h-4 stroke-[2.5]" />
-                                        <span>+ Create New Event</span>
+                                        <span>Create New Event</span>
                                     </button>
                                 )}
 
@@ -743,6 +657,7 @@ export default function ClubDashboardPage() {
                                 </button>
                             </div>
                         </div>
+                        )}
 
                         {/* TAB: MANAGE CLUB PROFILE */}
                         {activeTab === "profile" && (
@@ -1073,98 +988,25 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: CLUB EVENTS & WORKSHOPS (EXCLUSIVELY FOR EVENTS TAB) */}
                         {activeTab === "events" && (
-                            <div className="space-y-6">
-                                {/* Quick Metric Summary Cards Row */}
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                                    {/* Metric 1: Total */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setEventFilter("all")}
-                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
-                                            eventFilter === "all"
-                                                ? "bg-[#a2ff86] text-black shadow-[3px_3px_0px_#000] font-black"
-                                                : "bg-white hover:bg-[#FAF6EE] text-neutral-900 shadow-[2px_2px_0px_#000]"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wider ${
-                                                eventFilter === "all" ? "text-neutral-800" : "text-neutral-500"
-                                            }`}>
-                                                Total Sessions
-                                            </span>
-                                            <Calendar className="w-4 h-4 opacity-70" />
-                                        </div>
-                                        <div className="text-2xl sm:text-3xl font-black mt-2">
-                                            {events.length}
-                                        </div>
-                                    </button>
-
-                                    {/* Metric 2: Published */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setEventFilter("published")}
-                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
-                                            eventFilter === "published"
-                                                ? "bg-emerald-300 text-black shadow-[3px_3px_0px_#000] font-black"
-                                                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-950 shadow-[2px_2px_0px_#000]"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-emerald-900">
-                                                Published
-                                            </span>
-                                            <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-                                        </div>
-                                        <div className="text-2xl sm:text-3xl font-black text-neutral-900 mt-2">
-                                            {publishedEvents.length}
-                                        </div>
-                                    </button>
-
-                                    {/* Metric 3: Draft */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setEventFilter("draft")}
-                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
-                                            eventFilter === "draft"
-                                                ? "bg-amber-300 text-black shadow-[3px_3px_0px_#000] font-black"
-                                                : "bg-amber-50 hover:bg-amber-100 text-amber-950 shadow-[2px_2px_0px_#000]"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-900">
-                                                Drafts
-                                            </span>
-                                            <FileText className="w-4 h-4 text-amber-700" />
-                                        </div>
-                                        <div className="text-2xl sm:text-3xl font-black text-neutral-900 mt-2">
-                                            {draftEvents.length}
-                                        </div>
-                                    </button>
-
-                                    {/* Metric 4: Cancelled */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setEventFilter("cancelled")}
-                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
-                                            eventFilter === "cancelled"
-                                                ? "bg-rose-300 text-black shadow-[3px_3px_0px_#000] font-black"
-                                                : "bg-rose-50 hover:bg-rose-100 text-rose-950 shadow-[2px_2px_0px_#000]"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-rose-900">
-                                                Cancelled
-                                            </span>
-                                            <Ban className="w-4 h-4 text-rose-700" />
-                                        </div>
-                                        <div className="text-2xl sm:text-3xl font-black text-neutral-900 mt-2">
-                                            {cancelledEvents.length}
-                                        </div>
-                                    </button>
-                                </div>
+                            eventId ? (
+                                <ClubEventDetailWorkspace
+                                    eventId={eventId}
+                                    club={club}
+                                    onBack={() => navigate("/club/events")}
+                                    onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                                />
+                            ) : (
+                                <div className="space-y-6">
+                                    {/* Event Analytics Deck (Turnout, 4-Month Trend Graph, Lifecycle Stages & Event Matrix) */}
+                                <ClubEventAnalyticsSection
+                                    events={events}
+                                    currentFilter={eventFilter}
+                                    onSelectFilter={(f) => setEventFilter(f)}
+                                    onOpenCreateModal={() => openCreateEventModal("published")}
+                                />
 
                                 {/* Filter Pills Bar */}
-                                <div className="p-3 sm:p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-wrap items-center justify-between gap-3">
+                                <div className="p-3 sm:p-4 rounded-2xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex flex-wrap items-center justify-between gap-3">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <button
                                             type="button"
@@ -1182,7 +1024,7 @@ export default function ClubDashboardPage() {
                                             onClick={() => setEventFilter("published")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "published"
-                                                    ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-emerald-300 text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1190,10 +1032,21 @@ export default function ClubDashboardPage() {
                                         </button>
                                         <button
                                             type="button"
+                                            onClick={() => setEventFilter("completed")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "completed"
+                                                    ? "bg-sky-300 text-black shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            Completed ({completedEvents.length})
+                                        </button>
+                                        <button
+                                            type="button"
                                             onClick={() => setEventFilter("draft")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "draft"
-                                                    ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-amber-300 text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1204,7 +1057,7 @@ export default function ClubDashboardPage() {
                                             onClick={() => setEventFilter("cancelled")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "cancelled"
-                                                    ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-rose-300 text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1234,9 +1087,10 @@ export default function ClubDashboardPage() {
                                         <button
                                             type="button"
                                             onClick={() => openCreateEventModal("published")}
-                                            className="mt-2 px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                            className="mt-2 px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-2"
                                         >
-                                            + Create New Event
+                                            <Plus className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Create New Event</span>
                                         </button>
                                     </div>
                                 ) : (
@@ -1244,16 +1098,17 @@ export default function ClubDashboardPage() {
                                         {filteredEvents.map((ev) => (
                                             <div
                                                 key={ev.id}
-                                                className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between"
+                                                onClick={() => navigate(`/club/events/${ev.id}`)}
+                                                className="p-5 sm:p-6 rounded-3xl bg-white border-4 border-black shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] hover:-translate-y-1 hover:-translate-x-1 transition-all cursor-pointer flex flex-col justify-between group"
                                             >
                                                 <div>
                                                     {/* Cover Banner if attached */}
                                                     {ev.coverImageUrl && (
-                                                        <div className="w-full h-40 sm:h-48 rounded-xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                                        <div className="w-full h-40 sm:h-48 rounded-2xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
                                                             <img
                                                                 src={ev.coverImageUrl}
                                                                 alt={ev.title}
-                                                                className="w-full h-full object-cover"
+                                                                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
                                                             />
                                                             {ev.isOptimistic && (
                                                                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">
@@ -1269,13 +1124,17 @@ export default function ClubDashboardPage() {
                                                                 className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black ${
                                                                     ev.status === "published"
                                                                         ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
+                                                                        : ev.status === "completed"
+                                                                        ? "bg-sky-200 text-black shadow-[1px_1px_0px_#000]"
                                                                         : ev.status === "draft"
                                                                         ? "bg-amber-200 text-black shadow-[1px_1px_0px_#000]"
                                                                         : "bg-rose-200 text-black shadow-[1px_1px_0px_#000]"
                                                                 }`}
                                                             >
                                                                 {ev.status === "published"
-                                                                    ? "Published"
+                                                                    ? "Published (Live)"
+                                                                    : ev.status === "completed"
+                                                                    ? "Completed"
                                                                     : ev.status === "draft"
                                                                     ? "Draft"
                                                                     : "Cancelled"}
@@ -1298,7 +1157,7 @@ export default function ClubDashboardPage() {
                                                         </span>
                                                     </div>
 
-                                                    <h3 className="text-base sm:text-lg font-black text-neutral-900 line-clamp-1">
+                                                    <h3 className="text-base sm:text-lg font-black text-neutral-900 line-clamp-1 group-hover:text-black transition-colors">
                                                         {ev.title}
                                                     </h3>
                                                     <p className="text-xs text-neutral-600 line-clamp-2 mt-1.5 leading-relaxed">
@@ -1311,210 +1170,53 @@ export default function ClubDashboardPage() {
                                                             {ev.venueOrLocation || (ev.locationType === "virtual" ? "Virtual (Online)" : ev.locationType === "hybrid" ? "Hybrid" : "Campus Hall")}
                                                         </span>
                                                         {ev.registrationUrl && (
-                                                            <a
-                                                                href={ev.registrationUrl}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="text-emerald-700 hover:underline flex items-center gap-1 font-bold"
-                                                            >
-                                                                <span>RSVP / Registration Link</span>
+                                                            <span className="text-emerald-700 flex items-center gap-1 font-bold">
+                                                                <span>RSVP Enabled</span>
                                                                 <ExternalLink className="w-3 h-3" />
-                                                            </a>
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Event-wise Key Analytics Metrics */}
+                                                    <div className="mt-3 flex items-center gap-2 text-xs font-bold flex-wrap">
+                                                        <span className="inline-flex items-center gap-1 text-sky-950 bg-sky-50 px-2 py-0.5 rounded-md border border-black/20">
+                                                            <Users className="w-3 h-3 text-sky-700 stroke-[2.5]" />
+                                                            <span>{ev.registrationsCount || 0} RSVPs</span>
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1 text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded-md border border-black/20">
+                                                            <UserCheck className="w-3 h-3 text-emerald-700 stroke-[2.5]" />
+                                                            <span>{ev.attendeesCount || 0} Attended</span>
+                                                        </span>
+                                                        {(ev.rejectedCount ?? 0) > 0 && (
+                                                            <span className="inline-flex items-center gap-1 text-rose-950 bg-rose-50 px-2 py-0.5 rounded-md border border-black/20">
+                                                                <span>{ev.rejectedCount} Rejected</span>
+                                                            </span>
+                                                        )}
+                                                        {(Number(ev.registrationsCount) || 0) > 0 && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-[#FAF6EE] text-black text-[10px] font-black border border-black/30">
+                                                                {Math.round(((Number(ev.attendeesCount) || 0) / (Number(ev.registrationsCount) || 1)) * 100)}% Turnout
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>
 
-                                                {/* Action Bar */}
-                                                <div className="mt-5 pt-3.5 border-t-2 border-black/10 flex flex-wrap items-center justify-between gap-2">
-                                                    <div className="flex items-center gap-2">
-                                                        {/* Three Dots Menu Button (on the left side of Applications Sheet) */}
-                                                        <div className="relative inline-block text-left">
-                                                            <button
-                                                                type="button"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    setOpenActionMenuId(openActionMenuId === ev.id ? null : ev.id);
-                                                                }}
-                                                                className="w-8 h-8 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[1.5px_1.5px_0px_#000] hover:shadow-[2px_2px_0px_#000] cursor-pointer transition-all active:translate-x-[0.5px] active:translate-y-[0.5px] flex items-center justify-center"
-                                                                title="More Event Options & Actions"
-                                                                aria-label="More Event Options & Actions"
-                                                            >
-                                                                <MoreVertical className="w-4 h-4 stroke-[2.5]" />
-                                                            </button>
+                                                {/* Clean Action Footer: clicking navigates to dedicated event console */}
+                                                <div className="mt-5 pt-3.5 border-t-2 border-black/10 flex items-center justify-between gap-2">
+                                                    <span className="text-xs font-bold text-neutral-500 group-hover:text-black transition-colors">
+                                                        Manage roster, agenda & analytics
+                                                    </span>
 
-                                                            {openActionMenuId === ev.id && (
-                                                                <>
-                                                                    {/* Backdrop to dismiss */}
-                                                                    <div
-                                                                        className="fixed inset-0 z-30 cursor-default"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            setOpenActionMenuId(null);
-                                                                        }}
-                                                                    />
-                                                                    {/* Neo-Brutalist Dropdown */}
-                                                                    <div
-                                                                        className="absolute left-0 bottom-full mb-1.5 w-52 bg-[#FAF6EE] border-2 border-black rounded-2xl shadow-[4px_4px_0px_#000] p-1.5 z-40 animate-in fade-in zoom-in-95 text-left divide-y divide-black/10"
-                                                                        onClick={(e) => e.stopPropagation()}
-                                                                    >
-                                                                        <div className="py-1">
-                                                                            {/* Option: Edit */}
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    setOpenActionMenuId(null);
-                                                                                    handleEditEvent(ev);
-                                                                                }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-neutral-900 hover:bg-white rounded-xl transition-colors text-left cursor-pointer"
-                                                                            >
-                                                                                <Edit3 className="w-3.5 h-3.5 stroke-[2.5] text-neutral-700" />
-                                                                                <span>Edit Event Details</span>
-                                                                            </button>
-
-                                                                            {/* Option: See Analytics */}
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    setOpenActionMenuId(null);
-                                                                                    setAnalyticsEvent(ev);
-                                                                                }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-[#0284c7] hover:bg-white rounded-xl transition-colors text-left cursor-pointer"
-                                                                            >
-                                                                                <BarChart3 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                                                <span>See Analytics</span>
-                                                                            </button>
-                                                                        </div>
-
-                                                                        {/* Status Transitions */}
-                                                                        <div className="py-1">
-                                                                            {ev.status === "published" && (
-                                                                                <>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => {
-                                                                                            setOpenActionMenuId(null);
-                                                                                            setSecurityConfirmTarget({ event: ev, action: "draft" });
-                                                                                        }}
-                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-amber-900 hover:bg-amber-100 rounded-xl transition-colors text-left cursor-pointer"
-                                                                                    >
-                                                                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                                                        <span>To Draft...</span>
-                                                                                    </button>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => {
-                                                                                            setOpenActionMenuId(null);
-                                                                                            setSecurityConfirmTarget({ event: ev, action: "cancelled" });
-                                                                                        }}
-                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-rose-900 hover:bg-rose-100 rounded-xl transition-colors text-left cursor-pointer"
-                                                                                    >
-                                                                                        <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                                                        <span>Cancel Event...</span>
-                                                                                    </button>
-                                                                                </>
-                                                                            )}
-
-                                                                            {ev.status === "draft" && (
-                                                                                <>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => {
-                                                                                            setOpenActionMenuId(null);
-                                                                                            handleSetEventStatus(ev, "published");
-                                                                                        }}
-                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-emerald-900 hover:bg-emerald-100 rounded-xl transition-colors text-left cursor-pointer"
-                                                                                    >
-                                                                                        <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                                                        <span>Publish Live</span>
-                                                                                    </button>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => {
-                                                                                            setOpenActionMenuId(null);
-                                                                                            setSecurityConfirmTarget({ event: ev, action: "cancelled" });
-                                                                                        }}
-                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-rose-900 hover:bg-rose-100 rounded-xl transition-colors text-left cursor-pointer"
-                                                                                    >
-                                                                                        <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                                                        <span>Cancel Event...</span>
-                                                                                    </button>
-                                                                                </>
-                                                                            )}
-
-                                                                            {ev.status === "cancelled" && (
-                                                                                <>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => {
-                                                                                            setOpenActionMenuId(null);
-                                                                                            handleSetEventStatus(ev, "published");
-                                                                                        }}
-                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-emerald-900 hover:bg-emerald-100 rounded-xl transition-colors text-left cursor-pointer"
-                                                                                    >
-                                                                                        <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                                                        <span>Publish Live</span>
-                                                                                    </button>
-                                                                                    <button
-                                                                                        type="button"
-                                                                                        onClick={() => {
-                                                                                            setOpenActionMenuId(null);
-                                                                                            setSecurityConfirmTarget({ event: ev, action: "draft" });
-                                                                                        }}
-                                                                                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-amber-900 hover:bg-amber-100 rounded-xl transition-colors text-left cursor-pointer"
-                                                                                    >
-                                                                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                                                        <span>Restore to Draft...</span>
-                                                                                    </button>
-                                                                                </>
-                                                                            )}
-                                                                        </div>
-
-                                                                        {/* Delete Option */}
-                                                                        <div className="py-1">
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => {
-                                                                                    setOpenActionMenuId(null);
-                                                                                    setSecurityConfirmTarget({ event: ev, action: "delete" });
-                                                                                }}
-                                                                                className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-100 rounded-xl transition-colors text-left cursor-pointer"
-                                                                            >
-                                                                                <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                                                <span>Delete Event...</span>
-                                                                            </button>
-                                                                        </div>
-                                                                    </div>
-                                                                </>
-                                                            )}
-                                                        </div>
-
-                                                        {/* Applications Sheet Button (Right next to Three Dots) */}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setViewingApplicationsEvent(ev)}
-                                                            className="px-3 py-1.5 rounded-xl bg-[#38BDF8] hover:bg-[#0ea5e9] text-black text-xs font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                                            title="View applicant roster and Excel export"
-                                                        >
-                                                            <FileSpreadsheet className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                            <span>Applications Sheet</span>
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Delete Button */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDeleteEvent(ev)}
-                                                        className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border-2 border-black shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                        title="Delete Event"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] group-hover:bg-[#8ee673] group-hover:translate-x-0.5 transition-all shrink-0">
+                                                        <span>Open Event</span>
+                                                        <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    </span>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
                             </div>
+                            )
                         )}
 
 
@@ -1576,37 +1278,6 @@ export default function ClubDashboardPage() {
                 collegeName={club?.college_name}
                 collegeId={club?.college_id}
                 initialStatus={initialModalStatus}
-            />
-
-            {/* Event Applications Spreadsheet Modal */}
-            <EventApplicationsModal
-                isOpen={Boolean(viewingApplicationsEvent)}
-                onClose={() => setViewingApplicationsEvent(null)}
-                eventId={viewingApplicationsEvent?.id || null}
-                eventTitle={viewingApplicationsEvent?.title}
-            />
-
-            {/* Event Security Confirmation Challenge Modal */}
-            <EventSecurityConfirmModal
-                isOpen={Boolean(securityConfirmTarget)}
-                onClose={() => setSecurityConfirmTarget(null)}
-                event={securityConfirmTarget?.event || null}
-                action={securityConfirmTarget?.action || null}
-                onConfirm={handleExecuteSecurityConfirm}
-            />
-
-            {/* Event Analytics Modal */}
-            <EventAnalyticsModal
-                isOpen={Boolean(analyticsEvent)}
-                onClose={() => setAnalyticsEvent(null)}
-                eventId={analyticsEvent?.id || null}
-                eventTitle={analyticsEvent?.title}
-                onOpenApplicationsSheet={() => {
-                    if (analyticsEvent) {
-                        setViewingApplicationsEvent(analyticsEvent);
-                        setAnalyticsEvent(null);
-                    }
-                }}
             />
         </div>
     );

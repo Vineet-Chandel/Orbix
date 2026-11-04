@@ -88,6 +88,11 @@ export default {
           700: '#3f3f46',
         },
       },
+      borderWidth: {
+        '2.5': '2.5px',
+        '3': '3px',
+        '3.5': '3.5px',
+      },
       boxShadow: {
         'neo-xs': '1.5px 1.5px 0px #000000',
         'neo-sm': '2.5px 2.5px 0px #000000',

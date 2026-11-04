@@ -14,12 +14,16 @@ export interface ClubEvent {
     venueOrLocation: string | null;
     registrationUrl: string | null;
     coverImageUrl: string | null;
-    status: "draft" | "published" | "cancelled";
+    status: "draft" | "published" | "completed" | "cancelled";
     publishedAt: string | null;
     createdAt: string;
     updatedAt?: string;
     isOptimistic?: boolean;
     syncError?: string | null;
+    registrationsCount?: number;
+    attendeesCount?: number;
+    rejectedCount?: number;
+    likesCount?: number;
 }
 
 export interface CreateClubEventPayload {
@@ -33,11 +37,11 @@ export interface CreateClubEventPayload {
     venueOrLocation?: string | null;
     registrationUrl?: string | null;
     coverImageUrl?: string | null;
-    status: "draft" | "published" | "cancelled";
+    status: "draft" | "published" | "completed" | "cancelled";
 }
 
-export type ClubEventStatus = "draft" | "published" | "cancelled";
-export type ClubEventFilter = "all" | "published" | "draft" | "cancelled";
+export type ClubEventStatus = "draft" | "published" | "completed" | "cancelled";
+export type ClubEventFilter = "all" | "published" | "completed" | "draft" | "cancelled";
 
 export interface ClubEventsState {
     events: ClubEvent[];

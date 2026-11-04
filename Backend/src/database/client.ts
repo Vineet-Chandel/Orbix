@@ -605,6 +605,7 @@ export const testDatabaseConnection = async () => {
                 WHERE status = 'pending';
 
             -- Ensure club_events location_type constraint permits 'in_person', 'online', 'virtual', 'hybrid'
+            -- and status constraint permits 'draft', 'published', 'completed', 'cancelled'
             DO $$
             BEGIN
                 IF EXISTS (
@@ -613,6 +614,10 @@ export const testDatabaseConnection = async () => {
                     ALTER TABLE public.club_events DROP CONSTRAINT IF EXISTS club_events_location_type_check;
                     ALTER TABLE public.club_events ADD CONSTRAINT club_events_location_type_check
                         CHECK (location_type IN ('in_person', 'online', 'virtual', 'hybrid'));
+
+                    ALTER TABLE public.club_events DROP CONSTRAINT IF EXISTS club_events_status_check;
+                    ALTER TABLE public.club_events ADD CONSTRAINT club_events_status_check
+                        CHECK (status IN ('draft', 'published', 'completed', 'cancelled'));
                 END IF;
             END $$;
         `);

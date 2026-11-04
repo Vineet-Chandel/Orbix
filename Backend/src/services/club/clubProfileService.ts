@@ -275,7 +275,8 @@ export class ClubProfileService {
             query(
                 `SELECT 
                     COUNT(*) FILTER (WHERE status = 'published' AND starts_at >= NOW()) AS upcoming_count,
-                    COUNT(*) FILTER (WHERE status = 'published' AND starts_at < NOW()) AS past_count,
+                    COUNT(*) FILTER (WHERE (status = 'published' OR status = 'completed') AND starts_at < NOW()) AS past_count,
+                    COUNT(*) FILTER (WHERE status = 'completed') AS completed_count,
                     COUNT(*) FILTER (WHERE status = 'draft') AS draft_count,
                     COUNT(*) AS total_count
                  FROM club_events
@@ -1308,7 +1309,13 @@ export class ClubProfileService {
                 vc.created_at AS "created_at"
              FROM verified_clubs vc
              LEFT JOIN users u ON u.id = vc.auth_user_id
-             WHERE (LOWER(vc.slug) = $1 OR LOWER(u.username) = $1)
+             WHERE (
+                 LOWER(vc.slug) = $1 
+                 OR LOWER(u.username) = $1 
+                 OR vc.id::text = $1
+                 OR LOWER(REPLACE(vc.name, ' ', '-')) = $1
+                 OR LOWER(vc.name) = $1
+             )
              LIMIT 1;`,
             [cleanSlug]
         );
@@ -1422,7 +1429,7 @@ export class ClubProfileService {
                 cover_image_url AS "coverImageUrl",
                 published_at AS "publishedAt"
              FROM club_events
-             WHERE club_id = $1 AND status = 'published'
+             WHERE club_id = $1 AND status IN ('published', 'completed')
              ORDER BY starts_at ASC;`,
             [club.id]
         );
@@ -1667,7 +1674,7 @@ export class ClubProfileService {
              LEFT JOIN (
                  SELECT club_id, COUNT(*) AS event_count
                  FROM club_events
-                 WHERE status = 'published'
+                 WHERE status IN ('published', 'completed')
                  GROUP BY club_id
              ) ev ON ev.club_id = vc.id
              LEFT JOIN (

@@ -23,7 +23,7 @@ export interface EventLiveListingCardProps {
     locationType?: "in_person" | "virtual" | "hybrid";
     registrationUrl?: string;
     coverImageUrl?: string;
-    status?: "published" | "draft" | "cancelled";
+    status?: "published" | "completed" | "draft" | "cancelled";
     clubName: string;
     clubLogoUrl?: string | null;
     collegeName: string;
@@ -209,6 +209,8 @@ export const EventLiveListingCard: React.FC<EventLiveListingCardProps> = ({
                                 className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shrink-0 ${
                                     status === "published"
                                         ? "bg-[#a2ff86] text-black shadow-[1.5px_1.5px_0px_#000]"
+                                        : status === "completed"
+                                        ? "bg-sky-200 text-black shadow-[1.5px_1.5px_0px_#000]"
                                         : status === "draft"
                                         ? "bg-[#FFE566] text-black shadow-[1.5px_1.5px_0px_#000]"
                                         : "bg-rose-300 text-black shadow-[1.5px_1.5px_0px_#000]"
@@ -216,6 +218,8 @@ export const EventLiveListingCard: React.FC<EventLiveListingCardProps> = ({
                             >
                                 {status === "published"
                                     ? "● Live"
+                                    : status === "completed"
+                                    ? "✓ Completed"
                                     : status === "draft"
                                     ? "Draft"
                                     : "Cancelled"}
@@ -338,16 +342,18 @@ export const EventLiveListingCard: React.FC<EventLiveListingCardProps> = ({
                             </span>
                         </div>
 
-                        {/* QR Code Centerpiece */}
+                        {/* QR Code Centerpiece (Thick 4-side solid black border) */}
                         <div className="p-4 sm:p-5 flex flex-col items-center justify-center space-y-3.5 flex-1">
-                            <div className="p-3 bg-white rounded-2xl border-3 border-black shadow-[3px_3px_0px_#000] flex flex-col items-center">
+                            <div className="p-3.5 sm:p-4 bg-white rounded-2xl border-4 border-black shadow-[4px_4px_0px_#000] flex flex-col items-center">
                                 <OrbixCardQR
                                     value={directRegistrationUrl}
                                     size={160}
                                     showLogo={true}
+                                    noShadow={true}
+                                    className="p-1"
                                 />
-                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-700 mt-2 flex items-center gap-1">
-                                    <QrCode className="w-3 h-3 stroke-[2.5]" />
+                                <span className="text-[10px] font-black uppercase tracking-wider text-black mt-2.5 flex items-center gap-1.5">
+                                    <QrCode className="w-3.5 h-3.5 stroke-[2.5]" />
                                     Scan with Phone Camera
                                 </span>
                             </div>
@@ -579,15 +585,17 @@ export const EventLiveListingCard: React.FC<EventLiveListingCardProps> = ({
                         </span>
                     </div>
 
-                    {/* QR Code Centerpiece */}
+                    {/* QR Code Centerpiece (Export) */}
                     <div className="p-6 flex flex-col items-center justify-center space-y-4">
-                        <div className="p-4 bg-white rounded-2xl border-3 border-black shadow-[3px_3px_0px_#000] flex flex-col items-center">
+                        <div className="p-4 bg-white rounded-2xl border-4 border-black shadow-[4px_4px_0px_#000] flex flex-col items-center">
                             <OrbixCardQR
                                 value={directRegistrationUrl}
                                 size={190}
                                 showLogo={true}
+                                noShadow={true}
+                                className="p-1.5"
                             />
-                            <span className="text-xs font-black uppercase tracking-wider text-neutral-700 mt-2.5 flex items-center gap-1.5">
+                            <span className="text-xs font-black uppercase tracking-wider text-black mt-2.5 flex items-center gap-1.5">
                                 <QrCode className="w-4 h-4 stroke-[2.5]" />
                                 Scan with Phone Camera
                             </span>

@@ -7,6 +7,7 @@ interface OrbixCardQRProps {
     size?: number;
     className?: string;
     showLogo?: boolean;
+    noShadow?: boolean;
 }
 
 const qrCache = new Map<string, string>();
@@ -16,6 +17,7 @@ export const OrbixCardQR: React.FC<OrbixCardQRProps> = React.memo(({
     size = 240,
     className = "",
     showLogo = true,
+    noShadow = false,
 }) => {
     const cacheKey = `${value}_${size}`;
     const [qrDataUrl, setQrDataUrl] = useState<string>(() => qrCache.get(cacheKey) || "");
@@ -55,7 +57,9 @@ export const OrbixCardQR: React.FC<OrbixCardQRProps> = React.memo(({
 
     return (
         <div
-            className={`relative flex items-center justify-center rounded-2xl sm:rounded-3xl bg-white p-2 sm:p-3 shadow-xl border border-neutral-100 ${className}`}
+            className={`relative flex items-center justify-center rounded-2xl sm:rounded-3xl bg-white p-2 sm:p-3 ${
+                noShadow ? "" : "shadow-xl border border-neutral-100"
+            } ${className}`}
             style={{ width: size, height: size }}
         >
             {qrDataUrl ? (
