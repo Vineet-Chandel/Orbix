@@ -618,6 +618,9 @@ export const testDatabaseConnection = async () => {
                     ALTER TABLE public.club_events DROP CONSTRAINT IF EXISTS club_events_status_check;
                     ALTER TABLE public.club_events ADD CONSTRAINT club_events_status_check
                         CHECK (status IN ('draft', 'published', 'completed', 'cancelled'));
+
+                    ALTER TABLE public.verified_clubs 
+                        ADD COLUMN IF NOT EXISTS category_updated_at TIMESTAMPTZ;
                 END IF;
             END $$;
         `);

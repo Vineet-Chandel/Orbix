@@ -31,6 +31,8 @@ import {
     KeyRound,
     AlertTriangle,
     LifeBuoy,
+    Calendar,
+    Clock,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
@@ -302,6 +304,16 @@ export const NotificationsView: React.FC = () => {
         return (
             type === "club_team_invitation" ||
             Boolean((item.metadata as any)?.invitationId)
+        );
+    }, []);
+
+    // Helper functions for club campus events
+    const isClubEvent = useCallback((item: UserNotification): boolean => {
+        const type = (item.type || (item as any).notification_type || "").toLowerCase();
+        return (
+            type === "club_event" ||
+            type.startsWith("event_") ||
+            Boolean(item.metadata?.eventId)
         );
     }, []);
 
@@ -690,6 +702,7 @@ export const NotificationsView: React.FC = () => {
                                 const isConnAccepted = isConnectionAcceptedItem(item);
                                 const isConnInteraction = isConnectionInteraction(item);
                                 const isTeamInv = isClubTeamInvitation(item);
+                                const isClubEvt = isClubEvent(item);
                                 const isHire =
                                     item.type === "hire_inquiry" ||
                                     (item as any).notification_type === "hire_inquiry";
@@ -715,6 +728,8 @@ export const NotificationsView: React.FC = () => {
                                         ? (item.title || "Account Governance")
                                         : isTeamInv
                                         ? (meta.clubName || "Club Team Invitation")
+                                        : isClubEvt
+                                        ? (meta.clubName || item.title || "Campus Event")
                                         : (senderProfile.displayName ||
                                            meta.displayName ||
                                            meta.senderName ||
@@ -734,6 +749,8 @@ export const NotificationsView: React.FC = () => {
                                         ? (meta.ticketNumber ? `Ticket ${meta.ticketNumber}` : "")
                                         : isTeamInv
                                         ? (meta.positionTitle ? `${meta.positionTitle}${meta.teamName ? ` · ${meta.teamName}` : ""}` : "")
+                                        : isClubEvt
+                                        ? (meta.collegeName ? `${meta.collegeName} · Campus Event` : "Campus Club Event")
                                         : (senderProfile.username ||
                                            meta.username ||
                                            "");
@@ -771,6 +788,21 @@ export const NotificationsView: React.FC = () => {
                                             ) : isGov ? (
                                                 <div className="relative w-10 h-10 rounded-xl bg-rose-100 text-rose-900 border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 mt-0.5">
                                                     <AlertTriangle className="w-5 h-5 stroke-[2.2]" />
+                                                </div>
+                                            ) : isClubEvt ? (
+                                                <div className={`relative w-10 h-10 rounded-xl border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 mt-0.5 ${
+                                                    meta.action === "cancelled"
+                                                        ? "bg-rose-100 text-rose-800"
+                                                        : meta.action === "completed"
+                                                        ? "bg-sky-100 text-sky-800"
+                                                        : "bg-[#a2ff86] text-black"
+                                                }`}>
+                                                    <Calendar className="w-5 h-5 stroke-[2.2]" />
+                                                    {!item.isRead && (
+                                                        <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border border-black ${
+                                                            meta.action === "cancelled" ? "bg-rose-500" : "bg-emerald-500"
+                                                        }`} />
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <div className="relative w-10 h-10 rounded-xl bg-white border-2 border-black shadow-[1.5px_1.5px_0px_#000] overflow-hidden shrink-0 mt-0.5">
@@ -843,6 +875,25 @@ export const NotificationsView: React.FC = () => {
                                                         <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1">
                                                             <Check className="w-2.5 h-2.5 stroke-[3]" />
                                                             <span>Connected</span>
+                                                        </span>
+                                                    )}
+
+                                                    {isClubEvt && (
+                                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1 ${
+                                                            meta.action === "cancelled"
+                                                                ? "bg-rose-200 text-rose-900"
+                                                                : meta.action === "completed"
+                                                                ? "bg-sky-200 text-sky-900"
+                                                                : "bg-[#a2ff86] text-black"
+                                                        }`}>
+                                                            <Calendar className="w-2.5 h-2.5 stroke-[2.5]" />
+                                                            <span>
+                                                                {meta.action === "cancelled"
+                                                                    ? "Event Cancelled"
+                                                                    : meta.action === "completed"
+                                                                    ? "Event Completed"
+                                                                    : "Campus Event"}
+                                                            </span>
                                                         </span>
                                                     )}
 
@@ -1271,6 +1322,179 @@ export const NotificationsView: React.FC = () => {
                                                 </span>
                                             </div>
                                         )}
+                                    </div>
+                                );
+                            }
+
+                            // -------------------------------------------------------------
+                            // CASE C: CAMPUS CLUB EVENT NOTIFICATION (PUBLISHED, CANCELLED, COMPLETED)
+                            // -------------------------------------------------------------
+                            if (isClubEvent(activeItem)) {
+                                const eventId = meta.eventId || "";
+                                const eventTitle = meta.eventTitle || activeItem.title || "Campus Event";
+                                const clubName = meta.clubName || "Verified Club";
+                                const clubSlug = meta.clubSlug || "";
+                                const collegeName = meta.collegeName || "Collegiate Institution";
+                                const action = (meta.action || "published").toLowerCase();
+                                const startsAt = meta.startsAt;
+                                const venue = meta.venueOrLocation;
+
+                                const formattedStartsAt = startsAt
+                                    ? new Date(startsAt).toLocaleString("en-US", {
+                                          weekday: "short",
+                                          month: "short",
+                                          day: "numeric",
+                                          year: "numeric",
+                                          hour: "numeric",
+                                          minute: "2-digit",
+                                          hour12: true,
+                                      })
+                                    : null;
+
+                                const isCancelled = action === "cancelled";
+                                const isCompleted = action === "completed";
+
+                                return (
+                                    <div className="flex-1 flex flex-col p-5 sm:p-6 space-y-5">
+                                        {/* Detail Top Header */}
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b-2 border-black/10">
+                                            <div className="flex items-center gap-3.5 min-w-0">
+                                                <div
+                                                    className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center font-black ${
+                                                        isCancelled
+                                                            ? "bg-rose-100 text-rose-700"
+                                                            : isCompleted
+                                                            ? "bg-sky-100 text-sky-700"
+                                                            : "bg-[#a2ff86] text-black"
+                                                    }`}
+                                                >
+                                                    <Calendar className="w-8 h-8 stroke-[2.2]" />
+                                                </div>
+
+                                                <div className="min-w-0 space-y-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h3 className="text-lg sm:text-xl font-black text-black tracking-tight truncate">
+                                                            {eventTitle}
+                                                        </h3>
+                                                        <span
+                                                            className={`inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000] shrink-0 ${
+                                                                isCancelled
+                                                                    ? "bg-rose-300 text-black"
+                                                                    : isCompleted
+                                                                    ? "bg-sky-300 text-black"
+                                                                    : "bg-[#a2ff86] text-black"
+                                                            }`}
+                                                        >
+                                                            <span>
+                                                                {isCancelled
+                                                                    ? "Cancelled"
+                                                                    : isCompleted
+                                                                    ? "Completed"
+                                                                    : "Live & Published"}
+                                                            </span>
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 flex-wrap text-xs">
+                                                        <span className="font-bold text-neutral-800 flex items-center gap-1">
+                                                            <span>{clubName}</span>
+                                                        </span>
+                                                        <span className="text-neutral-400">•</span>
+                                                        <span className="font-medium text-neutral-600 flex items-center gap-1">
+                                                            <Building2 className="w-3.5 h-3.5 text-neutral-400" />
+                                                            <span>{collegeName}</span>
+                                                        </span>
+                                                        <span className="text-neutral-400">•</span>
+                                                        <span className="text-neutral-500 font-mono font-bold text-[11px]">
+                                                            Received {formatFullDateTime(activeItem.createdAt)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Status Message / Banner */}
+                                        <div
+                                            className={`p-4 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] ${
+                                                isCancelled
+                                                    ? "bg-rose-50 border-rose-950"
+                                                    : isCompleted
+                                                    ? "bg-sky-50 border-sky-950"
+                                                    : "bg-[#FAF6EE]"
+                                            }`}
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div
+                                                    className={`p-2 rounded-xl border border-black shrink-0 ${
+                                                        isCancelled
+                                                            ? "bg-rose-200 text-rose-900"
+                                                            : isCompleted
+                                                            ? "bg-sky-200 text-sky-900"
+                                                            : "bg-[#a2ff86] text-black"
+                                                    }`}
+                                                >
+                                                    <Calendar className="w-5 h-5 stroke-[2.2]" />
+                                                </div>
+                                                <div className="space-y-1 min-w-0 flex-1">
+                                                    <h4 className="text-sm font-black text-black">
+                                                        {activeItem.title}
+                                                    </h4>
+                                                    <p className="text-xs text-neutral-700 leading-relaxed font-medium">
+                                                        {activeItem.body}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Event Specific Info Cards */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-1.5">
+                                                <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500 flex items-center gap-1.5">
+                                                    <Clock className="w-3.5 h-3.5" />
+                                                    <span>Scheduled Date & Time</span>
+                                                </span>
+                                                <p className="text-xs font-bold text-black font-mono">
+                                                    {formattedStartsAt || "Date details in event portal"}
+                                                </p>
+                                            </div>
+
+                                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-1.5">
+                                                <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500 flex items-center gap-1.5">
+                                                    <MapPin className="w-3.5 h-3.5" />
+                                                    <span>Location / Venue</span>
+                                                </span>
+                                                <p className="text-xs font-bold text-black truncate">
+                                                    {venue || "Campus Hall / Online"}
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Actions Footer */}
+                                        <div className="mt-auto pt-4 border-t-2 border-black/10 flex flex-wrap items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2">
+                                                {clubSlug && (
+                                                    <Link
+                                                        to={`/clubs/${clubSlug}`}
+                                                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all"
+                                                    >
+                                                        <span>View Club Page</span>
+                                                        <ExternalLink className="w-3.5 h-3.5" />
+                                                    </Link>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-2">
+                                                {eventId && (
+                                                    <Link
+                                                        to={`/events?eventId=${eventId}`}
+                                                        className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all"
+                                                    >
+                                                        <span>Open Event Details</span>
+                                                        <ArrowUpRight className="w-4 h-4 stroke-[2.5]" />
+                                                    </Link>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                 );
                             }

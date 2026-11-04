@@ -16,6 +16,7 @@ import {
     Building2,
     Mail,
     Settings,
+    TrendingUp,
 } from "lucide-react";
 import {
     useAppDispatch,
@@ -121,6 +122,7 @@ export default function ClubDashboardPage() {
     const getClubTabFromPath = (pathname: string): ClubTab => {
         if (pathname.startsWith("/club/team")) return "team";
         if (pathname.startsWith("/club/events")) return "events";
+        if (pathname.startsWith("/club/analytics") || pathname.startsWith("/club/trends")) return "analytics";
         if (pathname.startsWith("/club/profile") || pathname.startsWith("/club/manage-profile")) return "profile";
         if (pathname.startsWith("/club/clubs") || pathname.startsWith("/club/campus-clubs") || pathname.startsWith("/club/other-clubs")) return "clubs";
         if (pathname.startsWith("/club/settings")) return "settings";
@@ -131,6 +133,7 @@ export default function ClubDashboardPage() {
         overview: "/club/dashboard",
         team: "/club/team",
         events: "/club/events",
+        analytics: "/club/analytics",
         profile: "/club/profile",
         clubs: "/club/clubs",
         settings: "/club/settings",
@@ -514,6 +517,17 @@ export default function ClubDashboardPage() {
                                         </div>
                                     )}
 
+                                    {activeTab === "analytics" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Trends & Analytics
+                                            </h1>
+                                        </div>
+                                    )}
+
                                     {activeTab === "profile" && (
                                         <div className="flex items-center gap-2.5">
                                             <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
@@ -587,6 +601,17 @@ export default function ClubDashboardPage() {
                                         </>
                                     )}
 
+                                    {activeTab === "analytics" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Event Intelligence
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · 4-month turnout velocity, participation ratios, and session lifecycle metrics
+                                            </span>
+                                        </>
+                                    )}
+
                                     {activeTab === "profile" && (
                                         <>
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
@@ -629,7 +654,7 @@ export default function ClubDashboardPage() {
 
                             {/* Right: Tab-Specific Primary Actions & Inbox Bell */}
                             <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap">
-                                {activeTab === "events" && (
+                                {(activeTab === "events" || activeTab === "analytics") && (
                                     <button
                                         type="button"
                                         onClick={() => openCreateEventModal("published")}
@@ -997,16 +1022,8 @@ export default function ClubDashboardPage() {
                                 />
                             ) : (
                                 <div className="space-y-6">
-                                    {/* Event Analytics Deck (Turnout, 4-Month Trend Graph, Lifecycle Stages & Event Matrix) */}
-                                <ClubEventAnalyticsSection
-                                    events={events}
-                                    currentFilter={eventFilter}
-                                    onSelectFilter={(f) => setEventFilter(f)}
-                                    onOpenCreateModal={() => openCreateEventModal("published")}
-                                />
-
-                                {/* Filter Pills Bar */}
-                                <div className="p-3 sm:p-4 rounded-2xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex flex-wrap items-center justify-between gap-3">
+                                    {/* Filter Pills Bar */}
+                                    <div className="p-3 sm:p-4 rounded-2xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex flex-wrap items-center justify-between gap-3">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <button
                                             type="button"
@@ -1219,6 +1236,20 @@ export default function ClubDashboardPage() {
                             )
                         )}
 
+                        {/* TAB: TRENDS & ANALYTICS */}
+                        {activeTab === "analytics" && (
+                            <div className="space-y-6">
+                                <ClubEventAnalyticsSection
+                                    events={events}
+                                    currentFilter={eventFilter}
+                                    onSelectFilter={(filter) => {
+                                        setEventFilter(filter);
+                                        navigate(`/club/events?filter=${filter}`);
+                                    }}
+                                    onOpenCreateModal={() => openCreateEventModal("published")}
+                                />
+                            </div>
+                        )}
 
                         {/* TAB: CAMPUS CLUBS & DIRECTORY */}
                         {activeTab === "clubs" && (

@@ -31,6 +31,7 @@ import clubTeamRouter from "./clubTeamRoutes.js";
 import clubProfileRouter from "./clubProfileRoutes.js";
 import clubSettingsRouter from "./clubSettingsRoutes.js";
 import { ClubProfileService } from "../../services/club/clubProfileService.js";
+import { notifyClubAndCollegeUsers } from "../../services/club/clubEventNotificationService.js";
 
 const clubRouter = express.Router();
 
@@ -2367,11 +2368,20 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
             ]
         );
 
+        const newEvent = insertRes.rows[0];
+
+        // Notify club staff and college students if event is published live
+        if (finalStatus === "published") {
+            notifyClubAndCollegeUsers(newEvent.id, clubId, "published", userId).catch((err) =>
+                console.error("[POST /events] Notification dispatch error:", err)
+            );
+        }
+
         return res.status(201).json({
             success: true,
             message: `Event ${isPublished ? "published" : "created"} successfully.`,
             event: {
-                ...insertRes.rows[0],
+                ...newEvent,
                 registrationsCount: 0,
                 attendeesCount: 0,
                 rejectedCount: 0,
@@ -2434,6 +2444,26 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
 
         // Security check: Moving to Draft or Cancelling requires confirmation text and club account password
         if (status && (status === "draft" || status === "cancelled") && current.status !== status) {
+            // Enforce Minimum 4-Hour advance cancellation warning/limit when cancelling a live published event
+            if (status === "cancelled" && current.status === "published") {
+                const startsAtMs = new Date(current.starts_at).getTime();
+                const nowMs = Date.now();
+                const hoursRemaining = (startsAtMs - nowMs) / (1000 * 60 * 60);
+
+                if (hoursRemaining > 0 && hoursRemaining < 4) {
+                    const { emergencyBypass } = req.body;
+                    if (!emergencyBypass) {
+                        const minutesLeft = Math.max(1, Math.ceil(hoursRemaining * 60));
+                        return res.status(400).json({
+                            success: false,
+                            code: "EVENT_CANCELLATION_4H_LIMIT",
+                            hoursRemaining,
+                            message: `Warning: Minimum 4-hour advance limit required to cancel a published event. This event is scheduled to start in ${minutesLeft} minutes. Cancellation triggers immediate alerts to all registered students. To proceed under urgent circumstances, please acknowledge the 4-hour emergency waiver.`,
+                        });
+                    }
+                }
+            }
+
             const { password, confirmationText } = req.body;
             if (!password) {
                 return res.status(400).json({
@@ -2530,6 +2560,15 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
              LIMIT 1;`,
             [eventId, clubId]
         );
+
+        // Dispatch lifecycle notifications when transitioned to published, cancelled, or completed
+        if (newStatus !== current.status) {
+            if (newStatus === "published" || newStatus === "cancelled" || newStatus === "completed") {
+                notifyClubAndCollegeUsers(String(eventId), clubId, newStatus, userId).catch((err) =>
+                    console.error("[PATCH /events] Notification dispatch error:", err)
+                );
+            }
+        }
 
         return res.json({
             success: true,

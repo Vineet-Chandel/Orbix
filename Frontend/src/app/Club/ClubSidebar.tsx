@@ -4,6 +4,7 @@ import {
     LayoutDashboard,
     Users,
     CalendarDays,
+    TrendingUp,
     Edit3,
     Mail,
     LogOut,
@@ -14,7 +15,7 @@ import {
 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
-export type ClubTab = "overview" | "team" | "events" | "profile" | "clubs" | "settings";
+export type ClubTab = "overview" | "team" | "events" | "analytics" | "profile" | "clubs" | "settings";
 
 interface ClubSidebarProps {
     club: {
@@ -311,7 +312,60 @@ export const ClubSidebar = ({
                         )}
                     </Link>
 
-                    {/* Item 4: Manage Profile */}
+                    {/* Item 4: Trends & Analytics */}
+                    <Link
+                        to="/club/analytics"
+                        onClick={() => {
+                            onTabChange("analytics");
+                            if (onClose) onClose();
+                        }}
+                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
+                            activeTab === "analytics"
+                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
+                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
+                        }`}
+                        title={!isExpanded ? "Trends & Analytics" : undefined}
+                    >
+                        <span
+                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
+                                activeTab === "analytics" && isExpanded
+                                    ? "bg-black opacity-100"
+                                    : "bg-transparent opacity-0"
+                            }`}
+                        />
+                        <div className="flex items-center w-full">
+                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                <TrendingUp
+                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                                        activeTab === "analytics"
+                                            ? "text-black"
+                                            : "text-neutral-700 group-hover:text-black"
+                                    }`}
+                                />
+                            </div>
+                            {isExpanded && (
+                                <span
+                                    className={`whitespace-nowrap truncate animate-fadeIn pl-0.5 ${
+                                        activeTab === "analytics"
+                                            ? "text-black font-black"
+                                            : "text-neutral-800 font-bold"
+                                    }`}
+                                >
+                                    Trends & Analytics
+                                </span>
+                            )}
+                        </div>
+
+                        {/* Floating tooltip when contracted */}
+                        {!isExpanded && (
+                            <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
+                                <span>Trends & Analytics</span>
+                                {activeTab === "analytics" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
+                            </div>
+                        )}
+                    </Link>
+
+                    {/* Item 5: Manage Profile */}
                     <Link
                         to="/club/profile"
                         onClick={() => {
@@ -529,6 +583,21 @@ export const ClubSidebar = ({
                             <div className="flex items-center gap-2.5 min-w-0">
                                 <CalendarDays className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
                                 <span className="truncate">Events & Workshops</span>
+                            </div>
+                        </Link>
+
+                        <Link
+                            to="/club/analytics"
+                            onClick={() => {
+                                setIsProfileMenuOpen(false);
+                                onTabChange("analytics");
+                                if (onClose) onClose();
+                            }}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-neutral-800 font-bold hover:text-black hover:bg-black/5 transition-colors text-left cursor-pointer"
+                        >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                                <TrendingUp className="w-3.5 h-3.5 text-neutral-700 flex-shrink-0" />
+                                <span className="truncate">Trends & Analytics</span>
                             </div>
                         </Link>
 

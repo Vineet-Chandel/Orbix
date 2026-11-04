@@ -229,7 +229,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     };
 
     // Handle Security Action Execution (Draft, Cancel, Delete with password & delete phrase)
-    const handleExecuteSecurityAction = async (password: string, confirmationText: string) => {
+    const handleExecuteSecurityAction = async (password: string, confirmationText: string, emergencyBypass?: boolean) => {
         if (!event || !securityTarget) return;
         const { action } = securityTarget;
 
@@ -242,6 +242,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         previousStatus: event.status,
                         password,
                         confirmationText,
+                        emergencyBypass,
                     })
                 ).unwrap();
 

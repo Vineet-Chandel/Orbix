@@ -18,6 +18,7 @@ export interface ClubProfileData {
     slug: string;
     clubUsername?: string;
     category: string;
+    categoryUpdatedAt?: string | null;
     collegeId?: string;
     collegeName: string;
     collegeCity: string;

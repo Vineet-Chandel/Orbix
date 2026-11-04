@@ -166,6 +166,8 @@ export class ClubProfileService {
                     COALESCE(u.username, vc.slug) AS slug,
                     u.username AS "clubUsername",
                     vc.category,
+                    vc.category_updated_at AS "categoryUpdatedAt",
+                    vc.category_updated_at AS "category_updated_at",
                     vc.college_id AS "collegeId",
                     vc.college_name AS "collegeName",
                     vc.college_name AS "college_name",
@@ -342,7 +344,7 @@ export class ClubProfileService {
 
         // Current club record for validation, diffing and slug resolution (single fast query)
         const currentRes = await query(
-            `SELECT id, slug, auth_user_id, name, category, about, college_name, college_id FROM verified_clubs WHERE id = $1 LIMIT 1;`,
+            `SELECT id, slug, auth_user_id, name, category, category_updated_at, about, college_name, college_id FROM verified_clubs WHERE id = $1 LIMIT 1;`,
             [clubId]
         );
         const currentClub = currentRes.rows[0];
@@ -355,6 +357,32 @@ export class ClubProfileService {
         // Slug updates are blocked — username changes require a separate process
         if (payload.slug !== undefined) {
             delete payload.slug; // Silently ignore slug changes from the profile update endpoint
+        }
+
+        // Minimum 4-Hour Cooldown limit on Club Category changes
+        if (
+            payload.category !== undefined &&
+            String(payload.category).trim() !== "" &&
+            String(payload.category).trim() !== String(currentClub.category || "").trim()
+        ) {
+            if (currentClub.category_updated_at) {
+                const lastUpdated = new Date(currentClub.category_updated_at).getTime();
+                const fourHoursMs = 4 * 60 * 60 * 1000;
+                const elapsed = Date.now() - lastUpdated;
+                if (elapsed < fourHoursMs) {
+                    const remainingMinutes = Math.ceil((fourHoursMs - elapsed) / (60 * 1000));
+                    const hours = Math.floor(remainingMinutes / 60);
+                    const mins = remainingMinutes % 60;
+                    const timeStr = hours > 0
+                        ? `${hours} hour${hours > 1 ? "s" : ""} and ${mins} min${mins !== 1 ? "s" : ""}`
+                        : `${mins} minute${mins !== 1 ? "s" : ""}`;
+                    const err: any = new Error(
+                        `Club category can only be changed once every 4 hours. You can change it again in ${timeStr}.`
+                    );
+                    err.statusCode = 429;
+                    throw err;
+                }
+            }
         }
 
         // URL format validation helper
@@ -559,6 +587,9 @@ export class ClubProfileService {
         }
         if (payload.category !== undefined && String(payload.category).trim().length > 0) {
             addField("category", String(payload.category).trim());
+            if (String(payload.category).trim() !== String(currentClub.category || "").trim()) {
+                addField("category_updated_at", new Date().toISOString());
+            }
         }
         if (cleanShortDescription !== undefined) {
             addField("short_description", cleanShortDescription);

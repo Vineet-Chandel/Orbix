@@ -681,6 +681,21 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                     </p>
                                 </button>
                             </div>
+
+                            {/* Warning when transitioning from Published to Cancelled stage */}
+                            {editingEvent?.status === "published" && form.status === "cancelled" && (
+                                <div className="p-3.5 rounded-2xl bg-rose-100 border-2 border-rose-900 shadow-[2px_2px_0px_#000] space-y-1.5 animate-in fade-in duration-200">
+                                    <div className="flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4 text-rose-700 stroke-[2.5]" />
+                                        <span className="text-xs font-black uppercase tracking-wider text-rose-950">
+                                            Warning: Moving from Published to Cancelled Stage
+                                        </span>
+                                    </div>
+                                    <p className="text-xs font-bold text-rose-950 leading-relaxed">
+                                        Orbix enforces a minimum 4-hour advance cancellation limit. Setting this event to Cancelled will immediately dispatch cancellation notifications to all registered students and campus members of your college.
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     </form>
                 </div>

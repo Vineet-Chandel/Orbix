@@ -164,15 +164,16 @@ export const changeClubEventStatus = createAsyncThunk<
         previousStatus: ClubEventStatus;
         password?: string;
         confirmationText?: string;
+        emergencyBypass?: boolean;
     },
     { rejectValue: { eventId: string; previousStatus: ClubEventStatus; message: string } }
->("clubEvents/changeClubEventStatus", async ({ eventId, status, previousStatus, password, confirmationText }, { rejectWithValue }) => {
+>("clubEvents/changeClubEventStatus", async ({ eventId, status, previousStatus, password, confirmationText, emergencyBypass }, { rejectWithValue }) => {
     try {
         const res = await fetch(`/api/club/events/${eventId}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             credentials: "include",
-            body: JSON.stringify({ status, password, confirmationText }),
+            body: JSON.stringify({ status, password, confirmationText, emergencyBypass }),
         });
 
         const data = await res.json().catch(() => null);

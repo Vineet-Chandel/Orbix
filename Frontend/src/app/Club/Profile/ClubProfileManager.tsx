@@ -623,6 +623,7 @@ export const ClubProfileManager: React.FC<ClubProfileManagerProps> = ({
                         onNameChange={setName}
                         category={category}
                         onCategoryChange={setCategory}
+                        categoryUpdatedAt={club?.categoryUpdatedAt}
                         foundedYear={foundedYear}
                         onFoundedYearChange={setFoundedYear}
                         operatingStatus={operatingStatus}

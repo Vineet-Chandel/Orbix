@@ -23,6 +23,7 @@ interface StepIdentityProps {
     onNameChange: (val: string) => void;
     category: string;
     onCategoryChange: (val: string) => void;
+    categoryUpdatedAt?: string | null;
     foundedYear: string;
     onFoundedYearChange: (val: string) => void;
     operatingStatus: "active" | "on_hiatus" | "inactive";
@@ -39,6 +40,7 @@ export const StepIdentity: React.FC<StepIdentityProps> = ({
     onNameChange,
     category,
     onCategoryChange,
+    categoryUpdatedAt,
     foundedYear,
     onFoundedYearChange,
     operatingStatus,
@@ -48,6 +50,17 @@ export const StepIdentity: React.FC<StepIdentityProps> = ({
     collegeState,
     isVerified = true,
 }) => {
+    // 4-Hour Cooldown Limit Calculation
+    const lastUpdatedMs = categoryUpdatedAt ? new Date(categoryUpdatedAt).getTime() : 0;
+    const elapsedMs = Date.now() - lastUpdatedMs;
+    const fourHoursMs = 4 * 60 * 60 * 1000;
+    const isLocked = lastUpdatedMs > 0 && elapsedMs < fourHoursMs;
+    const remainingMinutes = isLocked ? Math.ceil((fourHoursMs - elapsedMs) / (60 * 1000)) : 0;
+    const remainingHours = Math.floor(remainingMinutes / 60);
+    const remainingMins = remainingMinutes % 60;
+    const timeRemainingStr = remainingHours > 0
+        ? `${remainingHours}h ${remainingMins}m`
+        : `${remainingMins}m`;
     const currentYear = new Date().getFullYear();
 
     const statuses = [
@@ -138,15 +151,32 @@ export const StepIdentity: React.FC<StepIdentityProps> = ({
 
                 {/* Primary Category */}
                 <div className="space-y-1.5">
-                    <label className="block text-xs font-black uppercase tracking-wider text-black">
-                        Primary Category <span className="text-rose-500">*</span>
-                    </label>
+                    <div className="flex items-center justify-between">
+                        <label className="block text-xs font-black uppercase tracking-wider text-black">
+                            Primary Category <span className="text-rose-500">*</span>
+                        </label>
+                        {isLocked ? (
+                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-black/30 shadow-[1px_1px_0px_#000]">
+                                🔒 Locked ({timeRemainingStr} remaining)
+                            </span>
+                        ) : (
+                            <span className="text-[10px] font-bold text-neutral-500">
+                                Minimum 4-hour update interval
+                            </span>
+                        )}
+                    </div>
                     <NeoSelect
                         value={category}
                         onChange={onCategoryChange}
                         options={CLUB_CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+                        disabled={isLocked}
                         className="w-full text-xs font-bold"
                     />
+                    <p className="text-[10px] text-neutral-500 font-medium leading-snug">
+                        {isLocked
+                            ? `Category was updated recently. To maintain discovery consistency, it can be updated again in ${timeRemainingStr}.`
+                            : "Club primary category can only be changed once every 4 hours."}
+                    </p>
                 </div>
             </div>
 

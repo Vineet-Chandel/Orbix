@@ -8,6 +8,7 @@ import {
     Check,
     X,
     ShieldAlert,
+    Bell,
 } from "lucide-react";
 import type { ClubEvent } from "../../store/clubEventsSlice";
 import { OrbixLoader } from "../../components/ui/loader";
@@ -17,7 +18,7 @@ export interface EventSecurityConfirmModalProps {
     onClose: () => void;
     event: ClubEvent | null;
     action: "draft" | "cancelled" | "delete" | null;
-    onConfirm: (password: string, confirmationText: string) => Promise<void>;
+    onConfirm: (password: string, confirmationText: string, emergencyBypass?: boolean) => Promise<void>;
 }
 
 export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps> = ({
@@ -30,6 +31,7 @@ export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps>
     const [confirmationInput, setConfirmationInput] = useState("");
     const [passwordInput, setPasswordInput] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [emergencyBypass, setEmergencyBypass] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -37,13 +39,26 @@ export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps>
     const expectedPhrase = `delete ${eventTitle}`;
     const isPhraseMatched =
         confirmationInput.trim().toLowerCase() === expectedPhrase.toLowerCase();
-    const canSubmit = isPhraseMatched && passwordInput.length > 0 && !submitting;
+
+    // 4-Hour cancellation policy check
+    const startsAtMs = event?.startsAt ? new Date(event.startsAt).getTime() : 0;
+    const nowMs = Date.now();
+    const hoursRemaining = (startsAtMs - nowMs) / (1000 * 60 * 60);
+    const isCancellingLiveEvent = action === "cancelled" && event?.status === "published";
+    const isWithinFourHours = isCancellingLiveEvent && hoursRemaining > 0 && hoursRemaining < 4;
+
+    const canSubmit =
+        isPhraseMatched &&
+        passwordInput.length > 0 &&
+        (!isWithinFourHours || emergencyBypass) &&
+        !submitting;
 
     useEffect(() => {
         if (isOpen) {
             setConfirmationInput("");
             setPasswordInput("");
             setShowPassword(false);
+            setEmergencyBypass(false);
             setSubmitting(false);
             setErrorMessage(null);
         }
@@ -89,7 +104,7 @@ export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps>
         setErrorMessage(null);
 
         try {
-            await onConfirm(passwordInput, confirmationInput.trim());
+            await onConfirm(passwordInput, confirmationInput.trim(), emergencyBypass);
             onClose();
         } catch (err: any) {
             setErrorMessage(
@@ -144,6 +159,45 @@ export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps>
                         {actionMeta.warning}
                     </p>
                 </div>
+
+                {/* Live Cancellation Warnings: Campus Broadcast & 4-Hour Policy Notice */}
+                {isCancellingLiveEvent && (
+                    <div className="space-y-3">
+                        <div className="p-3.5 rounded-2xl bg-sky-50 border-2 border-black/30 flex items-start gap-3 shadow-[1.5px_1.5px_0px_#000]">
+                            <Bell className="w-4 h-4 text-sky-700 shrink-0 mt-0.5" />
+                            <p className="text-xs font-bold text-sky-950 leading-relaxed">
+                                <strong>Campus Notification Broadcast:</strong> Cancelling this published event will immediately dispatch cancellation notifications to the club and all registered students & campus members of your college.
+                            </p>
+                        </div>
+
+                        {isWithinFourHours && (
+                            <div className="p-3.5 rounded-2xl bg-rose-100 border-2 border-rose-900 shadow-[2px_2px_0px_#000] space-y-2.5">
+                                <div className="flex items-center gap-2">
+                                    <AlertTriangle className="w-4 h-4 text-rose-700 stroke-[2.5]" />
+                                    <span className="text-xs font-black uppercase tracking-wider text-rose-950">
+                                        ⚠️ Minimum 4-Hour Cancellation Policy Limit
+                                    </span>
+                                </div>
+                                <p className="text-xs font-bold text-rose-950 leading-relaxed">
+                                    This event starts in{" "}
+                                    <span className="underline font-black text-black">
+                                        {Math.max(1, Math.ceil(hoursRemaining * 60))} minutes
+                                    </span>
+                                    . Orbix requires a minimum 4-hour advance cancellation limit to prevent disruption to registered students.
+                                </p>
+                                <label className="flex items-start gap-2 pt-1 text-xs font-black text-rose-950 cursor-pointer select-none">
+                                    <input
+                                        type="checkbox"
+                                        checked={emergencyBypass}
+                                        onChange={(e) => setEmergencyBypass(e.target.checked)}
+                                        className="mt-0.5 w-4 h-4 rounded border-2 border-black accent-black cursor-pointer"
+                                    />
+                                    <span>I confirm this is an urgent emergency cancellation. Please alert all registered students immediately.</span>
+                                </label>
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
