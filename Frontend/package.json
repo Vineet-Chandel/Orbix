@@ -17,6 +17,7 @@
     "firebase": "^13.1.0",
     "framer-motion": "^14.1.0",
     "html-to-image": "^1.11.13",
+    "jsqr": "^1.4.0",
     "katex": "^0.19.1",
     "lucide-react": "^1.59.0",
     "mermaid": "^12.2.0",

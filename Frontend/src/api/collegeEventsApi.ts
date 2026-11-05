@@ -274,3 +274,71 @@ export async function fetchPublicEventById(eventId: string): Promise<CollegeEven
     }
     return data.event || null;
 }
+
+export interface VerifiedAttendeeData {
+    registrationId: string;
+    eventId: string;
+    clubId: string;
+    userId: string;
+    status: "pending" | "registered" | "attended" | "waitlisted" | "rejected" | "cancelled" | "blocked";
+    ticketCode: string;
+    registeredAt: string;
+    checkedInAt: string | null;
+    department: string | null;
+    yearOfStudy: string | null;
+    rollNumber: string | null;
+    phoneNumber: string | null;
+    notes: string | null;
+    reviewedAt: string | null;
+    reviewNotes: string | null;
+    username: string;
+    firstName: string;
+    middleName: string | null;
+    lastName: string;
+    email: string;
+    avatarUrl: string | null;
+    coverImageUrl: string | null;
+    headline: string | null;
+    bio: string | null;
+    location: string | null;
+    collegeName: string | null;
+    website: string | null;
+    linkedin: string | null;
+    github: string | null;
+    customLink: string | null;
+    links: any[] | null;
+    skills: any[] | null;
+    phone: string | null;
+    isPhoneVerified: boolean;
+    isEmailVerified: boolean;
+    memberSince: string;
+}
+
+export interface CheckinVerifyResponse {
+    success: boolean;
+    actionTaken: "checked_in" | "already_checked_in" | "pending" | "invalid_status";
+    message: string;
+    attendee: VerifiedAttendeeData;
+}
+
+/**
+ * Club staff scans or pastes an attendee ticket code for live identity verification & check-in
+ */
+export async function verifyEventTicketAndCheckin(
+    eventId: string,
+    ticketCode: string,
+    forceCheckIn: boolean = false
+): Promise<CheckinVerifyResponse> {
+    const res = await fetch(`/api/club/events/${eventId}/checkin-verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ticketCode, forceCheckIn }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to verify entry ticket.");
+    }
+    return data;
+}
+
