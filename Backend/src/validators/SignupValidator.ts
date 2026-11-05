@@ -543,12 +543,17 @@ const SignupValidator = (data: any) => {
         throw new ValidationError("Middle name must be a string if provided.");
     }
 
-    if (typeof data.termsAccepted !== "boolean") {
-        throw new ValidationError("Terms accepted must be a boolean.");
+    // Legal Consent & Age Validation (Non-negotiable)
+    if (data.termsAccepted !== true) {
+        throw new ValidationError("You must accept the Terms and Conditions.");
     }
 
-    if (data.termsAccepted !== true) {
-        throw new ValidationError("You must accept the terms and conditions.");
+    if (data.privacyPolicyAccepted !== true) {
+        throw new ValidationError("You must acknowledge the Privacy Policy.");
+    }
+
+    if (data.isAgeConfirmed !== true) {
+        throw new ValidationError("You must confirm that you are at least 18 years of age to register an individual account.");
     }
 
     // 2. Max Length & DoS Protection
@@ -598,7 +603,11 @@ const SignupValidator = (data: any) => {
         gmail: normalizedGmail,
         password: password, // preserved exactly
         username: normalizedUsername,
-        termsAccepted: data.termsAccepted
+        termsAccepted: true,
+        termsVersion: "v1.0",
+        privacyPolicyAccepted: true,
+        privacyPolicyVersion: "v1.0",
+        isAgeConfirmed: true
     };
 };
 

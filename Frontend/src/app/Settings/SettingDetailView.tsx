@@ -1154,13 +1154,24 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                         </p>
                                     </div>
                                 </div>
-                                <Link
-                                    to="/docs/public-vs-private-profile"
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] self-start sm:self-auto cursor-pointer"
-                                >
-                                    <span>Privacy Architecture Docs</span>
-                                    <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
-                                </Link>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Link
+                                        to="/privacy"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#a2ff86] hover:bg-[#86ef6c] border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] self-start sm:self-auto cursor-pointer"
+                                    >
+                                        <span>Full Privacy Policy</span>
+                                        <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    </Link>
+                                    <Link
+                                        to="/docs/public-vs-private-profile"
+                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] self-start sm:self-auto cursor-pointer"
+                                    >
+                                        <span>Privacy Architecture Docs</span>
+                                        <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    </Link>
+                                </div>
                             </div>
 
                             <p className="text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed">
@@ -1577,16 +1588,18 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
                             <div className="pt-4 border-t-2 border-black/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-neutral-600 font-medium">
                                 <div className="flex flex-wrap items-center gap-3 font-bold text-black">
-                                    <Link to="/docs" className="hover:underline">Documentation</Link>
+                                    <Link to="/privacy" target="_blank" className="hover:underline">Privacy Policy</Link>
                                     <span>•</span>
-                                    <Link to="/events" className="hover:underline">Events Calendar</Link>
+                                    <Link to="/terms" target="_blank" className="hover:underline">Terms & Conditions</Link>
+                                    <span>•</span>
+                                    <Link to="/docs" className="hover:underline">Docs</Link>
+                                    <span>•</span>
+                                    <Link to="/events" className="hover:underline">Events</Link>
                                     <span>•</span>
                                     <Link to="/leaderboard" className="hover:underline">Leaderboard</Link>
-                                    <span>•</span>
-                                    <Link to="/blogs" className="hover:underline">Engineering Blog</Link>
                                 </div>
                                 <span className="font-mono text-[11px] text-neutral-500">
-                                    Proprietary © {new Date().getFullYear()} Orbix Inc. All rights reserved.
+                                    Proprietary © {new Date().getFullYear()} Orbix. All rights reserved.
                                 </span>
                             </div>
                         </div>

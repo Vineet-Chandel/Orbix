@@ -393,8 +393,23 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                                                         </div>
                                                     )}
                                                     <div className="truncate">
-                                                        <div className="font-black text-black truncate">
-                                                            {app.applicantName}
+                                                        <div className="font-black text-black truncate flex items-center gap-1.5">
+                                                            <span>{app.applicantName}</span>
+                                                            {app.isAttendeeUnder18 && (
+                                                                app.guardianConsentStatus === 'verified' ? (
+                                                                    <span className="px-1 py-0.2 bg-[#a2ff86] text-black font-black text-[9px] uppercase border border-black rounded shadow-[1px_1px_0px_#000]" title="Guardian consent confirmed">
+                                                                        Minor: Verified
+                                                                    </span>
+                                                                ) : app.guardianConsentStatus === 'rejected' ? (
+                                                                    <span className="px-1 py-0.2 bg-[#FF6B6B] text-white font-black text-[9px] uppercase border border-black rounded shadow-[1px_1px_0px_#000]" title="Guardian consent declined">
+                                                                        Minor: Declined
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="px-1 py-0.2 bg-[#FFE566] text-black font-black text-[9px] uppercase border border-black rounded shadow-[1px_1px_0px_#000]" title="Awaiting electronic guardian verification">
+                                                                        Minor: Consent Pending
+                                                                    </span>
+                                                                )
+                                                            )}
                                                         </div>
                                                         <div className="text-[10px] font-mono text-neutral-500 truncate">
                                                             @{app.username}

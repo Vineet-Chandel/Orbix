@@ -257,12 +257,19 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
                     email,
                     password,
                     termsaccepted,
+                    terms_version,
+                    terms_accepted_at,
+                    privacy_policy_accepted,
+                    privacy_policy_version,
+                    privacy_policy_accepted_at,
+                    is_age_18_confirmed,
+                    age_confirmed_at,
                     avatar_url,
                     account_type,
                     is_email_verified,
                     email_verified_at,
                     is_verified_coder
-                ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'personal',true,CURRENT_TIMESTAMP,true)
+                ) VALUES ($1,$2,$3,$4,$5,$6,$7,'v1.0',CURRENT_TIMESTAMP,true,'v1.0',CURRENT_TIMESTAMP,true,CURRENT_TIMESTAMP,$8,'personal',true,CURRENT_TIMESTAMP,true)
                 RETURNING id, username, email AS gmail, firstname AS "firstName", lastname AS "lastName", avatar_url AS "avatarUrl", photo_url AS "photoUrl", is_email_verified AS "isEmailVerified", is_verified_coder AS "isVerifiedCoder"`,
             [
                 validatedData.username,
@@ -278,6 +285,26 @@ authRouter.post('/signup', async (req: Request, res: Response) => {
 
         const createdUser = result.rows[0];
         const userId = createdUser?.id || `usr-${Date.now()}`;
+
+        // Audit Trail: Append-only legal consent records
+        const userAgentHeader = (req.headers["user-agent"] as string) || "Unknown User-Agent";
+        try {
+            await query(
+                `INSERT INTO user_legal_consents (user_id, document_type, document_version, action, ip_address, user_agent, metadata)
+                 VALUES
+                 ($1, 'terms_and_conditions', 'v1.0', 'accepted', $2, $3, $4),
+                 ($1, 'privacy_policy', 'v1.0', 'accepted', $2, $3, $4),
+                 ($1, 'age_confirmation', 'v1.0', 'accepted', $2, $3, $4);`,
+                [
+                    userId,
+                    ip,
+                    userAgentHeader,
+                    JSON.stringify({ registrationType: "personal", agreedAt: new Date().toISOString() })
+                ]
+            );
+        } catch (consentErr) {
+            console.error("Failed to log user legal consents:", consentErr);
+        }
 
         // Ensure leaderboard entry verification status is synchronized
         try {

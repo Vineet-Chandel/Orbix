@@ -664,6 +664,58 @@ export const testDatabaseConnection = async () => {
                 CREATE INDEX IF NOT EXISTS idx_club_certificates_club ON public.club_certificates(club_id, created_at DESC);
                 CREATE INDEX IF NOT EXISTS idx_club_certificates_event ON public.club_certificates(event_id);
                 CREATE INDEX IF NOT EXISTS idx_club_certificates_code ON public.club_certificates(credential_code);
+
+                -- Legal Consent & Minor Protection (Migration 030)
+                ALTER TABLE public.users ADD COLUMN IF NOT EXISTS terms_version VARCHAR(32) DEFAULT 'v1.0';
+                ALTER TABLE public.users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+                ALTER TABLE public.users ADD COLUMN IF NOT EXISTS privacy_policy_accepted BOOLEAN DEFAULT TRUE;
+                ALTER TABLE public.users ADD COLUMN IF NOT EXISTS privacy_policy_version VARCHAR(32) DEFAULT 'v1.0';
+                ALTER TABLE public.users ADD COLUMN IF NOT EXISTS privacy_policy_accepted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+                ALTER TABLE public.users ADD COLUMN IF NOT EXISTS is_age_18_confirmed BOOLEAN DEFAULT TRUE;
+                ALTER TABLE public.users ADD COLUMN IF NOT EXISTS age_confirmed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
+                CREATE TABLE IF NOT EXISTS public.user_legal_consents (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    document_type VARCHAR(50) NOT NULL,
+                    document_version VARCHAR(32) NOT NULL DEFAULT 'v1.0',
+                    action VARCHAR(50) NOT NULL DEFAULT 'accepted',
+                    ip_address VARCHAR(100),
+                    user_agent TEXT,
+                    metadata JSONB DEFAULT '{}'::jsonb,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_user_legal_consents_user ON public.user_legal_consents(user_id);
+                CREATE INDEX IF NOT EXISTS idx_user_legal_consents_type ON public.user_legal_consents(user_id, document_type);
+                CREATE INDEX IF NOT EXISTS idx_user_legal_consents_created ON public.user_legal_consents(created_at DESC);
+
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'club_event_registrations') THEN
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS is_attendee_under_18 BOOLEAN DEFAULT FALSE;
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS guardian_name VARCHAR(255);
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS guardian_email VARCHAR(255);
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS guardian_phone VARCHAR(50);
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS guardian_relationship VARCHAR(100);
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS guardian_consent_status VARCHAR(50) DEFAULT 'not_required';
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS guardian_consent_token VARCHAR(128);
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS guardian_consent_token_expires_at TIMESTAMPTZ;
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS guardian_consent_verified_at TIMESTAMPTZ;
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS guardian_consent_ip VARCHAR(100);
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS guardian_consent_user_agent TEXT;
+                    ALTER TABLE public.club_event_registrations DROP CONSTRAINT IF EXISTS club_event_registrations_guardian_status_check;
+                    ALTER TABLE public.club_event_registrations ADD CONSTRAINT club_event_registrations_guardian_status_check
+                        CHECK (guardian_consent_status IN ('not_required', 'pending_verification', 'verified', 'rejected', 'withdrawn'));
+                    CREATE INDEX IF NOT EXISTS idx_club_event_reg_guardian_token ON public.club_event_registrations(guardian_consent_token) WHERE guardian_consent_token IS NOT NULL;
+                    CREATE INDEX IF NOT EXISTS idx_club_event_reg_minor_consent ON public.club_event_registrations(event_id, guardian_consent_status);
+                END IF;
+
+                IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'account_deletion_requests') THEN
+                    ALTER TABLE public.account_deletion_requests DROP CONSTRAINT IF EXISTS account_deletion_requests_user_id_fkey;
+                    ALTER TABLE public.account_deletion_requests ALTER COLUMN user_id DROP NOT NULL;
+                    ALTER TABLE public.account_deletion_requests ADD CONSTRAINT account_deletion_requests_user_id_fkey
+                        FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE SET NULL;
+                    ALTER TABLE public.account_deletion_requests ADD COLUMN IF NOT EXISTS user_email_hash VARCHAR(64);
+                    ALTER TABLE public.account_deletion_requests ADD COLUMN IF NOT EXISTS purge_log JSONB DEFAULT '{}'::jsonb;
+                END IF;
             END $$;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");

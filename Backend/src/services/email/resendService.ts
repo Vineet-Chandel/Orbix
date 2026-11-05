@@ -638,3 +638,105 @@ export async function sendSecurityNotificationEmail(options: SendSecurityNotific
     logContext: "Security notification",
   });
 }
+
+
+export interface SendGuardianConsentEmailOptions {
+  to: string;
+  guardianName: string;
+  studentName: string;
+  eventTitle: string;
+  clubName: string;
+  collegeName: string;
+  consentLink: string;
+  expiresInDays?: number;
+}
+
+/**
+ * Sends verifiable electronic consent request email to parent or legal guardian for a minor attendee.
+ */
+export async function sendGuardianConsentEmail(options: SendGuardianConsentEmailOptions): Promise<SendEmailResult> {
+  const {
+    to,
+    guardianName,
+    studentName,
+    eventTitle,
+    clubName,
+    collegeName,
+    consentLink,
+    expiresInDays = 7,
+  } = options;
+
+  const subject = `Parental Consent Required: ${studentName} - ${eventTitle}`;
+  const message = `Your dependent, <strong>${studentName}</strong>, has registered to attend the collegiate event <strong>"${eventTitle}"</strong> organized by <strong>${clubName}</strong> at <strong>${collegeName}</strong>. In accordance with applicable minor data protection standards and the Orbix Platform Terms, verifiable parental or guardian consent is legally required before participation and student registration can be confirmed.<br><br>Please click the secure button below to review event details, data processing provisions, and electronically record your consent:`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${subject}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F4F0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F4F4F0; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; background-color: #FAF6EE; border: 3px solid #000000; box-shadow: 6px 6px 0px 0px #000000; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #000000; padding: 20px 24px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td>
+                    <span style="font-size: 20px; font-weight: 900; letter-spacing: 1.5px; color: #a2ff86; text-transform: uppercase;">ORBIX</span>
+                  </td>
+                  <td align="right">
+                    <span style="background-color: #FFE566; color: #000000; padding: 4px 10px; border-radius: 999px; border: 1.5px solid #000000; font-size: 11px; font-weight: 900; text-transform: uppercase;">Minor Protection</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 28px 24px;">
+              <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 900; color: #000000;">Parental / Guardian Consent Request</h1>
+              <p style="font-size: 14px; line-height: 1.6; color: #333333;">Dear <strong>${guardianName}</strong>,</p>
+              <p style="font-size: 14px; line-height: 1.6; color: #333333;">${message}</p>
+              
+              <div style="background-color: #FFFFFF; border: 2px solid #000000; padding: 16px; margin: 20px 0; border-radius: 6px; box-shadow: 3px 3px 0px 0px #000000;">
+                <p style="margin: 0 0 6px 0; font-size: 13px; color: #555555;"><strong>Event:</strong> ${eventTitle}</p>
+                <p style="margin: 0 0 6px 0; font-size: 13px; color: #555555;"><strong>Host Club:</strong> ${clubName}</p>
+                <p style="margin: 0 0 6px 0; font-size: 13px; color: #555555;"><strong>Campus:</strong> ${collegeName}</p>
+                <p style="margin: 0; font-size: 13px; color: #555555;"><strong>Attendee:</strong> ${studentName} (Under 18)</p>
+              </div>
+
+              <div style="text-align: center; margin: 28px 0;">
+                <a href="${consentLink}" style="display: inline-block; background-color: #a2ff86; color: #000000; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; text-decoration: none; padding: 14px 28px; border: 2.5px solid #000000; border-radius: 6px; box-shadow: 4px 4px 0px 0px #000000;">Review & Record Guardian Consent</a>
+              </div>
+
+              <p style="font-size: 12px; line-height: 1.5; color: #666666; border-top: 1px solid #DDDDDD; padding-top: 16px;">
+                This link will expire in ${expiresInDays} days. If you do not recognize this request or wish to decline participation, you may decline directly on the verification page or ignore this email.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 24px; background-color: #F0EDE6; border-top: 2px solid #000000; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #777777;">Orbix Platform • Digital Identity & Collegiate Chapter Network</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const text = `Hello ${guardianName},\n\nYour dependent, ${studentName}, has registered for "${eventTitle}" at ${collegeName} hosted by ${clubName}.\n\nVerifiable parental/guardian consent is required. Please review and confirm consent at the following link:\n${consentLink}\n\nLink expires in ${expiresInDays} days.`;
+
+  return dispatchEmail({
+    to,
+    subject,
+    html,
+    text,
+    fromName: "Orbix Minor Protection",
+    defaultFromEmail: "onboarding@resend.dev",
+    logContext: "Guardian consent verification",
+  });
+}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import {
     Mail,
     RotateCcw,
@@ -30,7 +30,9 @@ export default function SignupForm() {
         lastName: "",
         gmail: "",
         password: "",
-        termsAccepted: true,
+        termsAccepted: false,
+        privacyPolicyAccepted: false,
+        isAgeConfirmed: false,
     });
 
     const [errors, setErrors] = useState<{
@@ -40,6 +42,8 @@ export default function SignupForm() {
         gmail?: string;
         password?: string;
         termsAccepted?: string;
+        privacyPolicyAccepted?: string;
+        isAgeConfirmed?: string;
     }>({});
 
     const [loading, setLoading] = useState(false);
@@ -108,7 +112,13 @@ export default function SignupForm() {
         }
 
         if (!formData.termsAccepted) {
-            newErrors.termsAccepted = "You must accept the terms to continue";
+            newErrors.termsAccepted = "You must accept the Terms & Conditions to register";
+        }
+        if (!formData.privacyPolicyAccepted) {
+            newErrors.privacyPolicyAccepted = "You must acknowledge the Privacy Policy";
+        }
+        if (!formData.isAgeConfirmed) {
+            newErrors.isAgeConfirmed = "You must confirm you are at least 18 years of age";
         }
 
         setErrors(newErrors);
@@ -303,6 +313,8 @@ export default function SignupForm() {
                 gmail: email,
                 password: formData.password,
                 termsAccepted: formData.termsAccepted,
+                privacyPolicyAccepted: formData.privacyPolicyAccepted,
+                isAgeConfirmed: formData.isAgeConfirmed,
                 verificationToken,
             };
 
@@ -480,39 +492,82 @@ export default function SignupForm() {
                     />
                 </div>
 
-                {/* Terms & Conditions Checkbox */}
-                <div className="pt-1">
-                    <NeoCheckbox
-                        checked={formData.termsAccepted}
-                        onCheckedChange={(checked) => {
-                            setFormData({ ...formData, termsAccepted: checked });
-                            if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: undefined });
-                        }}
-                        size="sm"
-                        label={
-                            <span className="leading-snug font-medium text-xs text-neutral-700">
-                                I accept the{" "}
-                                <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                    Terms of Service
-                                </a>{" "}
-                                and{" "}
-                                <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                    Privacy Policy
-                                </a>
-                                .
-                            </span>
-                        }
-                    />
-                    {errors.termsAccepted && (
-                        <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
-                    )}
+                {/* Separate Versioned Legal Consents & Age Confirmation */}
+                <div className="space-y-3 pt-2">
+                    {/* 1. Terms & Conditions */}
+                    <div>
+                        <NeoCheckbox
+                            checked={formData.termsAccepted}
+                            onCheckedChange={(checked) => {
+                                setFormData({ ...formData, termsAccepted: checked });
+                                if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: undefined });
+                            }}
+                            size="sm"
+                            label={
+                                <span className="leading-snug font-medium text-xs text-neutral-700">
+                                    I accept the{" "}
+                                    <Link to="/terms" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                        Terms & Conditions
+                                    </Link>
+                                    .
+                                </span>
+                            }
+                        />
+                        {errors.termsAccepted && (
+                            <p className="text-xs font-bold text-rose-600 mt-0.5 px-1">{errors.termsAccepted}</p>
+                        )}
+                    </div>
+
+                    {/* 2. Privacy Policy */}
+                    <div>
+                        <NeoCheckbox
+                            checked={formData.privacyPolicyAccepted}
+                            onCheckedChange={(checked) => {
+                                setFormData({ ...formData, privacyPolicyAccepted: checked });
+                                if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: undefined });
+                            }}
+                            size="sm"
+                            label={
+                                <span className="leading-snug font-medium text-xs text-neutral-700">
+                                    I acknowledge and agree to the{" "}
+                                    <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                        Privacy Policy
+                                    </Link>
+                                    .
+                                </span>
+                            }
+                        />
+                        {errors.privacyPolicyAccepted && (
+                            <p className="text-xs font-bold text-rose-600 mt-0.5 px-1">{errors.privacyPolicyAccepted}</p>
+                        )}
+                    </div>
+
+                    {/* 3. Age 18+ Confirmation */}
+                    <div>
+                        <NeoCheckbox
+                            checked={formData.isAgeConfirmed}
+                            onCheckedChange={(checked) => {
+                                setFormData({ ...formData, isAgeConfirmed: checked });
+                                if (errors.isAgeConfirmed) setErrors({ ...errors, isAgeConfirmed: undefined });
+                            }}
+                            size="sm"
+                            label={
+                                <span className="leading-snug font-medium text-xs text-neutral-700">
+                                    I confirm that I am at least <strong>18 years of age</strong> and legally eligible to create an individual Orbix account.
+                                </span>
+                            }
+                        />
+                        {errors.isAgeConfirmed && (
+                            <p className="text-xs font-bold text-rose-600 mt-0.5 px-1">{errors.isAgeConfirmed}</p>
+                        )}
+                    </div>
                 </div>
 
                 {/* Neo-brutalist Capsule Button */}
                 <div className="pt-2">
                     <button
                         type="submit"
-                        disabled={loading || !formData.termsAccepted}
+                        disabled={loading || !formData.termsAccepted || !formData.privacyPolicyAccepted || !formData.isAgeConfirmed}
                         className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                     >
                         {loading ? (

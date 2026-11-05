@@ -1,6 +1,5 @@
 # Orbix Club Application Verification: Manual Database & Reviewer Guide
 
-Rahul
 
 This guide provides complete technical documentation for Orbix staff and reviewers responsible for auditing, verifying, and activating collegiate clubs—either through the **Orbix Reviewer Portal (`/clubs/reviewer`)** or manually via the **PostgreSQL / Supabase Database**.
 

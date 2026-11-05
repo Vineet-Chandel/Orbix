@@ -25,6 +25,7 @@ import { privacyRouter } from './Routes/account/privacyRoutes.js';
 import { platformRouter } from './Routes/platform/platformRoutes.js';
 import { sessionRouter } from './Routes/session/sessionRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
+import { startAccountPurgeWorker } from './services/account/accountPurgeService.js';
 import redis from './redis/client.js';
 
 const app: Express = express();
@@ -119,6 +120,13 @@ const startServer = async () => {
         testDatabaseConnection().catch((error) => {
             console.warn("⚠️ Database connection check warning:", error.message || error);
         });
+
+        // Start automated 7-day account deletion purge worker
+        try {
+            startAccountPurgeWorker();
+        } catch (workerErr) {
+            console.error("Failed to initialize account purge worker:", workerErr);
+        }
     } catch (error) {
         console.error("Server startup failed:", error);
     }

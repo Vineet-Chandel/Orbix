@@ -47,6 +47,11 @@ export interface ApplyForEventPayload {
     rollNumber?: string;
     phoneNumber?: string;
     notes?: string;
+    isAttendeeUnder18?: boolean;
+    guardianName?: string;
+    guardianEmail?: string;
+    guardianPhone?: string;
+    guardianRelationship?: string;
 }
 
 export interface StudentApplicationItem {
@@ -101,6 +106,13 @@ export interface ClubEventApplicantRow {
     reviewedAt?: string | null;
     reviewNotes?: string | null;
     notes: string;
+    isAttendeeUnder18?: boolean;
+    guardianName?: string | null;
+    guardianEmail?: string | null;
+    guardianPhone?: string | null;
+    guardianRelationship?: string | null;
+    guardianConsentStatus?: "not_required" | "pending_verification" | "verified" | "rejected" | "withdrawn";
+    guardianConsentVerifiedAt?: string | null;
 }
 
 export interface ClubEventApplicationsResponse {

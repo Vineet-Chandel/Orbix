@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import type { ConfirmationResult, RecaptchaVerifier } from "firebase/auth";
 import {
     formatToE164,
@@ -1425,9 +1425,9 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 label={
                                     <span className="leading-snug font-medium text-xs text-neutral-700">
                                         I accept the{" "}
-                                        <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                        <Link to="/terms" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
                                             Terms of Service
-                                        </a>
+                                        </Link>
                                         .
                                     </span>
                                 }
@@ -1443,9 +1443,9 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 label={
                                     <span className="leading-snug font-medium text-xs text-neutral-700">
                                         I accept the{" "}
-                                        <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                        <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
                                             Privacy Policy
-                                        </a>
+                                        </Link>
                                         .
                                     </span>
                                 }
