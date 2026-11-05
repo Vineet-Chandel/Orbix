@@ -91,6 +91,73 @@ clubProfileRouter.patch("/", authenticate, async (req: Request, res: Response) =
 });
 
 /**
+ * DELETE /api/club/profile/image
+ * Removes club logo or banner image asset and cleans up Cloudinary storage.
+ */
+clubProfileRouter.delete("/image", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Authentication required." });
+        }
+
+        const type = (req.query.type as string) || req.body?.type;
+        if (!type || !["logo", "banner"].includes(type)) {
+            return res.status(400).json({
+                success: false,
+                message: "Image type is required and must be 'logo' or 'banner'.",
+            });
+        }
+
+        const requestedClubId = (req.query.clubId as string) || req.body?.clubId || undefined;
+        const result = await ClubProfileService.removeClubImage(userId, type as "logo" | "banner", requestedClubId);
+
+        return res.json({
+            success: true,
+            message: `Club ${type} removed successfully.`,
+            ...result,
+        });
+    } catch (err: any) {
+        console.error("DELETE /api/club/profile/image error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to remove image.",
+        });
+    }
+});
+
+/**
+ * GET /api/club/profile/preview
+ * Returns the exact public preview representation of the current club profile for authorized managers.
+ */
+clubProfileRouter.get("/preview", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Authentication required." });
+        }
+
+        const requestedClubId = (req.query.clubId as string) || undefined;
+        const fullProfile = await ClubProfileService.getFullClubProfile(userId, requestedClubId);
+
+        // Fetch public profile view using the club slug
+        const publicView = await ClubProfileService.getPublicClubProfile(fullProfile.club.slug, userId);
+
+        return res.json({
+            success: true,
+            ...publicView,
+            isPreview: true,
+        });
+    } catch (err: any) {
+        console.error("GET /api/club/profile/preview error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to generate profile preview.",
+        });
+    }
+});
+
+/**
  * POST /api/club/profile/upload-signature
  * Generates signed direct Cloudinary upload params for logo, banner, coordinator photo, or achievement badge.
  */

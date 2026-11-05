@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, Mail, Trash2, X, Inbox, Loader2, ArrowUpRight } from "lucide-react";
+import { Bell, Mail, Trash2, X, Inbox, ArrowUpRight } from "lucide-react";
+import { OrbixLoader } from "./ui/loader";
 import { useAppSelector } from "../store";
 import {
     fetchNotifications,
@@ -10,7 +11,7 @@ import {
 } from "../utils/profileApi";
 
 interface NotificationBellProps {
-    variant?: "dark" | "light";
+    variant?: "dark" | "light" | "neo";
     className?: string;
 }
 
@@ -156,6 +157,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     }
 
     const isDark = variant === "dark";
+    const isNeo = variant === "neo";
 
     return (
         <div ref={containerRef} className={`relative inline-block ${className}`}>
@@ -165,17 +167,35 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                 onClick={handleOpenDropdown}
                 aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ""}`}
                 title="Notifications"
-                className={`relative flex items-center justify-center w-9 h-9 rounded-xl transition-all cursor-pointer outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 active:outline-none ${
-                    isDark
-                        ? "text-neutral-300 hover:text-white hover:bg-white/[0.08] active:translate-x-0.5 active:translate-y-0.5"
-                        : "text-black hover:bg-[#FAF6EE] active:translate-x-0.5 active:translate-y-0.5"
-                } ${isOpen ? (isDark ? "bg-white/[0.12] text-white" : "bg-[#FAF6EE] text-black") : ""}`}
+                className={`relative flex items-center justify-center transition-all cursor-pointer group outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 select-none ${
+                    isNeo
+                        ? `w-10 h-10 rounded-xl bg-white hover:bg-[#FFE566]/20 text-black border-2 border-black ${
+                              isOpen
+                                  ? "bg-[#FFE566] shadow-[1px_1px_0px_#000] translate-x-[1px] translate-y-[1px]"
+                                  : "shadow-[2.5px_2.5px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                          }`
+                        : isDark
+                        ? `w-9 h-9 rounded-xl text-neutral-300 hover:text-white hover:bg-white/[0.08] active:translate-x-0.5 active:translate-y-0.5 ${
+                              isOpen ? "bg-white/[0.12] text-white" : ""
+                          }`
+                        : `w-9 h-9 rounded-xl text-black hover:bg-[#FAF6EE] active:translate-x-0.5 active:translate-y-0.5 ${
+                              isOpen ? "bg-[#FAF6EE] text-black" : ""
+                          }`
+                }`}
             >
-                <Bell className="w-4.5 h-4.5 transition-transform group-hover:rotate-6" />
+                <Bell
+                    className={`${
+                        isNeo ? "w-5 h-5 stroke-[2.2]" : "w-4.5 h-4.5 stroke-[2]"
+                    } transition-transform duration-200 group-hover:rotate-6 text-current`}
+                />
 
-                {/* Automatic Unread Counter Badge */}
+                {/* Automatic Unread Counter Badge — Half Outer / Half Inner floating badge */}
                 {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-black leading-none text-black bg-[#FFE566] rounded-full border-2 border-black shadow-[1px_1px_0px_#000]">
+                    <span
+                        className={`absolute ${
+                            isNeo ? "-top-2 -right-2" : "-top-1.5 -right-1.5"
+                        } z-10 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black leading-none text-black bg-[#FFE566] rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] pointer-events-none select-none`}
+                    >
                         {unreadCount > 99 ? "99+" : unreadCount}
                     </span>
                 )}
@@ -234,11 +254,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                     {/* Notification Items List */}
                     <div className={`max-h-[380px] overflow-y-auto divide-y-2 ${isDark ? "divide-neutral-800" : "divide-black/10"}`}>
                         {loading && notifications.length === 0 ? (
-                            <div className="py-12 flex flex-col items-center justify-center gap-2">
-                                <Loader2 className="w-5 h-5 animate-spin text-black" />
-                                <span className={`text-xs font-bold ${isDark ? "text-neutral-400" : "text-neutral-600"}`}>
-                                    Checking updates...
-                                </span>
+                            <div className="py-8 flex flex-col items-center justify-center">
+                                <OrbixLoader size="sm" />
                             </div>
                         ) : notifications.length === 0 ? (
                             <div className="py-10 px-6 text-center flex flex-col items-center justify-center">
@@ -325,7 +342,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
                                                         title="Delete"
                                                     >
                                                         {isDeleting ? (
-                                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                            <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                                         ) : (
                                                             <Trash2 className="w-3.5 h-3.5" />
                                                         )}

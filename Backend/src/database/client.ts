@@ -127,6 +127,12 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMPTZ NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_two_factor_enabled BOOLEAN DEFAULT false;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS two_factor_enabled_at TIMESTAMPTZ NULL;
+            ALTER TABLE users ALTER COLUMN password DROP NOT NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS google_id VARCHAR(255) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS github_id VARCHAR(255) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS auth_provider VARCHAR(50) DEFAULT 'local';
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id ON users(google_id) WHERE google_id IS NOT NULL;
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_users_github_id ON users(github_id) WHERE github_id IS NOT NULL;
             CREATE UNIQUE INDEX IF NOT EXISTS idx_users_phone_unique ON users (LOWER(TRIM(phone))) WHERE phone IS NOT NULL AND TRIM(phone) != '';
             CREATE INDEX IF NOT EXISTS idx_users_two_factor ON users (is_two_factor_enabled) WHERE is_two_factor_enabled = true;
             CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
@@ -597,6 +603,68 @@ export const testDatabaseConnection = async () => {
             CREATE INDEX IF NOT EXISTS idx_relationships_high_pending 
                 ON user_relationships(user_high_id, requested_by, created_at DESC) 
                 WHERE status = 'pending';
+
+            -- Ensure club_events location_type constraint permits 'in_person', 'online', 'virtual', 'hybrid'
+            -- and status constraint permits 'draft', 'published', 'completed', 'cancelled'
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'club_events'
+                ) THEN
+                    ALTER TABLE public.club_events DROP CONSTRAINT IF EXISTS club_events_location_type_check;
+                    ALTER TABLE public.club_events ADD CONSTRAINT club_events_location_type_check
+                        CHECK (location_type IN ('in_person', 'online', 'virtual', 'hybrid'));
+
+                    ALTER TABLE public.club_events DROP CONSTRAINT IF EXISTS club_events_status_check;
+                    ALTER TABLE public.club_events ADD CONSTRAINT club_events_status_check
+                        CHECK (status IN ('draft', 'published', 'completed', 'cancelled'));
+
+                    ALTER TABLE public.verified_clubs 
+                        ADD COLUMN IF NOT EXISTS category_updated_at TIMESTAMPTZ;
+                END IF;
+
+                -- Ensure club_event_registrations status constraint supports full approval flow
+                IF EXISTS (
+                    SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'club_event_registrations'
+                ) THEN
+                    ALTER TABLE public.club_event_registrations DROP CONSTRAINT IF EXISTS club_event_registrations_status_check;
+                    ALTER TABLE public.club_event_registrations ADD CONSTRAINT club_event_registrations_status_check
+                        CHECK (status IN ('pending', 'registered', 'attended', 'waitlisted', 'rejected', 'cancelled', 'blocked'));
+                    ALTER TABLE public.club_event_registrations ALTER COLUMN status SET DEFAULT 'pending';
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS reviewed_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL;
+                    ALTER TABLE public.club_event_registrations ADD COLUMN IF NOT EXISTS review_notes TEXT;
+                    CREATE INDEX IF NOT EXISTS idx_club_event_registrations_status ON public.club_event_registrations(event_id, status);
+                END IF;
+
+                -- Ensure club_certificates table exists
+                CREATE TABLE IF NOT EXISTS public.club_certificates (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    event_id UUID REFERENCES public.club_events(id) ON DELETE SET NULL,
+                    title VARCHAR(255) NOT NULL,
+                    certificate_type VARCHAR(50) NOT NULL DEFAULT 'participation' CHECK (
+                        certificate_type IN ('participation', 'excellence', 'merit', 'contributor', 'organizer', 'appreciation')
+                    ),
+                    recipient_name VARCHAR(255) NOT NULL,
+                    recipient_email VARCHAR(255),
+                    description TEXT,
+                    credential_code VARCHAR(64) NOT NULL UNIQUE,
+                    signer_name VARCHAR(150),
+                    signer_role VARCHAR(150),
+                    issued_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    issue_date TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    metadata JSONB DEFAULT '{}'::jsonb,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_user ON public.club_certificates(user_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_club ON public.club_certificates(club_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_event ON public.club_certificates(event_id);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_code ON public.club_certificates(credential_code);
+            END $$;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");
     } catch (error) {
@@ -611,7 +679,7 @@ export const testDatabaseConnection = async () => {
 const isRetryableError = (error: any): boolean => {
     if (!error) return false;
     const msg = String(error.message || "").toLowerCase();
-    const code = String(error.code || "");
+    const code = String(error.code || "").toUpperCase();
     return (
         msg.includes("timeout") ||
         msg.includes("connection terminated") ||
@@ -619,6 +687,16 @@ const isRetryableError = (error: any): boolean => {
         msg.includes("econnreset") ||
         msg.includes("etimedout") ||
         msg.includes("epipe") ||
+        msg.includes("enotfound") ||
+        msg.includes("eaddrnotavail") ||
+        msg.includes("econnrefused") ||
+        msg.includes("ehostunreach") ||
+        code === "ENOTFOUND" ||
+        code === "EADDRNOTAVAIL" ||
+        code === "ECONNRESET" ||
+        code === "ETIMEDOUT" ||
+        code === "ECONNREFUSED" ||
+        code === "EHOSTUNREACH" ||
         code === "57P01" || // admin_shutdown
         code === "57P02" || // crash_shutdown
         code === "57P03" || // cannot_connect_now

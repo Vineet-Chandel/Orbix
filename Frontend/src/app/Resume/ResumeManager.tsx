@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
     Sparkles,
     FileText,
@@ -33,6 +34,7 @@ import { ResumeUploadModal } from "./Intelligence/ResumeUploadModal";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { NeoToggle } from "../../components/NeoToggle";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface ResumeManagerProps {
     onOpenMobileSidebar?: () => void;
@@ -58,6 +60,11 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
     // Modals
     const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
     const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
+
+    const { handleBackdropClick: handlePreviewBackdropClick } = useModalDismiss({
+        isOpen: isPreviewModalOpen,
+        onClose: () => setIsPreviewModalOpen(false),
+    });
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
 
@@ -699,16 +706,17 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
             {/* ========================================================================= */}
             {/* INTERACTIVE PDF PREVIEW MODAL */}
             {/* ========================================================================= */}
-            {isPreviewModalOpen && resumeData?.resumeUrl && (
+            {isPreviewModalOpen && resumeData?.resumeUrl && typeof document !== "undefined" && createPortal(
                 <div
                     role="dialog"
                     aria-modal="true"
-                    className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
-                    onClick={(e) => {
-                        if (e.target === e.currentTarget) setIsPreviewModalOpen(false);
-                    }}
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+                    onClick={handlePreviewBackdropClick}
                 >
-                    <div className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl overflow-hidden shadow-[8px_8px_0px_#000] flex flex-col">
+                    <div
+                        className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl overflow-hidden shadow-[8px_8px_0px_#000] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black bg-white">
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black text-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
@@ -761,7 +769,8 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                             />
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ========================================================================= */}

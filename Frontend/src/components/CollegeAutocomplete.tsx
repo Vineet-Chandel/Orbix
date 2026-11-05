@@ -6,16 +6,17 @@ import {
     MapPin,
     Building,
     X,
-    Loader2,
     PlusCircle,
     ShieldCheck,
     AlertCircle,
     Lock,
     Clock,
 } from "lucide-react";
+import { OrbixLoader } from "./ui/loader";
 import { searchInstitutions, type InstitutionItem } from "../utils/profileApi";
 import { RequestCollegeModal } from "./RequestCollegeModal";
 import { CollegeChangeWarningModal } from "./CollegeChangeWarningModal";
+import { VerifiedBadge } from "./VerifiedBadge";
 
 export interface CollegeAutocompleteProps {
     value?: string | null; // collegeId (UUID)
@@ -213,10 +214,7 @@ export function CollegeAutocomplete({
                                     {selectedCollege.officialName}
                                 </h4>
                                 {selectedCollege.verificationStatus === "verified" && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[10px] font-black text-black shadow-[1px_1px_0px_#000]">
-                                        <ShieldCheck className="w-3 h-3 text-black stroke-[2.5]" />
-                                        <span>Verified</span>
-                                    </span>
+                                    <VerifiedBadge size="sm" title="Verified Institution" />
                                 )}
                             </div>
                             <div className="flex items-center gap-3 text-[11px] text-neutral-600 font-semibold mt-0.5 flex-wrap">
@@ -350,7 +348,7 @@ export function CollegeAutocomplete({
                     />
 
                     <div className="absolute right-3 flex items-center gap-1.5">
-                        {isLoading && <Loader2 className="w-4 h-4 text-black animate-spin" />}
+                        {isLoading && <OrbixLoader size="xs" variant="minimal" color="#000000" />}
                         {queryText && !isLoading && (
                             <button
                                 type="button"
@@ -427,10 +425,7 @@ export function CollegeAutocomplete({
                                                         {item.officialName}
                                                     </span>
                                                     {item.verificationStatus === "verified" && (
-                                                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[9px] font-black text-black shadow-[1px_1px_0px_#000]">
-                                                            <CheckCircle2 className="w-2.5 h-2.5 stroke-[2.5]" />
-                                                            <span>Verified</span>
-                                                        </span>
+                                                        <VerifiedBadge size="xs" title="Verified Institution" />
                                                     )}
                                                 </div>
                                                 <div className="flex items-center gap-2.5 text-[11px] text-neutral-600 font-semibold mt-1 flex-wrap">
@@ -457,10 +452,10 @@ export function CollegeAutocomplete({
                                                     e.stopPropagation();
                                                     handleSelect(item);
                                                 }}
-                                                className="px-3 py-1.5 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-800 border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] text-xs font-black uppercase tracking-wider flex items-center gap-1 transition-all flex-shrink-0 cursor-pointer"
+                                                className="px-3.5 py-1.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all flex-shrink-0 cursor-pointer select-none"
                                             >
                                                 <span>Select</span>
-                                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                                             </button>
                                         </li>
                                     );

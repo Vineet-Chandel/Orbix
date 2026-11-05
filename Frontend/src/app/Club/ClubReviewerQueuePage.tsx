@@ -7,11 +7,13 @@ import {
     RefreshCw,
     ExternalLink,
     Lock,
-    Loader2,
     CheckCircle2,
 } from "lucide-react";
+import { OrbixButton } from "../../components/OrbixButton";
 import { useToast } from "../../context/ToastContext";
 import { NeoSelect } from "../../components/NeoSelect";
+import { NeoCheckbox } from "../../components/NeoCheckbox";
+import { NeoDateTimePicker } from "../../components/NeoDateTimePicker";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
 interface ReviewerApplication {
@@ -250,13 +252,11 @@ export default function ClubReviewerQueuePage() {
                 <div className="flex items-center gap-3">
                     <Link
                         to="/"
-                        className="flex items-center gap-2 group"
+                        className="flex items-center gap-2.5 group hover:opacity-85 transition-opacity"
                         title="Orbix Home"
                     >
-                        <div className="w-8 h-8 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center p-1.5 shadow-[1.5px_1.5px_0px_#000] group-hover:scale-105 transition-transform flex-shrink-0">
-                            <OrbixLogo className="w-full h-full text-black" />
-                        </div>
-                        <span className="font-black text-lg tracking-tight text-black group-hover:text-neutral-700 transition-colors">
+                        <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                        <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none group-hover:text-neutral-700 transition-colors">
                             Orbix Staff
                         </span>
                     </Link>
@@ -561,66 +561,59 @@ export default function ClubReviewerQueuePage() {
                                                 </div>
 
                                                 {/* Checklist Checkboxes */}
-                                                <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
-                                                    <input
-                                                        type="checkbox"
+                                                <div className="space-y-2 pt-1">
+                                                    <NeoCheckbox
                                                         checked={editForm.clubExistenceConfirmed}
-                                                        onChange={(e) =>
+                                                        onCheckedChange={(checked) =>
                                                             setEditForm({
                                                                 ...editForm,
-                                                                clubExistenceConfirmed: e.target.checked,
+                                                                clubExistenceConfirmed: checked,
                                                             })
                                                         }
-                                                        className="h-4 w-4 rounded border-2 border-black accent-black"
+                                                        label="1. Club Existence Confirmed"
+                                                        labelClassName="text-xs font-bold text-black"
+                                                        size="sm"
                                                     />
-                                                    <span>1. Club Existence Confirmed</span>
-                                                </label>
 
-                                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                    <input
-                                                        type="checkbox"
+                                                    <NeoCheckbox
                                                         checked={editForm.collegeAuthorizationConfirmed}
-                                                        onChange={(e) =>
+                                                        onCheckedChange={(checked) =>
                                                             setEditForm({
                                                                 ...editForm,
-                                                                collegeAuthorizationConfirmed: e.target.checked,
+                                                                collegeAuthorizationConfirmed: checked,
                                                             })
                                                         }
-                                                        className="h-4 w-4 rounded border-2 border-black accent-black"
+                                                        label="2. College Association Confirmed"
+                                                        labelClassName="text-xs font-bold text-black"
+                                                        size="sm"
                                                     />
-                                                    <span>2. College Association Confirmed</span>
-                                                </label>
 
-                                                <label className="flex items-center gap-2 cursor-pointer select-none">
-                                                    <input
-                                                        type="checkbox"
+                                                    <NeoCheckbox
                                                         checked={editForm.representativeAuthorityConfirmed}
-                                                        onChange={(e) =>
+                                                        onCheckedChange={(checked) =>
                                                             setEditForm({
                                                                 ...editForm,
-                                                                representativeAuthorityConfirmed: e.target.checked,
+                                                                representativeAuthorityConfirmed: checked,
                                                             })
                                                         }
-                                                        className="h-4 w-4 rounded border-2 border-black accent-black"
+                                                        label="3. Representative Authority Confirmed"
+                                                        labelClassName="text-xs font-bold text-black"
+                                                        size="sm"
                                                     />
-                                                    <span>3. Representative Authority Confirmed</span>
-                                                </label>
+                                                </div>
 
                                                 {/* Last Contacted Date */}
                                                 <div className="pt-1">
-                                                    <label className="block text-[10px] font-black uppercase tracking-wider text-neutral-600 mb-1">
-                                                        Last College Contact Date
-                                                    </label>
-                                                    <input
-                                                        type="date"
+                                                    <NeoDateTimePicker
+                                                        mode="date"
+                                                        label="Last College Contact Date"
                                                         value={editForm.lastCollegeContactedAt}
-                                                        onChange={(e) =>
+                                                        onChange={(val) =>
                                                             setEditForm({
                                                                 ...editForm,
-                                                                lastCollegeContactedAt: e.target.value,
+                                                                lastCollegeContactedAt: val,
                                                             })
                                                         }
-                                                        className="w-full h-8 px-2.5 rounded-xl bg-white border border-black/30 text-xs font-mono font-bold"
                                                     />
                                                 </div>
                                             </div>
@@ -720,28 +713,18 @@ export default function ClubReviewerQueuePage() {
 
                                             {selectedRequest.status !== "approved" && (
                                                 <div className="pt-2 border-t-2 border-black/10 space-y-2">
-                                                    <button
-                                                        type="button"
-                                                        disabled={isSaving || isPromoting || !isAllChecklistConfirmed}
+                                                    <OrbixButton
+                                                        fullWidth
+                                                        disabled={isSaving || !isAllChecklistConfirmed}
+                                                        loading={isPromoting}
+                                                        loadingLabel="Activating Club in Database..."
                                                         onClick={handlePromoteClub}
-                                                        className={`w-full py-2.5 rounded-xl border-2 border-black text-xs font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 transition-all ${
-                                                            isAllChecklistConfirmed
-                                                                ? "bg-emerald-400 hover:bg-emerald-500 text-black cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
-                                                                : "bg-neutral-100 text-neutral-400 border-neutral-300 cursor-not-allowed shadow-none"
-                                                        }`}
+                                                        variant="lime"
+                                                        size="md"
+                                                        icon={<ShieldCheck className="w-4 h-4" />}
                                                     >
-                                                        {isPromoting ? (
-                                                            <>
-                                                                <Loader2 className="w-4 h-4 animate-spin" />
-                                                                <span>Activating Club in Database...</span>
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <ShieldCheck className="w-4 h-4" />
-                                                                <span>Approve & Activate Club (Promote to Live)</span>
-                                                            </>
-                                                        )}
-                                                    </button>
+                                                        Approve & Activate Club (Promote to Live)
+                                                    </OrbixButton>
 
                                                     <button
                                                         type="button"

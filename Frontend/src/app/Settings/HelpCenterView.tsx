@@ -13,19 +13,20 @@ import {
     ChevronDown,
     ChevronUp,
     ExternalLink,
-    Loader2,
     Paperclip,
     Plus,
     Check,
     MessageSquare,
     Laptop,
 } from "lucide-react";
+import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import {
     createHelpTicket,
     fetchUserHelpTickets,
     fetchHelpTicketDetail,
     sendTicketReply,
     fetchHelpFAQs,
+    submitFAQFeedback,
     extractClientSystemInfo,
     type HelpTicketCategory,
     type HelpTicketPriority,
@@ -95,6 +96,58 @@ const CATEGORIES: CategoryOption[] = [
     },
 ];
 
+const DEFAULT_FAQS: FAQItem[] = [
+    {
+        id: "sync-frequency",
+        category: "Platform Sync",
+        question: "How often does Orbix refresh my platform stats (LeetCode, Codeforces, GitHub)?",
+        answer:
+            "Orbix triggers automatic daily syncs for all connected profiles. You can also trigger an instant live refresh at any time by visiting your Developer Profile or Onboarding hub and clicking 'Sync'.",
+    },
+    {
+        id: "college-update-rule",
+        category: "College & Identity",
+        question: "Why is my College Name locked or on cooldown?",
+        answer:
+            "To ensure leaderboard integrity and prevent gaming college standings during contest seasons, college identity updates have a 3-day verification cooldown. You can change your college once every 3 days.",
+    },
+    {
+        id: "orbix-score",
+        category: "Orbix Score",
+        question: "How is the Orbix Score calculated across competitive platforms?",
+        answer:
+            "Orbix Score is a calibrated 0 to 10,000 composite algorithm that mathematically weights algorithmic problem counts across platforms (40%), rated contest performance (35%), active weekly streak consistency (15%), and verified open-source GitHub contributions (10%). Diminishing returns curves ensure fair benchmarking across all coding platforms.",
+    },
+    {
+        id: "private-profile",
+        category: "Privacy",
+        question: "What happens when I toggle my profile to Private?",
+        answer:
+            "A private profile immediately de-indexes your stats, contest rating history, and resume from public URLs and global explore searches. Only essential identity information (name and handle) remains visible to confirmed connections.",
+    },
+    {
+        id: "resume-audit",
+        category: "Resume Intelligence",
+        question: "How does the Resume Intelligence engine evaluate my resume?",
+        answer:
+            "The Orbix Resume Intelligence engine uses deterministic multi-stage AST parsing to evaluate resumes across 7 distinct dimensions: ATS Compatibility, Quantification & Metrics, Technical Depth, Action-Oriented Language, Brevity, Section Architecture, and Verifiable Project Provenance.",
+    },
+    {
+        id: "club-verification",
+        category: "Clubs & Chapters",
+        question: "What is required to verify a student developer club?",
+        answer:
+            "Clubs submit collegiate proof (such as an official college portal link or faculty advisor contact). Once submitted, the Orbix verification queue reviews the request under the 4-Pillar Reviewer Standard within 24 to 48 business hours.",
+    },
+    {
+        id: "card-studio",
+        category: "Developer Card",
+        question: "How can I export my verified developer card or embed my live badge?",
+        answer:
+            "Visit the Card Studio on your profile page to customize themes, download high-resolution PNG/SVG assets, or copy the auto-updating Markdown badge snippet for your GitHub README.",
+    },
+];
+
 export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
     const toast = useToast();
 
@@ -123,10 +176,22 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
     const [replyText, setReplyText] = useState("");
     const [isSendingReply, setIsSendingReply] = useState(false);
 
-    // FAQs state
-    const [faqs, setFaqs] = useState<FAQItem[]>([]);
+    // FAQs state (initialized with rich default answers)
+    const [faqs, setFaqs] = useState<FAQItem[]>(DEFAULT_FAQS);
     const [expandedFaqId, setExpandedFaqId] = useState<string | null>("sync-frequency");
     const [faqSearch, setFaqSearch] = useState("");
+    const [faqCategoryFilter, setFaqCategoryFilter] = useState<string>("all");
+    const [votedFaqs, setVotedFaqs] = useState<Record<string, boolean>>({});
+
+    const handleFaqFeedback = async (faqId: string, isHelpful: boolean) => {
+        setVotedFaqs((prev) => ({ ...prev, [faqId]: isHelpful }));
+        try {
+            await submitFAQFeedback(faqId, isHelpful);
+            toast.info("Thank you for your feedback!", { title: "Documentation Rating" });
+        } catch {
+            // non-blocking
+        }
+    };
 
     // Active category metadata
     const activeCatConfig = useMemo(
@@ -147,11 +212,17 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
         }
     }, []);
 
-    // Fetch FAQs
+    // Fetch FAQs from API with fallback to DEFAULT_FAQS
     useEffect(() => {
         fetchHelpFAQs()
-            .then((data) => setFaqs(data.faqs || []))
-            .catch(() => {});
+            .then((data) => {
+                if (data?.faqs && data.faqs.length > 0) {
+                    setFaqs(data.faqs);
+                }
+            })
+            .catch(() => {
+                // Preserves DEFAULT_FAQS smoothly
+            });
     }, []);
 
     useEffect(() => {
@@ -253,17 +324,21 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
         }
     };
 
-    // Filter FAQs by search
+    // Filter FAQs by search and category
     const filteredFaqs = useMemo(() => {
-        if (!faqSearch.trim()) return faqs;
+        let list = faqs;
+        if (faqCategoryFilter !== "all") {
+            list = list.filter((f) => f.category.toLowerCase().includes(faqCategoryFilter.toLowerCase()));
+        }
+        if (!faqSearch.trim()) return list;
         const q = faqSearch.toLowerCase();
-        return faqs.filter(
+        return list.filter(
             (f) =>
                 f.question.toLowerCase().includes(q) ||
                 f.answer.toLowerCase().includes(q) ||
                 f.category.toLowerCase().includes(q)
         );
-    }, [faqs, faqSearch]);
+    }, [faqs, faqSearch, faqCategoryFilter]);
 
     // Status badge style helper
     const renderStatusBadge = (status: HelpTicketStatus) => {
@@ -632,23 +707,17 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
 
                                     {/* Action Buttons */}
                                     <div className="flex items-center justify-end gap-3 pt-2">
-                                        <button
+                                        <OrbixButton
                                             type="submit"
-                                            disabled={isSubmitting}
-                                            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                            loading={isSubmitting}
+                                            loadingLabel="Transmitting Request..."
+                                            variant="black"
+                                            size="lg"
+                                            icon={<Send className="w-4 h-4 stroke-[2.5]" />}
+                                            uppercase
                                         >
-                                            {isSubmitting ? (
-                                                <>
-                                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                                    <span>Transmitting Request...</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <Send className="w-4 h-4 stroke-[2.5]" />
-                                                    <span>Submit Help Request</span>
-                                                </>
-                                            )}
-                                        </button>
+                                            Submit Help Request
+                                        </OrbixButton>
                                     </div>
                                 </form>
                             )}
@@ -659,11 +728,8 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
                     {activeTab === "history" && (
                         <div>
                             {isLoadingDetail ? (
-                                <div className="py-12 text-center space-y-2">
-                                    <Loader2 className="w-6 h-6 animate-spin mx-auto text-black" />
-                                    <p className="text-xs font-bold text-neutral-600">
-                                        Loading ticket details...
-                                    </p>
+                                <div className="py-16 flex items-center justify-center text-black">
+                                    <OrbixLoader size="md" />
                                 </div>
                             ) : selectedTicket ? (
                                 /* Selected Ticket Detail View */
@@ -767,18 +833,18 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
                                                 className="w-full p-3 bg-[#FAF6EE] text-black text-xs font-medium rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] focus:outline-none focus:ring-2 focus:ring-black"
                                             />
                                             <div className="flex justify-end">
-                                                <button
+                                                <OrbixButton
                                                     type="submit"
-                                                    disabled={isSendingReply || !replyText.trim()}
-                                                    className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                                                    disabled={!replyText.trim()}
+                                                    loading={isSendingReply}
+                                                    loadingLabel="Sending Reply..."
+                                                    variant="black"
+                                                    size="sm"
+                                                    icon={<Send className="w-3.5 h-3.5" />}
+                                                    uppercase
                                                 >
-                                                    {isSendingReply ? (
-                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    ) : (
-                                                        <Send className="w-3.5 h-3.5" />
-                                                    )}
-                                                    <span>Send Reply</span>
-                                                </button>
+                                                    Send Reply
+                                                </OrbixButton>
                                             </div>
                                         </form>
                                     </div>
@@ -787,11 +853,8 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
                                 /* Ticket List */
                                 <div className="space-y-4">
                                     {isLoadingTickets ? (
-                                        <div className="py-12 text-center space-y-2">
-                                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-black" />
-                                            <p className="text-xs font-bold text-neutral-600">
-                                                Loading your tickets...
-                                            </p>
+                                        <div className="py-16 flex items-center justify-center text-black">
+                                            <OrbixLoader size="md" />
                                         </div>
                                     ) : tickets.length === 0 ? (
                                         <div className="py-12 text-center space-y-3">
@@ -857,56 +920,119 @@ export const HelpCenterView: React.FC<HelpCenterViewProps> = ({ user }) => {
                     {/* TAB 3: INSTANT FAQS & SOLUTIONS */}
                     {activeTab === "faqs" && (
                         <div className="space-y-4">
-                            {/* Search */}
-                            <div className="relative">
-                                <input
-                                    type="text"
-                                    value={faqSearch}
-                                    onChange={(e) => setFaqSearch(e.target.value)}
-                                    placeholder="Search answers (e.g. sync, college cooldown, score)..."
-                                    className="w-full px-4 py-2.5 bg-[#FAF6EE] text-black text-xs font-bold rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] focus:outline-none focus:ring-2 focus:ring-black placeholder:font-normal placeholder:text-neutral-500"
-                                />
+                            {/* Search and Category Filter */}
+                            <div className="space-y-3">
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        value={faqSearch}
+                                        onChange={(e) => setFaqSearch(e.target.value)}
+                                        placeholder="Search answers (e.g. sync, college cooldown, score, resume)..."
+                                        className="w-full px-4 py-2.5 bg-[#FAF6EE] text-black text-xs font-bold rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] focus:outline-none focus:ring-2 focus:ring-black placeholder:font-normal placeholder:text-neutral-500"
+                                    />
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                    {["all", "Platform Sync", "College", "Score", "Privacy", "Clubs"].map((cat) => {
+                                        const isSel = faqCategoryFilter === cat;
+                                        return (
+                                            <button
+                                                key={cat}
+                                                type="button"
+                                                onClick={() => setFaqCategoryFilter(cat)}
+                                                className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                                                    isSel
+                                                        ? "bg-[#FFE566] text-black border-black shadow-[1.5px_1.5px_0px_#000]"
+                                                        : "bg-white text-neutral-600 border-black/20 hover:border-black"
+                                                }`}
+                                            >
+                                                {cat === "all" ? "All Topics" : cat}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             {/* Accordion Questions */}
                             <div className="space-y-2.5">
-                                {filteredFaqs.map((faq) => {
-                                    const isExpanded = expandedFaqId === faq.id;
-                                    return (
-                                        <div
-                                            key={faq.id}
-                                            className="rounded-xl border-2 border-black bg-white shadow-[2px_2px_0px_#000] overflow-hidden"
-                                        >
-                                            <button
-                                                type="button"
-                                                onClick={() =>
-                                                    setExpandedFaqId(isExpanded ? null : faq.id)
-                                                }
-                                                className="w-full p-3.5 text-left flex items-center justify-between gap-3 cursor-pointer hover:bg-[#FAF6EE]/50 transition-colors"
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded bg-[#FAF6EE] border border-black/30 text-neutral-700 shrink-0">
-                                                        {faq.category}
-                                                    </span>
-                                                    <span className="text-xs sm:text-sm font-black text-black">
-                                                        {faq.question}
-                                                    </span>
-                                                </div>
-                                                {isExpanded ? (
-                                                    <ChevronUp className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
-                                                ) : (
-                                                    <ChevronDown className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
-                                                )}
-                                            </button>
+                                {filteredFaqs.length === 0 ? (
+                                    <div className="p-8 text-center rounded-xl bg-white border-2 border-black space-y-2">
+                                        <p className="text-xs font-black text-black">No matching documentation found</p>
+                                        <p className="text-[11px] text-neutral-500">
+                                            Try searching with another keyword, or submit a direct ticket to our team.
+                                        </p>
+                                    </div>
+                                ) : (
+                                    filteredFaqs.map((faq) => {
+                                        const isExpanded = expandedFaqId === faq.id;
+                                        const hasVoted = votedFaqs[faq.id] !== undefined;
 
-                                            {isExpanded && (
-                                                <div className="p-3.5 pt-0 text-xs text-neutral-700 font-medium leading-relaxed border-t border-black/10 bg-[#FAF6EE]/20">
-                                                    {faq.answer}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
+                                        return (
+                                            <div
+                                                key={faq.id}
+                                                className="rounded-xl border-2 border-black bg-white shadow-[2px_2px_0px_#000] overflow-hidden"
+                                            >
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setExpandedFaqId(isExpanded ? null : faq.id)
+                                                    }
+                                                    className="w-full p-3.5 text-left flex items-center justify-between gap-3 cursor-pointer hover:bg-[#FAF6EE]/50 transition-colors"
+                                                >
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[10px] font-mono font-black uppercase px-2 py-0.5 rounded bg-[#FAF6EE] border border-black/30 text-neutral-700 shrink-0">
+                                                            {faq.category}
+                                                        </span>
+                                                        <span className="text-xs sm:text-sm font-black text-black">
+                                                            {faq.question}
+                                                        </span>
+                                                    </div>
+                                                    {isExpanded ? (
+                                                        <ChevronUp className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
+                                                    ) : (
+                                                        <ChevronDown className="w-4 h-4 text-black shrink-0 stroke-[2.5]" />
+                                                    )}
+                                                </button>
+
+                                                {isExpanded && (
+                                                    <div className="p-3.5 pt-0 text-xs text-neutral-700 font-medium leading-relaxed border-t border-black/10 bg-[#FAF6EE]/20 space-y-3">
+                                                        <p className="pt-2">{faq.answer}</p>
+
+                                                        {/* Helpful Voting */}
+                                                        <div className="pt-2 border-t border-black/10 flex items-center justify-between text-[11px] text-neutral-600">
+                                                            <span>Was this answer helpful?</span>
+                                                            <div className="flex items-center gap-2">
+                                                                {hasVoted ? (
+                                                                    <span className="font-bold text-black flex items-center gap-1">
+                                                                        <Check className="w-3.5 h-3.5 text-emerald-600 stroke-[3]" />
+                                                                        Thanks for your feedback!
+                                                                    </span>
+                                                                ) : (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleFaqFeedback(faq.id, true)}
+                                                                            className="px-2.5 py-1 rounded-lg border border-black bg-white hover:bg-[#a2ff86] text-black font-bold cursor-pointer transition-colors"
+                                                                        >
+                                                                            Yes
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => handleFaqFeedback(faq.id, false)}
+                                                                            className="px-2.5 py-1 rounded-lg border border-black bg-white hover:bg-rose-100 text-black font-bold cursor-pointer transition-colors"
+                                                                        >
+                                                                            No
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
 
                             {/* Contact Support Footer in FAQs */}

@@ -10,6 +10,7 @@ import developmentAnalyticsReducer from "./developmentAnalyticsSlice";
 import eventsReducer from "./eventsSlice";
 import networkReducer from "./networkSlice";
 import clubReducer from "./clubSlice";
+import clubEventsReducer from "./clubEventsSlice";
 
 export const store = configureStore({
     reducer: {
@@ -23,6 +24,7 @@ export const store = configureStore({
         events: eventsReducer,
         network: networkReducer,
         club: clubReducer,
+        clubEvents: clubEventsReducer,
     },
 });
 
@@ -42,3 +44,4 @@ export * from "./developmentAnalyticsSlice";
 export * from "./eventsSlice";
 export * from "./networkSlice";
 export * from "./clubSlice";
+export * from "./clubEventsSlice";

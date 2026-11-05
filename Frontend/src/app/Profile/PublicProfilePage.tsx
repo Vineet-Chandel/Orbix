@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -48,6 +49,8 @@ import { isDemoProfileUsername, demoPublicProfile, demoConnectedPortals } from "
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
 import { HireMeModal } from "./HireMeModal";
+import { VerifiedBadge } from "../../components/VerifiedBadge";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { GetTheCardModal } from "./GetTheCardModal";
 import { CARD_THEMES } from "./CardStudio/types";
 import { useToast } from "../../context/ToastContext";
@@ -418,7 +421,7 @@ export const ProfileHeader = ({ isEmbedded, isDemo }: { isEmbedded?: boolean; is
                 <div className="w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-black font-black text-sm transition-transform duration-200 group-hover:scale-105">
                     <OrbixLogoMark className="w-full h-full text-black" />
                 </div>
-                <span className="font-extrabold text-neutral-950 text-2xl sm:text-3xl tracking-tight group-hover:text-black transition-colors">
+                <span className="font-black text-black text-2xl sm:text-3xl tracking-tight leading-none group-hover:text-black transition-colors">
                     Orbix
                 </span>
             </Link>
@@ -547,6 +550,11 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     const [isHireModalOpen, setIsHireModalOpen] = useState(false);
     const [isCardModalOpen, setIsCardModalOpen] = useState(false);
     const [isResumePreviewOpen, setIsResumePreviewOpen] = useState(false);
+
+    const { handleBackdropClick: handleResumePreviewBackdropClick } = useModalDismiss({
+        isOpen: isResumePreviewOpen,
+        onClose: () => setIsResumePreviewOpen(false),
+    });
     const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
 
     const handleBlockUser = async () => {
@@ -1150,8 +1158,8 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                             </span>
                                         </div>
                                         {Boolean(profile.isEmailVerified || profile.isVerified || profile.isVerifiedCoder) ? (
-                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] border-2 border-black text-black font-black text-xs shadow-[1.5px_1.5px_0px_#000]">
-                                                <ShieldCheck className="w-3.5 h-3.5 stroke-[2.5]" />
+                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white border-2 border-black text-black font-black text-xs shadow-[1.5px_1.5px_0px_#000]">
+                                                <VerifiedBadge size="xs" />
                                                 <span>Verified Orbix Profile</span>
                                             </div>
                                         ) : (
@@ -1521,8 +1529,8 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                         {profile.college.officialName}
                                                     </span>
                                                     {profile.college.verificationStatus === "verified" && (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#a2ff86] border border-black text-[10px] font-black text-black uppercase shadow-[1px_1px_0px_#000]">
-                                                            <ShieldCheck className="w-2.5 h-2.5 text-black stroke-[2.5]" />
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-black text-[10px] font-black text-black uppercase shadow-[1px_1px_0px_#000]">
+                                                            <VerifiedBadge size="xs" />
                                                             Verified
                                                         </span>
                                                     )}
@@ -1848,9 +1856,15 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
             />
 
             {/* Interactive PDF Resume Modal */}
-            {isResumePreviewOpen && profile.resumeUrl && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
-                    <div className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl overflow-hidden shadow-[8px_8px_0px_#000] flex flex-col">
+            {isResumePreviewOpen && profile.resumeUrl && typeof document !== "undefined" && createPortal(
+                <div
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn"
+                    onClick={handleResumePreviewBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl overflow-hidden shadow-[8px_8px_0px_#000] flex flex-col"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between px-5 py-4 border-b-2 border-black bg-white">
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black text-black flex items-center justify-center flex-shrink-0 shadow-[1.5px_1.5px_0px_#000]">
@@ -1904,7 +1918,8 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                             />
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

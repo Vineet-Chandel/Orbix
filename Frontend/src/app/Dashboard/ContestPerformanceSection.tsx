@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     LineChart as ChartIcon,
@@ -26,6 +27,7 @@ import { CodeChefBadge } from "../../components/CodeChefBadge";
 import { CodeChefRatingLadder } from "../../components/CodeChefRatingLadder";
 import { AtCoderBadge } from "../../components/AtCoderBadge";
 import { AtCoderRatingLadder } from "../../components/AtCoderRatingLadder";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface ContestPerformanceSectionProps {
     connectedPortals: Record<string, any>;
@@ -63,6 +65,11 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
     const [timeRange, setTimeRange] = useState<TimeRangeFilter>("ALL");
     const [hoveredPoint, setHoveredPoint] = useState<ContestHistoryPoint | null>(null);
     const [isTierModalOpen, setIsTierModalOpen] = useState<boolean>(false);
+
+    const { handleBackdropClick: handleTierModalBackdropClick } = useModalDismiss({
+        isOpen: isTierModalOpen,
+        onClose: () => setIsTierModalOpen(false),
+    });
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const initialSelectionDoneRef = useRef<boolean>(false);
 
@@ -1263,14 +1270,18 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
             {/* ========================================================================= */}
             {/* TIER EXPLANATION MODAL ("What does Candidate Master mean?")                */}
             {/* ========================================================================= */}
-            {isTierModalOpen && activePlatform && (
+            {isTierModalOpen && activePlatform && typeof document !== "undefined" && createPortal(
                 <div
                     role="dialog"
                     aria-modal="true"
                     aria-labelledby="tier-modal-title"
-                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fadeIn"
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
+                    onClick={handleTierModalBackdropClick}
                 >
-                    <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-white border border-black/10 shadow-2xl p-6 sm:p-7 space-y-5 text-neutral-900 relative">
+                    <div
+                        className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl bg-white border border-black/10 shadow-2xl p-6 sm:p-7 space-y-5 text-neutral-900 relative"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Close button */}
                         <button
                             type="button"
@@ -1418,7 +1429,8 @@ export const ContestPerformanceSection: React.FC<ContestPerformanceSectionProps>
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </section>
     );

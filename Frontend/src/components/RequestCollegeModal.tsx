@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, CheckCircle2, AlertCircle, Building2, Globe, Loader2, ShieldCheck } from "lucide-react";
+import { createPortal } from "react-dom";
+import { X, CheckCircle2, AlertCircle, Building2, Globe, ShieldCheck } from "lucide-react";
 import { submitInstitutionVerificationRequest } from "../utils/profileApi";
 import { useToast } from "../context/ToastContext";
 import { NeoSelect } from "./NeoSelect";
+import { OrbixLoader } from "./ui/loader";
+import { useModalDismiss } from "../hooks/useModalDismiss";
 
 const INDIAN_STATES = [
     "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
@@ -55,18 +58,8 @@ export function RequestCollegeModal({
         }
     }, [isOpen, initialQuery]);
 
-    // Handle Escape key to close
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape" && isOpen && !submitting) {
-                onClose();
-            }
-        };
-        window.addEventListener("keydown", handleKeyDown);
-        return () => window.removeEventListener("keydown", handleKeyDown);
-    }, [isOpen, submitting, onClose]);
-
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -113,19 +106,25 @@ export function RequestCollegeModal({
         }
     };
 
-    return (
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen,
+        onClose: () => {
+            if (!submitting) onClose();
+        },
+    });
+
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
             role="dialog"
             aria-modal="true"
             aria-labelledby="request-modal-title"
-            onClick={(e) => {
-                if (e.target === e.currentTarget && !submitting) {
-                    onClose();
-                }
-            }}
+            onClick={handleBackdropClick}
         >
-            <div className="relative w-full max-w-lg rounded-2xl bg-white border-2 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 overflow-hidden text-black animate-scaleUp">
+            <div
+                className="relative w-full max-w-lg rounded-2xl bg-white border-2 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 overflow-hidden text-black animate-scaleUp"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Neo-Brutalist Close Button */}
                 <button
                     type="button"
@@ -299,10 +298,7 @@ export function RequestCollegeModal({
                                 className="px-5 py-2.5 rounded-xl border-2 border-black bg-black text-[#a2ff86] hover:bg-neutral-900 font-black text-xs shadow-[3px_3px_0px_#000] cursor-pointer flex items-center gap-2 transition-all active:translate-x-[1px] active:translate-y-[1px] disabled:opacity-50"
                             >
                                 {submitting ? (
-                                    <>
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                        <span>Submitting...</span>
-                                    </>
+                                    <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                 ) : (
                                     <span>Submit Request</span>
                                 )}
@@ -311,7 +307,8 @@ export function RequestCollegeModal({
                     </form>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }
 export default RequestCollegeModal;

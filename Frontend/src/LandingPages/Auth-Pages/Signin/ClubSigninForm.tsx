@@ -4,6 +4,8 @@ import { ArrowRight, ShieldCheck, ArrowLeft, RefreshCw } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
+import { getOrCreateDeviceId } from "../../../api/sessionActivityApi";
+import { OrbixLoader } from "../../../components/ui/loader";
 
 export default function ClubSigninForm() {
     const navigate = useNavigate();
@@ -116,7 +118,7 @@ export default function ClubSigninForm() {
         setLoading(true);
 
         try {
-            const endpoints = ["http://localhost:3000/api/signin", "/api/signin"];
+            const endpoints = ["/api/signin", "http://localhost:3000/api/signin"];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -126,6 +128,7 @@ export default function ClubSigninForm() {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
+                            "x-orbix-device-id": getOrCreateDeviceId(),
                         },
                         credentials: "include",
                         body: JSON.stringify({
@@ -226,7 +229,7 @@ export default function ClubSigninForm() {
 
         setIsVerifying2FA(true);
         try {
-            const endpoints = ["http://localhost:3000/api/auth/2fa/verify-login", "/api/auth/2fa/verify-login"];
+            const endpoints = ["/api/auth/2fa/verify-login", "http://localhost:3000/api/auth/2fa/verify-login"];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -234,7 +237,10 @@ export default function ClubSigninForm() {
                 try {
                     const res = await fetch(url, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: { 
+                            "Content-Type": "application/json",
+                            "x-orbix-device-id": getOrCreateDeviceId(),
+                        },
                         credentials: "include",
                         body: JSON.stringify({
                             challengeToken,
@@ -270,7 +276,7 @@ export default function ClubSigninForm() {
         if (cooldownSeconds > 0 || isResending) return;
         setIsResending(true);
         try {
-            const endpoints = ["http://localhost:3000/api/auth/2fa/resend-login-otp", "/api/auth/2fa/resend-login-otp"];
+            const endpoints = ["/api/auth/2fa/resend-login-otp", "http://localhost:3000/api/auth/2fa/resend-login-otp"];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -278,7 +284,10 @@ export default function ClubSigninForm() {
                 try {
                     const res = await fetch(url, {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers: { 
+                            "Content-Type": "application/json",
+                            "x-orbix-device-id": getOrCreateDeviceId(),
+                        },
                         credentials: "include",
                         body: JSON.stringify({ challengeToken }),
                     });
@@ -461,10 +470,7 @@ export default function ClubSigninForm() {
                 className="w-full mt-2 py-3.5 px-6 rounded-full bg-black text-white font-black text-sm tracking-wide uppercase border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:-translate-y-0.5 active:translate-x-[2px] active:translate-y-[2px] active:shadow-[2px_2px_0px_#000] transition-all disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
             >
                 {loading ? (
-                    <>
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        <span>Signing into Club Portal...</span>
-                    </>
+                    <OrbixLoader size="xs" variant="inline" />
                 ) : (
                     <>
                         <span>Sign In to Club Portal</span>
@@ -476,7 +482,7 @@ export default function ClubSigninForm() {
             {/* Club Information & Status Tracker Callout Box */}
             <div className="mt-6 p-4 bg-white border-2 border-black rounded-2xl shadow-[3px_3px_0px_#000]">
                 <div className="flex items-start gap-3">
-                    <div className="p-2 rounded-xl bg-black text-[#a2ff86] border border-black shrink-0">
+                    <div className="p-2 rounded-xl bg-[#a2ff86] text-black border border-black shrink-0">
                         <ShieldCheck className="w-5 h-5" />
                     </div>
                     <div className="flex-1 min-w-0">

@@ -1,36 +1,53 @@
-import { useEffect, useState, useMemo } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useState, useMemo, useRef } from "react";
+import { useNavigate, useSearchParams, useLocation, useParams } from "react-router-dom";
 import {
     Calendar,
     CalendarDays,
     Plus,
     Edit3,
-    Trash2,
     Clock,
     MapPin,
-    X,
     Bell,
     ExternalLink,
-    CheckCircle2,
-    Ban,
-    FileText,
     Users,
+    UserCheck,
     ShieldCheck,
     ArrowRight,
     Building2,
     Mail,
     Settings,
+    TrendingUp,
+    Award,
 } from "lucide-react";
-import { useAppDispatch, useAppSelector, clearUser, fetchClubProfile } from "../../store";
+import {
+    useAppDispatch,
+    useAppSelector,
+    clearUser,
+    fetchClubProfile,
+    fetchClubEvents,
+    createClubEvent,
+    updateClubEvent,
+    addEventOptimistic,
+    updateEventOptimistic,
+    type ClubEvent,
+    type CreateClubEventPayload,
+    type ClubEventStatus,
+    type ClubEventFilter,
+} from "../../store";
 import { useToast } from "../../context/ToastContext";
-import { NeoSelect } from "../../components/NeoSelect";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { ClubSidebar, type ClubTab } from "./ClubSidebar";
 import ClubInboxModal from "./ClubInboxModal";
+import { ClubEventModal } from "./ClubEventModal";
+import { ClubEventAnalyticsSection } from "./ClubEventAnalyticsSection";
 import { ClubTeamWorkspace } from "./Team/ClubTeamWorkspace";
 import type { TeamStats } from "./Team/types";
 import { ClubProfileManager } from "./Profile/ClubProfileManager";
 import { ClubSettingsView } from "./Settings/ClubSettingsView";
+import { OtherClubsSection } from "./OtherClubsSection";
+import { ClubEventDetailWorkspace } from "./ClubEventDetailPage";
+import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
+import { OrbixLoader } from "../../components/ui/loader";
 
 interface VerifiedClub {
     id: string;
@@ -39,6 +56,7 @@ interface VerifiedClub {
     slug: string;
     clubUsername?: string;
     category: string;
+    college_id?: string;
     college_name: string;
     college_city: string;
     college_state: string;
@@ -46,7 +64,9 @@ interface VerifiedClub {
     short_description: string | null;
     about: string | null;
     logo_url: string | null;
+    logoUrl?: string | null;
     cover_image_url: string | null;
+    coverImageUrl?: string | null;
     website_url: string | null;
     public_email: string | null;
     social_links: {
@@ -71,26 +91,8 @@ interface ClubStats {
     total_count: string | number;
 }
 
-interface ClubEvent {
-    id: string;
-    clubId: string;
-    title: string;
-    slug: string;
-    summary: string | null;
-    description: string | null;
-    startsAt: string;
-    endsAt: string | null;
-    timezone: string;
-    locationType: "in_person" | "virtual" | "hybrid";
-    venueOrLocation: string | null;
-    registrationUrl: string | null;
-    coverImageUrl: string | null;
-    status: "draft" | "published" | "cancelled";
-    publishedAt: string | null;
-    createdAt: string;
-}
-
 export default function ClubDashboardPage() {
+    const { eventId } = useParams<{ eventId?: string }>();
     const navigate = useNavigate();
     const dispatch = useAppDispatch();
     const { user } = useAppSelector((state) => state.user);
@@ -98,11 +100,11 @@ export default function ClubDashboardPage() {
 
     // Centralized Redux club state
     const clubState = useAppSelector((state) => state.club);
+    const { events } = useAppSelector((state) => state.clubEvents);
 
     // Data States (initialized immediately from Redux if already in memory)
     const [club, setClub] = useState<VerifiedClub | null>(clubState.club as any);
     const [, setStats] = useState<ClubStats>(clubState.stats || { upcoming_count: 0, past_count: 0, draft_count: 0, total_count: 0 });
-    const [events, setEvents] = useState<ClubEvent[]>([]);
     const [loading, setLoading] = useState(!clubState.isInitialized);
 
     // Synchronize local states with Redux club slice
@@ -118,40 +120,69 @@ export default function ClubDashboardPage() {
         }
     }, [clubState.club, clubState.stats, clubState.isInitialized]);
 
-    // Navigation & URL Tab Sync
-    const [searchParams, setSearchParams] = useSearchParams();
-    const tabFromUrl = searchParams.get("tab") as ClubTab | null;
-    const initialTab: ClubTab = (tabFromUrl === "team" || tabFromUrl === "events" || tabFromUrl === "profile" || tabFromUrl === "settings") ? tabFromUrl : "overview";
-    const [activeTab, setActiveTabState] = useState<ClubTab>(initialTab);
-    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-
-    // Switch tab and sync with URL query param
-    const handleTabChange = (tab: ClubTab) => {
-        setActiveTabState(tab);
-        if (tab === "overview") {
-            setSearchParams((prev) => {
-                const next = new URLSearchParams(prev);
-                next.delete("tab");
-                return next;
-            }, { replace: true });
-        } else {
-            setSearchParams((prev) => {
-                const next = new URLSearchParams(prev);
-                next.set("tab", tab);
-                return next;
-            }, { replace: true });
-        }
+    // Path to Club Tab mapping & clean full route paths
+    const getClubTabFromPath = (pathname: string): ClubTab => {
+        if (pathname.startsWith("/club/team")) return "team";
+        if (pathname.startsWith("/club/events")) return "events";
+        if (pathname.startsWith("/club/analytics") || pathname.startsWith("/club/trends")) return "analytics";
+        if (pathname.startsWith("/club/certificates")) return "certificates";
+        if (pathname.startsWith("/club/profile") || pathname.startsWith("/club/manage-profile")) return "profile";
+        if (pathname.startsWith("/club/clubs") || pathname.startsWith("/club/campus-clubs") || pathname.startsWith("/club/other-clubs")) return "clubs";
+        if (pathname.startsWith("/club/settings")) return "settings";
+        return "overview";
     };
 
-    // Update activeTab when browser back/forward or deep-link changes
-    useEffect(() => {
-        const currentTab = searchParams.get("tab") as ClubTab | null;
-        if (currentTab === "team" || currentTab === "events" || currentTab === "profile" || currentTab === "settings") {
-            setActiveTabState(currentTab);
-        } else {
-            setActiveTabState("overview");
+    const clubTabToPath: Record<ClubTab, string> = {
+        overview: "/club/dashboard",
+        team: "/club/team",
+        events: "/club/events",
+        analytics: "/club/analytics",
+        certificates: "/club/certificates",
+        profile: "/club/profile",
+        clubs: "/club/clubs",
+        settings: "/club/settings",
+    };
+
+    // Navigation & Clean Full Route Sync
+    const location = useLocation();
+    const [searchParams] = useSearchParams();
+    const [activeTab, setActiveTabState] = useState<ClubTab>(() => {
+        const tabQuery = searchParams.get("tab") as ClubTab | null;
+        if (tabQuery && clubTabToPath[tabQuery]) {
+            return tabQuery;
         }
-    }, [searchParams]);
+        return getClubTabFromPath(location.pathname);
+    });
+    const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+    // Keep activeTab in sync with route changes (browser back/forward, direct links)
+    useEffect(() => {
+        setActiveTabState(getClubTabFromPath(location.pathname));
+    }, [location.pathname]);
+
+    // Backward compatibility: automatically migrate legacy query parameters (?tab=team) to clean full routes (/club/team)
+    useEffect(() => {
+        const tabQuery = searchParams.get("tab") as ClubTab | null;
+        if (tabQuery && clubTabToPath[tabQuery]) {
+            navigate(clubTabToPath[tabQuery], { replace: true });
+        }
+    }, [searchParams, navigate]);
+
+    // Deep link support for /club/inbox
+    useEffect(() => {
+        if (location.pathname === "/club/inbox") {
+            setIsInboxModalOpen(true);
+        }
+    }, [location.pathname]);
+
+    // Switch tab by navigating to the full route
+    const handleTabChange = (tab: ClubTab) => {
+        setActiveTabState(tab);
+        const targetPath = clubTabToPath[tab] || "/club/dashboard";
+        if (location.pathname !== targetPath) {
+            navigate(targetPath);
+        }
+    };
 
     // Team Stats and Sidebar Badge States
     const [teamStats, setTeamStats] = useState<TeamStats | null>(null);
@@ -185,32 +216,26 @@ export default function ClubDashboardPage() {
 
     // Event Modal State
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-    const [editingEventId, setEditingEventId] = useState<string | null>(null);
-    const [eventForm, setEventForm] = useState({
-        title: "",
-        summary: "",
-        description: "",
-        startsAt: "",
-        endsAt: "",
-        timezone: "Asia/Kolkata",
-        locationType: "in_person" as "in_person" | "virtual" | "hybrid",
-        venueOrLocation: "",
-        registrationUrl: "",
-        coverImageUrl: "",
-        status: "published" as "draft" | "published" | "cancelled",
-    });
-    const [isSavingEvent, setIsSavingEvent] = useState(false);
-    const [eventFilter, setEventFilter] = useState<"all" | "published" | "draft" | "cancelled">("all");
+    const [editingEvent, setEditingEvent] = useState<ClubEvent | null>(null);
+    const [initialModalStatus, setInitialModalStatus] = useState<ClubEventStatus>("published");
+    const [eventFilter, setEventFilter] = useState<ClubEventFilter>("all");
+    const [isCertStudioOpen, setIsCertStudioOpen] = useState(false);
+
+    // In-flight request guards to prevent duplicate concurrent network calls (e.g. StrictMode, rapid switches)
+    const isFetchingClubRef = useRef(false);
+    const isFetchingInboxRef = useRef(false);
 
     // Fetch club profile and events (leveraging Redux and Redis caching)
     const fetchClubData = async (force = false) => {
+        if (isFetchingClubRef.current && !force) return;
+        isFetchingClubRef.current = true;
         try {
             if (!clubState.isInitialized || force) {
                 setLoading(true);
             }
-            const [profileResult, eventsRes] = await Promise.allSettled([
+            const [profileResult] = await Promise.allSettled([
                 dispatch(fetchClubProfile({ force })).unwrap(),
-                fetch("/api/club/events", { credentials: "include" }).then((r) => r.json()),
+                dispatch(fetchClubEvents(club?.id)).unwrap(),
             ]);
 
             if (profileResult.status === "fulfilled") {
@@ -227,26 +252,27 @@ export default function ClubDashboardPage() {
                     return;
                 }
                 if (typeof err === "string" && (err.includes("404") || err.includes("403") || err.toLowerCase().includes("no verified club"))) {
-                    navigate("/clubs/status", { replace: true });
+                    navigate("/club/status", { replace: true });
                     return;
                 }
             }
 
-            if (eventsRes.status === 'fulfilled' && eventsRes.value?.success && Array.isArray(eventsRes.value.events)) {
-                setEvents(eventsRes.value.events);
-            }
         } catch (err) {
             console.error("Failed to load club dashboard:", err);
             toast.error("Could not load club dashboard. Please refresh.", { title: "Error" });
         } finally {
             setLoading(false);
+            isFetchingClubRef.current = false;
         }
     };
 
     // Fetch inbox unread count
     const fetchInboxCounts = async () => {
+        if (isFetchingInboxRef.current) return;
+        isFetchingInboxRef.current = true;
         try {
-            const res = await fetch("/api/club/inbox/unread-count", { credentials: "include" });
+            const queryParam = club?.id ? `?clubId=${encodeURIComponent(club.id)}` : "";
+            const res = await fetch(`/api/club/inbox/unread-count${queryParam}`, { credentials: "include" });
             if (res.ok) {
                 const data = await res.json();
                 if (data?.success && data.counts) {
@@ -259,6 +285,8 @@ export default function ClubDashboardPage() {
             }
         } catch {
             // silent fail for badge sync
+        } finally {
+            isFetchingInboxRef.current = false;
         }
     };
 
@@ -276,155 +304,90 @@ export default function ClubDashboardPage() {
     }, []);
 
     // Open Event Create Modal
-    const openCreateEventModal = (initialStatus: "draft" | "published" = "published") => {
-        setEditingEventId(null);
-        setEventForm({
-            title: "",
-            summary: "",
-            description: "",
-            startsAt: "",
-            endsAt: "",
-            timezone: "Asia/Kolkata",
-            locationType: "in_person",
-            venueOrLocation: "",
-            registrationUrl: "",
-            coverImageUrl: "",
-            status: initialStatus,
-        });
+    const openCreateEventModal = (initialStatus: ClubEventStatus = "published") => {
+        setEditingEvent(null);
+        setInitialModalStatus(initialStatus);
+        setActiveTabState("events");
+        navigate("/club/events");
         setIsEventModalOpen(true);
     };
 
     // Open Event Edit Modal
     const handleEditEvent = (ev: ClubEvent) => {
-        setEditingEventId(ev.id);
-        const formatForInput = (isoStr: string | null) => {
-            if (!isoStr) return "";
-            const d = new Date(isoStr);
-            const pad = (n: number) => (n < 10 ? `0${n}` : n);
-            return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-        };
-
-        setEventForm({
-            title: ev.title,
-            summary: ev.summary || "",
-            description: ev.description || "",
-            startsAt: formatForInput(ev.startsAt),
-            endsAt: formatForInput(ev.endsAt),
-            timezone: ev.timezone || "Asia/Kolkata",
-            locationType: ev.locationType || "in_person",
-            venueOrLocation: ev.venueOrLocation || "",
-            registrationUrl: ev.registrationUrl || "",
-            coverImageUrl: ev.coverImageUrl || "",
-            status: ev.status,
-        });
+        setEditingEvent(ev);
+        setActiveTabState("events");
+        navigate("/club/events");
         setIsEventModalOpen(true);
     };
 
-    // Handle Event Save (Create or Edit)
-    const handleSaveEvent = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!eventForm.title.trim()) {
-            toast.error("Event title is required.", { title: "Validation Error" });
-            return;
-        }
-        if (!eventForm.startsAt) {
-            toast.error("Event start date and time is required.", { title: "Validation Error" });
-            return;
-        }
-
-        setIsSavingEvent(true);
-        try {
-            const url = editingEventId ? `/api/club/events/${editingEventId}` : "/api/club/events";
-            const method = editingEventId ? "PATCH" : "POST";
-
-            const res = await fetch(url, {
-                method,
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    title: eventForm.title,
-                    summary: eventForm.summary || null,
-                    description: eventForm.description || null,
-                    startsAt: new Date(eventForm.startsAt).toISOString(),
-                    endsAt: eventForm.endsAt ? new Date(eventForm.endsAt).toISOString() : null,
-                    timezone: eventForm.timezone,
-                    locationType: eventForm.locationType,
-                    venueOrLocation: eventForm.venueOrLocation || null,
-                    registrationUrl: eventForm.registrationUrl || null,
-                    coverImageUrl: eventForm.coverImageUrl || null,
-                    status: eventForm.status,
-                }),
-            });
-
-            const data = await res.json().catch(() => null);
-            if (!res.ok) {
-                throw new Error(data?.message || "Failed to save event.");
-            }
-
-            toast.success(
-                editingEventId ? "Event updated successfully!" : "New event created successfully!",
-                { title: "Success" }
-            );
-
+    // Handle Event Save (Optimistic create or update with background API processing)
+    const handleModalSubmit = (payload: CreateClubEventPayload, isEditing: boolean, eventId?: string) => {
+        if (isEditing && eventId) {
+            const previousEvent = events.find((e) => e.id === eventId);
+            // 1. Optimistic Redux update immediately
+            dispatch(updateEventOptimistic({ id: eventId, changes: payload }));
             setIsEventModalOpen(false);
-            setEditingEventId(null);
-            fetchClubData();
-        } catch (err: any) {
-            console.error("Save event error:", err);
-            toast.error(err.message || "Failed to save event.", { title: "Error" });
-        } finally {
-            setIsSavingEvent(false);
-        }
-    };
+            setEditingEvent(null);
+            toast.success("Event updated successfully!", { title: "Success" });
 
-    // Handle Delete Event
-    const handleDeleteEvent = async (eventId: string) => {
-        if (!confirm("Are you sure you want to permanently delete this event?")) return;
+            // 2. Background API call
+            dispatch(updateClubEvent({ eventId, payload, previousEvent }))
+                .unwrap()
+                .catch((err: any) => {
+                    toast.error(err?.message || "Failed to sync update to server. Changes reverted.", {
+                        title: "Sync Error",
+                    });
+                });
+        } else {
+            const tempId = `opt-event-${Date.now()}`;
+            const optimisticEvent: ClubEvent = {
+                id: tempId,
+                clubId: club?.id || "",
+                title: payload.title,
+                slug: payload.title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+                summary: payload.summary || null,
+                description: payload.description || null,
+                startsAt: payload.startsAt,
+                endsAt: payload.endsAt || null,
+                timezone: payload.timezone || "Asia/Kolkata",
+                locationType: payload.locationType,
+                venueOrLocation: payload.venueOrLocation || null,
+                registrationUrl: payload.registrationUrl || null,
+                coverImageUrl: payload.coverImageUrl || null,
+                status: payload.status,
+                publishedAt: payload.status === "published" ? new Date().toISOString() : null,
+                createdAt: new Date().toISOString(),
+                isOptimistic: true,
+            };
 
-        try {
-            const res = await fetch(`/api/club/events/${eventId}`, {
-                method: "DELETE",
-                credentials: "include",
-            });
-            const data = await res.json().catch(() => null);
-            if (!res.ok) throw new Error(data?.message || "Failed to delete event.");
+            // 1. Optimistic Redux add immediately: instantly reflects in listing & counts!
+            dispatch(addEventOptimistic(optimisticEvent));
+            setIsEventModalOpen(false);
+            setEditingEvent(null);
 
-            toast.success("Event deleted successfully.", { title: "Deleted" });
-            fetchClubData();
-        } catch (err: any) {
-            console.error("Delete event error:", err);
-            toast.error(err.message || "Failed to delete event.", { title: "Error" });
-        }
-    };
+            const statusToastText =
+                payload.status === "published"
+                    ? "Event published! Added to live listing immediately."
+                    : payload.status === "draft"
+                    ? "Event saved to drafts immediately."
+                    : "Event saved as cancelled.";
 
-    // Handle Quick Status Changes (Publish, Draft, Cancel)
-    const handleSetEventStatus = async (ev: ClubEvent, nextStatus: "draft" | "published" | "cancelled") => {
-        try {
-            const res = await fetch(`/api/club/events/${ev.id}`, {
-                method: "PATCH",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status: nextStatus }),
-            });
-            const data = await res.json().catch(() => null);
-            if (!res.ok) throw new Error(data?.message || "Failed to change status.");
+            toast.success(statusToastText, { title: "Event Added" });
 
-            const statusLabel =
-                nextStatus === "published"
-                    ? "published live"
-                    : nextStatus === "cancelled"
-                    ? "marked as cancelled"
-                    : "moved to draft";
-            toast.success(`Event is now ${statusLabel}.`, { title: "Status Updated" });
-            fetchClubData();
-        } catch (err: any) {
-            console.error("Update status error:", err);
-            toast.error(err.message || "Failed to update event status.", { title: "Error" });
+            // 2. Background API call
+            dispatch(createClubEvent({ tempId, payload }))
+                .unwrap()
+                .catch((err: any) => {
+                    toast.error(err?.message || "Failed to persist event to server. Removed from listing.", {
+                        title: "Sync Error",
+                    });
+                });
         }
     };
 
     // Event subsets
     const publishedEvents = useMemo(() => events.filter((e) => e.status === "published"), [events]);
+    const completedEvents = useMemo(() => events.filter((e) => e.status === "completed"), [events]);
     const draftEvents = useMemo(() => events.filter((e) => e.status === "draft"), [events]);
     const cancelledEvents = useMemo(() => events.filter((e) => e.status === "cancelled"), [events]);
 
@@ -454,17 +417,44 @@ export default function ClubDashboardPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center text-neutral-900 font-sans">
-                <div className="flex flex-col items-center gap-4 bg-white p-6 rounded-2xl border-2 border-black shadow-[4px_4px_0px_#000]">
-                    <div className="w-10 h-10 border-4 border-black border-t-[#a2ff86] rounded-full animate-spin" />
-                    <p className="text-xs font-black tracking-wider uppercase">Loading Club Space...</p>
-                </div>
+            <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center text-black">
+                <OrbixLoader size="lg" />
             </div>
         );
     }
 
     if (!club) {
-        return null;
+        return (
+            <div className="min-h-screen bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] flex items-center justify-center p-4 text-black">
+                <div className="max-w-md w-full bg-white rounded-2xl border-2 border-black p-6 sm:p-8 shadow-[6px_6px_0px_#000] text-center space-y-4">
+                    <div className="w-14 h-14 mx-auto rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center shadow-[3px_3px_0px_#000]">
+                        <Building2 className="w-7 h-7 text-black stroke-[2.5]" />
+                    </div>
+                    <div className="space-y-1">
+                        <h2 className="text-lg font-black text-black">Club Session Unavailable</h2>
+                        <p className="text-xs text-neutral-600 font-medium">
+                            We could not synchronize club credentials for this session. Please refresh or sign in to continue.
+                        </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-3 pt-2">
+                        <button
+                            type="button"
+                            onClick={() => fetchClubData(true)}
+                            className="px-4 py-2 rounded-xl bg-[#a2ff86] text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#8ee673] cursor-pointer"
+                        >
+                            Retry Sync
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => navigate("/auth/signin")}
+                            className="px-4 py-2 rounded-xl bg-black text-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-neutral-800 cursor-pointer"
+                        >
+                            Sign In
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     return (
@@ -487,11 +477,12 @@ export default function ClubDashboardPage() {
             <div className="flex-1 flex flex-col h-full min-h-0 overflow-y-auto min-w-0 p-2 sm:p-3 lg:p-3">
                 <section
                     aria-label="Orbix Club Space"
-                    className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
+                    className="flex-1 w-full min-h-0 bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-3 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between"
                 >
                     <div className="p-4 sm:p-6 lg:p-8 flex-1 space-y-6">
                         {/* Dynamic Header Bar tailored to each tab */}
-                        <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        {((!eventId && !isEventModalOpen) || activeTab !== "events") && (
+                            <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             {/* Left: Mobile Toggle & Tab-Specific Title & Badges */}
                             <div className="space-y-1">
                                 <div className="flex items-center gap-3">
@@ -536,6 +527,28 @@ export default function ClubDashboardPage() {
                                         </div>
                                     )}
 
+                                    {activeTab === "analytics" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <TrendingUp className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Trends & Analytics
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "certificates" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Award className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Certificates & Credentials
+                                            </h1>
+                                        </div>
+                                    )}
+
                                     {activeTab === "profile" && (
                                         <div className="flex items-center gap-2.5">
                                             <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
@@ -547,6 +560,17 @@ export default function ClubDashboardPage() {
                                         </div>
                                     )}
 
+
+                                    {activeTab === "clubs" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Building2 className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Campus Chapters & Directory
+                                            </h1>
+                                        </div>
+                                    )}
 
                                     {activeTab === "settings" && (
                                         <div className="flex items-center gap-2.5">
@@ -593,7 +617,29 @@ export default function ClubDashboardPage() {
                                                 Active Schedule
                                             </span>
                                             <span className="text-xs font-bold text-neutral-700">
-                                                · {events.length} Total Sessions · Manage published sessions, drafts, and meetups
+                                                · Manage published sessions, drafts, and meetups
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "analytics" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Event Intelligence
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · 4-month turnout velocity, participation ratios, and session lifecycle metrics
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "certificates" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Official Credentials
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Issue verifiable participation & merit credentials to campus students
                                             </span>
                                         </>
                                     )}
@@ -609,6 +655,21 @@ export default function ClubDashboardPage() {
                                         </>
                                     )}
 
+                                    {activeTab === "clubs" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Campus Directory
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Discover student chapters, cross-club collaborations & peer initiatives
+                                            </span>
+                                            {club.college_name && (
+                                                <span className="text-xs font-bold text-neutral-500 hidden md:inline">
+                                                    · {club.college_name}
+                                                </span>
+                                            )}
+                                        </>
+                                    )}
 
                                     {activeTab === "settings" && (
                                         <>
@@ -625,14 +686,25 @@ export default function ClubDashboardPage() {
 
                             {/* Right: Tab-Specific Primary Actions & Inbox Bell */}
                             <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap">
-                                {activeTab === "events" && (
+                                {(activeTab === "events" || activeTab === "analytics") && (
                                     <button
                                         type="button"
                                         onClick={() => openCreateEventModal("published")}
                                         className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
                                     >
                                         <Plus className="w-4 h-4 stroke-[2.5]" />
-                                        <span>+ Create New Event</span>
+                                        <span>Create New Event</span>
+                                    </button>
+                                )}
+
+                                {activeTab === "certificates" && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCertStudioOpen(true)}
+                                        className="px-4 py-2 sm:py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                                    >
+                                        <Award className="w-4 h-4 stroke-[2.5]" />
+                                        <span>Issue Certificates</span>
                                     </button>
                                 )}
 
@@ -640,25 +712,30 @@ export default function ClubDashboardPage() {
                                 <button
                                     type="button"
                                     onClick={() => setIsInboxModalOpen(true)}
-                                    className="relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white hover:bg-[#FFE566] text-black border-2 border-black shadow-[3px_3px_0px_#000] transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px]"
+                                    className="relative flex items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-white hover:bg-[#FFE566]/20 text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] hover:shadow-[3.5px_3.5px_0px_#000] transition-all cursor-pointer group active:translate-x-[1px] active:translate-y-[1px] select-none"
                                     title={`Club Notifications & Inbox ${inboxCounts.unreadCount > 0 ? `(${inboxCounts.unreadCount} unread)` : ""}`}
                                     aria-label="Club Notifications & Inbox"
                                 >
-                                    <Bell className="w-5.5 h-5.5 sm:w-6 sm:h-6 stroke-[2.3] transition-transform group-hover:rotate-6" />
+                                    <Bell className="w-5 h-5 sm:w-5.5 sm:h-5.5 stroke-[2.2] transition-transform duration-200 group-hover:rotate-12" />
                                     {inboxCounts.unreadCount > 0 && (
-                                        <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black leading-none text-black bg-[#FF6B6B] rounded-full border-2 border-black shadow-[1px_1px_0px_#000] animate-pulse">
+                                        <span className="absolute -top-2 -right-2 z-10 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black leading-none text-black bg-[#FFE566] rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000] pointer-events-none select-none">
                                             {inboxCounts.unreadCount > 99 ? "99+" : inboxCounts.unreadCount}
                                         </span>
                                     )}
                                 </button>
                             </div>
                         </div>
+                        )}
 
                         {/* TAB: MANAGE CLUB PROFILE */}
                         {activeTab === "profile" && (
                             <ClubProfileManager
                                 clubId={club.id}
-                                onProfileUpdated={fetchClubData}
+                                onProfileUpdated={(updatedClub) => {
+                                    if (updatedClub) {
+                                        setClub(updatedClub as any);
+                                    }
+                                }}
                             />
                         )}
 
@@ -669,8 +746,8 @@ export default function ClubDashboardPage() {
                                 <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-6">
                                     <div className="flex items-start sm:items-center gap-4 min-w-0">
                                         <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-black text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden flex items-center justify-center flex-shrink-0 font-black text-xl sm:text-2xl">
-                                            {club.logo_url ? (
-                                                <img src={club.logo_url} alt={club.name} className="w-full h-full object-cover" />
+                                            {club.logo_url || club.logoUrl ? (
+                                                <img src={club.logo_url || club.logoUrl || ""} alt={club.name} className="w-full h-full object-cover" />
                                             ) : (
                                                 <span>{club.name.slice(0, 2).toUpperCase()}</span>
                                             )}
@@ -907,6 +984,11 @@ export default function ClubDashboardPage() {
                                                     className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex flex-col justify-between space-y-2"
                                                 >
                                                     <div>
+                                                        {ev.coverImageUrl && (
+                                                            <div className="w-full h-24 rounded-lg border border-black overflow-hidden mb-2 bg-neutral-100 shadow-[1px_1px_0px_#000]">
+                                                                <img src={ev.coverImageUrl} alt={ev.title} className="w-full h-full object-cover" />
+                                                            </div>
+                                                        )}
                                                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
                                                             <span
                                                                 className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border border-black ${
@@ -974,129 +1056,41 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: CLUB EVENTS & WORKSHOPS (EXCLUSIVELY FOR EVENTS TAB) */}
                         {activeTab === "events" && (
-                            <div className="space-y-6">
-                                {/* Header Card with Title and Prominent + Create New Event Button */}
-                                <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <CalendarDays className="w-6 h-6 text-black" />
-                                            <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight">
-                                                Club Events & Workshops
-                                            </h2>
-                                        </div>
-                                        <p className="text-xs sm:text-sm font-bold text-neutral-600">
-                                            Manage your chapter's published sessions, drafts, cancelled meetups, and create new events.
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => openCreateEventModal("published")}
-                                        className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                                    >
-                                        <Plus className="w-4 h-4 stroke-[2.5]" />
-                                        <span>+ Create New Event</span>
-                                    </button>
-                                </div>
-
-                                {/* Quick Metric Summary Cards Row */}
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                                    {/* Metric 1: Total */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setEventFilter("all")}
-                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
-                                            eventFilter === "all"
-                                                ? "bg-black text-[#a2ff86] shadow-[3px_3px_0px_#000]"
-                                                : "bg-white hover:bg-[#FAF6EE] text-neutral-900 shadow-[2px_2px_0px_#000]"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wider ${
-                                                eventFilter === "all" ? "text-neutral-300" : "text-neutral-500"
-                                            }`}>
-                                                Total Sessions
-                                            </span>
-                                            <Calendar className="w-4 h-4 opacity-70" />
-                                        </div>
-                                        <div className="text-2xl sm:text-3xl font-black mt-2">
-                                            {events.length}
-                                        </div>
-                                    </button>
-
-                                    {/* Metric 2: Published */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setEventFilter("published")}
-                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
-                                            eventFilter === "published"
-                                                ? "bg-emerald-300 text-black shadow-[3px_3px_0px_#000] font-black"
-                                                : "bg-emerald-50 hover:bg-emerald-100 text-emerald-950 shadow-[2px_2px_0px_#000]"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-emerald-900">
-                                                Published
-                                            </span>
-                                            <CheckCircle2 className="w-4 h-4 text-emerald-700" />
-                                        </div>
-                                        <div className="text-2xl sm:text-3xl font-black text-neutral-900 mt-2">
-                                            {publishedEvents.length}
-                                        </div>
-                                    </button>
-
-                                    {/* Metric 3: Draft */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setEventFilter("draft")}
-                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
-                                            eventFilter === "draft"
-                                                ? "bg-amber-300 text-black shadow-[3px_3px_0px_#000] font-black"
-                                                : "bg-amber-50 hover:bg-amber-100 text-amber-950 shadow-[2px_2px_0px_#000]"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-900">
-                                                Drafts
-                                            </span>
-                                            <FileText className="w-4 h-4 text-amber-700" />
-                                        </div>
-                                        <div className="text-2xl sm:text-3xl font-black text-neutral-900 mt-2">
-                                            {draftEvents.length}
-                                        </div>
-                                    </button>
-
-                                    {/* Metric 4: Cancelled */}
-                                    <button
-                                        type="button"
-                                        onClick={() => setEventFilter("cancelled")}
-                                        className={`p-4 rounded-xl border-2 border-black transition-all text-left cursor-pointer ${
-                                            eventFilter === "cancelled"
-                                                ? "bg-rose-300 text-black shadow-[3px_3px_0px_#000] font-black"
-                                                : "bg-rose-50 hover:bg-rose-100 text-rose-950 shadow-[2px_2px_0px_#000]"
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-rose-900">
-                                                Cancelled
-                                            </span>
-                                            <Ban className="w-4 h-4 text-rose-700" />
-                                        </div>
-                                        <div className="text-2xl sm:text-3xl font-black text-neutral-900 mt-2">
-                                            {cancelledEvents.length}
-                                        </div>
-                                    </button>
-                                </div>
-
-                                {/* Filter Pills Bar */}
-                                <div className="p-3 sm:p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] flex flex-wrap items-center justify-between gap-3">
+                            eventId ? (
+                                <ClubEventDetailWorkspace
+                                    eventId={eventId}
+                                    club={club}
+                                    onBack={() => navigate("/club/events")}
+                                    onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                                />
+                            ) : isEventModalOpen ? (
+                                <ClubEventModal
+                                    isOpen={isEventModalOpen}
+                                    onClose={() => {
+                                        setIsEventModalOpen(false);
+                                        setEditingEvent(null);
+                                    }}
+                                    onSubmit={handleModalSubmit}
+                                    editingEvent={editingEvent}
+                                    clubId={club?.id}
+                                    clubName={club?.name}
+                                    clubLogoUrl={club?.logo_url || undefined}
+                                    collegeName={club?.college_name}
+                                    collegeId={club?.college_id}
+                                    initialStatus={initialModalStatus}
+                                    onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+                                />
+                            ) : (
+                                <div className="space-y-6">
+                                    {/* Filter Pills Bar */}
+                                    <div className="p-3 sm:p-4 rounded-2xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex flex-wrap items-center justify-between gap-3">
                                     <div className="flex flex-wrap items-center gap-2">
                                         <button
                                             type="button"
                                             onClick={() => setEventFilter("all")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "all"
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-[#a2ff86] text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1107,7 +1101,7 @@ export default function ClubDashboardPage() {
                                             onClick={() => setEventFilter("published")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "published"
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-emerald-300 text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1115,10 +1109,21 @@ export default function ClubDashboardPage() {
                                         </button>
                                         <button
                                             type="button"
+                                            onClick={() => setEventFilter("completed")}
+                                            className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
+                                                eventFilter === "completed"
+                                                    ? "bg-sky-300 text-black shadow-[2px_2px_0px_#000]"
+                                                    : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            Completed ({completedEvents.length})
+                                        </button>
+                                        <button
+                                            type="button"
                                             onClick={() => setEventFilter("draft")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "draft"
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-amber-300 text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1129,7 +1134,7 @@ export default function ClubDashboardPage() {
                                             onClick={() => setEventFilter("cancelled")}
                                             className={`px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider border-2 border-black cursor-pointer transition-all ${
                                                 eventFilter === "cancelled"
-                                                    ? "bg-black text-[#a2ff86] shadow-[2px_2px_0px_#000]"
+                                                    ? "bg-rose-300 text-black shadow-[2px_2px_0px_#000]"
                                                     : "bg-[#FAF6EE] text-neutral-700 hover:bg-neutral-100"
                                             }`}
                                         >
@@ -1159,9 +1164,10 @@ export default function ClubDashboardPage() {
                                         <button
                                             type="button"
                                             onClick={() => openCreateEventModal("published")}
-                                            className="mt-2 px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                            className="mt-2 px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-2"
                                         >
-                                            + Create New Event
+                                            <Plus className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Create New Event</span>
                                         </button>
                                     </div>
                                 ) : (
@@ -1169,25 +1175,53 @@ export default function ClubDashboardPage() {
                                         {filteredEvents.map((ev) => (
                                             <div
                                                 key={ev.id}
-                                                className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between"
+                                                onClick={() => navigate(`/club/events/${ev.id}`)}
+                                                className="p-5 sm:p-6 rounded-3xl bg-white border-4 border-black shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] hover:-translate-y-1 hover:-translate-x-1 transition-all cursor-pointer flex flex-col justify-between group"
                                             >
                                                 <div>
+                                                    {/* Cover Banner if attached */}
+                                                    {ev.coverImageUrl && (
+                                                        <div className="w-full h-40 sm:h-48 rounded-2xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                                            <img
+                                                                src={ev.coverImageUrl}
+                                                                alt={ev.title}
+                                                                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                                                            />
+                                                            {ev.isOptimistic && (
+                                                                <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">
+                                                                    Syncing...
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
+
                                                     <div className="flex items-center justify-between gap-2 mb-2">
-                                                        <span
-                                                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black ${
-                                                                ev.status === "published"
-                                                                    ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span
+                                                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black ${
+                                                                    ev.status === "published"
+                                                                        ? "bg-emerald-300 text-black shadow-[1px_1px_0px_#000]"
+                                                                        : ev.status === "completed"
+                                                                        ? "bg-sky-200 text-black shadow-[1px_1px_0px_#000]"
+                                                                        : ev.status === "draft"
+                                                                        ? "bg-amber-200 text-black shadow-[1px_1px_0px_#000]"
+                                                                        : "bg-rose-200 text-black shadow-[1px_1px_0px_#000]"
+                                                                }`}
+                                                            >
+                                                                {ev.status === "published"
+                                                                    ? "Published (Live)"
+                                                                    : ev.status === "completed"
+                                                                    ? "Completed"
                                                                     : ev.status === "draft"
-                                                                    ? "bg-amber-200 text-black shadow-[1px_1px_0px_#000]"
-                                                                    : "bg-rose-200 text-black shadow-[1px_1px_0px_#000]"
-                                                            }`}
-                                                        >
-                                                            {ev.status === "published"
-                                                                ? "Published"
-                                                                : ev.status === "draft"
-                                                                ? "Draft"
-                                                                : "Cancelled"}
-                                                        </span>
+                                                                    ? "Draft"
+                                                                    : "Cancelled"}
+                                                            </span>
+                                                            {!ev.coverImageUrl && ev.isOptimistic && (
+                                                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">
+                                                                    Syncing...
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                         <span className="text-xs font-bold text-neutral-500 flex items-center gap-1">
                                                             <Clock className="w-3.5 h-3.5" />
                                                             {new Date(ev.startsAt).toLocaleDateString(undefined, {
@@ -1200,7 +1234,7 @@ export default function ClubDashboardPage() {
                                                         </span>
                                                     </div>
 
-                                                    <h3 className="text-base sm:text-lg font-black text-neutral-900 line-clamp-1">
+                                                    <h3 className="text-base sm:text-lg font-black text-neutral-900 line-clamp-1 group-hover:text-black transition-colors">
                                                         {ev.title}
                                                     </h3>
                                                     <p className="text-xs text-neutral-600 line-clamp-2 mt-1.5 leading-relaxed">
@@ -1213,108 +1247,156 @@ export default function ClubDashboardPage() {
                                                             {ev.venueOrLocation || (ev.locationType === "virtual" ? "Virtual (Online)" : ev.locationType === "hybrid" ? "Hybrid" : "Campus Hall")}
                                                         </span>
                                                         {ev.registrationUrl && (
-                                                            <a
-                                                                href={ev.registrationUrl}
-                                                                target="_blank"
-                                                                rel="noopener noreferrer"
-                                                                className="text-emerald-700 hover:underline flex items-center gap-1 font-bold"
-                                                            >
-                                                                <span>RSVP / Registration Link</span>
+                                                            <span className="text-emerald-700 flex items-center gap-1 font-bold">
+                                                                <span>RSVP Enabled</span>
                                                                 <ExternalLink className="w-3 h-3" />
-                                                            </a>
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Event-wise Key Analytics Metrics */}
+                                                    <div className="mt-3 flex items-center gap-2 text-xs font-bold flex-wrap">
+                                                        <span className="inline-flex items-center gap-1 text-sky-950 bg-sky-50 px-2 py-0.5 rounded-md border border-black/20">
+                                                            <Users className="w-3 h-3 text-sky-700 stroke-[2.5]" />
+                                                            <span>{ev.registrationsCount || 0} RSVPs</span>
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1 text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded-md border border-black/20">
+                                                            <UserCheck className="w-3 h-3 text-emerald-700 stroke-[2.5]" />
+                                                            <span>{ev.attendeesCount || 0} Attended</span>
+                                                        </span>
+                                                        {(ev.rejectedCount ?? 0) > 0 && (
+                                                            <span className="inline-flex items-center gap-1 text-rose-950 bg-rose-50 px-2 py-0.5 rounded-md border border-black/20">
+                                                                <span>{ev.rejectedCount} Rejected</span>
+                                                            </span>
+                                                        )}
+                                                        {(Number(ev.registrationsCount) || 0) > 0 && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-[#FAF6EE] text-black text-[10px] font-black border border-black/30">
+                                                                {Math.round(((Number(ev.attendeesCount) || 0) / (Number(ev.registrationsCount) || 1)) * 100)}% Turnout
+                                                            </span>
                                                         )}
                                                     </div>
                                                 </div>
 
-                                                {/* Action Bar */}
-                                                <div className="mt-5 pt-3.5 border-t-2 border-black/10 flex flex-wrap items-center justify-between gap-2">
-                                                    <div className="flex flex-wrap items-center gap-1.5">
-                                                        {/* Status Toggles */}
-                                                        {ev.status === "published" && (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "draft")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-amber-100 hover:bg-amber-200 text-amber-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    To Draft
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "cancelled")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-rose-100 hover:bg-rose-200 text-rose-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    Cancel Event
-                                                                </button>
-                                                            </>
-                                                        )}
+                                                {/* Clean Action Footer: clicking navigates to dedicated event console */}
+                                                <div className="mt-5 pt-3.5 border-t-2 border-black/10 flex items-center justify-between gap-2">
+                                                    <span className="text-xs font-bold text-neutral-500 group-hover:text-black transition-colors">
+                                                        Manage roster, agenda & analytics
+                                                    </span>
 
-                                                        {ev.status === "draft" && (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "published")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-emerald-200 hover:bg-emerald-300 text-emerald-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    Publish Live
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "cancelled")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-rose-100 hover:bg-rose-200 text-rose-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    Cancel Event
-                                                                </button>
-                                                            </>
-                                                        )}
-
-                                                        {ev.status === "cancelled" && (
-                                                            <>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "draft")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-amber-100 hover:bg-amber-200 text-amber-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    Restore to Draft
-                                                                </button>
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => handleSetEventStatus(ev, "published")}
-                                                                    className="px-2.5 py-1 rounded-xl text-xs font-black border-2 border-black bg-emerald-200 hover:bg-emerald-300 text-emerald-950 shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                                >
-                                                                    Publish Live
-                                                                </button>
-                                                            </>
-                                                        )}
-
-                                                        {/* Edit Button */}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleEditEvent(ev)}
-                                                            className="px-2.5 py-1 rounded-xl bg-white hover:bg-neutral-50 text-neutral-900 text-xs font-black border-2 border-black shadow-[1px_1px_0px_#000] cursor-pointer flex items-center gap-1"
-                                                        >
-                                                            <Edit3 className="w-3 h-3" />
-                                                            <span>Edit</span>
-                                                        </button>
-                                                    </div>
-
-                                                    {/* Delete Button */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handleDeleteEvent(ev.id)}
-                                                        className="p-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border-2 border-black shadow-[1px_1px_0px_#000] cursor-pointer"
-                                                        title="Delete Event"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] group-hover:bg-[#8ee673] group-hover:translate-x-0.5 transition-all shrink-0">
+                                                        <span>Open Event</span>
+                                                        <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                    </span>
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
                             </div>
+                            )
                         )}
 
+                        {/* TAB: TRENDS & ANALYTICS */}
+                        {activeTab === "analytics" && (
+                            <div className="space-y-6">
+                                <ClubEventAnalyticsSection
+                                    events={events}
+                                    currentFilter={eventFilter}
+                                    onSelectFilter={(filter) => {
+                                        setEventFilter(filter);
+                                        navigate(`/club/events?filter=${filter}`);
+                                    }}
+                                    onOpenCreateModal={() => openCreateEventModal("published")}
+                                />
+                            </div>
+                        )}
+
+                        {/* TAB: CERTIFICATES & CREDENTIALS STUDIO */}
+                        {activeTab === "certificates" && (
+                            <div className="space-y-6">
+                                <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row items-center justify-between gap-4">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                                Official Credential Studio
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-500">
+                                                Cryptographically Signed · Strict Eligibility Enforced
+                                            </span>
+                                        </div>
+                                        <h2 className="text-xl sm:text-2xl font-black text-black">
+                                            Campus Certificates & Turnout Recognition
+                                        </h2>
+                                        <p className="text-xs sm:text-sm font-bold text-neutral-600 max-w-2xl">
+                                            Issue verified achievement and participation certificates directly to campus students and event attendees. Dispatches automated in-app notifications to each recipient.
+                                        </p>
+                                    </div>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCertStudioOpen(true)}
+                                        className="px-5 py-3 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-3 border-black font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] flex items-center gap-2 transition-transform active:translate-x-0.5 active:translate-y-0.5 shrink-0"
+                                    >
+                                        <Award className="w-5 h-5 stroke-[2.5]" />
+                                        <span>+ Launch Issuance Studio</span>
+                                    </button>
+                                </div>
+
+                                {/* Quick Launch Cards for the Two Perspectives */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div
+                                        onClick={() => setIsCertStudioOpen(true)}
+                                        className="p-6 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all cursor-pointer space-y-3 group"
+                                    >
+                                        <div className="w-12 h-12 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                            <CalendarDays className="w-6 h-6 text-black" />
+                                        </div>
+                                        <h3 className="text-lg font-black text-black group-hover:text-neutral-800 flex items-center justify-between">
+                                            <span>1. Event Participation Turnout</span>
+                                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                                        </h3>
+                                        <p className="text-xs font-medium text-neutral-600 leading-relaxed">
+                                            Select a completed or live event, review verified attendees and checked-in students, and issue participation or merit certificates with 1-click batch delivery.
+                                        </p>
+                                        <div className="pt-2 text-xs font-black text-black flex items-center gap-1">
+                                            <span>Select Event Roster</span> &rarr;
+                                        </div>
+                                    </div>
+
+                                    <div
+                                        onClick={() => setIsCertStudioOpen(true)}
+                                        className="p-6 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all cursor-pointer space-y-3 group"
+                                    >
+                                        <div className="w-12 h-12 rounded-xl bg-[#FFDE59] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                            <ShieldCheck className="w-6 h-6 text-black" />
+                                        </div>
+                                        <h3 className="text-lg font-black text-black group-hover:text-neutral-800 flex items-center justify-between">
+                                            <span>2. Credible Campus Network</span>
+                                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+                                        </h3>
+                                        <p className="text-xs font-medium text-neutral-600 leading-relaxed">
+                                            Categorize students by credibility (attended sessions count, team contributors, campus verified). Hand-pick standout individuals for excellence & appreciation awards.
+                                        </p>
+                                        <div className="pt-2 text-xs font-black text-black flex items-center gap-1">
+                                            <span>Browse Connected Students</span> &rarr;
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB: CAMPUS CLUBS & DIRECTORY */}
+                        {activeTab === "clubs" && (
+                            <OtherClubsSection
+                                currentClubId={club.id}
+                                currentClubSlug={club.slug}
+                                collegeId={(club as any).college_id || (club as any).collegeId}
+                                collegeName={club.college_name}
+                                currentClubData={club}
+                                onNavigateToEditProfile={() => handleTabChange("profile")}
+                                onNavigateToTab={handleTabChange}
+                            />
+                        )}
 
                         {/* TAB: CLUB SETTINGS & PREFERENCES */}
                         {activeTab === "settings" && (
@@ -1336,6 +1418,9 @@ export default function ClubDashboardPage() {
                 isOpen={isInboxModalOpen}
                 onClose={() => {
                     setIsInboxModalOpen(false);
+                    if (location.pathname === "/club/inbox") {
+                        navigate("/club/dashboard", { replace: true });
+                    }
                     fetchInboxCounts();
                 }}
                 clubId={club.id}
@@ -1343,191 +1428,11 @@ export default function ClubDashboardPage() {
                 onUnreadCountChange={(newCount) => setInboxCounts((prev) => ({ ...prev, unreadCount: newCount }))}
             />
 
-            {/* Event Create / Edit Modal */}
-            {isEventModalOpen && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="w-full max-w-xl bg-white rounded-3xl border-2 border-black shadow-[8px_8px_0px_#000] p-6 space-y-5 animate-in fade-in zoom-in-95 duration-150 my-8">
-                        <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
-                            <div>
-                                <h3 className="font-black text-base text-neutral-900">
-                                    {editingEventId ? "Edit Event" : "Create New Club Event"}
-                                </h3>
-                                <p className="text-xs text-neutral-500 font-medium">
-                                    Publish or draft workshops, hackathons, and chapter meetups.
-                                </p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setIsEventModalOpen(false)}
-                                className="p-1 rounded-lg border-2 border-black hover:bg-neutral-100 cursor-pointer"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        <form onSubmit={handleSaveEvent} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Event Title *
-                                </label>
-                                <input
-                                    type="text"
-                                    required
-                                    value={eventForm.title}
-                                    onChange={(e) => setEventForm({ ...eventForm, title: e.target.value })}
-                                    placeholder="e.g. Intro to Web3 & Smart Contracts Workshop"
-                                    className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold"
-                                />
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Starts At *
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        required
-                                        value={eventForm.startsAt}
-                                        onChange={(e) => setEventForm({ ...eventForm, startsAt: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Ends At (Optional)
-                                    </label>
-                                    <input
-                                        type="datetime-local"
-                                        value={eventForm.endsAt}
-                                        onChange={(e) => setEventForm({ ...eventForm, endsAt: e.target.value })}
-                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Location Type
-                                    </label>
-                                    <NeoSelect
-                                        value={eventForm.locationType}
-                                        onChange={(val) => setEventForm({ ...eventForm, locationType: val as any })}
-                                        options={[
-                                            { value: "in_person", label: "In-Person (Campus)" },
-                                            { value: "virtual", label: "Virtual (Online Link)" },
-                                            { value: "hybrid", label: "Hybrid" },
-                                        ]}
-                                        size="sm"
-                                        className="w-full"
-                                        triggerClassName="h-9 font-bold bg-[#FAF6EE] text-xs"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Venue or Location Details
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={eventForm.venueOrLocation}
-                                        onChange={(e) => setEventForm({ ...eventForm, venueOrLocation: e.target.value })}
-                                        placeholder="e.g. Auditorium Hall B / Zoom link"
-                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                    />
-                                </div>
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Registration / RSVP URL
-                                </label>
-                                <input
-                                    type="url"
-                                    value={eventForm.registrationUrl}
-                                    onChange={(e) => setEventForm({ ...eventForm, registrationUrl: e.target.value })}
-                                    placeholder="https://forms.gle/... or https://unstop.com/..."
-                                    className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Cover Image URL
-                                </label>
-                                <input
-                                    type="url"
-                                    value={eventForm.coverImageUrl}
-                                    onChange={(e) => setEventForm({ ...eventForm, coverImageUrl: e.target.value })}
-                                    placeholder="https://.../poster.jpg"
-                                    className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Brief Summary (1-2 sentences)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={eventForm.summary}
-                                    onChange={(e) => setEventForm({ ...eventForm, summary: e.target.value })}
-                                    placeholder="A hands-on session covering problem solving techniques..."
-                                    className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Full Description & Agenda
-                                </label>
-                                <textarea
-                                    rows={3}
-                                    value={eventForm.description}
-                                    onChange={(e) => setEventForm({ ...eventForm, description: e.target.value })}
-                                    placeholder="Prerequisites, schedule, speaker details, and certificate info..."
-                                    className="w-full p-3 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-medium"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-xs font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                    Publish Status
-                                </label>
-                                <NeoSelect
-                                    value={eventForm.status}
-                                    onChange={(val) => setEventForm({ ...eventForm, status: val as any })}
-                                    options={[
-                                        { value: "published", label: "Published (Live for Registrations)" },
-                                        { value: "draft", label: "Draft (Saved internally)" },
-                                        { value: "cancelled", label: "Cancelled (Session Cancelled)" },
-                                    ]}
-                                    size="sm"
-                                    className="w-full"
-                                    triggerClassName="h-9 font-bold bg-[#FAF6EE] text-xs"
-                                />
-                            </div>
-
-                            <div className="pt-3 border-t-2 border-black/10 flex items-center justify-end gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsEventModalOpen(false)}
-                                    className="px-4 py-2 rounded-xl border-2 border-black text-xs font-bold hover:bg-neutral-100 cursor-pointer"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSavingEvent}
-                                    className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                                >
-                                    {isSavingEvent ? "Saving..." : editingEventId ? "Update Event" : "Create Event"}
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
+            {/* Attached Certificate Issuance Studio Modal */}
+            <ClubCertificateStudioModal
+                isOpen={isCertStudioOpen}
+                onClose={() => setIsCertStudioOpen(false)}
+            />
         </div>
     );
 }

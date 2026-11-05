@@ -1,5 +1,6 @@
 // Frontend/src/app/Settings/ConnectionsSettingsView.tsx
 import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     Users,
@@ -8,11 +9,11 @@ import {
     Bell,
     UserMinus,
     ShieldAlert,
-    Loader2,
     RefreshCw,
     GraduationCap,
     Send,
 } from "lucide-react";
+import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import {
     fetchUserConnectionsList,
     removeActiveConnection,
@@ -23,6 +24,7 @@ import {
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { useToast } from "../../context/ToastContext";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface ConnectionsSettingsViewProps {
     user: any;
@@ -45,6 +47,18 @@ export const ConnectionsSettingsView: React.FC<ConnectionsSettingsViewProps> = (
     const [notifyTitle, setNotifyTitle] = useState("");
     const [notifyBody, setNotifyBody] = useState("");
     const [isSendingNotify, setIsSendingNotify] = useState(false);
+
+    const { handleBackdropClick: handleNotifyModalBackdropClick } = useModalDismiss({
+        isOpen: isNotifyModalOpen,
+        onClose: () => {
+            if (!isSendingNotify) {
+                setIsNotifyModalOpen(false);
+                setActiveTarget(null);
+            }
+        },
+        disableEscape: isSendingNotify,
+        disableBackdrop: isSendingNotify,
+    });
 
     const loadConnections = useCallback(
         async (cursor?: string, search?: string, isRefresh = false) => {
@@ -187,9 +201,8 @@ export const ConnectionsSettingsView: React.FC<ConnectionsSettingsViewProps> = (
 
             {/* Content List */}
             {loading ? (
-                <div className="py-12 flex flex-col items-center justify-center gap-2">
-                    <Loader2 className="w-6 h-6 animate-spin text-black" />
-                    <span className="text-xs font-bold text-neutral-600">Loading your connections...</span>
+                <div className="py-16 flex items-center justify-center text-black">
+                    <OrbixLoader size="md" />
                 </div>
             ) : connections.length === 0 ? (
                 <div className="py-12 text-center flex flex-col items-center justify-center space-y-3">
@@ -348,9 +361,15 @@ export const ConnectionsSettingsView: React.FC<ConnectionsSettingsViewProps> = (
             />
 
             {/* Notify Modal (Subject to 3/24h Limit) */}
-            {isNotifyModalOpen && activeTarget && (
-                <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn">
-                    <div className="w-full max-w-md bg-white border-2 border-black rounded-3xl p-6 shadow-[6px_6px_0px_#000] space-y-4">
+            {isNotifyModalOpen && activeTarget && typeof document !== "undefined" && createPortal(
+                <div
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
+                    onClick={handleNotifyModalBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-md bg-white border-2 border-black rounded-3xl p-6 shadow-[6px_6px_0px_#000] space-y-4"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                             <div className="flex items-center gap-2.5">
                                 <div className="w-9 h-9 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000]">
@@ -405,22 +424,21 @@ export const ConnectionsSettingsView: React.FC<ConnectionsSettingsViewProps> = (
                                 >
                                     Cancel
                                 </button>
-                                <button
+                                <OrbixButton
                                     type="submit"
-                                    disabled={isSendingNotify}
-                                    className="px-4 py-2 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                                    variant="black"
+                                    size="sm"
+                                    icon={<Send className="w-3.5 h-3.5" />}
+                                    loading={isSendingNotify}
+                                    loadingLabel="Sending..."
                                 >
-                                    {isSendingNotify ? (
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    ) : (
-                                        <Send className="w-3.5 h-3.5" />
-                                    )}
-                                    <span>Send Notification</span>
-                                </button>
+                                    Send Notification
+                                </OrbixButton>
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

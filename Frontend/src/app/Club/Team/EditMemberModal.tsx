@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { X, Shield } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import { VerifiedBadge } from "../../../components/VerifiedBadge";
 import type { ClubMember, ClubTeam } from "./types";
 import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
 
@@ -48,6 +51,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
     }, [member]);
 
     if (!isOpen || !member) return null;
+    if (typeof document === "undefined") return null;
 
     const isTargetOwner = member.clubRole === "owner";
 
@@ -186,9 +190,17 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
         (t) => !t.isArchived && !member.teams.some((mt) => mt.teamId === t.id)
     );
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-            <div className="w-full max-w-xl bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-5 sm:p-6 space-y-5 my-auto max-h-[92vh] overflow-y-auto no-scrollbar">
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
+    return createPortal(
+        <div
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs animate-fadeIn overflow-y-auto"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="w-full max-w-xl bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-5 sm:p-6 space-y-5 my-auto max-h-[92vh] overflow-y-auto no-scrollbar"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header with Member Info */}
                 <div className="flex items-start justify-between gap-3 pb-3 border-b-2 border-black/15">
                     <div className="flex items-center gap-3 min-w-0">
@@ -201,9 +213,14 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                             }}
                         />
                         <div className="min-w-0">
-                            <h3 className="text-base font-black text-black truncate">
-                                {member.displayName}
-                            </h3>
+                            <div className="flex items-center gap-1.5">
+                                <h3 className="text-base font-black text-black truncate">
+                                    {member.displayName}
+                                </h3>
+                                {member.isVerifiedCoder && (
+                                    <VerifiedBadge size="xs" title="Verified Coder" />
+                                )}
+                            </div>
                             <p className="text-xs font-mono font-bold text-neutral-600 truncate">
                                 @{member.username} {member.college ? `• ${member.college}` : ""}
                             </p>
@@ -399,6 +416,7 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
                     </div>
                 )}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

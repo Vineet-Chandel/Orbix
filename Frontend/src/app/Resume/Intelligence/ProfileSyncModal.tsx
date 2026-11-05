@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import {
     X,
     Check,
@@ -6,14 +7,15 @@ import {
     ShieldCheck,
     AlertCircle,
     ArrowRight,
-    Loader2
 } from "lucide-react";
+import { OrbixButton } from "../../../components/OrbixButton";
 import {
     applyProfileSyncApi,
     type ProfileSyncProposal,
     type ProposedSyncField
 } from "../../../utils/resumeIntelligenceApi";
 import { useAppDispatch, updateUserProfile } from "../../../store";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 interface ProfileSyncModalProps {
     isOpen: boolean;
@@ -36,9 +38,19 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen,
+        onClose: () => {
+            if (!isApplying) onClose();
+        },
+        disableEscape: isApplying,
+        disableBackdrop: isApplying,
+    });
+
     if (!isOpen || !proposal || proposal.proposedFields.length === 0) {
         return null;
     }
+    if (typeof document === "undefined") return null;
 
     const toggleField = (key: string) => {
         setSelectedFields(prev =>
@@ -113,9 +125,15 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
         );
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-            <div className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white border-2 border-black rounded-2xl shadow-[8px_8px_0px_#000] overflow-hidden">
+    return createPortal(
+        <div
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="relative w-full max-w-2xl max-h-[90vh] flex flex-col bg-white border-2 border-black rounded-2xl shadow-[8px_8px_0px_#000] overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="p-5 sm:p-6 bg-[#FFE566] border-b-2 border-black flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -246,27 +264,21 @@ export const ProfileSyncModal: React.FC<ProfileSyncModalProps> = ({
                         >
                             Cancel
                         </button>
-                        <button
-                            type="button"
-                            disabled={isApplying || selectedFields.length === 0}
+                        <OrbixButton
+                            disabled={selectedFields.length === 0}
+                            loading={isApplying}
+                            loadingLabel="Syncing..."
                             onClick={handleApply}
-                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#FDD835] disabled:opacity-50 font-black text-xs text-black transition shadow-[3px_3px_0px_#000] flex items-center justify-center gap-2"
+                            variant="yellow"
+                            icon={<Check className="w-4 h-4 stroke-[2.5]" />}
+                            className="w-full sm:w-auto"
                         >
-                            {isApplying ? (
-                                <>
-                                    <Loader2 className="w-4 h-4 animate-spin text-black" />
-                                    <span>Syncing...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Check className="w-4 h-4 stroke-[2.5]" />
-                                    <span>Sync {selectedFields.length} Field{selectedFields.length !== 1 ? "s" : ""}</span>
-                                </>
-                            )}
-                        </button>
+                            Sync {selectedFields.length} Field{selectedFields.length !== 1 ? "s" : ""}
+                        </OrbixButton>
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

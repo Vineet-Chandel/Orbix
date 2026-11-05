@@ -3,11 +3,11 @@ import React, { useState, useEffect, useCallback } from "react";
 import {
     Search,
     RefreshCw,
-    Loader2,
     Calendar,
     Unlock,
     UserX,
 } from "lucide-react";
+import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import {
     fetchBlockedUsersList,
     unblockTargetUser,
@@ -133,9 +133,8 @@ export const BlockedSettingsView: React.FC = () => {
 
             {/* List Content */}
             {loading ? (
-                <div className="py-12 flex flex-col items-center justify-center gap-2">
-                    <Loader2 className="w-6 h-6 animate-spin text-black" />
-                    <span className="text-xs font-bold text-neutral-600">Loading blocked accounts...</span>
+                <div className="py-16 flex items-center justify-center text-black">
+                    <OrbixLoader size="md" />
                 </div>
             ) : filteredUsers.length === 0 ? (
                 <div className="py-12 text-center flex flex-col items-center justify-center space-y-3">
@@ -190,23 +189,21 @@ export const BlockedSettingsView: React.FC = () => {
                                     </div>
                                 </div>
 
-                                <button
-                                    type="button"
+                                <OrbixButton
+                                    size="sm"
+                                    variant="white"
+                                    icon={<Unlock className="w-3.5 h-3.5 stroke-[2.5]" />}
+                                    loading={unblockingId === item.blockedId}
+                                    loadingLabel="Unblocking..."
                                     onClick={() => {
                                         setActiveTarget(item);
                                         setIsUnblockModalOpen(true);
                                     }}
-                                    disabled={unblockingId === item.blockedId}
-                                    className="px-3.5 py-1.5 rounded-xl bg-white hover:bg-rose-50 text-neutral-800 hover:text-rose-700 border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] inline-flex items-center gap-1.5 transition-all cursor-pointer shrink-0 self-end sm:self-auto"
+                                    className="hover:bg-rose-50 hover:text-rose-700 self-end sm:self-auto"
                                     title="Unblock account"
                                 >
-                                    {unblockingId === item.blockedId ? (
-                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    ) : (
-                                        <Unlock className="w-3.5 h-3.5 stroke-[2.5]" />
-                                    )}
-                                    <span>Unblock</span>
-                                </button>
+                                    Unblock
+                                </OrbixButton>
                             </div>
                         );
                     })}

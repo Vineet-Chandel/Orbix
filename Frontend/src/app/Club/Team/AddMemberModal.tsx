@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
     X,
     Search,
     UserPlus,
     Shield,
-    Loader2,
     Users,
     Briefcase,
     Info,
 } from "lucide-react";
+import { OrbixLoader, OrbixButton } from "../../../components/ui/loader";
 import { useToast } from "../../../context/ToastContext";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import { VerifiedBadge } from "../../../components/VerifiedBadge";
 import type { ClubTeam, UserSearchItem } from "./types";
 import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
 
@@ -173,9 +176,20 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
         }
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-fadeIn overflow-y-auto">
-            <div className="w-full max-w-2xl bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-5 sm:p-6 space-y-5 my-auto max-h-[92vh] overflow-y-auto no-scrollbar">
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
+    if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs animate-fadeIn overflow-y-auto"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="w-full max-w-2xl bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-5 sm:p-6 space-y-5 my-auto max-h-[92vh] overflow-y-auto no-scrollbar"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="flex items-start justify-between gap-3 pb-3 border-b-2 border-black/15">
                     <div className="flex items-center gap-3">
@@ -221,7 +235,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                                         autoFocus
                                     />
                                     {isSearching && (
-                                        <Loader2 className="w-4 h-4 text-neutral-500 absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin" />
+                                        <OrbixLoader size="xs" variant="minimal" className="absolute right-3.5 top-1/2 -translate-y-1/2" />
                                     )}
                                 </div>
 
@@ -268,9 +282,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                                                                     {user.displayName}
                                                                 </span>
                                                                 {user.isVerifiedCoder && (
-                                                                    <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-600">
-                                                                        Verified
-                                                                    </span>
+                                                                    <VerifiedBadge size="xs" title="Verified Coder" />
                                                                 )}
                                                             </div>
                                                             <span className="text-[11px] font-mono font-bold text-neutral-600 block truncate">
@@ -292,7 +304,7 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                                                         )}
                                                         <button
                                                             type="button"
-                                                            className="px-2.5 py-1 rounded-lg bg-black text-[#a2ff86] font-black text-[11px] border border-black"
+                                                            className="px-2.5 py-1 rounded-lg bg-[#a2ff86] text-black hover:bg-[#8ee673] font-black text-[11px] border border-black cursor-pointer"
                                                         >
                                                             Select
                                                         </button>
@@ -318,6 +330,9 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                                     <div className="min-w-0">
                                         <p className="text-xs font-black text-black flex items-center gap-1.5">
                                             <span>{selectedUser.displayName}</span>
+                                            {selectedUser.isVerifiedCoder && (
+                                                <VerifiedBadge size="xs" title="Verified Coder" />
+                                            )}
                                             <span className="font-mono font-bold text-neutral-700">(@{selectedUser.username})</span>
                                         </p>
                                         <p className="text-[11px] text-neutral-600 font-medium truncate">
@@ -516,26 +531,22 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
                         >
                             Cancel
                         </button>
-                        <button
+                        <OrbixButton
                             type="submit"
-                            disabled={!selectedUser || isSubmitting}
-                            className="px-5 py-2.5 rounded-xl bg-[#a2ff86] border-2 border-black text-black font-black text-xs uppercase tracking-wider shadow-[3px_3px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                            disabled={!selectedUser}
+                            loading={isSubmitting}
+                            loadingLabel="Sending Invitation..."
+                            variant="lime"
+                            size="md"
+                            iconRight={<UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />}
+                            uppercase
                         >
-                            {isSubmitting ? (
-                                <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                    <span>Dispatching Invitation...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <span>Send Invitation</span>
-                                    <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
-                                </>
-                            )}
-                        </button>
+                            Send Invitation
+                        </OrbixButton>
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

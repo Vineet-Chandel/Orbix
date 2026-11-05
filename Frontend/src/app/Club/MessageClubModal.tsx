@@ -1,9 +1,13 @@
 import { useState } from "react";
-import { X, Send, AlertCircle, CheckCircle2, ShieldCheck, Loader2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { X, Send, AlertCircle, CheckCircle2 } from "lucide-react";
+import { OrbixButton } from "../../components/OrbixButton";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
 import { Link } from "react-router-dom";
 import { NeoSelect } from "../../components/NeoSelect";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
+import { VerifiedBadge } from "../../components/VerifiedBadge";
 
 interface MessageClubModalProps {
     isOpen: boolean;
@@ -39,6 +43,7 @@ export default function MessageClubModal({
     const [sentSuccess, setSentSuccess] = useState(false);
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -97,9 +102,17 @@ export default function MessageClubModal({
         onClose();
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs select-none">
-            <div className="w-full max-w-lg bg-[#FAF6EE] border-2 border-black rounded-3xl shadow-[8px_8px_0px_#000] overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose: handleClose });
+
+    return createPortal(
+        <div
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs select-none"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="w-full max-w-lg bg-[#FAF6EE] border-2 border-black rounded-3xl shadow-[8px_8px_0px_#000] overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="p-5 bg-white border-b-2 border-black flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -113,7 +126,7 @@ export default function MessageClubModal({
                         <div>
                             <div className="flex items-center gap-1.5">
                                 <span className="text-xs font-black text-black">Contact {clubName}</span>
-                                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                                <VerifiedBadge size="xs" />
                             </div>
                             <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block">
                                 Direct Club Inquiry
@@ -227,28 +240,22 @@ export default function MessageClubModal({
                                 >
                                     Cancel
                                 </button>
-                                <button
+                                <OrbixButton
                                     type="submit"
-                                    disabled={isSubmitting || body.trim().length < 5}
-                                    className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    disabled={body.trim().length < 5}
+                                    loading={isSubmitting}
+                                    loadingLabel="Sending..."
+                                    variant="lime"
+                                    icon={<Send className="w-3.5 h-3.5" />}
                                 >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            <span>Sending...</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Send className="w-3.5 h-3.5" />
-                                            <span>Send Message</span>
-                                        </>
-                                    )}
-                                </button>
+                                    Send Message
+                                </OrbixButton>
                             </div>
                         </form>
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 }

@@ -9,6 +9,7 @@ import {
     Lock,
     Globe,
     GraduationCap,
+    Activity,
 } from "lucide-react";
 import type { ClubSettingsViewKey } from "./types";
 
@@ -71,11 +72,20 @@ export const ClubAccountCenterView: React.FC<ClubAccountCenterViewProps> = ({
         {
             id: "manage-account" as ClubSettingsViewKey,
             title: "Manage Account",
-            description: "Verify registered club email, change email & organization slug securely (with monthly quotas), and export data archive.",
+            description: "Primary email address, username management (with monthly quotas), and data archive export.",
             icon: <UserCog className="w-5 h-5 text-black stroke-[2.5]" />,
             iconBg: "bg-purple-200",
             badge: "Manage & Verify",
             badgeStyle: "bg-purple-100 text-purple-900 border border-purple-300",
+        },
+        {
+            id: "your-activity" as ClubSettingsViewKey,
+            title: "Team Access & Activity",
+            description: "Audit log of team member logins, administrative sessions, and collegiate workspace actions.",
+            icon: <Activity className="w-5 h-5 text-black stroke-[2.5]" />,
+            iconBg: "bg-[#a2ff86]",
+            badge: "Active Audit",
+            badgeStyle: "bg-emerald-100 text-emerald-800 border border-emerald-300",
         },
     ];
 

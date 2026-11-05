@@ -290,14 +290,6 @@ export default function SettingsPage() {
                                         {currentView.replace(/-/g, " ")}
                                     </span>
                                 </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => handleSelectView("hub")}
-                                    className="px-3 py-1 rounded-lg bg-white hover:bg-neutral-100 text-black border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition-all cursor-pointer"
-                                >
-                                    All Settings
-                                </button>
                             </div>
                         )}
 

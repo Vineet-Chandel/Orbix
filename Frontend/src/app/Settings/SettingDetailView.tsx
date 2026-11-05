@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
+    ArrowRight,
     Bookmark,
     UserX,
     MessageSquare,
@@ -11,7 +13,6 @@ import {
     Lock,
     Laptop,
     Search,
-    Loader2,
     UserCheck,
     UserMinus,
     MoreVertical,
@@ -20,10 +21,16 @@ import {
     MapPin,
     X,
     RefreshCw,
+    FileText,
+    Check,
+    Globe,
 } from "lucide-react";
+import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import type { SettingsViewKey } from "./types";
 import { useToast } from "../../context/ToastContext";
 import { NeoToggle } from "../../components/NeoToggle";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
+import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { useAppDispatch, useAppSelector, setUser } from "../../store";
 import {
     fetchBlockedUsersThunk,
@@ -38,6 +45,16 @@ import { OrbixLogo } from "../../components/OrbixLogo";
 import type { ConnectedUserItem } from "../../api/relationshipApi";
 import { HelpCenterView } from "./HelpCenterView";
 import { ManageAccountView } from "./ManageAccountView";
+import { YourActivityView } from "./YourActivityView";
+import {
+    fetchAccountGovernanceStatus,
+    fetchPrivacyPreferences,
+    updatePrivacyPreferences,
+    fetchPlatformAboutMetadata,
+    type GovernanceStatusResponse,
+    type PlatformAboutMetadata,
+    type PrivacyPreferences,
+} from "../../api/settingsGovernanceApi";
 
 interface SettingDetailViewProps {
     viewKey: SettingsViewKey;
@@ -91,6 +108,29 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
     const [showTwoFactorDisableModal, setShowTwoFactorDisableModal] = useState(false);
     const [disablePassword, setDisablePassword] = useState("");
     const [isDisabling2FA, setIsDisabling2FA] = useState(false);
+
+    const { handleBackdropClick: handleSetupModalBackdropClick } = useModalDismiss({
+        isOpen: showTwoFactorSetupModal,
+        onClose: () => {
+            if (!isVerifyingSetupOtp && !isSendingSetupOtp) {
+                setShowTwoFactorSetupModal(false);
+            }
+        },
+        disableEscape: isVerifyingSetupOtp || isSendingSetupOtp,
+        disableBackdrop: isVerifyingSetupOtp || isSendingSetupOtp,
+    });
+
+    const { handleBackdropClick: handleDisableModalBackdropClick } = useModalDismiss({
+        isOpen: showTwoFactorDisableModal,
+        onClose: () => {
+            if (!isDisabling2FA) {
+                setShowTwoFactorDisableModal(false);
+                setDisablePassword("");
+            }
+        },
+        disableEscape: isDisabling2FA,
+        disableBackdrop: isDisabling2FA,
+    });
 
     // Setup timer
     useEffect(() => {
@@ -339,6 +379,50 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
     const [recruiterMessages, setRecruiterMessages] = useState(true);
     const [weeklyDigest, setWeeklyDigest] = useState(false);
     const [telemetryEnabled, setTelemetryEnabled] = useState(false);
+    const [isUpdatingPrivacy, setIsUpdatingPrivacy] = useState(false);
+
+    // Dynamic settings governance & platform metadata
+    const [governanceData, setGovernanceData] = useState<GovernanceStatusResponse | null>(null);
+    const [isLoadingGovernance, setIsLoadingGovernance] = useState(false);
+    const [, setPrivacyPrefs] = useState<PrivacyPreferences | null>(null);
+    const [platformMetadata, setPlatformMetadata] = useState<PlatformAboutMetadata | null>(null);
+
+    useEffect(() => {
+        if (viewKey === "account-status") {
+            setIsLoadingGovernance(true);
+            fetchAccountGovernanceStatus()
+                .then((data) => setGovernanceData(data))
+                .catch((err) => console.warn("[Governance] Fetch status warning:", err?.message))
+                .finally(() => setIsLoadingGovernance(false));
+        } else if (viewKey === "privacy-center") {
+            fetchPrivacyPreferences()
+                .then((data) => {
+                    setPrivacyPrefs(data.preferences);
+                    if (typeof data.preferences.anonymousTelemetry === "boolean") {
+                        setTelemetryEnabled(data.preferences.anonymousTelemetry);
+                    }
+                })
+                .catch((err) => console.warn("[Privacy] Fetch prefs warning:", err?.message));
+        } else if (viewKey === "about") {
+            fetchPlatformAboutMetadata()
+                .then((data) => setPlatformMetadata(data))
+                .catch((err) => console.warn("[Platform] Fetch metadata warning:", err?.message));
+        }
+    }, [viewKey]);
+
+    const handleToggleTelemetry = async (val: boolean) => {
+        setTelemetryEnabled(val);
+        setIsUpdatingPrivacy(true);
+        try {
+            await updatePrivacyPreferences({ anonymousTelemetry: val });
+            toast.info(val ? "Anonymous telemetry enabled. Thank you!" : "Anonymous telemetry disabled.");
+        } catch (err: any) {
+            setTelemetryEnabled(!val); // revert on error
+            toast.error(err.message || "Failed to save privacy preference.");
+        } finally {
+            setIsUpdatingPrivacy(false);
+        }
+    };
 
     // Password fields
     const [currentPassword, setCurrentPassword] = useState("");
@@ -531,20 +615,47 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                             />
                         </div>
 
-                        {/* Active Sessions Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
-                            <div className="flex items-center gap-2">
-                                <Laptop className="w-4 h-4 text-black stroke-[2.5]" />
-                                <h3 className="text-base font-black text-black">Where You're Logged In</h3>
-                            </div>
-                            <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-between gap-4">
-                                <div className="space-y-0.5">
-                                    <p className="text-xs font-black text-black">This Device (Current Session)</p>
-                                    <p className="text-[11px] text-neutral-600 font-medium">Browser session • Active now</p>
+                        {/* Active Sessions & Your Activity Portal Card */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-9 h-9 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000]">
+                                        <Laptop className="w-5 h-5 text-black stroke-[2.5]" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-base font-black text-black">Where You're Logged In</h3>
+                                        <p className="text-xs text-neutral-600 font-medium">
+                                            Active device sessions, login locations, and remote termination
+                                        </p>
+                                    </div>
                                 </div>
-                                <span className="px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black">
-                                    Active
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black self-start sm:self-auto">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-pulse" />
+                                    <span>Real-Time Tracking</span>
                                 </span>
+                            </div>
+
+                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <p className="text-xs font-black text-black">Active Device Authentication Pipeline</p>
+                                        <span className="px-2 py-0.5 rounded-md bg-white border border-black text-[10px] font-bold text-neutral-800">
+                                            Canonical SSO & 2FA
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Monitor authenticated hardware fingerprints, review security alerts, or log out of all other devices remotely with zero latency.
+                                    </p>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    onClick={() => onSelectView("your-activity")}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffd93d] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer shrink-0"
+                                >
+                                    <span>Manage All Devices</span>
+                                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -576,43 +687,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                 );
 
             case "your-activity":
-                return (
-                    <div className="space-y-6">
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="space-y-1">
-                                <h3 className="text-xl font-black text-black">Your Activity & Metrics</h3>
-                                <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                    Summary of your platform syncs, submission consistency, and active engagement.
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 pt-2">
-                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Platforms</p>
-                                    <p className="text-2xl font-black text-black">{user?.platforms?.length || 0}</p>
-                                    <p className="text-[10px] font-bold text-[#008f39]">Active</p>
-                                </div>
-                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Profile Status</p>
-                                    <p className="text-base font-black text-black truncate">{user?.isPublic !== false ? "Public" : "Private"}</p>
-                                    <p className="text-[10px] font-bold text-neutral-600">Visibility</p>
-                                </div>
-                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Account Age</p>
-                                    <p className="text-base font-black text-black">Active</p>
-                                    <p className={`text-[10px] font-bold ${user?.isEmailVerified ? "text-emerald-700 font-black" : "text-amber-800"}`}>
-                                        {user?.isEmailVerified ? "Email Verified" : "Pending OTP"}
-                                    </p>
-                                </div>
-                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] text-center space-y-1">
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-neutral-500">Sync Pipeline</p>
-                                    <p className="text-base font-black text-black">Healthy</p>
-                                    <p className="text-[10px] font-bold text-[#008f39]">Live Redis</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
+                return <YourActivityView />;
 
             case "notifications":
                 return (
@@ -722,9 +797,8 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                         </div>
 
                         {blocked.isLoading ? (
-                            <div className="py-16 text-center space-y-3">
-                                <Loader2 className="w-7 h-7 text-black animate-spin mx-auto" />
-                                <p className="text-xs font-bold text-neutral-500">Loading blocked accounts...</p>
+                            <div className="py-16 flex items-center justify-center text-black">
+                                <OrbixLoader size="md" />
                             </div>
                         ) : blocked.items.length === 0 ? (
                             <div className="p-8 sm:p-12 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
@@ -757,19 +831,17 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                             </div>
                                         </div>
 
-                                        <button
-                                            type="button"
+                                        <OrbixButton
+                                            size="sm"
+                                            variant="white"
+                                            icon={<UserCheck className="w-3.5 h-3.5" />}
+                                            loading={unblockingId === b.blockedId}
+                                            loadingLabel="Unblocking..."
                                             onClick={() => handleUnblock(b.blockedId, b.username)}
-                                            disabled={unblockingId === b.blockedId}
-                                            className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 shrink-0"
+                                            className="shrink-0"
                                         >
-                                            {unblockingId === b.blockedId ? (
-                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            ) : (
-                                                <UserCheck className="w-3.5 h-3.5" />
-                                            )}
-                                            <span>Unblock</span>
-                                        </button>
+                                            Unblock
+                                        </OrbixButton>
                                     </div>
                                 ))}
                             </div>
@@ -892,9 +964,8 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                             </div>
 
                             {connections.isLoading ? (
-                                <div className="py-16 text-center space-y-3">
-                                    <Loader2 className="w-7 h-7 text-black animate-spin mx-auto" />
-                                    <p className="text-xs font-bold text-neutral-500">Loading connections...</p>
+                                <div className="py-16 flex items-center justify-center text-black">
+                                    <OrbixLoader size="md" />
                                 </div>
                             ) : filteredConn.length === 0 ? (
                                 <div className="p-8 text-center rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
@@ -921,7 +992,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                                 <div className="min-w-0">
                                                     <div className="flex items-center gap-1.5">
                                                         <h4 className="font-black text-sm text-black truncate">{c.displayName}</h4>
-                                                        {c.isVerifiedCoder && <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />}
+                                                        {c.isVerifiedCoder && <VerifiedBadge size="xs" />}
                                                     </div>
                                                     <p className="text-xs font-mono font-bold text-neutral-500 truncate">@{c.username}</p>
                                                     {c.headline && (
@@ -959,20 +1030,18 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                             </div>
 
                                             <div className="flex items-center gap-2 shrink-0">
-                                                <button
-                                                    type="button"
+                                                <OrbixButton
+                                                    size="sm"
+                                                    variant="white"
+                                                    icon={<UserMinus className="w-3.5 h-3.5 stroke-[2]" />}
+                                                    loading={disconnectingId === c.relationshipId}
+                                                    loadingLabel="Disconnecting..."
                                                     onClick={() => setDisconnectTarget(c)}
-                                                    disabled={disconnectingId === c.relationshipId}
-                                                    className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-rose-50 text-neutral-800 hover:text-rose-700 font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer inline-flex items-center gap-1.5 transition-colors"
+                                                    className="hover:bg-rose-50 hover:text-rose-700"
                                                     title="Disconnect"
                                                 >
-                                                    {disconnectingId === c.relationshipId ? (
-                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    ) : (
-                                                        <UserMinus className="w-3.5 h-3.5 stroke-[2]" />
-                                                    )}
-                                                    <span>Disconnect</span>
-                                                </button>
+                                                    Disconnect
+                                                </OrbixButton>
 
                                                 <div className="relative">
                                                     <button
@@ -1063,45 +1132,126 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
             case "privacy-center":
                 return (
-                    <div className="space-y-5">
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center p-2 shadow-[2px_2px_0px_#000] flex-shrink-0">
-                                    <OrbixLogo className="w-full h-full text-black" />
-                                </div>
-                                <div>
-                                    <h3 className="text-xl font-black text-black">Orbix Privacy Center</h3>
-                                    <p className="text-xs font-mono font-bold text-neutral-600">Zero telemetry selling • Developer First</p>
-                                </div>
-                            </div>
-                            <p className="text-xs sm:text-sm text-neutral-600 font-medium leading-relaxed">
-                                We believe developer data belongs to developers. Orbix never sells your code, submissions, or contact details to third-party data brokers.
-                            </p>
-
-                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-0.5">
-                                        <p className="text-xs font-black text-black">Anonymous Telemetry</p>
-                                        <p className="text-[11px] text-neutral-600 font-medium">Help improve Orbix by sharing anonymous performance telemetry.</p>
+                    <div className="space-y-6">
+                        {/* Hero Header */}
+                        <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-black/10 pb-5">
+                                <div className="flex items-center gap-3.5">
+                                    <div className="w-12 h-12 rounded-2xl bg-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                        <ShieldCheck className="w-6 h-6 text-black stroke-[2.5]" />
                                     </div>
-                                    <NeoToggle
-                                        checked={telemetryEnabled}
-                                        onChange={(v) => {
-                                            setTelemetryEnabled(v);
-                                            toast.info(`Telemetry preferences updated.`);
-                                        }}
-                                        ariaLabel="Toggle telemetry"
-                                    />
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight leading-tight">
+                                                Orbix Privacy Center
+                                            </h3>
+                                            <span className="hidden sm:inline-block px-2.5 py-0.5 rounded-full bg-black text-[#a2ff86] text-[10px] font-black uppercase font-mono tracking-wider">
+                                                Developer First
+                                            </span>
+                                        </div>
+                                        <p className="text-xs font-mono font-bold text-neutral-600 mt-1">
+                                            Zero telemetry selling • Complete data ownership • Encrypted transmission
+                                        </p>
+                                    </div>
                                 </div>
+                                <Link
+                                    to="/docs/public-vs-private-profile"
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black text-xs font-black text-black shadow-[2px_2px_0px_#000] self-start sm:self-auto cursor-pointer"
+                                >
+                                    <span>Privacy Architecture Docs</span>
+                                    <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                                </Link>
                             </div>
 
-                            <div className="pt-2">
+                            <p className="text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed">
+                                At Orbix, we believe developer data belongs strictly to developers. Your competitive metrics, problem solutions, open-source repositories, and resume documents are used exclusively to build your verified engineering identity and power community leaderboards. We never monetize, package, or sell your personal data.
+                            </p>
+                        </div>
+
+                        {/* Four Core Privacy Pillars */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-amber-200 border-2 border-black flex items-center justify-center shrink-0">
+                                        <Lock className="w-4 h-4 text-black stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-sm font-black text-black">Zero Commercial Reselling</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Orbix will never sell your contact credentials, profile analytics, or coding activity to third-party advertisers, data aggregators, or unsolicited recruiter lists.
+                                </p>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-sky-200 border-2 border-black flex items-center justify-center shrink-0">
+                                        <Globe className="w-4 h-4 text-black stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-sm font-black text-black">Public vs. Private Gating</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Switching your account to Private immediately de-indexes your public showcase, masks leaderboard rankings, and blocks direct recruiter inquiries with zero latency.
+                                </p>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-emerald-200 border-2 border-black flex items-center justify-center shrink-0">
+                                        <FileText className="w-4 h-4 text-black stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-sm font-black text-black">Resume Fact Confidentiality</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Resumes uploaded for ATS audit are processed securely with deterministic fact provenance. Extracted details remain private until you explicitly choose to publish them.
+                                </p>
+                            </div>
+
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-xl bg-purple-200 border-2 border-black flex items-center justify-center shrink-0">
+                                        <RefreshCw className="w-4 h-4 text-black stroke-[2.5]" />
+                                    </div>
+                                    <h4 className="text-sm font-black text-black">Data Portability & Erasure</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    You retain total ownership over your data. Request an export of all synced achievements, or initiate complete, permanent account deletion from Manage Account.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Interactive Privacy Preferences & Quick Navigation */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <h4 className="text-sm font-black uppercase tracking-wider text-black">
+                                Privacy Preferences & Profile Controls
+                            </h4>
+
+                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div className="space-y-0.5">
+                                    <div className="flex items-center gap-2">
+                                        <p className="text-xs font-black text-black">Anonymous Diagnostics & Performance Telemetry</p>
+                                        {isUpdatingPrivacy && <OrbixLoader size="xs" variant="inline" color="currentColor" />}
+                                    </div>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Help optimize Orbix by sharing anonymous latency and client crash logs. No personal data, handles, or source code are ever recorded.
+                                    </p>
+                                </div>
+                                <NeoToggle
+                                    checked={telemetryEnabled}
+                                    onChange={handleToggleTelemetry}
+                                    ariaLabel="Toggle telemetry"
+                                />
+                            </div>
+
+                            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t-2 border-black/10">
+                                <p className="text-xs text-neutral-600 font-medium">
+                                    Looking to hide your profile, manage visibility flags, or adjust recruiter contact permissions?
+                                </p>
                                 <button
                                     type="button"
                                     onClick={() => onSelectView("account-privacy")}
-                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer"
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer shrink-0"
                                 >
-                                    <span>Open Profile Privacy Controls</span>
+                                    <span>Profile Privacy Controls</span>
                                     <ExternalLink className="w-3.5 h-3.5" />
                                 </button>
                             </div>
@@ -1109,72 +1259,340 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                     </div>
                 );
 
-            case "account-status":
+            case "account-status": {
+                const standing = governanceData?.standing;
+                const statusType = standing?.status || "good";
+                const activeStrikes = standing?.conduct?.activeStrikes ?? 0;
+                const connectedPortals = standing?.syncHealth?.connectedPlatformsCount ?? 16;
+                const safeguard = standing?.collegiateSafeguard;
+                const activeRestrictions = governanceData?.activeRestrictions || [];
+
                 return (
-                    <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="space-y-1">
-                                <h3 className="text-xl font-black text-black">Account Standing</h3>
-                                <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                    Current health status of your Orbix developer account.
+                    <div className="space-y-6">
+                        {/* Active Restrictions Banner if any */}
+                        {activeRestrictions.length > 0 && (
+                            <div className="p-5 rounded-2xl bg-rose-50 border-2 border-black shadow-[4px_4px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2 text-rose-700">
+                                    <UserX className="w-5 h-5 stroke-[2.5]" />
+                                    <h4 className="text-sm font-black uppercase tracking-wider">
+                                        Active Account Restriction
+                                    </h4>
+                                </div>
+                                {activeRestrictions.map((r, idx) => (
+                                    <div key={idx} className="text-xs text-neutral-700 space-y-1">
+                                        <p className="font-bold">
+                                            Restriction: <span className="font-mono text-black">{r.restrictionType}</span>
+                                        </p>
+                                        <p className="font-medium">{r.reason}</p>
+                                        {r.expiresAt && (
+                                            <p className="text-[11px] font-mono text-neutral-500">
+                                                Expires: {new Date(r.expiresAt).toLocaleDateString()}
+                                            </p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Standing Hero */}
+                        <div className="p-6 sm:p-7 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-black/10 pb-5">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xl sm:text-2xl font-black text-black tracking-tight">
+                                            Account Standing
+                                        </h3>
+                                        {isLoadingGovernance ? (
+                                            <OrbixLoader size="xs" variant="inline" color="currentColor" />
+                                        ) : statusType === "good" ? (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
+                                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Good Standing</span>
+                                            </span>
+                                        ) : statusType === "cooldown" ? (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
+                                                <RefreshCw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Cooldown Active</span>
+                                            </span>
+                                        ) : statusType === "warning" || statusType === "probation" ? (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFE566] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
+                                                <span>Under Review</span>
+                                            </span>
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-200 text-rose-900 text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
+                                                <span>Restricted</span>
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-xs sm:text-sm text-neutral-600 font-medium">
+                                        Overall platform health, security status, and developer privileges.
+                                    </p>
+                                </div>
+                                <div className="text-left sm:text-right">
+                                    <span className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500 block">
+                                        Developer ID
+                                    </span>
+                                    <span className="text-xs font-black text-black font-mono">
+                                        @{user?.username || "developer"}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Trust & Health Indicators */}
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Community Conduct
+                                    </span>
+                                    <p className={`text-sm font-black flex items-center gap-1.5 ${activeStrikes === 0 ? "text-emerald-700" : "text-amber-700"}`}>
+                                        <Check className="w-4 h-4 stroke-[3]" />
+                                        {activeStrikes === 0 ? "100% Compliant" : `${activeStrikes} Active Strike${activeStrikes > 1 ? "s" : ""}`}
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        {activeStrikes === 0 ? "Zero active moderation warnings or strikes" : "Conduct under administrative review"}
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Platform Sync Status
+                                    </span>
+                                    <p className="text-sm font-black text-black flex items-center gap-1.5">
+                                        <RefreshCw className="w-4 h-4 stroke-[2.5] text-sky-600" />
+                                        {standing?.syncHealth?.status === "healthy" || !standing ? "Active & Healthy" : "Partial Sync"}
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        Automatic daily sync across {connectedPortals} supported portal{connectedPortals !== 1 ? "s" : ""}
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <span className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Account Security
+                                    </span>
+                                    <p className="text-sm font-black text-black flex items-center gap-1.5">
+                                        <ShieldCheck className="w-4 h-4 stroke-[2.5] text-emerald-600" />
+                                        {standing?.securityLevel?.level || (twoFactorEnabled ? "2FA Enabled" : "Standard Protection")}
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        {standing?.securityLevel?.twoFactorActive || twoFactorEnabled
+                                            ? "Two-factor authentication active"
+                                            : "Verified email credential"}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Entitlements & Capabilities */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <h4 className="text-sm font-black uppercase tracking-wider text-black">
+                                Platform Capabilities & Quotas
+                            </h4>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Global & College Leaderboards
+                                    </p>
+                                    <p className="text-base font-black text-black">
+                                        {governanceData?.capabilities?.leaderboards?.label || "Eligible & Ranked"}
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        {governanceData?.capabilities?.leaderboards?.description ||
+                                            "Real-time percentile ranking, tier badges, and college standings"}
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Developer Showcase & Card Studio
+                                    </p>
+                                    <p className="text-base font-black text-black">
+                                        {governanceData?.capabilities?.cardStudio?.label || "Full Access"}
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        {governanceData?.capabilities?.cardStudio?.description ||
+                                            "Custom public URL, interactive 3D card export, and SVG profile embeds"}
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Resume Intelligence Engine
+                                    </p>
+                                    <p className="text-base font-black text-black">
+                                        {governanceData?.capabilities?.resumeIntelligence?.label || "Unlimited Audits"}
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        {governanceData?.capabilities?.resumeIntelligence?.description ||
+                                            "7-dimension deterministic ATS scoring & fact provenance extraction"}
+                                    </p>
+                                </div>
+
+                                <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                                    <p className="text-[10px] font-black uppercase tracking-wider font-mono text-neutral-500">
+                                        Platform Sync Rate
+                                    </p>
+                                    <p className="text-base font-black text-black">
+                                        {governanceData?.capabilities?.syncCadence?.label || "Automated + Live Refresh"}
+                                    </p>
+                                    <p className="text-[11px] text-neutral-600 font-medium">
+                                        {governanceData?.capabilities?.syncCadence?.description ||
+                                            "Daily background updates plus manual on-demand synchronization"}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Leaderboard Integrity Safeguard Notice */}
+                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-start gap-3">
+                            <GraduationCap className="w-5 h-5 text-black shrink-0 mt-0.5" />
+                            <div className="space-y-0.5 text-xs">
+                                <p className="font-black text-black">
+                                    {safeguard?.isOnCooldown ? "Collegiate Verification Cooldown Active" : "Collegiate Fair-Play Safeguard"}
+                                </p>
+                                <p className="text-neutral-600 font-medium leading-relaxed">
+                                    {safeguard?.isOnCooldown
+                                        ? `Your college affiliation change is subject to a 72-hour integrity cooldown. Approximately ${safeguard.remainingCooldownHours} hour(s) remaining. Anti-cheat algorithmic bounding ensures all contest milestones remain genuine.`
+                                        : "To protect seasonal leaderboard integrity and university rankings, college affiliation changes are subject to a 3-day verification cooldown. Anti-cheat algorithmic bounding ensures all contest milestones remain genuine."}
                                 </p>
                             </div>
-                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000]">
-                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                <span>Good Standing</span>
-                            </span>
-                        </div>
-
-                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-2 text-xs font-bold text-neutral-700">
-                            <div className="flex items-center justify-between">
-                                <span>Community Guidelines:</span>
-                                <span className="text-[#008f39]">100% Compliant</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span>API Rate Limits:</span>
-                                <span>5,000 requests / hour</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span>External Sync Queues:</span>
-                                <span className="text-[#008f39]">Healthy</span>
-                            </div>
                         </div>
                     </div>
                 );
+            }
 
-            case "about":
+            case "about": {
+                const p = platformMetadata?.platform;
+                const versionString = p
+                    ? `Version ${p.version} (${p.edition} • Build ${p.buildNumber})`
+                    : "Version 2.4.0 (Titan Edition • Build 2026.10)";
+                const channelLabel = p?.channel ? `${p.channel.toUpperCase()} RELEASE` : "OFFICIAL RELEASE";
+                const supportedPortalsCount = platformMetadata?.ecosystemStats?.supportedPortals || 16;
+
                 return (
-                    <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-2xl bg-[#FFE566] border-2 border-black flex items-center justify-center p-2 shadow-[2px_2px_0px_#000] flex-shrink-0">
-                                <OrbixLogo className="w-full h-full text-black" />
+                    <div className="space-y-6">
+                        {/* Hero Card */}
+                        <div className="p-6 sm:p-8 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b-2 border-black/10 pb-5">
+                                <div className="flex items-center gap-3.5">
+                                    <div className="w-12 h-12 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                                        <OrbixLogo className="w-7 h-7 text-black" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-2xl sm:text-3xl font-black text-black tracking-tight leading-none">
+                                            Orbix Platform
+                                        </h3>
+                                        <p className="text-xs font-mono font-bold text-neutral-600 mt-1">
+                                            {versionString}
+                                        </p>
+                                    </div>
+                                </div>
+                                <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#a2ff86] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] self-start sm:self-auto">
+                                    {channelLabel}
+                                </span>
                             </div>
-                            <div>
-                                <h3 className="text-xl font-black text-black">Orbix Platform</h3>
-                                <p className="text-xs font-mono font-bold text-neutral-600">v1.4.0 • Neo-Grotesque Edition</p>
+
+                            <div className="space-y-3 text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed">
+                                <p>
+                                    Orbix is the unified developer identity and competitive analytics ecosystem designed for software engineers, student clubs, and tech hiring teams worldwide.
+                                </p>
+                                <p>
+                                    In an era where developer talent is fragmented across dozens of coding portals, contest hubs, and code repositories, Orbix provides a single, mathematically verified proof of work. Through deterministic benchmarking, transparent skill provenance, and collegiate community infrastructure, Orbix transforms individual practice into tangible engineering credibility.
+                                </p>
                             </div>
                         </div>
 
-                        <p className="text-xs sm:text-sm text-neutral-700 font-medium leading-relaxed max-w-xl">
-                            Orbix is the unified developer identity and competitive analytics platform built for coders, student clubs, and tech hiring teams worldwide.
-                        </p>
+                        {/* Four Canonical Pillars */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#a2ff86] border border-black inline-block" />
+                                    <h4 className="text-sm font-black text-black">Deterministic Scoring Engine</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    A calibrated 0 to 10,000 Orbix Score evaluating algorithmic problem solving, contest ratings, active streaks, and verified open-source contributions with anti-cheat bounding.
+                                </p>
+                            </div>
 
-                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1.5 text-xs font-bold text-neutral-700">
-                            <div className="flex items-center justify-between">
-                                <span>Frontend Engine:</span>
-                                <span>React 19 • Vite • Tailwind</span>
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#FFE566] border border-black inline-block" />
+                                    <h4 className="text-sm font-black text-black">{supportedPortalsCount} Connected Developer Portals</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Native multi-platform synchronization across LeetCode, Codeforces, GitHub, CodeChef, AtCoder, HackerRank, GeeksforGeeks, Kaggle, and other genuine engineering portals.
+                                </p>
                             </div>
-                            <div className="flex items-center justify-between">
-                                <span>Backend Infrastructure:</span>
-                                <span>Node • Express • PostgreSQL • Redis</span>
+
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-sky-300 border border-black inline-block" />
+                                    <h4 className="text-sm font-black text-black">Collegiate Leaderboard Network</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Inter-university rankings and dedicated governance infrastructure for student chapters, coding societies, and campus hackathons nationwide.
+                                </p>
                             </div>
-                            <div className="flex items-center justify-between">
-                                <span>License:</span>
-                                <span>Proprietary © {new Date().getFullYear()} Orbix Inc.</span>
+
+                            <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-rose-300 border border-black inline-block" />
+                                    <h4 className="text-sm font-black text-black">Resume Intelligence & Fact Provenance</h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                    Multi-stage AST parsing, deterministic 7-dimension ATS scoring, and explicit skill verification connecting resume claims with verified coding data.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Documentation, Legal & Credits */}
+                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                            <h4 className="text-sm font-black uppercase tracking-wider text-black">
+                                Platform Architecture & Documentation
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-bold">
+                                <Link
+                                    to="/docs/orbix-score-algorithm"
+                                    className="p-3 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black flex items-center justify-between shadow-[2px_2px_0px_#000] text-black"
+                                >
+                                    <span>Scoring Algorithm</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </Link>
+                                <Link
+                                    to="/docs/supported-platform-registry"
+                                    className="p-3 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black flex items-center justify-between shadow-[2px_2px_0px_#000] text-black"
+                                >
+                                    <span>Platform Registry</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </Link>
+                                <Link
+                                    to="/docs/public-vs-private-profile"
+                                    className="p-3 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black flex items-center justify-between shadow-[2px_2px_0px_#000] text-black"
+                                >
+                                    <span>Privacy Controls</span>
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                </Link>
+                            </div>
+
+                            <div className="pt-4 border-t-2 border-black/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-neutral-600 font-medium">
+                                <div className="flex flex-wrap items-center gap-3 font-bold text-black">
+                                    <Link to="/docs" className="hover:underline">Documentation</Link>
+                                    <span>•</span>
+                                    <Link to="/events" className="hover:underline">Events Calendar</Link>
+                                    <span>•</span>
+                                    <Link to="/leaderboard" className="hover:underline">Leaderboard</Link>
+                                    <span>•</span>
+                                    <Link to="/blogs" className="hover:underline">Engineering Blog</Link>
+                                </div>
+                                <span className="font-mono text-[11px] text-neutral-500">
+                                    Proprietary © {new Date().getFullYear()} Orbix Inc. All rights reserved.
+                                </span>
                             </div>
                         </div>
                     </div>
                 );
+            }
 
             default:
                 return null;
@@ -1228,9 +1646,15 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             {renderContent()}
 
             {/* Two-Factor Authentication Setup Modal */}
-            {showTwoFactorSetupModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-                    <div className="w-full max-w-md bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-5 animate-scaleUp">
+            {showTwoFactorSetupModal && typeof document !== "undefined" && createPortal(
+                <div
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
+                    onClick={handleSetupModalBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-md bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-5 animate-scaleUp"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Modal Header */}
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3">
@@ -1324,7 +1748,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                 >
                                     {isVerifyingSetupOtp ? (
                                         <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                             <span>Verifying...</span>
                                         </>
                                     ) : (
@@ -1334,13 +1758,20 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Two-Factor Authentication Disable Confirmation Modal */}
-            {showTwoFactorDisableModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-                    <div className="w-full max-w-md bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-5 animate-scaleUp">
+            {showTwoFactorDisableModal && typeof document !== "undefined" && createPortal(
+                <div
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
+                    onClick={handleDisableModalBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-md bg-white border-2 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-5 animate-scaleUp"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Modal Header */}
                         <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3">
@@ -1412,7 +1843,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                 >
                                     {isDisabling2FA ? (
                                         <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                            <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                             <span>Disabling...</span>
                                         </>
                                     ) : (
@@ -1422,7 +1853,8 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

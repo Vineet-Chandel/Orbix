@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import {
     X,
     Calculator,
@@ -7,6 +8,7 @@ import {
     Award
 } from "lucide-react";
 import type { ComprehensiveScoringResult } from "../../../utils/resumeIntelligenceApi";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 interface ExplainScoreModalProps {
     isOpen: boolean;
@@ -19,13 +21,22 @@ export const ExplainScoreModal: React.FC<ExplainScoreModalProps> = ({
     onClose,
     scoring
 }) => {
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
     if (!isOpen || !scoring) return null;
+    if (typeof document === "undefined") return null;
 
     const dimensionsList = Object.values(scoring.dimensions || {});
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
-            <div className="relative w-full max-w-3xl max-h-[90vh] flex flex-col bg-white border-2 border-black rounded-2xl shadow-[8px_8px_0px_#000] overflow-hidden">
+    return createPortal(
+        <div
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fadeIn"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="relative w-full max-w-3xl max-h-[90vh] flex flex-col bg-white border-2 border-black rounded-2xl shadow-[8px_8px_0px_#000] overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Header */}
                 <div className="p-5 sm:p-6 bg-[#FFE566] border-b-2 border-black flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -176,6 +187,7 @@ export const ExplainScoreModal: React.FC<ExplainScoreModalProps> = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

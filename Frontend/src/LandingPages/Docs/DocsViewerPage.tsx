@@ -56,7 +56,7 @@ export const DocsViewerPage: React.FC = () => {
             {/* Global Navigation */}
             <NavBar activeTab="docs" />
 
-            <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24 sm:pt-32 sm:pb-32 space-y-8">
+            <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24 sm:pt-32 sm:pb-32 space-y-16 sm:space-y-20">
                 {/* ========================================================================= */}
                 {/* BREADCRUMB NAVIGATION & QUICK SWITCHER                                    */}
                 {/* ========================================================================= */}
@@ -162,7 +162,7 @@ export const DocsViewerPage: React.FC = () => {
                 {/* ========================================================================= */}
                 {/* RELATED DOCUMENTATION FILES                                               */}
                 {/* ========================================================================= */}
-                <section className="pt-8 border-t-2 border-black/15 space-y-6">
+                <section className="pt-16 border-t-2 border-black/15 space-y-8">
                     <div className="flex items-center justify-between">
                         <div>
                             <h3 className="text-xl font-black text-black">Explore Related Documents</h3>
@@ -177,21 +177,21 @@ export const DocsViewerPage: React.FC = () => {
                         </Link>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
                         {relatedDocs.map((item) => (
                             <Link
                                 key={item.id}
                                 to={`/docs/${item.slug}`}
-                                className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all flex flex-col justify-between space-y-3"
+                                className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:-translate-y-1 transition-all flex flex-col justify-between space-y-4"
                             >
                                 <div className="space-y-2">
-                                    <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-black/5 text-neutral-700">
+                                    <span className="inline-block text-xs font-mono font-semibold px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-700">
                                         {item.folderName}
                                     </span>
-                                    <h4 className="font-black text-xs sm:text-sm text-black line-clamp-2 leading-snug">
+                                    <h4 className="font-black text-sm sm:text-base text-black line-clamp-2 leading-snug">
                                         {item.title}
                                     </h4>
-                                    <p className="text-[11px] text-neutral-600 font-medium line-clamp-2">
+                                    <p className="text-xs text-neutral-600 font-medium line-clamp-2 leading-relaxed">
                                         {item.summary}
                                     </p>
                                 </div>

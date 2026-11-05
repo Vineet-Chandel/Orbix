@@ -1,4 +1,5 @@
 import { useEffect, useRef, type FC } from "react";
+import { createPortal } from "react-dom";
 import {
     ShieldCheck,
     FileText,
@@ -48,6 +49,7 @@ export const ClubRegistrationModal: FC<ClubRegistrationModalProps> = ({
     }, [isOpen, onCancel]);
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const steps = [
         {
@@ -92,9 +94,9 @@ export const ClubRegistrationModal: FC<ClubRegistrationModalProps> = ({
         },
     ];
 
-    return (
+    return createPortal(
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 md:p-6 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200"
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-3 sm:p-5 md:p-6 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200"
             role="dialog"
             aria-modal="true"
             aria-labelledby="club-modal-heading"
@@ -219,6 +221,7 @@ export const ClubRegistrationModal: FC<ClubRegistrationModalProps> = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

@@ -1,6 +1,8 @@
 import React, { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { UploadCloud, FileText, AlertTriangle, X, Sparkles, CheckCircle2 } from "lucide-react";
 import { uploadResumeApi, type GeminiAnalysisReport, type ResumeProfileData } from "../../../utils/resumeIntelligenceApi";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 export interface ResumeUploadModalProps {
     isOpen: boolean;
@@ -18,7 +20,17 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen,
+        onClose: () => {
+            if (!isUploading) onClose();
+        },
+        disableEscape: isUploading,
+        disableBackdrop: isUploading,
+    });
+
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selected = e.target.files?.[0];
@@ -70,17 +82,18 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
         }
     };
 
-    return (
+    return createPortal(
         <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="uploadModalTitle"
-            onClick={(e) => {
-                if (e.target === e.currentTarget && !isUploading) onClose();
-            }}
-            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
+            onClick={handleBackdropClick}
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 animate-fadeIn"
         >
-            <div className="w-full max-w-lg bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] text-black space-y-4">
+            <div
+                className="w-full max-w-lg bg-white border-2 border-black rounded-2xl p-6 shadow-[8px_8px_0px_#000] text-black space-y-4"
+                onClick={(e) => e.stopPropagation()}
+            >
                 <div className="flex items-center justify-between pb-3 border-b-2 border-black">
                     <div className="flex items-center gap-2.5">
                         <div className="w-9 h-9 rounded-xl bg-[#FFE566] text-black border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
@@ -200,7 +213,8 @@ export const ResumeUploadModal: React.FC<ResumeUploadModalProps> = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 export default ResumeUploadModal;

@@ -1,6 +1,8 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { X, ShieldCheck, Award, Zap, Code2, BookOpen, GitPullRequest, Flame, CheckCircle2 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface AlgorithmModalProps {
     isOpen: boolean;
@@ -8,7 +10,10 @@ interface AlgorithmModalProps {
 }
 
 export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose }) => {
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
     const pillars = [
         {
@@ -110,22 +115,24 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
         { name: "Substack", category: "Technical Writing", metrics: "Newsletter posts, Subscribers, Publications", pillars: "P6 (5%)" },
     ];
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+    return createPortal(
+        <div
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in"
+            onClick={handleBackdropClick}
+        >
             <div
                 className="relative w-full max-w-4xl max-h-[90vh] bg-[#FAF6EE] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] flex flex-col overflow-hidden text-black"
                 role="dialog"
                 aria-modal="true"
+                onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b-2 border-black bg-white">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-black text-[#a2ff86] rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center flex-shrink-0">
-                            <OrbixLogo className="w-6 h-6 text-[#a2ff86]" />
-                        </div>
+                    <div className="flex items-center gap-3.5">
+                        <OrbixLogo className="w-8 h-8 sm:w-9 sm:h-9 text-black flex-shrink-0" />
                         <div>
                             <div className="flex items-center gap-2 flex-wrap">
-                                <h2 className="text-xl sm:text-2xl font-black tracking-tight">Orbix Score Engine</h2>
+                                <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-none">Orbix Score Engine</h2>
                             </div>
                             <p className="text-xs sm:text-sm text-neutral-600 font-medium">
                                 Standard 0 to 10,000 Points • 6 Canonical Pillars • Diminishing Returns Architecture
@@ -268,6 +275,7 @@ export const AlgorithmModal: React.FC<AlgorithmModalProps> = ({ isOpen, onClose 
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

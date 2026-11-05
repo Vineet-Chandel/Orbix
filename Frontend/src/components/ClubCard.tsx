@@ -1,7 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import {
-    ShieldCheck,
     Users,
     Calendar,
     ArrowUpRight,
@@ -9,8 +8,10 @@ import {
     Radio,
     ExternalLink,
     Trophy,
+    MapPin,
 } from "lucide-react";
 import type { CollegeClubItem } from "../utils/clubProfileApi";
+import { VerifiedBadge } from "./VerifiedBadge";
 
 interface ClubCardProps {
     club: CollegeClubItem;
@@ -135,11 +136,8 @@ export const ClubCard: React.FC<ClubCardProps> = ({
                             )}
                         </div>
 
-                        {/* Verified badge pill */}
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-950 border border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
-                            <ShieldCheck className="w-3 h-3 text-emerald-700 stroke-[2.5]" />
-                            <span>Verified</span>
-                        </span>
+                        {/* Verified badge */}
+                        <VerifiedBadge size="sm" title="Verified Club" />
                     </div>
 
                     {/* Club Name & Handle */}
@@ -148,15 +146,16 @@ export const ClubCard: React.FC<ClubCardProps> = ({
                             {club.name}
                         </h3>
 
-                        <p className="text-[11px] font-bold text-neutral-500 truncate flex items-center gap-1">
-                            <span>orbix.in/clubs/{club.slug}</span>
-                            {showCampusName && club.collegeName && (
-                                <>
-                                    <span>·</span>
-                                    <span className="text-neutral-700 truncate">{club.collegeName}</span>
-                                </>
-                            )}
-                        </p>
+                        {showCampusName && club.collegeName ? (
+                            <p className="text-[11px] font-bold text-neutral-600 truncate flex items-center gap-1">
+                                <MapPin className="w-3 h-3 text-neutral-500 shrink-0" />
+                                <span className="truncate">{club.collegeName}</span>
+                            </p>
+                        ) : (
+                            <p className="text-[11px] font-bold text-neutral-500 truncate">
+                                @{club.slug}
+                            </p>
+                        )}
                     </div>
 
                     {/* Short Description */}
@@ -224,9 +223,9 @@ export const ClubCard: React.FC<ClubCardProps> = ({
                     <button
                         type="button"
                         onClick={() => onSelect && onSelect(club)}
-                        className="flex-1 py-2 px-3 rounded-xl bg-black text-[#a2ff86] group-hover:bg-[#a2ff86] group-hover:text-black border-2 border-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000] group-hover:shadow-[2.5px_2.5px_0px_#000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                        className="flex-1 py-2 px-3 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_#000] transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                     >
-                        <span>Explore Chapter</span>
+                        <span>Explore</span>
                         <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
                     </button>
 

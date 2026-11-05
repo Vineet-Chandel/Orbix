@@ -1,11 +1,14 @@
 import React, { useState, useRef, useMemo, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
-import { X, Download, Repeat, Loader2 } from "lucide-react";
+import { X, Download, Repeat } from "lucide-react";
+import { OrbixLoader } from "../../components/ui/loader";
 import { toPng } from "html-to-image";
 import { useToast } from "../../context/ToastContext";
 import { LinkedInCard } from "./CardStudio/LinkedInCard";
 import { InstagramStoryCard } from "./CardStudio/InstagramStoryCard";
 import { CARD_THEMES, type CardFormat, type CardFace } from "./CardStudio/types";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 import type {
     AggregatedCodingStats,
     CoderTypeBadge,
@@ -159,10 +162,16 @@ export const GetTheCardModal: React.FC<GetTheCardModalProps> = ({
         }
     };
 
-    if (!isOpen) return null;
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-md overflow-y-auto">
+    if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-xs overflow-y-auto"
+            onClick={handleBackdropClick}
+        >
             <div
                 className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-neutral-200 overflow-hidden flex flex-col max-h-[92vh] animate-in fade-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
@@ -421,7 +430,7 @@ export const GetTheCardModal: React.FC<GetTheCardModalProps> = ({
                         >
                             {downloadingSide === "front" ? (
                                 <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                     <span>Exporting Front...</span>
                                 </>
                             ) : (
@@ -440,7 +449,7 @@ export const GetTheCardModal: React.FC<GetTheCardModalProps> = ({
                         >
                             {downloadingSide === "back" ? (
                                 <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <OrbixLoader size="xs" variant="inline" color="currentColor" />
                                     <span>Exporting Back...</span>
                                 </>
                             ) : (
@@ -540,6 +549,7 @@ export const GetTheCardModal: React.FC<GetTheCardModalProps> = ({
                     )}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

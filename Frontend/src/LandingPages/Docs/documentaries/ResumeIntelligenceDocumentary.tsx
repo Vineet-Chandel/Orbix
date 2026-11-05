@@ -15,6 +15,7 @@ import {
     Check
 } from "lucide-react";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 
 export const ResumeIntelligenceDocumentary: React.FC = () => {
     // -------------------------------------------------------------------------
@@ -633,15 +634,14 @@ export const ResumeIntelligenceDocumentary: React.FC = () => {
                         </div>
 
                         <div className="space-y-3">
-                            <label className="flex items-center justify-between text-xs font-bold cursor-pointer">
+                            <div className="flex items-center justify-between text-xs font-bold">
                                 <span>Professional Headline Stated</span>
-                                <input
-                                    type="checkbox"
+                                <NeoCheckbox
                                     checked={headlinePresent}
-                                    onChange={(e) => setHeadlinePresent(e.target.checked)}
-                                    className="w-4 h-4 accent-black rounded cursor-pointer"
+                                    onCheckedChange={setHeadlinePresent}
+                                    size="sm"
                                 />
-                            </label>
+                            </div>
 
                             <div>
                                 <div className="flex justify-between text-xs font-bold mb-1">
@@ -687,15 +687,14 @@ export const ResumeIntelligenceDocumentary: React.FC = () => {
                                 />
                             </div>
 
-                            <label className="flex items-center justify-between text-xs font-bold cursor-pointer">
+                            <div className="flex items-center justify-between text-xs font-bold">
                                 <span>Selectable Text & OCR Clean</span>
-                                <input
-                                    type="checkbox"
+                                <NeoCheckbox
                                     checked={selectableTextValid}
-                                    onChange={(e) => setSelectableTextValid(e.target.checked)}
-                                    className="w-4 h-4 accent-black rounded cursor-pointer"
+                                    onCheckedChange={setSelectableTextValid}
+                                    size="sm"
                                 />
-                            </label>
+                            </div>
                         </div>
                     </div>
 
@@ -738,35 +737,32 @@ export const ResumeIntelligenceDocumentary: React.FC = () => {
                         </div>
 
                         <div className="space-y-2.5">
-                            <label className="flex items-center justify-between text-xs font-bold cursor-pointer">
+                            <div className="flex items-center justify-between text-xs font-bold">
                                 <span>Public GitHub / Code Repository Verified</span>
-                                <input
-                                    type="checkbox"
+                                <NeoCheckbox
                                     checked={hasGithubVerified}
-                                    onChange={(e) => setHasGithubVerified(e.target.checked)}
-                                    className="w-4 h-4 accent-black rounded cursor-pointer"
+                                    onCheckedChange={setHasGithubVerified}
+                                    size="sm"
                                 />
-                            </label>
+                            </div>
 
-                            <label className="flex items-center justify-between text-xs font-bold cursor-pointer">
+                            <div className="flex items-center justify-between text-xs font-bold">
                                 <span>LinkedIn or Personal Portfolio Present</span>
-                                <input
-                                    type="checkbox"
+                                <NeoCheckbox
                                     checked={hasLinkedinOrPortfolio}
-                                    onChange={(e) => setHasLinkedinOrPortfolio(e.target.checked)}
-                                    className="w-4 h-4 accent-black rounded cursor-pointer"
+                                    onCheckedChange={setHasLinkedinOrPortfolio}
+                                    size="sm"
                                 />
-                            </label>
+                            </div>
 
-                            <label className="flex items-center justify-between text-xs font-bold cursor-pointer">
+                            <div className="flex items-center justify-between text-xs font-bold">
                                 <span>Complete Contact Info (Email, Phone, Edu Year)</span>
-                                <input
-                                    type="checkbox"
+                                <NeoCheckbox
                                     checked={contactComplete}
-                                    onChange={(e) => setContactComplete(e.target.checked)}
-                                    className="w-4 h-4 accent-black rounded cursor-pointer"
+                                    onCheckedChange={setContactComplete}
+                                    size="sm"
                                 />
-                            </label>
+                            </div>
                         </div>
                     </div>
                 </div>

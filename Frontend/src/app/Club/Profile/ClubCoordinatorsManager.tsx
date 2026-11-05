@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import {
     Plus,
     UserCheck,
@@ -8,8 +9,8 @@ import {
     MoveDown,
     X,
     Mail,
-    Loader2,
 } from "lucide-react";
+import { OrbixButton } from "../../../components/OrbixButton";
 import { getPlatformIcon } from "../../../utils/platformLinks";
 import type { ClubCoordinator } from "../../../utils/clubProfileApi";
 import {
@@ -22,6 +23,9 @@ import {
 } from "../../../utils/clubProfileApi";
 import { useToast } from "../../../context/ToastContext";
 import { NeoImageDropzone } from "../../../components/NeoImageDropzone";
+import { ConfirmationModal } from "../../../components/ConfirmationModal";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
 
 interface ClubCoordinatorsManagerProps {
     clubId: string;
@@ -41,6 +45,10 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
     // Modal state
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCoordinator, setEditingCoordinator] = useState<ClubCoordinator | null>(null);
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen: isModalOpen,
+        onClose: () => setIsModalOpen(false),
+    });
 
     // Form fields
     const [name, setName] = useState("");
@@ -58,6 +66,7 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [coordinatorToDelete, setCoordinatorToDelete] = useState<ClubCoordinator | null>(null);
 
     const openAddModal = () => {
         setEditingCoordinator(null);
@@ -151,15 +160,13 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to remove this coordinator from the public club profile?")) {
-            return;
-        }
-
+    const confirmDelete = async () => {
+        if (!coordinatorToDelete) return;
         try {
-            setDeletingId(id);
-            await deleteCoordinator(id, clubId);
+            setDeletingId(coordinatorToDelete.id);
+            await deleteCoordinator(coordinatorToDelete.id, clubId);
             toast.success("Coordinator removed.");
+            setCoordinatorToDelete(null);
             onUpdate();
         } catch (err: any) {
             toast.error(err.message || "Failed to remove coordinator.");
@@ -329,7 +336,7 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
                                         </button>
                                         <button
                                             type="button"
-                                            onClick={() => handleDelete(coord.id)}
+                                            onClick={() => setCoordinatorToDelete(coord)}
                                             disabled={deletingId === coord.id}
                                             className="p-1 text-red-600 hover:text-red-800 rounded border border-neutral-300 hover:border-red-600 cursor-pointer disabled:opacity-50"
                                             title="Delete"
@@ -345,9 +352,15 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
             )}
 
             {/* MODAL: ADD / EDIT COORDINATOR */}
-            {isModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
-                    <div className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
+            {isModalOpen && typeof document !== "undefined" && createPortal(
+                <div
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150"
+                    onClick={handleBackdropClick}
+                >
+                    <div
+                        className="bg-white rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {/* Header */}
                         <div className="p-4 sm:p-5 bg-[#FAF6EE] border-b-2 border-black flex items-center justify-between">
                             <h3 className="text-base font-black text-black">
@@ -450,28 +463,20 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
 
                             {/* Toggles */}
                             <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-2.5">
-                                <label className="flex items-center gap-2.5 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={isPrimary}
-                                        onChange={(e) => setIsPrimary(e.target.checked)}
-                                        className="w-4 h-4 rounded border-2 border-black text-black focus:ring-0"
-                                    />
-                                    <span className="text-xs font-black text-black">
-                                        Designate as Primary / Lead Coordinator
-                                    </span>
-                                </label>
-                                <label className="flex items-center gap-2.5 cursor-pointer">
-                                    <input
-                                        type="checkbox"
-                                        checked={isPublic}
-                                        onChange={(e) => setIsPublic(e.target.checked)}
-                                        className="w-4 h-4 rounded border-2 border-black text-black focus:ring-0"
-                                    />
-                                    <span className="text-xs font-bold text-neutral-800">
-                                        Publicly visible on the club's showcase profile
-                                    </span>
-                                </label>
+                                <NeoCheckbox
+                                    checked={isPrimary}
+                                    onCheckedChange={setIsPrimary}
+                                    label="Designate as Primary / Lead Coordinator"
+                                    labelClassName="text-xs font-black text-black"
+                                    size="sm"
+                                />
+                                <NeoCheckbox
+                                    checked={isPublic}
+                                    onCheckedChange={setIsPublic}
+                                    label="Publicly visible on the club's showcase profile"
+                                    labelClassName="text-xs font-bold text-neutral-800"
+                                    size="sm"
+                                />
                             </div>
 
                             {/* Modal Actions */}
@@ -483,25 +488,33 @@ export const ClubCoordinatorsManager: React.FC<ClubCoordinatorsManagerProps> = (
                                 >
                                     Cancel
                                 </button>
-                                <button
+                                <OrbixButton
                                     type="submit"
-                                    disabled={isSubmitting}
-                                    className="px-5 py-2 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer disabled:opacity-50 flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    loading={isSubmitting}
+                                    loadingLabel="Saving..."
+                                    variant="lime"
                                 >
-                                    {isSubmitting ? (
-                                        <>
-                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                            <span>Saving...</span>
-                                        </>
-                                    ) : (
-                                        <span>{editingCoordinator ? "Update Coordinator" : "Add Coordinator"}</span>
-                                    )}
-                                </button>
+                                    {editingCoordinator ? "Update Coordinator" : "Add Coordinator"}
+                                </OrbixButton>
                             </div>
                         </form>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
+
+            {/* Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={Boolean(coordinatorToDelete)}
+                title="Remove Coordinator"
+                message={`Are you sure you want to remove "${coordinatorToDelete?.name}" from the public coordinators list?`}
+                confirmText="Yes, Remove"
+                cancelText="Keep"
+                variant="danger"
+                isLoading={deletingId !== null}
+                onConfirm={confirmDelete}
+                onClose={() => setCoordinatorToDelete(null)}
+            />
         </div>
     );
 };

@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ShieldCheck, ArrowLeft, RefreshCw } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
+import { getOrCreateDeviceId } from "../../../api/sessionActivityApi";
+import { OrbixLoader } from "../../../components/ui/loader";
 
 export default function SigninForm() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const toast = useToast();
     const dispatch = useAppDispatch();
 
@@ -93,9 +96,8 @@ export default function SigninForm() {
                 }
             }
 
-            const searchParams = new URLSearchParams(window.location.search);
-            const queryReturn = searchParams.get("returnUrl");
-            if (queryReturn && (queryReturn.startsWith("/blog") || queryReturn.startsWith("/blogs"))) {
+            const queryReturn = searchParams.get("returnUrl") || searchParams.get("redirect");
+            if (queryReturn && (queryReturn.startsWith("/blog") || queryReturn.startsWith("/blogs") || queryReturn.startsWith("/"))) {
                 return queryReturn;
             }
         } catch {
@@ -122,7 +124,8 @@ export default function SigninForm() {
 
         const destination = resolvePostLoginRedirect();
         if (destination !== "/dashboard") {
-            toast.success("Welcome back! Returning to publication...", { title: "Signed In" });
+            const isBlog = destination.startsWith("/blog") || destination.startsWith("/blogs");
+            toast.success(isBlog ? "Welcome back! Returning to publication..." : "Welcome back! Redirecting...", { title: "Signed In" });
             navigate(destination);
         } else {
             toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });
@@ -138,7 +141,7 @@ export default function SigninForm() {
         setLoading(true);
 
         try {
-            const endpoints = ["http://localhost:3000/api/signin", "/api/signin"];
+            const endpoints = ["/api/signin", "http://localhost:3000/api/signin"];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -148,6 +151,7 @@ export default function SigninForm() {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
+                            "x-orbix-device-id": getOrCreateDeviceId(),
                         },
                         credentials: "include",
                         body: JSON.stringify({
@@ -251,7 +255,7 @@ export default function SigninForm() {
 
         setIsVerifying2FA(true);
         try {
-            const endpoints = ["http://localhost:3000/api/auth/2fa/verify-login", "/api/auth/2fa/verify-login"];
+            const endpoints = ["/api/auth/2fa/verify-login", "http://localhost:3000/api/auth/2fa/verify-login"];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -261,6 +265,7 @@ export default function SigninForm() {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",
+                            "x-orbix-device-id": getOrCreateDeviceId(),
                         },
                         credentials: "include",
                         body: JSON.stringify({
@@ -302,7 +307,7 @@ export default function SigninForm() {
         if (cooldownSeconds > 0 || isResending) return;
         setIsResending(true);
         try {
-            const endpoints = ["http://localhost:3000/api/auth/2fa/resend-login-otp", "/api/auth/2fa/resend-login-otp"];
+            const endpoints = ["/api/auth/2fa/resend-login-otp", "http://localhost:3000/api/auth/2fa/resend-login-otp"];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -495,13 +500,7 @@ export default function SigninForm() {
                     className="group relative flex h-12 w-full items-center justify-center rounded-full bg-black text-sm sm:text-base font-black text-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:bg-neutral-900 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                 >
                     {loading ? (
-                        <div className="flex items-center gap-2">
-                            <svg className="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                            </svg>
-                            <span>Logging in...</span>
-                        </div>
+                        <OrbixLoader size="xs" variant="inline" />
                     ) : (
                         <span className="inline-flex items-center gap-2">
                             <span>Login</span>

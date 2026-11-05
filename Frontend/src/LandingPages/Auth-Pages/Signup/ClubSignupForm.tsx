@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { ConfirmationResult, RecaptchaVerifier } from "firebase/auth";
 import {
     formatToE164,
@@ -23,6 +23,7 @@ import {
     ArrowLeft,
     RotateCcw,
     AlertCircle,
+    Sparkles,
 } from "lucide-react";
 import { FormInput } from "../FormInput";
 import { PasswordStrengthIndicator } from "../PasswordStrengthIndicator";
@@ -31,8 +32,9 @@ import { evaluatePassword } from "../passwordValidator";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, useAppSelector, setUser } from "../../../store";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { CollegeAutocomplete } from "../../../components/CollegeAutocomplete";
-import type { InstitutionItem } from "../../../utils/profileApi";
+import { getInstitutionById, searchInstitutions, type InstitutionItem } from "../../../utils/profileApi";
 
 interface ClubSignupFormProps {
     onSwitchToPersonal?: () => void;
@@ -304,6 +306,48 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             }));
         }
     };
+
+    const [searchParams] = useSearchParams();
+    const isCampusInvite = searchParams.get("ref") === "campus-invite";
+    const invitedCollegeName = searchParams.get("college");
+    const invitedCollegeId = searchParams.get("collegeId");
+
+    // Auto-populate college if directed via campus invite link
+    useEffect(() => {
+        let isCancelled = false;
+        const autoSelectCollege = async () => {
+            if (invitedCollegeId) {
+                try {
+                    const inst = await getInstitutionById(invitedCollegeId);
+                    if (!isCancelled && inst) {
+                        handleCollegeSelect(inst);
+                        return;
+                    }
+                } catch {
+                    // fall back to search
+                }
+            }
+            if (invitedCollegeName && !selectedCollege) {
+                try {
+                    const results = await searchInstitutions(invitedCollegeName, { limit: 5 });
+                    if (!isCancelled && results.length > 0) {
+                        const match =
+                            results.find(
+                                (r) => r.officialName.toLowerCase() === invitedCollegeName.toLowerCase()
+                            ) || results[0];
+                        handleCollegeSelect(match);
+                    }
+                } catch {
+                    // silently fail
+                }
+            }
+        };
+
+        autoSelectCollege();
+        return () => {
+            isCancelled = true;
+        };
+    }, [invitedCollegeId, invitedCollegeName]);
 
     const validate = () => {
         const newErrors: Record<string, string> = {};
@@ -878,6 +922,24 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         <form onSubmit={formStep === "details" ? handleProceedToVerification : (e) => { e.preventDefault(); executeFinalSubmission(); }} className="space-y-6" noValidate>
             {formStep === "details" ? (
                 <>
+                    {/* Campus outreach invitation banner */}
+                    {isCampusInvite && (
+                        <div className="p-3.5 mb-3 rounded-2xl bg-[#a2ff86]/30 border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                            <div className="p-2 rounded-xl bg-[#a2ff86] border-2 border-black flex-shrink-0">
+                                <Sparkles className="w-5 h-5 text-black stroke-[2.5]" />
+                            </div>
+                            <div className="min-w-0">
+                                <h4 className="font-black text-black text-xs uppercase tracking-wider">
+                                    Campus Chapter Invitation
+                                </h4>
+                                <p className="text-xs font-semibold text-neutral-800">
+                                    You've been invited to register your official student club chapter at{" "}
+                                    <strong>{invitedCollegeName || "your college"}</strong>. Complete the details below to claim your verified campus hub!
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     {/* Signed-in user account & club status banner */}
                     {isAuthenticated && authUser && (
                         <div className="mb-2">
@@ -1352,44 +1414,42 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
                     {/* SECTION E: LEGAL CONSENT */}
                     <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-2.5">
-                        <div className="space-y-2 pt-1">
-                            <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.termsAccepted}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, termsAccepted: e.target.checked });
-                                        if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
-                                    }}
-                                    className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
-                                />
-                                <span className="leading-snug font-medium">
-                                    I accept the{" "}
-                                    <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                        Terms of Service
-                                    </a>
-                                    .
-                                </span>
-                            </label>
+                        <div className="space-y-3 pt-1">
+                            <NeoCheckbox
+                                checked={formData.termsAccepted}
+                                onCheckedChange={(checked) => {
+                                    setFormData({ ...formData, termsAccepted: checked });
+                                    if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
+                                }}
+                                size="sm"
+                                label={
+                                    <span className="leading-snug font-medium text-xs text-neutral-700">
+                                        I accept the{" "}
+                                        <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                            Terms of Service
+                                        </a>
+                                        .
+                                    </span>
+                                }
+                            />
 
-                            <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
-                                <input
-                                    type="checkbox"
-                                    checked={formData.privacyPolicyAccepted}
-                                    onChange={(e) => {
-                                        setFormData({ ...formData, privacyPolicyAccepted: e.target.checked });
-                                        if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
-                                    }}
-                                    className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
-                                />
-                                <span className="leading-snug font-medium">
-                                    I accept the{" "}
-                                    <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                        Privacy Policy
-                                    </a>
-                                    .
-                                </span>
-                            </label>
+                            <NeoCheckbox
+                                checked={formData.privacyPolicyAccepted}
+                                onCheckedChange={(checked) => {
+                                    setFormData({ ...formData, privacyPolicyAccepted: checked });
+                                    if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
+                                }}
+                                size="sm"
+                                label={
+                                    <span className="leading-snug font-medium text-xs text-neutral-700">
+                                        I accept the{" "}
+                                        <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                            Privacy Policy
+                                        </a>
+                                        .
+                                    </span>
+                                }
+                            />
                         </div>
                         {errors.termsAccepted && (
                             <p className="text-xs font-bold text-rose-600 px-1">{errors.termsAccepted}</p>

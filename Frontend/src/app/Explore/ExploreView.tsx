@@ -19,13 +19,13 @@ import {
     UserMinus,
     UserPlus,
     UserX,
-    Loader2,
     Send,
     Inbox,
     MoreVertical,
     Copy,
     WifiOff,
 } from "lucide-react";
+import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import { type ExploreDeveloper } from "../../utils/profileApi";
 import PublicProfilePage from "../Profile/PublicProfilePage";
 import { useToast } from "../../context/ToastContext";
@@ -1043,13 +1043,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
 
                                 {/* Developers Cards Grid */}
                                 {explore.isLoading ? (
-                                    <div className="py-20 flex flex-col items-center justify-center space-y-4">
-                                        <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
-                                            <Loader2 className="w-8 h-8 text-black animate-spin" />
-                                        </div>
-                                        <p className="text-xs font-black uppercase tracking-wider text-black">
-                                            Scanning verified developers...
-                                        </p>
+                                    <div className="py-24 flex items-center justify-center text-black">
+                                        <OrbixLoader size="lg" />
                                     </div>
                                 ) : (!isOnline || explore.error) && filteredDevelopers.length === 0 ? (
                                     <div className="p-12 text-center rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 animate-in fade-in">
@@ -1235,20 +1230,17 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
 
                                                     {/* Action Footer: Connect & In-Place Inspection */}
                                                     <div className="p-3 bg-[#FAF6EE] border-t-2 border-black flex items-center gap-2">
-                                                        <button
-                                                            type="button"
+                                                        <OrbixButton
+                                                            size="sm"
+                                                            variant="yellow"
+                                                            icon={<UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />}
+                                                            loading={isConnecting}
+                                                            loadingLabel="Connecting..."
                                                             onClick={() => handleConnect(candidate)}
-                                                            disabled={isConnecting}
-                                                            className="shrink-0 px-4 py-2 text-xs font-black rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 bg-[#FFE566] hover:bg-[#ffe043] text-black cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px] inline-flex items-center justify-center gap-1.5 select-none"
                                                             title={`Send connection request to ${candidate.displayName}`}
                                                         >
-                                                            {isConnecting ? (
-                                                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                            ) : (
-                                                                <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                            )}
-                                                            <span>Connect</span>
-                                                        </button>
+                                                            Connect
+                                                        </OrbixButton>
 
                                                         <button
                                                             type="button"
@@ -1267,11 +1259,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
 
                                 {/* Infinite Scroll Loading More Indicator */}
                                 {explore.isLoadingMore && (
-                                    <div className="py-8 flex flex-col items-center justify-center gap-2.5 animate-in fade-in">
-                                        <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
-                                            <RefreshCw className="w-4 h-4 text-black animate-spin stroke-[2.5]" />
-                                            <span className="text-xs font-black text-black">Loading more developers...</span>
-                                        </div>
+                                    <div className="py-8 flex items-center justify-center text-black">
+                                        <OrbixLoader size="sm" />
                                     </div>
                                 )}
 
@@ -1331,13 +1320,8 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
 
                                 {/* Connections List */}
                                 {connections.isLoading ? (
-                                    <div className="py-20 flex flex-col items-center justify-center space-y-4">
-                                        <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000]">
-                                            <Loader2 className="w-8 h-8 text-black animate-spin" />
-                                        </div>
-                                        <p className="text-xs font-black uppercase tracking-wider text-black">
-                                            Loading your connections...
-                                        </p>
+                                    <div className="py-24 flex items-center justify-center text-black">
+                                        <OrbixLoader size="lg" />
                                     </div>
                                 ) : filteredConnections.length === 0 ? (
                                     <div className="p-12 text-center rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
@@ -1488,7 +1472,7 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                             title="Disconnect"
                                                         >
                                                             {isRemoving ? (
-                                                                <Loader2 className="w-4 h-4 animate-spin text-rose-500" />
+                                                                <OrbixLoader size="xs" variant="inline" color="#f43f5e" />
                                                             ) : (
                                                                 <UserMinus className="w-4 h-4 stroke-[2]" />
                                                             )}
@@ -1678,19 +1662,17 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                             </div>
 
                                                             <div className="p-3 bg-[#FAF6EE] border-t-2 border-black flex items-center gap-2">
-                                                                <button
-                                                                    type="button"
+                                                                <OrbixButton
+                                                                    size="sm"
+                                                                    variant="black"
+                                                                    icon={<Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                                                    loading={isBusy}
+                                                                    loadingLabel="Accepting..."
                                                                     onClick={() => handleAcceptRequest(item)}
-                                                                    disabled={isBusy}
-                                                                    className="flex-1 py-2 px-3 rounded-xl bg-black text-[#a2ff86] hover:bg-neutral-900 border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-1.5"
+                                                                    className="flex-1"
                                                                 >
-                                                                    {isBusy ? (
-                                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                                    ) : (
-                                                                        <Check className="w-3.5 h-3.5 stroke-[3]" />
-                                                                    )}
-                                                                    <span>Accept</span>
-                                                                </button>
+                                                                    Accept
+                                                                </OrbixButton>
 
                                                                 <button
                                                                     type="button"
@@ -1834,19 +1816,16 @@ export const ExploreView: React.FC<ExploreViewProps> = ({ onOpenMobileSidebar })
                                                                     Profile
                                                                 </button>
 
-                                                                <button
-                                                                    type="button"
+                                                                <OrbixButton
+                                                                    size="sm"
+                                                                    variant="danger"
+                                                                    icon={<X className="w-3.5 h-3.5 stroke-[2.5]" />}
+                                                                    loading={isBusy}
+                                                                    loadingLabel="Withdrawing..."
                                                                     onClick={() => setWithdrawTarget(item)}
-                                                                    disabled={isBusy}
-                                                                    className="py-1.5 px-3 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-900 border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5"
                                                                 >
-                                                                    {isBusy ? (
-                                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                                    ) : (
-                                                                        <X className="w-3.5 h-3.5 stroke-[2.5]" />
-                                                                    )}
-                                                                    <span>Withdraw Request</span>
-                                                                </button>
+                                                                    Withdraw Request
+                                                                </OrbixButton>
                                                             </div>
                                                         </article>
                                                     );

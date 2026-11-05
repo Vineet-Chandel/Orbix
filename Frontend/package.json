@@ -11,10 +11,15 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.13.0",
+    "@types/dompurify": "^3.0.5",
+    "@types/katex": "^0.16.8",
+    "dompurify": "^3.4.17",
     "firebase": "^13.1.0",
     "framer-motion": "^14.1.0",
     "html-to-image": "^1.11.13",
+    "katex": "^0.19.1",
     "lucide-react": "^1.59.0",
+    "mermaid": "^12.2.0",
     "prismjs": "^1.30.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
@@ -22,7 +27,11 @@
     "react-markdown": "^10.1.0",
     "react-redux": "^9.3.0",
     "react-router-dom": "^7.18.4",
-    "remark-gfm": "^4.0.1"
+    "rehype-katex": "^7.0.1",
+    "rehype-raw": "^7.0.0",
+    "remark-emoji": "^5.0.2",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

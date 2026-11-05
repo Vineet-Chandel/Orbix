@@ -95,8 +95,8 @@ export const DocsHubPage: React.FC = () => {
                 {/* HEADER HERO SECTION                                                      */}
                 {/* ========================================================================= */}
                 <header className="text-center max-w-3xl mx-auto space-y-4">
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#FFE566] border-2 border-black text-black font-black text-xs tracking-wider uppercase shadow-[2px_2px_0px_#000] select-none">
-                        <OrbixLogo className="w-3.5 h-3.5 text-black flex-shrink-0" />
+                    <div className="inline-flex items-center justify-center gap-2.5 text-black font-black text-lg sm:text-xl tracking-tight select-none">
+                        <OrbixLogo className="w-6 h-6 sm:w-7 sm:h-7 text-black flex-shrink-0" />
                         <span>Orbix Architecture & Documentation</span>
                     </div>
 

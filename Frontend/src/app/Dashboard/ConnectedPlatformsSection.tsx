@@ -8,6 +8,7 @@ import { editPlatformHandle, disconnectPlatform } from "../../utils/profileApi";
 import { PlatformDifficultyGauge, type DifficultyBreakdown } from "./PlatformDifficultyGauge";
 import { useAppDispatch, useAppSelector } from "../../store";
 import { invalidateConnectedPlatformCaches } from "../../utils/cacheManager";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 export interface PortalProfileData {
     success: boolean;
@@ -396,6 +397,20 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
     // Modal state for Viewing/Managing a connected account
     const [viewingPortalId, setViewingPortalId] = useState<string | null>(null);
     const [isSingleVerifying, setIsSingleVerifying] = useState(false);
+
+    const { handleBackdropClick: handleConnectBackdropClick } = useModalDismiss({
+        isOpen: Boolean(connectingPortalId),
+        onClose: () => {
+            if (!isSavingConnect) setConnectingPortalId(null);
+        },
+        disableEscape: isSavingConnect,
+        disableBackdrop: isSavingConnect,
+    });
+
+    const { handleBackdropClick: handleViewingBackdropClick } = useModalDismiss({
+        isOpen: Boolean(viewingPortalId),
+        onClose: () => setViewingPortalId(null),
+    });
 
     // Counts
     const connectedCount = useMemo(() => {
@@ -1028,7 +1043,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
             {connectingPortalId && activeConnectingConfig && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn"
-                    onClick={() => !isSavingConnect && setConnectingPortalId(null)}
+                    onClick={handleConnectBackdropClick}
                 >
                     <div
                         className="w-full max-w-lg bg-white rounded-2xl border border-neutral-200 shadow-2xl p-5 sm:p-6 space-y-4"
@@ -1253,7 +1268,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
             {viewingPortalId && activeViewingProfile && activeViewingConfig && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fadeIn"
-                    onClick={() => setViewingPortalId(null)}
+                    onClick={handleViewingBackdropClick}
                 >
                     <div
                         className="w-full max-w-lg bg-white rounded-2xl border border-neutral-200 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[92vh] overflow-y-auto scrollbar-none"

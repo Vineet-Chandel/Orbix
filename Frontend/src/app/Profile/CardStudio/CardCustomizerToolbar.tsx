@@ -6,6 +6,7 @@ import type { CardFormat, CardFace, CardThemeId, SlotShowcaseCategory } from "./
 import type { RankedPlatform, RankedContestPlatform } from "../../../utils/cardStatsAggregator";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 
 interface CardCustomizerToolbarProps {
     format: CardFormat;
@@ -243,32 +244,31 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                     <label className="block text-[11px] font-black text-black uppercase tracking-wider mb-1.5">
                         GitHub Activity
                     </label>
-                    <label
-                        className={`inline-flex items-center gap-2 text-xs font-bold cursor-pointer ${
-                            !isGitHubConnected ? "opacity-50 cursor-not-allowed" : ""
-                        }`}
+                    <div
+                        className="inline-flex items-center gap-2"
                         title={
                             !isGitHubConnected
                                 ? "Connect GitHub in the Platforms section below to include stats"
                                 : "Toggle GitHub stats on card"
                         }
                     >
-                        <input
-                            type="checkbox"
+                        <NeoCheckbox
                             checked={includeGitHub && isGitHubConnected}
                             disabled={!isGitHubConnected}
-                            onChange={(e) => onToggleGitHub(e.target.checked)}
-                            className="w-4 h-4 rounded border-2 border-black text-black focus:ring-black accent-black cursor-pointer"
+                            onCheckedChange={onToggleGitHub}
+                            size="sm"
+                            label={
+                                <span className="inline-flex items-center gap-2 font-bold text-black text-xs">
+                                    Include GitHub Stats
+                                    {!isGitHubConnected && (
+                                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
+                                            Not Connected
+                                        </span>
+                                    )}
+                                </span>
+                            }
                         />
-                        <span className="font-bold text-black">
-                            Include GitHub Stats
-                        </span>
-                        {!isGitHubConnected && (
-                            <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
-                                Not Connected
-                            </span>
-                        )}
-                    </label>
+                    </div>
                 </div>
             </div>
 

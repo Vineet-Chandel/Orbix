@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { DEFAULT_AVATAR_URL } from "../../../utils/avatarConstants";
 import type { ClubMember, ClubTeam, ClubInvitation, TeamStats } from "./types";
 import { AddMemberModal } from "./AddMemberModal";
@@ -232,7 +233,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setIsAddMemberOpen(true)}
-                                className="px-4 py-2.5 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                                className="px-4 py-2.5 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 <UserPlus className="w-4 h-4 stroke-[2.5]" />
                                 <span>Add Member</span>
@@ -268,7 +269,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setIsAddMemberOpen(true)}
-                                className="px-3.5 py-2 rounded-xl bg-black hover:bg-neutral-900 text-[#a2ff86] border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
+                                className="px-3.5 py-2 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] text-xs font-black uppercase tracking-wider flex items-center gap-1.5 transition-all cursor-pointer active:translate-x-[1px] active:translate-y-[1px]"
                             >
                                 <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
                                 <span>Add Member</span>
@@ -360,7 +361,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                     onClick={() => setActiveTab("overview")}
                     className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer ${
                         activeTab === "overview"
-                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                            ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                             : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                     }`}
                 >
@@ -371,7 +372,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                     onClick={() => setActiveTab("departments")}
                     className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                         activeTab === "departments"
-                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                            ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                             : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                     }`}
                 >
@@ -385,7 +386,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                     onClick={() => setActiveTab("members")}
                     className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                         activeTab === "members"
-                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                            ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                             : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                     }`}
                 >
@@ -399,7 +400,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                     onClick={() => setActiveTab("invitations")}
                     className={`px-3.5 sm:px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 ${
                         activeTab === "invitations"
-                            ? "bg-black text-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000]"
+                            ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
                             : "text-neutral-700 hover:text-black hover:bg-[#FAF6EE] border-2 border-transparent"
                     }`}
                 >
@@ -595,15 +596,13 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                             <span className="text-xs font-black uppercase tracking-wider text-black">
                                 Departments ({visibleTeams.length})
                             </span>
-                            <label className="inline-flex items-center gap-1.5 text-xs font-bold text-neutral-700 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={showArchivedTeams}
-                                    onChange={(e) => setShowArchivedTeams(e.target.checked)}
-                                    className="rounded border-black cursor-pointer"
-                                />
-                                <span>Show Archived</span>
-                            </label>
+                            <NeoCheckbox
+                                checked={showArchivedTeams}
+                                onCheckedChange={setShowArchivedTeams}
+                                label="Show Archived"
+                                labelClassName="text-xs font-bold text-neutral-700"
+                                size="sm"
+                            />
                         </div>
 
                         {canManageTeams && (
@@ -770,7 +769,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                 type="text"
                                 value={memberSearchQuery}
                                 onChange={(e) => setMemberSearchQuery(e.target.value)}
-                                placeholder="Search by name, handle, or title..."
+                                placeholder="Search by name, username, or title..."
                                 className="w-full pl-10 pr-4 py-2 bg-[#FAF6EE] border-2 border-black rounded-xl text-xs font-bold text-black focus:outline-none"
                             />
                         </div>
@@ -948,7 +947,7 @@ export const ClubTeamWorkspace: React.FC<ClubTeamWorkspaceProps> = ({
                                         onClick={() => setInvitationStatusFilter(st)}
                                         className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase transition-all cursor-pointer ${
                                             invitationStatusFilter === st
-                                                ? "bg-black text-[#a2ff86] border border-black"
+                                                ? "bg-[#a2ff86] text-black border border-black font-black"
                                                 : "bg-[#FAF6EE] text-neutral-700 hover:text-black border border-black/40"
                                         }`}
                                     >

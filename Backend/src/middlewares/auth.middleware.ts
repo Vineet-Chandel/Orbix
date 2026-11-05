@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { getUserDetailsCache, userDetailsCache } from "../redis/cache/cache-auth.js";
 import { query } from "../database/client.js";
+import { isSessionRevoked, throttleTouchSession } from "../services/session/sessionService.js";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
@@ -47,6 +48,21 @@ export const authenticate = async (req: Request, res: Response, next: NextFuncti
                 status: "failed",
                 message: "Invalid token payload",
             });
+        }
+
+        // Validate session revocation status in Redis/DB
+        const sessionId = decoded?.sid || decoded?.sessionId;
+        if (sessionId) {
+            const revoked = await isSessionRevoked(sessionId);
+            if (revoked) {
+                return res.status(401).json({
+                    status: "failed",
+                    message: "Session has been terminated. Please sign in again.",
+                    sessionRevoked: true,
+                });
+            }
+            (req as any).sessionId = sessionId;
+            throttleTouchSession(sessionId);
         }
 
         // Check Redis cache first, fallback to Postgres
@@ -148,6 +164,16 @@ export const optionalAuthenticate = async (req: Request, res: Response, next: Ne
         const username = decoded?.username;
         if (!userGmail && !userId && !username) {
             return next();
+        }
+
+        const sessionId = decoded?.sid || decoded?.sessionId;
+        if (sessionId) {
+            const revoked = await isSessionRevoked(sessionId);
+            if (revoked) {
+                return next();
+            }
+            (req as any).sessionId = sessionId;
+            throttleTouchSession(sessionId);
         }
 
         let user = userGmail ? await getUserDetailsCache(userGmail) : null;

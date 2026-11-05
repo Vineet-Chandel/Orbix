@@ -1,7 +1,7 @@
 import type { EventItem } from "../../../store";
 
 // Helper to create consistent contest items
-const createContest = (
+export const createContest = (
     id: string,
     platform: string,
     platformName: string,
@@ -13,15 +13,15 @@ const createContest = (
     type: "contest" | "hackathon" = "contest",
     division: string | null = null,
     rated: boolean = true,
-    description?: string
+    description?: string,
+    refTimeMs: number = Date.now()
 ): EventItem => {
     const startMs = new Date(isoStart).getTime();
-    const endMs = startMs + durationHours * 3600 * 1000;
-    const now = Date.now();
+    const endMs = startMs + Math.round(durationHours * 3600 * 1000);
     let status: "UPCOMING" | "LIVE" | "FINISHED" = "UPCOMING";
-    if (now >= endMs) {
+    if (refTimeMs >= endMs) {
         status = "FINISHED";
-    } else if (now >= startMs && now < endMs) {
+    } else if (refTimeMs >= startMs && refTimeMs < endMs) {
         status = "LIVE";
     }
 
@@ -31,11 +31,11 @@ const createContest = (
         platformName,
         title,
         url,
-        startTime: isoStart,
+        startTime: new Date(startMs).toISOString(),
         endTime: new Date(endMs).toISOString(),
         startTimestamp: startMs,
         endTimestamp: endMs,
-        durationSeconds: durationHours * 3600,
+        durationSeconds: Math.round(durationHours * 3600),
         durationFormatted,
         type,
         status,
@@ -45,1020 +45,623 @@ const createContest = (
     };
 };
 
-export const MOCK_EVENT_LIST: EventItem[] = [
-    // -------------------------------------------------------------------------
-    // OCTOBER 2026 - COMPLETE HIGH-DENSITY SCHEDULE (60+ CONTESTS)
-    // -------------------------------------------------------------------------
+// Helper: format ISO date in IST (+05:30) timezone
+function formatIstIso(year: number, monthIndex: number, day: number, hour: number = 0, minute: number = 0): string {
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${year}-${pad(monthIndex + 1)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00+05:30`;
+}
 
-    // Oct 1 (Thu)
-    createContest(
-        "cf-1114",
-        "codeforces",
-        "Codeforces",
-        "Codeforces Round 1114 (Div. 2)",
-        "https://codeforces.com/contest/1114",
-        "2026-10-01T20:05:00+05:30",
-        2,
-        "2h",
-        "contest",
-        "Div. 2",
-        true
-    ),
-    createContest(
-        "cses-sprint-8",
-        "cses",
-        "CSES",
-        "CSES Algorithmic Sprint 8",
-        "https://cses.fi/problemset/",
-        "2026-10-01T18:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
+/**
+ * Dynamic Self-Updating Dummy Data Algorithm
+ *
+ * Generates an authentic, high-density multi-month contest and hackathon schedule
+ * relative to the current live clock or given referenceDate.
+ *
+ * It prevents landing page dummy data from getting old or stuck in the "finished" stage,
+ * ensuring platforms always have non-zero counts and upcoming contests.
+ */
+export function generateDynamicMockEvents(refDate: Date = new Date()): EventItem[] {
+    const events: EventItem[] = [];
+    const nowMs = refDate.getTime();
+    const currentYear = refDate.getFullYear();
+    const currentMonth = refDate.getMonth(); // 0-indexed
 
-    // Oct 2 (Fri)
-    createContest(
-        "atcoder-abc-471",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Beginner Contest 471",
-        "https://atcoder.jp/contests/abc471",
-        "2026-10-02T17:30:00+05:30",
-        1.67,
-        "1h 40m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "hr-oct-challenge",
-        "hackerrank",
-        "HackerRank",
-        "HackerRank October Code Challenge",
-        "https://www.hackerrank.com/contests",
-        "2026-10-02T20:00:00+05:30",
-        3,
-        "3h",
-        "contest",
-        null,
-        true
-    ),
+    // Generate across 4-month window: [Previous Month, Current Month, Next Month, Next Month + 1]
+    const monthsToGenerate: Array<{ year: number; month: number }> = [
+        {
+            year: currentMonth === 0 ? currentYear - 1 : currentYear,
+            month: currentMonth === 0 ? 11 : currentMonth - 1,
+        },
+        { year: currentYear, month: currentMonth },
+        {
+            year: currentMonth === 11 ? currentYear + 1 : currentYear,
+            month: currentMonth === 11 ? 0 : currentMonth + 1,
+        },
+        {
+            year: currentMonth >= 10 ? currentYear + 1 : currentYear,
+            month: (currentMonth + 2) % 12,
+        },
+    ];
 
-    // Oct 3 (Sat)
-    createContest(
-        "atcoder-arc-227",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Regular Contest-- 227",
-        "https://atcoder.jp/contests/arc227",
-        "2026-10-03T17:30:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "lc-biweekly-166",
-        "leetcode",
-        "LeetCode",
-        "Biweekly Contest 166",
-        "https://leetcode.com/contest/biweekly-contest-166",
-        "2026-10-03T20:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "cf-1115",
-        "codeforces",
-        "Codeforces",
-        "Codeforces Round 1115 (Div. 1 + Div. 2)",
-        "https://codeforces.com/contest/1115",
-        "2026-10-03T20:05:00+05:30",
-        2.5,
-        "2h 30m",
-        "contest",
-        "Div. 1 + 2",
-        true
-    ),
+    for (const { year, month } of monthsToGenerate) {
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        // Month index offset relative to year 2026 for consistent incremental round numbers
+        const monthOffset = (year - 2026) * 12 + month;
 
-    // Oct 4 (Sun)
-    createContest(
-        "lc-weekly-515",
-        "leetcode",
-        "LeetCode",
-        "Weekly Contest 515",
-        "https://leetcode.com/contest/weekly-contest-515",
-        "2026-10-04T08:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "code360-143",
-        "code360",
-        "Code360",
-        "Coding Ninjas Weekend Contest 143",
-        "https://www.naukri.com/code360/contests",
-        "2026-10-04T19:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "gfg-weekly-169",
-        "geeksforgeeks",
-        "GeeksforGeeks",
-        "GfG Weekly Coding Contest 169",
-        "https://practice.geeksforgeeks.org/events/rec/gfg-weekly-coding-contest",
-        "2026-10-04T19:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
+        for (let day = 1; day <= daysInMonth; day++) {
+            const date = new Date(year, month, day);
+            const dayOfWeek = date.getDay(); // 0 = Sun, 1 = Mon, ..., 6 = Sat
+            const weekOfMonth = Math.floor((day - 1) / 7) + 1;
 
-    // Oct 5 (Mon)
-    createContest(
-        "topcoder-srm-857",
-        "topcoder",
-        "TopCoder",
-        "Single Round Match 857",
-        "https://www.topcoder.com/community/events",
-        "2026-10-05T18:30:00+05:30",
-        2,
-        "2h",
-        "contest",
-        "Div 1 & 2",
-        true
-    ),
-    createContest(
-        "ib-drift-a",
-        "interviewbit",
-        "InterviewBit",
-        "Code Drift October Sprint",
-        "https://www.interviewbit.com/contests",
-        "2026-10-05T21:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
+            // 1. LeetCode: Weekly Contest (Every Sunday at 08:00 IST)
+            if (dayOfWeek === 0) {
+                const roundNum = 422 + monthOffset * 4 + weekOfMonth;
+                events.push(
+                    createContest(
+                        `lc-weekly-${roundNum}`,
+                        "leetcode",
+                        "LeetCode",
+                        `Weekly Contest ${roundNum}`,
+                        `https://leetcode.com/contest/weekly-contest-${roundNum}`,
+                        formatIstIso(year, month, day, 8, 0),
+                        1.5,
+                        "1h 30m",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 6 (Tue)
-    createContest(
-        "cf-edu-172",
-        "codeforces",
-        "Codeforces",
-        "Educational Codeforces Round 172",
-        "https://codeforces.com/contest/edu172",
-        "2026-10-06T20:05:00+05:30",
-        2,
-        "2h",
-        "contest",
-        "Rated for Div. 2",
-        true
-    ),
+            // LeetCode: Biweekly Contest (Alternate Saturdays at 20:00 IST)
+            if (dayOfWeek === 6 && (weekOfMonth === 2 || weekOfMonth === 4)) {
+                const roundNum = 142 + monthOffset * 2 + Math.floor(weekOfMonth / 2);
+                events.push(
+                    createContest(
+                        `lc-biweekly-${roundNum}`,
+                        "leetcode",
+                        "LeetCode",
+                        `Biweekly Contest ${roundNum}`,
+                        `https://leetcode.com/contest/biweekly-contest-${roundNum}`,
+                        formatIstIso(year, month, day, 20, 0),
+                        1.5,
+                        "1h 30m",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 7 (Wed)
-    createContest(
-        "cc-starters-258",
-        "codechef",
-        "CodeChef",
-        "Starters 258 (Div. 1, 2, 3, 4)",
-        "https://www.codechef.com/START258",
-        "2026-10-07T20:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "he-circuits-sprint",
-        "hackerearth",
-        "HackerEarth",
-        "HackerEarth Circuits '26 Kickoff",
-        "https://www.hackerearth.com/challenges/",
-        "2026-10-07T18:00:00+05:30",
-        3,
-        "3h",
-        "contest",
-        null,
-        true
-    ),
+            // 2. Codeforces: Tuesday Round (Div. 2 at 20:05 IST)
+            if (dayOfWeek === 2) {
+                const roundNum = 1002 + monthOffset * 6 + weekOfMonth * 2;
+                events.push(
+                    createContest(
+                        `cf-div2-${year}-${month + 1}-${day}`,
+                        "codeforces",
+                        "Codeforces",
+                        `Codeforces Round ${roundNum} (Div. 2)`,
+                        `https://codeforces.com/contest/${roundNum}`,
+                        formatIstIso(year, month, day, 20, 5),
+                        2,
+                        "2h",
+                        "contest",
+                        "Div. 2",
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 8 (Thu)
-    createContest(
-        "cses-graph-sprint",
-        "cses",
-        "CSES",
-        "CSES Graph Theory Challenge",
-        "https://cses.fi/problemset/",
-        "2026-10-08T19:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "spoj-classical-42",
-        "spoj",
-        "SPOJ",
-        "SPOJ Classical Contest 42",
-        "https://www.spoj.com/contests/",
-        "2026-10-08T17:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
+            // Codeforces: Thursday Educational Round (Div. 2 at 20:05 IST)
+            if (dayOfWeek === 4) {
+                const eduNum = 176 + monthOffset * 2 + weekOfMonth;
+                events.push(
+                    createContest(
+                        `cf-edu-${year}-${month + 1}-${day}`,
+                        "codeforces",
+                        "Codeforces",
+                        `Educational Codeforces Round ${eduNum} (Rated for Div. 2)`,
+                        `https://codeforces.com/contest/${eduNum + 810}`,
+                        formatIstIso(year, month, day, 20, 5),
+                        2,
+                        "2h",
+                        "contest",
+                        "Div. 2",
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 9 (Fri)
-    createContest(
-        "atcoder-abc-472",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Beginner Contest 472",
-        "https://atcoder.jp/contests/abc472",
-        "2026-10-09T17:30:00+05:30",
-        1.67,
-        "1h 40m",
-        "contest",
-        null,
-        true
-    ),
+            // Codeforces: Saturday Round (Div. 1 + Div. 2 or Div. 3 at 20:05 IST)
+            if (dayOfWeek === 6) {
+                const roundNum = 1003 + monthOffset * 6 + weekOfMonth * 2;
+                const isDiv3 = day % 2 === 0;
+                events.push(
+                    createContest(
+                        `cf-round-${year}-${month + 1}-${day}`,
+                        "codeforces",
+                        "Codeforces",
+                        isDiv3
+                            ? `Codeforces Round ${roundNum} (Div. 3)`
+                            : `Codeforces Round ${roundNum} (Div. 1 + Div. 2)`,
+                        `https://codeforces.com/contest/${roundNum}`,
+                        formatIstIso(year, month, day, 20, 5),
+                        isDiv3 ? 2.25 : 2.5,
+                        isDiv3 ? "2h 15m" : "2h 30m",
+                        "contest",
+                        isDiv3 ? "Div. 3" : "Div. 1 + 2",
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 10 (Sat)
-    createContest(
-        "atcoder-arc-228",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Regular Contest-- 228",
-        "https://atcoder.jp/contests/arc228",
-        "2026-10-10T17:30:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "cf-1116",
-        "codeforces",
-        "Codeforces",
-        "Codeforces Round 1116 (Div. 3)",
-        "https://codeforces.com/contest/1116",
-        "2026-10-10T14:35:00+05:30",
-        2.25,
-        "2h 15m",
-        "contest",
-        "Div. 3",
-        true
-    ),
-    createContest(
-        "lc-biweekly-167",
-        "leetcode",
-        "LeetCode",
-        "Biweekly Contest 167",
-        "https://leetcode.com/contest/biweekly-contest-167",
-        "2026-10-10T20:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
+            // 3. CodeChef: Starters (Every Wednesday at 20:00 IST)
+            if (dayOfWeek === 3) {
+                const starterNum = 262 + monthOffset * 4 + weekOfMonth;
+                events.push(
+                    createContest(
+                        `cc-starters-${starterNum}`,
+                        "codechef",
+                        "CodeChef",
+                        `Starters ${starterNum}`,
+                        `https://www.codechef.com/START${starterNum}`,
+                        formatIstIso(year, month, day, 20, 0),
+                        2,
+                        "2h",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 11 (Sun)
-    createContest(
-        "lc-weekly-516",
-        "leetcode",
-        "LeetCode",
-        "Weekly Contest 516",
-        "https://leetcode.com/contest/weekly-contest-516",
-        "2026-10-11T08:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "code360-144",
-        "code360",
-        "Code360",
-        "Coding Ninjas Weekend Contest 144",
-        "https://www.naukri.com/code360/contests",
-        "2026-10-11T19:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "gfg-weekly-170",
-        "geeksforgeeks",
-        "GeeksforGeeks",
-        "GfG Weekly Coding Contest 170",
-        "https://practice.geeksforgeeks.org/events/rec/gfg-weekly-coding-contest",
-        "2026-10-11T19:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
+            // 4. AtCoder: Beginner Contest (Every Saturday at 17:30 IST)
+            if (dayOfWeek === 6) {
+                const abcNum = 472 + monthOffset * 4 + weekOfMonth;
+                events.push(
+                    createContest(
+                        `atcoder-abc-${abcNum}`,
+                        "atcoder",
+                        "AtCoder",
+                        `AtCoder Beginner Contest ${abcNum}`,
+                        `https://atcoder.jp/contests/abc${abcNum}`,
+                        formatIstIso(year, month, day, 17, 30),
+                        1.67,
+                        "1h 40m",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 12 (Mon)
-    createContest(
-        "hr-10days-algo",
-        "hackerrank",
-        "HackerRank",
-        "10 Days of Algorithms Sprint",
-        "https://www.hackerrank.com/contests",
-        "2026-10-12T16:00:00+05:30",
-        3,
-        "3h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "topcoder-srm-858",
-        "topcoder",
-        "TopCoder",
-        "Single Round Match 858",
-        "https://www.topcoder.com/community/events",
-        "2026-10-12T18:30:00+05:30",
-        2,
-        "2h",
-        "contest",
-        "Div 1 & 2",
-        true
-    ),
+            // AtCoder: Regular Contest (Alternate Sundays at 17:30 IST)
+            if (dayOfWeek === 0 && (weekOfMonth === 1 || weekOfMonth === 3)) {
+                const arcNum = 224 + monthOffset * 2 + Math.floor(weekOfMonth / 2);
+                events.push(
+                    createContest(
+                        `atcoder-arc-${arcNum}`,
+                        "atcoder",
+                        "AtCoder",
+                        `AtCoder Regular Contest ${arcNum}`,
+                        `https://atcoder.jp/contests/arc${arcNum}`,
+                        formatIstIso(year, month, day, 17, 30),
+                        2,
+                        "2h",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 13 (Tue)
-    createContest(
-        "cf-1117",
-        "codeforces",
-        "Codeforces",
-        "Codeforces Round 1117 (Div. 2)",
-        "https://codeforces.com/contest/1117",
-        "2026-10-13T20:05:00+05:30",
-        2,
-        "2h",
-        "contest",
-        "Div. 2",
-        true
-    ),
+            // 5. GeeksforGeeks: Weekly Coding Contest (Every Sunday at 19:00 IST)
+            if (dayOfWeek === 0) {
+                const gfgNum = 179 + monthOffset * 4 + weekOfMonth;
+                events.push(
+                    createContest(
+                        `gfg-weekly-${gfgNum}`,
+                        "geeksforgeeks",
+                        "GeeksforGeeks",
+                        `GfG Weekly Coding Contest ${gfgNum}`,
+                        `https://practice.geeksforgeeks.org/contest/gfg-weekly-coding-contest-${gfgNum}`,
+                        formatIstIso(year, month, day, 19, 0),
+                        1.5,
+                        "1h 30m",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 14 (Wed)
-    createContest(
-        "cc-starters-259",
-        "codechef",
-        "CodeChef",
-        "Starters 259 (Div. 1, 2, 3, 4)",
-        "https://www.codechef.com/START259",
-        "2026-10-14T20:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "ib-dp-marathon",
-        "interviewbit",
-        "InterviewBit",
-        "InterviewBit Dynamic Programming Marathon",
-        "https://www.interviewbit.com/contests",
-        "2026-10-14T19:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
+            // 6. HackerRank: Code Sprint (Alternate Fridays at 20:00 IST)
+            if (dayOfWeek === 5 && (weekOfMonth === 2 || weekOfMonth === 4)) {
+                events.push(
+                    createContest(
+                        `hr-sprint-${year}-${month + 1}-${day}`,
+                        "hackerrank",
+                        "HackerRank",
+                        `HackerRank Code Sprint ${month + 1}.${weekOfMonth}`,
+                        "https://www.hackerrank.com/contests",
+                        formatIstIso(year, month, day, 20, 0),
+                        3,
+                        "3h",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 15 (Thu)
-    createContest(
-        "cf-edu-173",
-        "codeforces",
-        "Codeforces",
-        "Educational Codeforces Round 173",
-        "https://codeforces.com/contest/edu173",
-        "2026-10-15T20:05:00+05:30",
-        2,
-        "2h",
-        "contest",
-        "Rated for Div. 2",
-        true
-    ),
-    createContest(
-        "cses-dp-sprint",
-        "cses",
-        "CSES",
-        "CSES Dynamic Programming Sprint",
-        "https://cses.fi/problemset/",
-        "2026-10-15T18:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
+            // 7. HackerEarth: Circuit Challenge (Bi-monthly on days 10 and 24 at 21:00 IST)
+            if (day === 10 || day === 24) {
+                events.push(
+                    createContest(
+                        `he-circuit-${year}-${month + 1}-${day}`,
+                        "hackerearth",
+                        "HackerEarth",
+                        `HackerEarth Algorithmic Circuit ${day}`,
+                        "https://www.hackerearth.com/challenges/",
+                        formatIstIso(year, month, day, 21, 0),
+                        3,
+                        "3h",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 16 (Fri)
-    createContest(
-        "atcoder-abc-473",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Beginner Contest 473",
-        "https://atcoder.jp/contests/abc473",
-        "2026-10-16T17:30:00+05:30",
-        1.67,
-        "1h 40m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "he-oct-circuits",
-        "hackerearth",
-        "HackerEarth",
-        "HackerEarth October Circuits '26",
-        "https://www.hackerearth.com/challenges/",
-        "2026-10-16T20:00:00+05:30",
-        3,
-        "3h",
-        "contest",
-        null,
-        true
-    ),
+            // 8. TopCoder: Single Round Match (Alternate Thursdays at 21:30 IST)
+            if (dayOfWeek === 4 && (weekOfMonth === 1 || weekOfMonth === 3)) {
+                const srmNum = 872 + monthOffset * 2 + Math.floor(weekOfMonth / 2);
+                events.push(
+                    createContest(
+                        `tc-srm-${srmNum}`,
+                        "topcoder",
+                        "TopCoder",
+                        `TopCoder SRM ${srmNum}`,
+                        "https://www.topcoder.com/community/events",
+                        formatIstIso(year, month, day, 21, 30),
+                        2,
+                        "2h",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 17 (Sat)
-    createContest(
-        "atcoder-agc-072",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Grand Contest 072",
-        "https://atcoder.jp/contests/agc072",
-        "2026-10-17T17:30:00+05:30",
-        3,
-        "3h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "cf-1118",
-        "codeforces",
-        "Codeforces",
-        "Codeforces Round 1118 (Div. 1 + Div. 2)",
-        "https://codeforces.com/contest/1118",
-        "2026-10-17T20:05:00+05:30",
-        2.5,
-        "2h 30m",
-        "contest",
-        "Div. 1 + 2",
-        true
-    ),
-    createContest(
-        "lc-weekly-517",
-        "leetcode",
-        "LeetCode",
-        "Weekly Contest 517",
-        "https://leetcode.com/contest/weekly-contest-517",
-        "2026-10-17T20:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
+            // 9. Code360: Weekly Contest (Every Sunday at 18:00 IST)
+            if (dayOfWeek === 0) {
+                const c360Num = 142 + monthOffset * 4 + weekOfMonth;
+                events.push(
+                    createContest(
+                        `c360-weekly-${c360Num}`,
+                        "code360",
+                        "Code360",
+                        `Code360 Weekly Contest ${c360Num}`,
+                        "https://www.naukri.com/code360/contests",
+                        formatIstIso(year, month, day, 18, 0),
+                        1.5,
+                        "1h 30m",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 18 (Sun)
-    createContest(
-        "lc-weekly-518",
-        "leetcode",
-        "LeetCode",
-        "Weekly Contest 518",
-        "https://leetcode.com/contest/weekly-contest-518",
-        "2026-10-18T08:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "atcoder-arc-229",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Regular Contest-- 229",
-        "https://atcoder.jp/contests/arc229",
-        "2026-10-18T17:30:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "code360-145",
-        "code360",
-        "Code360",
-        "Coding Ninjas Weekend Contest 145",
-        "https://www.naukri.com/code360/contests",
-        "2026-10-18T19:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "gfg-weekly-171",
-        "geeksforgeeks",
-        "GeeksforGeeks",
-        "GfG Weekly Coding Contest 171",
-        "https://practice.geeksforgeeks.org/events/rec/gfg-weekly-coding-contest",
-        "2026-10-18T19:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
+            // 10. InterviewBit: ByteRace (Alternate Saturdays at 18:00 IST)
+            if (dayOfWeek === 6 && (weekOfMonth === 1 || weekOfMonth === 3)) {
+                events.push(
+                    createContest(
+                        `ib-byterace-${year}-${month + 1}-${day}`,
+                        "interviewbit",
+                        "InterviewBit",
+                        `InterviewBit ByteRace Round ${weekOfMonth}`,
+                        "https://www.interviewbit.com/contest/",
+                        formatIstIso(year, month, day, 18, 0),
+                        1.5,
+                        "1h 30m",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 19 (Mon)
-    createContest(
-        "topcoder-srm-859",
-        "topcoder",
-        "TopCoder",
-        "Single Round Match 859",
-        "https://www.topcoder.com/community/events",
-        "2026-10-19T18:30:00+05:30",
-        2,
-        "2h",
-        "contest",
-        "Div 1 & 2",
-        true
-    ),
-    createContest(
-        "cf-1119",
-        "codeforces",
-        "Codeforces",
-        "Codeforces Round 1119 (Div. 3)",
-        "https://codeforces.com/contest/1119",
-        "2026-10-19T20:15:00+05:30",
-        2.25,
-        "2h 15m",
-        "contest",
-        "Div. 3",
-        true
-    ),
+            // 11. CSES: Algorithmic Sprint (Alternate Fridays at 18:00 IST)
+            if (dayOfWeek === 5 && (weekOfMonth === 1 || weekOfMonth === 3)) {
+                const csesNum = 10 + monthOffset * 2 + Math.floor(weekOfMonth / 2);
+                events.push(
+                    createContest(
+                        `cses-sprint-${csesNum}`,
+                        "cses",
+                        "CSES",
+                        `CSES Algorithmic Sprint ${csesNum}`,
+                        "https://cses.fi/contests/",
+                        formatIstIso(year, month, day, 18, 0),
+                        2,
+                        "2h",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
 
-    // Oct 20 (Tue - TODAY)
-    createContest(
-        "cses-sprint-9",
-        "cses",
-        "CSES",
-        "CSES Algorithmic Sprint 9",
-        "https://cses.fi/problemset/",
-        "2026-10-20T18:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "cf-edu-174",
-        "codeforces",
-        "Codeforces",
-        "Educational Codeforces Round 174",
-        "https://codeforces.com/contest/edu174",
-        "2026-10-20T20:05:00+05:30",
-        2,
-        "2h",
-        "contest",
-        "Rated for Div. 2",
-        true
-    ),
+            // 12. SPOJ: Algorithmic Sprint (Alternate Mondays at 19:00 IST)
+            if (dayOfWeek === 1 && (weekOfMonth === 2 || weekOfMonth === 4)) {
+                events.push(
+                    createContest(
+                        `spoj-challenge-${year}-${month + 1}-${day}`,
+                        "spoj",
+                        "SPOJ",
+                        `SPOJ Algorithmic Sprint ${month + 1}.${weekOfMonth}`,
+                        "https://www.spoj.com/",
+                        formatIstIso(year, month, day, 19, 0),
+                        2,
+                        "2h",
+                        "contest",
+                        null,
+                        true,
+                        undefined,
+                        nowMs
+                    )
+                );
+            }
+        }
 
-    // Oct 21 (Wed - FEATURED UP NEXT)
-    createContest(
-        "starters-261",
-        "codechef",
-        "CodeChef",
-        "Starters 261",
-        "https://www.codechef.com/START261",
-        "2026-10-21T20:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true,
-        "Weekly rated contest for Division 1, 2, 3 and 4."
-    ),
-    createContest(
-        "hr-codesprint-6",
-        "hackerrank",
-        "HackerRank",
-        "University CodeSprint 6",
-        "https://www.hackerrank.com/contests",
-        "2026-10-21T18:00:00+05:30",
-        3,
-        "3h",
-        "contest",
-        null,
-        true
-    ),
+        // Add 4 multi-day Hackathons for this month
+        events.push(
+            createContest(
+                `hack-ai-${year}-${month + 1}`,
+                "hackerearth",
+                "HackerEarth",
+                `International Autonomous AI Hackathon ${year}`,
+                "https://www.hackerearth.com/challenges/hackathon/",
+                formatIstIso(year, month, 5, 9, 0),
+                72,
+                "3d",
+                "hackathon",
+                null,
+                false,
+                "$50,000 in bounties for autonomous AI developer tooling.",
+                nowMs
+            )
+        );
 
-    // Oct 22 (Thu)
-    createContest(
-        "cf-1120",
-        "codeforces",
-        "Codeforces",
-        "Codeforces Round 1120 (Div. 2)",
-        "https://codeforces.com/contest/1120",
-        "2026-10-22T20:05:00+05:30",
-        2,
-        "2h",
-        "contest",
-        "Div. 2",
-        true
-    ),
-    createContest(
-        "cses-tree-algo",
-        "cses",
-        "CSES",
-        "CSES Tree Algorithms Sprint",
-        "https://cses.fi/problemset/",
-        "2026-10-22T18:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
+        events.push(
+            createContest(
+                `hack-quantum-${year}-${month + 1}`,
+                "hackerearth",
+                "HackerEarth",
+                `Quantum Algorithms & Security Challenge ${year}`,
+                "https://www.hackerearth.com/challenges/hackathon/",
+                formatIstIso(year, month, 14, 9, 0),
+                96,
+                "4d",
+                "hackathon",
+                null,
+                false,
+                "Post-quantum cryptographic implementations and benchmarking.",
+                nowMs
+            )
+        );
 
-    // Oct 23 (Fri)
-    createContest(
-        "lc-biweekly-168",
-        "leetcode",
-        "LeetCode",
-        "Biweekly Contest 168",
-        "https://leetcode.com/contest/biweekly-contest-168",
-        "2026-10-23T20:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "atcoder-abc-474",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Beginner Contest 474",
-        "https://atcoder.jp/contests/abc474",
-        "2026-10-23T17:30:00+05:30",
-        1.67,
-        "1h 40m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "hr-world-codesprint",
-        "hackerrank",
-        "HackerRank",
-        "World CodeSprint 2026",
-        "https://www.hackerrank.com/contests",
-        "2026-10-23T22:00:00+05:30",
-        3,
-        "3h",
-        "contest",
-        null,
-        true
-    ),
+        events.push(
+            createContest(
+                `hack-concurrency-${year}-${month + 1}`,
+                "hackerrank",
+                "HackerRank",
+                `Global High-Concurrency Systems Hackathon ${year}`,
+                "https://www.hackerrank.com/contests",
+                formatIstIso(year, month, 21, 9, 0),
+                72,
+                "3d",
+                "hackathon",
+                null,
+                false,
+                "Architecting zero-downtime distributed consensus nodes.",
+                nowMs
+            )
+        );
 
-    // Oct 24 (Sat)
-    createContest(
-        "atcoder-arc-230",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Regular Contest-- 230",
-        "https://atcoder.jp/contests/arc230",
-        "2026-10-24T17:30:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "cf-1121",
-        "codeforces",
-        "Codeforces",
-        "Codeforces Round 1121 (Div. 1 + Div. 2)",
-        "https://codeforces.com/contest/1121",
-        "2026-10-24T20:05:00+05:30",
-        2.5,
-        "2h 30m",
-        "contest",
-        "Div. 1 + 2",
-        true
-    ),
+        events.push(
+            createContest(
+                `hack-genai-${year}-${month + 1}`,
+                "code360",
+                "Code360",
+                `GenAI Coding Assistant Hackathon ${year}`,
+                "https://www.naukri.com/code360/contests",
+                formatIstIso(year, month, 27, 9, 0),
+                48,
+                "2d",
+                "hackathon",
+                null,
+                false,
+                "Build the future of agentic coding IDE plugins.",
+                nowMs
+            )
+        );
+    }
 
-    // Oct 25 (Sun)
-    createContest(
-        "lc-weekly-519",
-        "leetcode",
-        "LeetCode",
-        "Weekly Contest 519",
-        "https://leetcode.com/contest/weekly-contest-519",
-        "2026-10-25T08:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "topcoder-srm-860",
-        "topcoder",
-        "TopCoder",
-        "Single Round Match 860",
-        "https://www.topcoder.com/community/events",
-        "2026-10-25T18:30:00+05:30",
-        2,
-        "2h",
-        "contest",
-        "Div 1 & 2",
-        true
-    ),
-    createContest(
-        "gfg-weekly-172",
-        "geeksforgeeks",
-        "GeeksforGeeks",
-        "GfG Weekly Coding Contest 172",
-        "https://practice.geeksforgeeks.org/events/rec/gfg-weekly-coding-contest",
-        "2026-10-25T19:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "code360-146",
-        "code360",
-        "Code360",
-        "Coding Ninjas Weekend Contest 146",
-        "https://www.naukri.com/code360/contests",
-        "2026-10-25T19:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
+    // Safety guarantee: Ensure there is at least one upcoming contest within the next 24h
+    // so the UP NEXT card and countdown timer always display an active countdown.
+    const upcomingContests = events.filter((e) => e.type === "contest" && e.startTimestamp > nowMs);
+    if (upcomingContests.length === 0 || (upcomingContests[0].startTimestamp - nowMs > 24 * 3600 * 1000)) {
+        const nearStart = new Date(nowMs + 4 * 3600 * 1000);
+        nearStart.setMinutes(0, 0, 0);
+        const nearEnd = new Date(nearStart.getTime() + 2 * 3600 * 1000);
+        events.push({
+            id: `up-next-quick-${nearStart.getTime()}`,
+            platform: "codechef",
+            platformName: "CodeChef",
+            title: `Starters ${260 + (refDate.getMonth() + 1) * 2}`,
+            url: "https://www.codechef.com/contests",
+            startTime: nearStart.toISOString(),
+            endTime: nearEnd.toISOString(),
+            startTimestamp: nearStart.getTime(),
+            endTimestamp: nearEnd.getTime(),
+            durationSeconds: 7200,
+            durationFormatted: "2h",
+            type: "contest",
+            status: "UPCOMING",
+            division: null,
+            rated: true,
+        });
+    }
 
-    // Oct 26 (Mon)
-    createContest(
-        "ib-sys-design",
-        "interviewbit",
-        "InterviewBit",
-        "System Design Challenge Round 1",
-        "https://www.interviewbit.com/contests",
-        "2026-10-26T20:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "spoj-monthly-oct",
-        "spoj",
-        "SPOJ",
-        "SPOJ Monthly Sprint",
-        "https://www.spoj.com/contests/",
-        "2026-10-26T18:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
+    events.sort((a, b) => a.startTimestamp - b.startTimestamp);
+    return events;
+}
 
-    // Oct 27 (Tue)
-    createContest(
-        "cf-1122",
-        "codeforces",
-        "Codeforces",
-        "Codeforces Round 1122 (Div. 3)",
-        "https://codeforces.com/contest/1122",
-        "2026-10-27T20:05:00+05:30",
-        2.25,
-        "2h 15m",
-        "contest",
-        "Div. 3",
-        true
-    ),
+// Global cached dummy events instance for fast synchronous loading
+export const MOCK_EVENT_LIST: EventItem[] = generateDynamicMockEvents();
 
-    // Oct 28 (Wed)
-    createContest(
-        "cc-starters-262",
-        "codechef",
-        "CodeChef",
-        "Starters 262 (Div. 1, 2, 3, 4)",
-        "https://www.codechef.com/START262",
-        "2026-10-28T20:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "he-dev-sprint",
-        "hackerearth",
-        "HackerEarth",
-        "HackerEarth Developers Sprint",
-        "https://www.hackerearth.com/challenges/",
-        "2026-10-28T18:00:00+05:30",
-        3,
-        "3h",
-        "contest",
-        null,
-        true
-    ),
+// Initial profile loader: reads from localStorage cache or generates fresh dynamic events
+export const getInitialLandingEvents = (): EventItem[] => {
+    try {
+        if (typeof window !== "undefined" && window.localStorage) {
+            const cached = localStorage.getItem("orbix_landing_events_profile");
+            if (cached) {
+                const parsed: EventItem[] = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    const now = Date.now();
+                    const upcomingCount = parsed.filter((e) => e.endTimestamp > now).length;
+                    // If cache has at least 5 upcoming events, use it and recalculate statuses
+                    if (upcomingCount >= 5) {
+                        return parsed.map((e) => ({
+                            ...e,
+                            status: (now >= e.endTimestamp
+                                ? "FINISHED"
+                                : now >= e.startTimestamp
+                                ? "LIVE"
+                                : "UPCOMING") as "UPCOMING" | "LIVE" | "FINISHED",
+                        }));
+                    }
+                }
+            }
+        }
+    } catch (err) {
+        console.warn("Failed to read cached landing events profile:", err);
+    }
 
-    // Oct 29 (Thu)
-    createContest(
-        "cses-marathon",
-        "cses",
-        "CSES",
-        "CSES Advanced Problemset Marathon",
-        "https://cses.fi/problemset/",
-        "2026-10-29T18:00:00+05:30",
-        2,
-        "2h",
-        "contest",
-        null,
-        true
-    ),
+    return generateDynamicMockEvents();
+};
 
-    // Oct 30 (Fri)
-    createContest(
-        "atcoder-abc-475",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Beginner Contest 475",
-        "https://atcoder.jp/contests/abc475",
-        "2026-10-30T17:30:00+05:30",
-        1.67,
-        "1h 40m",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "gfg-jobathon",
-        "geeksforgeeks",
-        "GeeksforGeeks",
-        "GeeksforGeeks Mega Job-a-thon",
-        "https://practice.geeksforgeeks.org/events/rec/job-a-thon",
-        "2026-10-30T20:00:00+05:30",
-        2.5,
-        "2h 30m",
-        "contest",
-        null,
-        true
-    ),
+// Save events to local dummy data profile
+export const saveLandingEventsProfile = (events: EventItem[]): void => {
+    try {
+        if (typeof window !== "undefined" && window.localStorage) {
+            localStorage.setItem("orbix_landing_events_profile", JSON.stringify(events));
+        }
+    } catch (err) {
+        console.warn("Failed to save landing events profile:", err);
+    }
+};
 
-    // Oct 31 (Sat)
-    createContest(
-        "atcoder-agc-073",
-        "atcoder",
-        "AtCoder",
-        "AtCoder Grand Contest 073",
-        "https://atcoder.jp/contests/agc073",
-        "2026-10-31T17:30:00+05:30",
-        3,
-        "3h",
-        "contest",
-        null,
-        true
-    ),
-    createContest(
-        "cf-halloween-special",
-        "codeforces",
-        "Codeforces",
-        "Codeforces Halloween Special Round",
-        "https://codeforces.com/contest/halloween2026",
-        "2026-10-31T20:05:00+05:30",
-        3,
-        "3h",
-        "contest",
-        "Div. 1 + 2",
-        true
-    ),
-    createContest(
-        "lc-biweekly-169",
-        "leetcode",
-        "LeetCode",
-        "Biweekly Contest 169",
-        "https://leetcode.com/contest/biweekly-contest-169",
-        "2026-10-31T20:00:00+05:30",
-        1.5,
-        "1h 30m",
-        "contest",
-        null,
-        true
-    ),
+// Fetch live contest events from search API (/api/events)
+export const fetchLandingEventsApi = async (): Promise<EventItem[] | null> => {
+    const endpoints = ["/api/events", "http://localhost:3000/api/events"];
 
-    // -------------------------------------------------------------------------
-    // HACKATHONS (October 2026)
-    // -------------------------------------------------------------------------
-    createContest(
-        "hack-ai-autonomous",
-        "hackerearth",
-        "HackerEarth",
-        "International Autonomous AI Hackathon 2026",
-        "https://www.hackerearth.com/challenges/hackathon/",
-        "2026-10-05T09:00:00+05:30",
-        72,
-        "3d",
-        "hackathon",
-        null,
-        false,
-        "$50,000 in bounties for autonomous AI developer tooling."
-    ),
-    createContest(
-        "hack-quantum-security",
-        "hackerearth",
-        "HackerEarth",
-        "Quantum Algorithms & Security Challenge",
-        "https://www.hackerearth.com/challenges/hackathon/",
-        "2026-10-14T09:00:00+05:30",
-        96,
-        "4d",
-        "hackathon",
-        null,
-        false,
-        "Post-quantum cryptographic implementations and benchmarking."
-    ),
-    createContest(
-        "hack-web3-systems",
-        "hackerrank",
-        "HackerRank",
-        "Global High-Concurrency Systems Hackathon",
-        "https://www.hackerrank.com/contests",
-        "2026-10-21T09:00:00+05:30",
-        72,
-        "3d",
-        "hackathon",
-        null,
-        false,
-        "Architecting zero-downtime distributed consensus nodes."
-    ),
-    createContest(
-        "hack-genai-championship",
-        "code360",
-        "Code360",
-        "GenAI Coding Assistant Hackathon 2026",
-        "https://www.naukri.com/code360/contests",
-        "2026-10-27T09:00:00+05:30",
-        48,
-        "2d",
-        "hackathon",
-        null,
-        false,
-        "Build the future of agentic coding IDE plugins."
-    ),
-];
+    for (const ep of endpoints) {
+        try {
+            const res = await fetch(ep, {
+                signal: AbortSignal.timeout(5000),
+                headers: { Accept: "application/json" },
+            });
+            if (res.ok) {
+                const data = await res.json();
+                if (data && Array.isArray(data.events) && data.events.length > 0) {
+                    return data.events;
+                }
+            }
+        } catch {
+            // Try fallback endpoint
+        }
+    }
+    return null;
+};
 
-// Fallback counts for fast rendering
+// Merge live API events with dynamic hackathons and missing platform fallbacks
+export const mergeLandingEvents = (apiEvents: EventItem[]): EventItem[] => {
+    const now = Date.now();
+    const dynamicFallback = generateDynamicMockEvents(new Date(now));
+    const combinedMap = new Map<string, EventItem>();
+
+    // 1. Add all API events with dynamically computed status
+    for (const ev of apiEvents) {
+        const key = `${ev.platform}-${ev.title.toLowerCase().trim()}-${new Date(ev.startTime).toISOString().slice(0, 10)}`;
+        const status = (now >= ev.endTimestamp
+            ? "FINISHED"
+            : now >= ev.startTimestamp
+            ? "LIVE"
+            : "UPCOMING") as "UPCOMING" | "LIVE" | "FINISHED";
+        combinedMap.set(key, { ...ev, status });
+    }
+
+    // 2. Add hackathons from dynamic mock if API didn't provide any
+    const hasHackathons = apiEvents.some((e) => e.type === "hackathon");
+    if (!hasHackathons) {
+        for (const hack of dynamicFallback.filter((e) => e.type === "hackathon")) {
+            const key = `hack-${hack.id}`;
+            if (!combinedMap.has(key)) {
+                combinedMap.set(key, hack);
+            }
+        }
+    }
+
+    // 3. Supplement any platform with 0 events
+    const apiPlatforms = new Set(apiEvents.map((e) => e.platform.toLowerCase()));
+    for (const fallbackItem of dynamicFallback) {
+        if (!apiPlatforms.has(fallbackItem.platform.toLowerCase())) {
+            const key = `${fallbackItem.platform}-${fallbackItem.title.toLowerCase().trim()}-${new Date(fallbackItem.startTime).toISOString().slice(0, 10)}`;
+            if (!combinedMap.has(key)) {
+                combinedMap.set(key, fallbackItem);
+            }
+        }
+    }
+
+    const merged = Array.from(combinedMap.values());
+    merged.sort((a, b) => a.startTimestamp - b.startTimestamp);
+    return merged;
+};
+
+// Fallback counts for fast initial rendering
 export const MOCK_COUNTS: Record<string, number> = {
     leetcode: 8,
     codeforces: 12,

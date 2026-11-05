@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
     Mail,
     RotateCcw,
@@ -14,9 +14,12 @@ import { evaluatePassword } from "../passwordValidator";
 import OtpSegmentedInput from "../OtpSegmentedInput";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
+import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 
 export default function SignupForm() {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
     const toast = useToast();
     const dispatch = useAppDispatch();
 
@@ -48,6 +51,15 @@ export default function SignupForm() {
     const [emailCooldown, setEmailCooldown] = useState(0);
     const [resendingOtp, setResendingOtp] = useState(false);
     const [verifyingAndRegistering, setVerifyingAndRegistering] = useState(false);
+
+    const { handleBackdropClick: handleOtpModalBackdropClick } = useModalDismiss({
+        isOpen: showOtpModal,
+        onClose: () => {
+            if (!verifyingAndRegistering) setShowOtpModal(false);
+        },
+        disableEscape: verifyingAndRegistering,
+        disableBackdrop: verifyingAndRegistering,
+    });
 
     const passwordStrength = evaluatePassword(formData.password);
 
@@ -347,7 +359,8 @@ export default function SignupForm() {
             toast.success("Account registered and email verified! Welcome to Orbix.", {
                 title: "Welcome to Orbix! ✓",
             });
-            navigate("/onboarding");
+            const redirectParam = searchParams.get("redirect");
+            navigate(redirectParam ? `/onboarding?redirect=${encodeURIComponent(redirectParam)}` : "/onboarding");
 
         } catch (err: any) {
             console.error("Verification and signup error:", err);
@@ -469,28 +482,27 @@ export default function SignupForm() {
 
                 {/* Terms & Conditions Checkbox */}
                 <div className="pt-1">
-                    <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs text-neutral-700">
-                        <input
-                            type="checkbox"
-                            checked={formData.termsAccepted}
-                            onChange={(e) => {
-                                setFormData({ ...formData, termsAccepted: e.target.checked });
-                                if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: undefined });
-                            }}
-                            className="mt-0.5 h-4 w-4 rounded border-2 border-black text-black cursor-pointer accent-black shadow-[1px_1px_0px_#000] focus:ring-0"
-                        />
-                        <span className="leading-snug font-medium">
-                            I accept the{" "}
-                            <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                Terms of Service
-                            </a>{" "}
-                            and{" "}
-                            <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                Privacy Policy
-                            </a>
-                            .
-                        </span>
-                    </label>
+                    <NeoCheckbox
+                        checked={formData.termsAccepted}
+                        onCheckedChange={(checked) => {
+                            setFormData({ ...formData, termsAccepted: checked });
+                            if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: undefined });
+                        }}
+                        size="sm"
+                        label={
+                            <span className="leading-snug font-medium text-xs text-neutral-700">
+                                I accept the{" "}
+                                <a href="#terms" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                    Terms of Service
+                                </a>{" "}
+                                and{" "}
+                                <a href="#privacy" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                    Privacy Policy
+                                </a>
+                                .
+                            </span>
+                        }
+                    />
                     {errors.termsAccepted && (
                         <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
                     )}
@@ -531,12 +543,16 @@ export default function SignupForm() {
 
             {/* Neo-Brutalist Email Verification Modal */}
             {showOtpModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                <div
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+                    onClick={handleOtpModalBackdropClick}
+                >
                     <div
                         className="relative w-full max-w-md bg-[#FAF6EE] border-3 sm:border-4 border-black rounded-3xl p-6 sm:p-7 shadow-[8px_8px_0px_#000] text-black space-y-5"
                         role="dialog"
                         aria-modal="true"
                         aria-labelledby="otp-dialog-title"
+                        onClick={(e) => e.stopPropagation()}
                     >
                         {/* Modal Header */}
                         <div className="flex items-start justify-between gap-3">

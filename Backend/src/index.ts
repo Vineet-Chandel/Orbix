@@ -3,6 +3,7 @@ import 'dotenv/config';
 import express, { type Express, type Request, type Response } from 'express';
 import cookieParser from 'cookie-parser';
 import authRouter from './Routes/auth/auth.js';
+import { oauthRouter } from './Routes/auth/oauthRoutes.js';
 import portalsRouter from './Routes/portals/portals.js';
 import profileRouter from './Routes/profile/profile.js';
 import leaderboardRouter from './Routes/leaderboard/leaderboard.js';
@@ -19,6 +20,10 @@ import { helpRouter } from './Routes/help/helpRoutes.js';
 import verificationRouter from './Routes/verification/verificationRoutes.js';
 import manageAccountsRouter from './Routes/account/manageAccountsRoutes.js';
 import blogRouter from './Routes/blog/blogRoutes.js';
+import { accountGovernanceRouter } from './Routes/account/accountGovernanceRoutes.js';
+import { privacyRouter } from './Routes/account/privacyRoutes.js';
+import { platformRouter } from './Routes/platform/platformRoutes.js';
+import { sessionRouter } from './Routes/session/sessionRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import redis from './redis/client.js';
 
@@ -33,7 +38,18 @@ app.use((req: Request, res: Response, next: express.NextFunction) => {
     }
     res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+    
+    const requestedHeaders = req.headers["access-control-request-headers"];
+    if (requestedHeaders) {
+        res.setHeader("Access-Control-Allow-Headers", requestedHeaders);
+    } else {
+        res.setHeader(
+            "Access-Control-Allow-Headers",
+            "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-orbix-device-id, X-Orbix-Device-Id, *"
+        );
+    }
+    res.setHeader("Access-Control-Expose-Headers", "Authorization, Set-Cookie");
+
     if (req.method === "OPTIONS") {
         res.sendStatus(200);
         return;
@@ -52,6 +68,8 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
 });
 
 app.use('/api', authRouter);
+app.use('/api/auth', oauthRouter);
+app.use('/auth', oauthRouter);
 app.use('/api/profile', profileRouter);
 app.use('/api/portals', portalsRouter);
 app.use('/api/leaderboard', leaderboardRouter);
@@ -70,7 +88,15 @@ app.use('/api/verification', verificationRouter);
 app.use('/api/settings/verification', verificationRouter);
 app.use('/api/settings/manage-account', manageAccountsRouter);
 app.use('/api/manage-account', manageAccountsRouter);
+app.use('/api/account/governance', accountGovernanceRouter);
+app.use('/api/account/privacy', privacyRouter);
+app.use('/api/privacy', privacyRouter);
+app.use('/api/account/sessions', sessionRouter);
+app.use('/api/account', sessionRouter);
+app.use('/api', sessionRouter);
 app.use('/api/account', manageAccountsRouter);
+app.use('/api/platform', platformRouter);
+app.use('/api/about', platformRouter);
 app.use('/relationships', relationshipRouter);
 app.use('/blocks', blockRouter);
 app.use('/profile', profileRouter);

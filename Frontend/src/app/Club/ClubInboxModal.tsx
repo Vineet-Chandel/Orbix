@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
     X,
     Inbox,
@@ -11,12 +12,13 @@ import {
     Archive,
     RotateCcw,
     Send,
-    Loader2,
     ExternalLink,
     AlertTriangle,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useToast } from "../../context/ToastContext";
+import { OrbixLoader } from "../../components/ui/loader";
+import { useModalDismiss } from "../../hooks/useModalDismiss";
 
 interface ClubInboxModalProps {
     isOpen: boolean;
@@ -270,11 +272,28 @@ export default function ClubInboxModal({
         }
     };
 
-    if (!isOpen) return null;
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen: isOpen && !blockConfirmUser,
+        onClose,
+    });
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-xs select-none">
-            <div className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl shadow-[8px_8px_0px_#000] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150">
+    const { handleBackdropClick: handleBlockBackdropClick } = useModalDismiss({
+        isOpen: Boolean(blockConfirmUser),
+        onClose: () => setBlockConfirmUser(null),
+    });
+
+    if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div
+            className="fixed inset-0 top-0 left-0 right-0 bottom-0 z-[100] flex items-center justify-center p-2 sm:p-4 bg-black/70 backdrop-blur-xs select-none"
+            onClick={handleBackdropClick}
+        >
+            <div
+                className="w-full max-w-5xl h-[88vh] bg-[#FAF6EE] border-2 border-black rounded-3xl shadow-[8px_8px_0px_#000] overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-150"
+                onClick={(e) => e.stopPropagation()}
+            >
                 {/* Top Action Header */}
                 <div className="p-4 sm:px-6 bg-white border-b-2 border-black flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
@@ -374,9 +393,8 @@ export default function ClubInboxModal({
                         }`}
                     >
                         {loadingList ? (
-                            <div className="p-8 text-center space-y-2 text-neutral-500">
-                                <Loader2 className="w-6 h-6 animate-spin mx-auto text-black" />
-                                <span className="text-xs font-bold">Loading inquiries...</span>
+                            <div className="p-8 flex items-center justify-center text-black">
+                                <OrbixLoader size="sm" />
                             </div>
                         ) : filteredConversations.length === 0 ? (
                             <div className="p-8 text-center space-y-3 my-auto">
@@ -611,9 +629,8 @@ export default function ClubInboxModal({
                                 {/* Message History */}
                                 <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4">
                                     {loadingMessages ? (
-                                        <div className="p-8 text-center space-y-2 text-neutral-500">
-                                            <Loader2 className="w-6 h-6 animate-spin mx-auto text-black" />
-                                            <span className="text-xs font-bold">Loading message history...</span>
+                                        <div className="p-8 flex items-center justify-center text-black">
+                                            <OrbixLoader size="sm" />
                                         </div>
                                     ) : messages.length === 0 ? (
                                         <div className="text-center py-8 text-xs font-bold text-neutral-500">
@@ -672,7 +689,7 @@ export default function ClubInboxModal({
                                         disabled={sendingReply || !replyBody.trim()}
                                         className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] disabled:opacity-50 disabled:cursor-not-allowed border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-2 cursor-pointer self-end transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                                     >
-                                        {sendingReply ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                                        {sendingReply ? <OrbixLoader size="xs" variant="inline" color="currentColor" /> : <Send className="w-4 h-4" />}
                                         <span className="hidden sm:inline">Reply</span>
                                     </button>
                                 </form>
@@ -684,8 +701,14 @@ export default function ClubInboxModal({
 
             {/* Block Confirmation Modal */}
             {blockConfirmUser && (
-                <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs select-none">
-                    <div className="w-full max-w-md bg-[#FAF6EE] border-2 border-black rounded-3xl p-6 shadow-[8px_8px_0px_#000] space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                <div
+                    className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs select-none"
+                    onClick={handleBlockBackdropClick}
+                >
+                    <div
+                        className="w-full max-w-md bg-[#FAF6EE] border-2 border-black rounded-3xl p-6 shadow-[8px_8px_0px_#000] space-y-4 animate-in fade-in zoom-in-95 duration-150"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="w-12 h-12 rounded-2xl bg-rose-100 border-2 border-black flex items-center justify-center text-rose-700 shadow-[2px_2px_0px_#000]">
                             <AlertTriangle className="w-6 h-6" />
                         </div>
@@ -726,13 +749,14 @@ export default function ClubInboxModal({
                                 onClick={handleExecuteBlock}
                                 className="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
                             >
-                                {isExecutingModeration ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Ban className="w-3.5 h-3.5" />}
+                                {isExecutingModeration ? <OrbixLoader size="xs" variant="inline" color="currentColor" /> : <Ban className="w-3.5 h-3.5" />}
                                 <span>Confirm Block</span>
                             </button>
                         </div>
                     </div>
                 </div>
             )}
-        </div>
+        </div>,
+        document.body
     );
 }
