@@ -1,6 +1,12 @@
 import express, { type Request, type Response } from "express";
 import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
 import { ClubEventFormService } from "../../services/club/clubEventFormService.js";
+import {
+    requireClubFormManagementPermission,
+    rateLimitFormSubmissions,
+    preventConcurrentSubmissions,
+    rateLimitDraftAutosave,
+} from "../../middlewares/formSecurity.middleware.js";
 
 export const eventFormRouter = express.Router();
 
@@ -10,11 +16,15 @@ export const eventFormRouter = express.Router();
  * ---------------------------------------------------------------------------
  */
 
+const clubManageAuth = [authenticate, requireClubFormManagementPermission("manage")];
+const clubPublishAuth = [authenticate, requireClubFormManagementPermission("publish")];
+const clubExportAuth = [authenticate, requireClubFormManagementPermission("export")];
+
 /**
  * GET /api/club/events/:eventId/form
  * Fetch form definition, current draft, published version, and event context
  */
-eventFormRouter.get("/club/events/:eventId/form", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.get("/club/events/:eventId/form", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -49,7 +59,7 @@ eventFormRouter.get("/club/events/:eventId/form", authenticate, async (req: Requ
  * POST /api/club/events/:eventId/form
  * Initialize or create registration form for an event
  */
-eventFormRouter.post("/club/events/:eventId/form", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.post("/club/events/:eventId/form", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -97,14 +107,14 @@ const handleSaveDraft = async (req: Request, res: Response) => {
     }
 };
 
-eventFormRouter.put("/club/events/:eventId/form/draft", authenticate, handleSaveDraft);
-eventFormRouter.put("/club/events/:eventId/form", authenticate, handleSaveDraft);
+eventFormRouter.put("/club/events/:eventId/form/draft", ...clubManageAuth, handleSaveDraft);
+eventFormRouter.put("/club/events/:eventId/form", ...clubManageAuth, handleSaveDraft);
 
 /**
  * PATCH /api/club/events/:eventId/form/draft/autosave
  * Autosave draft without triggering heavy validation
  */
-eventFormRouter.patch("/club/events/:eventId/form/draft/autosave", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.patch("/club/events/:eventId/form/draft/autosave", ...clubManageAuth, rateLimitDraftAutosave, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -129,7 +139,7 @@ eventFormRouter.patch("/club/events/:eventId/form/draft/autosave", authenticate,
  * POST /api/club/events/:eventId/form/publish
  * Publish draft into an immutable snapshot (FormVersion)
  */
-eventFormRouter.post("/club/events/:eventId/form/publish", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.post("/club/events/:eventId/form/publish", ...clubPublishAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -156,7 +166,7 @@ eventFormRouter.post("/club/events/:eventId/form/publish", authenticate, async (
  * POST /api/club/events/:eventId/form/close
  * Close registrations or reopen
  */
-eventFormRouter.post("/club/events/:eventId/form/close", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.post("/club/events/:eventId/form/close", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -183,7 +193,7 @@ eventFormRouter.post("/club/events/:eventId/form/close", authenticate, async (re
  * POST /api/club/events/:eventId/form/revert/:versionId
  * Revert draft to a prior immutable snapshot
  */
-eventFormRouter.post("/club/events/:eventId/form/revert/:versionId", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.post("/club/events/:eventId/form/revert/:versionId", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const versionId = String(req.params.versionId);
@@ -209,7 +219,7 @@ eventFormRouter.post("/club/events/:eventId/form/revert/:versionId", authenticat
  * POST /api/club/events/:eventId/form/questions
  * Add question to specified section
  */
-eventFormRouter.post("/club/events/:eventId/form/questions", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.post("/club/events/:eventId/form/questions", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -238,7 +248,7 @@ eventFormRouter.post("/club/events/:eventId/form/questions", authenticate, async
  * PUT /api/club/events/:eventId/form/questions/:questionId
  * Update single question by stable ID
  */
-eventFormRouter.put("/club/events/:eventId/form/questions/:questionId", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.put("/club/events/:eventId/form/questions/:questionId", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const questionId = String(req.params.questionId);
@@ -263,7 +273,7 @@ eventFormRouter.put("/club/events/:eventId/form/questions/:questionId", authenti
  * DELETE /api/club/events/:eventId/form/questions/:questionId
  * Delete question by stable ID
  */
-eventFormRouter.delete("/club/events/:eventId/form/questions/:questionId", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.delete("/club/events/:eventId/form/questions/:questionId", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const questionId = String(req.params.questionId);
@@ -288,7 +298,7 @@ eventFormRouter.delete("/club/events/:eventId/form/questions/:questionId", authe
  * POST /api/club/events/:eventId/form/sections
  * Add a new section
  */
-eventFormRouter.post("/club/events/:eventId/form/sections", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.post("/club/events/:eventId/form/sections", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -312,7 +322,7 @@ eventFormRouter.post("/club/events/:eventId/form/sections", authenticate, async 
  * DELETE /api/club/events/:eventId/form/sections/:sectionId
  * Delete section by stable ID
  */
-eventFormRouter.delete("/club/events/:eventId/form/sections/:sectionId", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.delete("/club/events/:eventId/form/sections/:sectionId", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const sectionId = String(req.params.sectionId);
@@ -337,7 +347,7 @@ eventFormRouter.delete("/club/events/:eventId/form/sections/:sectionId", authent
  * PUT /api/club/events/:eventId/form/reorder
  * Reorder sections and questions
  */
-eventFormRouter.put("/club/events/:eventId/form/reorder", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.put("/club/events/:eventId/form/reorder", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -361,7 +371,7 @@ eventFormRouter.put("/club/events/:eventId/form/reorder", authenticate, async (r
  * POST /api/club/events/:eventId/form/import-questions
  * Import questions into the form
  */
-eventFormRouter.post("/club/events/:eventId/form/import-questions", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.post("/club/events/:eventId/form/import-questions", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -387,10 +397,104 @@ eventFormRouter.post("/club/events/:eventId/form/import-questions", authenticate
 });
 
 /**
+ * GET /api/club/events/:eventId/form/question-library
+ * Retrieve questions from past club events to enable question reuse (Phase 6.1)
+ */
+eventFormRouter.get("/club/events/:eventId/form/question-library", ...clubManageAuth, async (req: Request, res: Response) => {
+    try {
+        const eventId = String(req.params.eventId);
+        const userId = req.user!.id;
+
+        const result = await ClubEventFormService.getClubQuestionLibrary(eventId, userId);
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        console.error("GET /api/club/events/:eventId/form/question-library error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to load club question library.",
+        });
+    }
+});
+
+/**
+ * POST /api/club/events/:eventId/form/ai-suggest
+ * Generate AI-assisted questionnaire suggestions (Phase 6.3)
+ */
+eventFormRouter.post("/club/events/:eventId/form/ai-suggest", ...clubManageAuth, async (req: Request, res: Response) => {
+    try {
+        const eventId = String(req.params.eventId);
+        const userId = req.user!.id;
+        const { prompt, eventType, eventDescription } = req.body;
+
+        const result = await ClubEventFormService.aiSuggestQuestions(eventId, userId, {
+            prompt,
+            eventType,
+            eventDescription,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        console.error("POST /api/club/events/:eventId/form/ai-suggest error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to generate AI question suggestions.",
+        });
+    }
+});
+
+/**
+ * POST /api/club/events/:eventId/form/qr-checkin
+ * Validate ticket pass code for quick QR check-in (Phase 6.4)
+ */
+eventFormRouter.post("/club/events/:eventId/form/qr-checkin", ...clubManageAuth, async (req: Request, res: Response) => {
+    try {
+        const eventId = String(req.params.eventId);
+        const userId = req.user!.id;
+        const { ticketCode } = req.body;
+
+        if (!ticketCode) {
+            return res.status(400).json({ success: false, message: "Ticket code is required." });
+        }
+
+        const result = await ClubEventFormService.verifyRegistrationQrCode(eventId, userId, ticketCode);
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        console.error("POST /api/club/events/:eventId/form/qr-checkin error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "QR check-in failed.",
+        });
+    }
+});
+
+/**
+ * GET /api/club/:clubId/forms/cross-event-analytics
+ * Multi-event registration & turnout analytics for the club (Phase 6.4)
+ */
+eventFormRouter.get("/club/:clubId/forms/cross-event-analytics", ...clubManageAuth, async (req: Request, res: Response) => {
+    try {
+        const clubId = String(req.params.clubId);
+        const userId = req.user!.id;
+
+        const result = await ClubEventFormService.getClubCrossEventStats(clubId, userId);
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        console.error("GET /api/club/:clubId/forms/cross-event-analytics error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to load cross-event analytics.",
+        });
+    }
+});
+
+/**
  * GET /api/club/events/:eventId/form/versions
  * List all immutable published versions
  */
-eventFormRouter.get("/club/events/:eventId/form/versions", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.get("/club/events/:eventId/form/versions", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -413,7 +517,7 @@ eventFormRouter.get("/club/events/:eventId/form/versions", authenticate, async (
  * GET /api/club/events/:eventId/form/versions/:versionId
  * Get snapshot of a specific form version
  */
-eventFormRouter.get("/club/events/:eventId/form/versions/:versionId", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.get("/club/events/:eventId/form/versions/:versionId", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const versionId = String(req.params.versionId);
@@ -434,14 +538,27 @@ eventFormRouter.get("/club/events/:eventId/form/versions/:versionId", authentica
 
 /**
  * GET /api/club/events/:eventId/form/responses
- * Retrieve paginated and filtered responses
+ * Retrieve paginated and filtered responses (Phase 5.4 Server-Side Filtering)
  */
-eventFormRouter.get("/club/events/:eventId/form/responses", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.get("/club/events/:eventId/form/responses", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
 
-        const { page, limit, versionId, status, search } = req.query;
+        const {
+            page,
+            limit,
+            versionId,
+            status,
+            search,
+            startDate,
+            endDate,
+            questionId,
+            answerSearch,
+            sortBy,
+            sortOrder,
+            responseIds,
+        } = req.query;
 
         const queryOpts: {
             page?: number;
@@ -449,12 +566,31 @@ eventFormRouter.get("/club/events/:eventId/form/responses", authenticate, async 
             versionId?: string;
             status?: string;
             search?: string;
+            startDate?: string;
+            endDate?: string;
+            questionId?: string;
+            answerSearch?: string;
+            sortBy?: string;
+            sortOrder?: string;
+            responseIds?: string[];
         } = {};
+
         if (page) queryOpts.page = Number(page);
         if (limit) queryOpts.limit = Number(limit);
         if (versionId) queryOpts.versionId = String(versionId);
         if (status) queryOpts.status = String(status);
         if (search) queryOpts.search = String(search);
+        if (startDate) queryOpts.startDate = String(startDate);
+        if (endDate) queryOpts.endDate = String(endDate);
+        if (questionId) queryOpts.questionId = String(questionId);
+        if (answerSearch) queryOpts.answerSearch = String(answerSearch);
+        if (sortBy) queryOpts.sortBy = String(sortBy);
+        if (sortOrder) queryOpts.sortOrder = String(sortOrder);
+        if (responseIds) {
+            queryOpts.responseIds = typeof responseIds === "string"
+                ? responseIds.split(",").map((s) => s.trim()).filter(Boolean)
+                : (Array.isArray(responseIds) ? responseIds as string[] : []);
+        }
 
         const result = await ClubEventFormService.getResponsesForClub(eventId, userId, queryOpts);
 
@@ -472,15 +608,27 @@ eventFormRouter.get("/club/events/:eventId/form/responses", authenticate, async 
 
 /**
  * GET /api/club/events/:eventId/form/responses/export
- * Export responses as CSV with dynamic question columns
+ * Export responses as CSV with dynamic question columns (Phase 5.5)
  */
-eventFormRouter.get("/club/events/:eventId/form/responses/export", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.get("/club/events/:eventId/form/responses/export", ...clubExportAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
-        const versionId = req.query.versionId ? String(req.query.versionId) : undefined;
+        const { versionId, status, search, startDate, endDate, responseIds } = req.query;
 
-        const { filename, csvContent } = await ClubEventFormService.exportResponsesCsv(eventId, userId, versionId);
+        const opts: any = {};
+        if (versionId) opts.versionId = String(versionId);
+        if (status) opts.status = String(status);
+        if (search) opts.search = String(search);
+        if (startDate) opts.startDate = String(startDate);
+        if (endDate) opts.endDate = String(endDate);
+        if (responseIds) {
+            opts.responseIds = typeof responseIds === "string"
+                ? responseIds.split(",").map((s) => s.trim()).filter(Boolean)
+                : (Array.isArray(responseIds) ? responseIds : []);
+        }
+
+        const { filename, csvContent } = await ClubEventFormService.exportResponsesCsv(eventId, userId, opts);
 
         res.setHeader("Content-Type", "text/csv; charset=utf-8");
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
@@ -494,10 +642,70 @@ eventFormRouter.get("/club/events/:eventId/form/responses/export", authenticate,
 });
 
 /**
+ * POST /api/club/events/:eventId/form/responses/export
+ * Multi-select export via POST body to handle large selections cleanly
+ */
+eventFormRouter.post("/club/events/:eventId/form/responses/export", ...clubExportAuth, async (req: Request, res: Response) => {
+    try {
+        const eventId = String(req.params.eventId);
+        const userId = req.user!.id;
+        const { versionId, status, search, startDate, endDate, responseIds } = req.body;
+
+        const { filename, csvContent } = await ClubEventFormService.exportResponsesCsv(eventId, userId, {
+            versionId,
+            status,
+            search,
+            startDate,
+            endDate,
+            responseIds,
+        });
+
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        return res.status(200).send(csvContent);
+    } catch (err: any) {
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to export responses.",
+        });
+    }
+});
+
+/**
+ * PUT /api/club/events/:eventId/form/responses/:registrationId/status
+ * Update student response registration status (Phase 5.3)
+ */
+eventFormRouter.put("/club/events/:eventId/form/responses/:registrationId/status", ...clubManageAuth, async (req: Request, res: Response) => {
+    try {
+        const eventId = String(req.params.eventId);
+        const registrationId = String(req.params.registrationId);
+        const userId = req.user!.id;
+        const { status, reviewNotes } = req.body;
+
+        if (!status) {
+            return res.status(400).json({ success: false, message: "Status is required." });
+        }
+
+        const updated = await ClubEventFormService.updateResponseStatus(eventId, userId, registrationId, status, reviewNotes);
+
+        return res.status(200).json({
+            success: true,
+            message: `Registration status updated to ${status}.`,
+            registration: updated,
+        });
+    } catch (err: any) {
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to update response status.",
+        });
+    }
+});
+
+/**
  * GET /api/club/events/:eventId/form/stats
  * Form response metrics and question-by-question breakdown analytics
  */
-eventFormRouter.get("/club/events/:eventId/form/stats", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.get("/club/events/:eventId/form/stats", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -521,7 +729,7 @@ eventFormRouter.get("/club/events/:eventId/form/stats", authenticate, async (req
  * POST /api/club/events/:eventId/form/release-grades
  * Release quiz grades to respondents
  */
-eventFormRouter.post("/club/events/:eventId/form/release-grades", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.post("/club/events/:eventId/form/release-grades", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -546,7 +754,7 @@ eventFormRouter.post("/club/events/:eventId/form/release-grades", authenticate, 
  * POST /api/club/events/:eventId/form/upload-signature
  * Generate Cloudinary signed credentials for form header, question image, or option image
  */
-eventFormRouter.post("/club/events/:eventId/form/upload-signature", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.post("/club/events/:eventId/form/upload-signature", ...clubManageAuth, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -613,6 +821,7 @@ eventFormRouter.get("/events/:eventId/form", optionalAuthenticate, async (req: R
             closedReason: data.closedReason,
             canSubmit: data.canSubmit,
             userResponse: data.userResponse,
+            draftResponse: data.draftResponse,
             registeredCount: data.registeredCount,
         });
     } catch (err: any) {
@@ -620,6 +829,76 @@ eventFormRouter.get("/events/:eventId/form", optionalAuthenticate, async (req: R
         return res.status(err.statusCode || 500).json({
             success: false,
             message: err.message || "Failed to load registration form.",
+        });
+    }
+});
+
+/**
+ * GET /api/events/:eventId/form/draft
+ * Retrieve authenticated student's unfinished registration draft
+ */
+eventFormRouter.get("/events/:eventId/form/draft", authenticate, async (req: Request, res: Response) => {
+    try {
+        const eventId = String(req.params.eventId);
+        const userId = req.user!.id;
+
+        const draft = await ClubEventFormService.getStudentDraft(eventId, userId);
+
+        return res.status(200).json({
+            success: true,
+            draft,
+        });
+    } catch (err: any) {
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to load draft.",
+        });
+    }
+});
+
+/**
+ * PUT /api/events/:eventId/form/draft
+ * Autosave student's partially completed registration
+ */
+eventFormRouter.put("/events/:eventId/form/draft", authenticate, rateLimitDraftAutosave, async (req: Request, res: Response) => {
+    try {
+        const eventId = String(req.params.eventId);
+        const userId = req.user!.id;
+
+        const savedDraft = await ClubEventFormService.saveStudentDraft(eventId, userId, req.body);
+
+        return res.status(200).json({
+            success: true,
+            message: "Draft saved.",
+            draft: savedDraft,
+        });
+    } catch (err: any) {
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to save draft.",
+        });
+    }
+});
+
+/**
+ * DELETE /api/events/:eventId/form/draft
+ * Clear student's autosaved draft
+ */
+eventFormRouter.delete("/events/:eventId/form/draft", authenticate, async (req: Request, res: Response) => {
+    try {
+        const eventId = String(req.params.eventId);
+        const userId = req.user!.id;
+
+        await ClubEventFormService.clearStudentDraft(eventId, userId);
+
+        return res.status(200).json({
+            success: true,
+            message: "Draft cleared successfully.",
+        });
+    } catch (err: any) {
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to clear draft.",
         });
     }
 });
@@ -682,8 +961,8 @@ const handleFormSubmission = async (req: Request, res: Response) => {
     }
 };
 
-eventFormRouter.post("/events/:eventId/form/submit", optionalAuthenticate, handleFormSubmission);
-eventFormRouter.post("/events/:eventId/register", optionalAuthenticate, handleFormSubmission);
+eventFormRouter.post("/events/:eventId/form/submit", optionalAuthenticate, rateLimitFormSubmissions, preventConcurrentSubmissions, handleFormSubmission);
+eventFormRouter.post("/events/:eventId/register", optionalAuthenticate, rateLimitFormSubmissions, preventConcurrentSubmissions, handleFormSubmission);
 
 /**
  * GET /api/events/:eventId/form/registration
@@ -712,7 +991,7 @@ eventFormRouter.get("/events/:eventId/form/registration", authenticate, async (r
  * PUT /api/events/:eventId/form/registration
  * Edit an existing registration when permitted
  */
-eventFormRouter.put("/events/:eventId/form/registration", authenticate, async (req: Request, res: Response) => {
+eventFormRouter.put("/events/:eventId/form/registration", authenticate, rateLimitFormSubmissions, preventConcurrentSubmissions, async (req: Request, res: Response) => {
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
@@ -729,6 +1008,26 @@ eventFormRouter.put("/events/:eventId/form/registration", authenticate, async (r
         return res.status(err.statusCode || 500).json({
             success: false,
             message: err.message || "Failed to update registration.",
+        });
+    }
+});
+
+/**
+ * POST /api/events/:eventId/form/cancel
+ * Cancel an existing registration and release capacity seat (Requirement 4.3)
+ */
+eventFormRouter.post("/events/:eventId/form/cancel", authenticate, async (req: Request, res: Response) => {
+    try {
+        const eventId = String(req.params.eventId);
+        const userId = req.user!.id;
+
+        const result = await ClubEventFormService.cancelStudentRegistration(eventId, userId);
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to cancel registration.",
         });
     }
 });

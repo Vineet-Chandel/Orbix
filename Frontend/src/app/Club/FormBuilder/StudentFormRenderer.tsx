@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import {
     CheckCircle2,
     Calendar,
@@ -23,6 +24,13 @@ import {
     Heart,
     ThumbsUp,
     Award,
+    Printer,
+    RotateCcw,
+    Clock,
+    WifiOff,
+    CheckCheck,
+    ChevronDown,
+    ChevronUp,
 } from "lucide-react";
 import type {
     ClubEventFormRecord,
@@ -35,9 +43,18 @@ import {
     requestAttachmentUploadSignature,
     uploadFileToCloudinary,
     submitEventFormResponse,
+    saveStudentDraft,
+    clearStudentDraft,
 } from "../../../api/clubEventFormApi";
+import {
+    getCloudinaryBannerUrl,
+    getCloudinaryAvatarUrl,
+    getCloudinaryThumbnailUrl,
+    getOptimizedCloudinaryUrl,
+} from "../../../utils/cloudinaryDelivery";
 import { useToast } from "../../../context/ToastContext";
 import { OrbixLoader } from "../../../components/ui/loader";
+import { ConfirmationModal } from "../../../components/ConfirmationModal";
 
 export interface StudentFormRendererProps {
     form: ClubEventFormRecord;
@@ -46,6 +63,14 @@ export interface StudentFormRendererProps {
     user?: any;
     studentProfile?: StudentIdentityProfile | null;
     userResponse?: any;
+    draftResponse?: {
+        answers?: Record<string, any>;
+        fileAttachments?: FileAttachmentMeta[];
+        currentSectionIndex?: number;
+        sectionHistory?: number[];
+        formVersionId?: string;
+        updatedAt?: string;
+    } | null;
     isPreview?: boolean;
     isClosed?: boolean;
     closedReason?: string;
@@ -71,6 +96,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     user,
     studentProfile,
     userResponse,
+    draftResponse,
     isPreview = false,
     isClosed = false,
     closedReason,
@@ -102,7 +128,27 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     const [submittedRegistration, setSubmittedRegistration] = useState<any>(userResponse || null);
     const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
     const [copiedTicket, setCopiedTicket] = useState(false);
+    const [copiedRegId, setCopiedRegId] = useState(false);
     const [showIdentityEditor, setShowIdentityEditor] = useState(false);
+    const [showAnswersSummary, setShowAnswersSummary] = useState(true);
+
+    // Autosave states
+    const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "unsaved" | "offline">("saved");
+    const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+    const [showClearConfirm, setShowClearConfirm] = useState(false);
+    const [draftRestoredNotice, setDraftRestoredNotice] = useState<string | null>(null);
+    const isInitialMount = useRef(true);
+
+    // Storage key for local storage persistence
+    const storageKey = `orbix_student_draft_${user?.id || "guest"}_${form.eventId}_${form.publishedVersionId || "v1"}`;
+
+    // Form autosave setting
+    const isAutosaveEnabled =
+        !isPreview &&
+        !userResponse &&
+        !submittedRegistration &&
+        form.settings?.presentation?.autosaveProgress !== false &&
+        form.settings?.presentation?.disableRespondentAutosave !== true;
 
     // Resolved student identity details combining studentProfile and user store
     const effectiveProfile = {
@@ -188,6 +234,137 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         }
     }, [user, studentProfile, userResponse, sections]);
 
+    // Restore unfinished draft from Server or Local Storage on initial load
+    useEffect(() => {
+        if (!userResponse && !submittedRegistration && isAutosaveEnabled) {
+            let restored = false;
+
+            // 1. Try server draft first
+            if (draftResponse && draftResponse.answers && Object.keys(draftResponse.answers).length > 0) {
+                setAnswers((prev) => ({ ...prev, ...draftResponse.answers }));
+                if (draftResponse.fileAttachments && Array.isArray(draftResponse.fileAttachments)) {
+                    setFileAttachments(draftResponse.fileAttachments);
+                }
+                if (typeof draftResponse.currentSectionIndex === "number" && draftResponse.currentSectionIndex < sections.length) {
+                    setCurrentSecIdx(draftResponse.currentSectionIndex);
+                }
+                if (Array.isArray(draftResponse.sectionHistory) && draftResponse.sectionHistory.length > 0) {
+                    setSectionHistory(draftResponse.sectionHistory);
+                }
+                restored = true;
+                setSaveStatus("saved");
+                if (draftResponse.updatedAt) {
+                    setLastSavedAt(new Date(draftResponse.updatedAt));
+                }
+            } else {
+                // 2. Try browser localStorage fallback
+                try {
+                    const localRaw = localStorage.getItem(storageKey);
+                    if (localRaw) {
+                        const parsed = JSON.parse(localRaw);
+                        if (parsed && typeof parsed === "object" && parsed.answers && Object.keys(parsed.answers).length > 0) {
+                            setAnswers((prev) => ({ ...prev, ...parsed.answers }));
+                            if (parsed.fileAttachments && Array.isArray(parsed.fileAttachments)) {
+                                setFileAttachments(parsed.fileAttachments);
+                            }
+                            if (typeof parsed.currentSecIdx === "number" && parsed.currentSecIdx < sections.length) {
+                                setCurrentSecIdx(parsed.currentSecIdx);
+                            }
+                            if (Array.isArray(parsed.sectionHistory) && parsed.sectionHistory.length > 0) {
+                                setSectionHistory(parsed.sectionHistory);
+                            }
+                            restored = true;
+                            setSaveStatus("saved");
+                            if (parsed.timestamp) {
+                                setLastSavedAt(new Date(parsed.timestamp));
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.warn("Could not parse local draft:", e);
+                }
+            }
+
+            if (restored) {
+                setDraftRestoredNotice("Restored your partially completed draft.");
+            }
+        }
+    }, [storageKey, draftResponse, userResponse, submittedRegistration, isAutosaveEnabled, sections.length]);
+
+    // Debounced Autosave (Every 1500ms after changes, no spamming API on every keystroke)
+    useEffect(() => {
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+            return;
+        }
+
+        if (!isAutosaveEnabled || Object.keys(answers).length === 0) return;
+
+        setSaveStatus("unsaved");
+
+        const timeout = setTimeout(async () => {
+            setSaveStatus("saving");
+
+            // Persist locally
+            try {
+                const payload = {
+                    answers,
+                    fileAttachments,
+                    currentSecIdx,
+                    sectionHistory,
+                    timestamp: Date.now(),
+                };
+                localStorage.setItem(storageKey, JSON.stringify(payload));
+            } catch (err) {
+                console.warn("LocalStorage save error:", err);
+            }
+
+            // Persist to server if authenticated student
+            if (user?.id) {
+                try {
+                    await saveStudentDraft(form.eventId, {
+                        answers,
+                        fileAttachments,
+                        currentSectionIndex: currentSecIdx,
+                        sectionHistory,
+                        formVersionId: form.publishedVersionId || undefined,
+                    });
+                    setSaveStatus("saved");
+                    setLastSavedAt(new Date());
+                } catch (apiErr) {
+                    console.warn("Server draft autosave failed, saved locally:", apiErr);
+                    setSaveStatus("offline");
+                }
+            } else {
+                setSaveStatus("saved");
+                setLastSavedAt(new Date());
+            }
+        }, 1500);
+
+        return () => clearTimeout(timeout);
+    }, [answers, fileAttachments, currentSecIdx, sectionHistory, form.eventId, form.publishedVersionId, isAutosaveEnabled, storageKey, user?.id]);
+
+    // Clear Form Action
+    const handleClearForm = async () => {
+        try {
+            localStorage.removeItem(storageKey);
+            if (user?.id) {
+                await clearStudentDraft(form.eventId).catch(() => {});
+            }
+            setAnswers({});
+            setFileAttachments([]);
+            setCurrentSecIdx(0);
+            setSectionHistory([0]);
+            setValidationErrors({});
+            setSaveStatus("saved");
+            setShowClearConfirm(false);
+            setDraftRestoredNotice(null);
+            toast.success("Registration form cleared.");
+        } catch {
+            toast.error("Failed to clear draft.");
+        }
+    };
+
     // Flatten custom questions for assessment results
     const allQuestions = React.useMemo(() => {
         const list: FormQuestion[] = [];
@@ -212,34 +389,8 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         Boolean(submittedRegistration?.quizGradesReleased) ||
         form.settings?.quiz?.releaseGrades === "immediately";
 
-    // Autosave progress in browser storage if enabled
-    useEffect(() => {
-        if (!userResponse && !submittedRegistration && form.settings?.presentation?.autosaveProgress !== false) {
-            try {
-                const saved = localStorage.getItem(`orbix_form_draft_${form.eventId}`);
-                if (saved) {
-                    const parsed = JSON.parse(saved);
-                    if (parsed && typeof parsed === "object") {
-                        setAnswers((prev) => ({ ...parsed, ...prev }));
-                    }
-                }
-            } catch {}
-        }
-    }, [form.eventId, userResponse, submittedRegistration]);
-
-    useEffect(() => {
-        if (!userResponse && !submittedRegistration && form.settings?.presentation?.autosaveProgress !== false) {
-            try {
-                if (Object.keys(answers).length > 0) {
-                    localStorage.setItem(`orbix_form_draft_${form.eventId}`, JSON.stringify(answers));
-                }
-            } catch {}
-        }
-    }, [answers, form.eventId, userResponse, submittedRegistration]);
-
     const activeSection: FormSection | undefined = sections[currentSecIdx];
     const totalSections = sections.length;
-    const accentColor = form.themeSettings?.accentColor || "#38BDF8";
 
     // Handle answer change
     const setAnswer = (questionId: string, value: any) => {
@@ -308,9 +459,12 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     // Validate current section before navigating forward or submitting
     const validateSection = (sec: FormSection): boolean => {
         const errors: Record<string, string> = {};
+        let firstInvalidQuestionId: string | null = null;
 
         for (const q of sec.questions) {
-            if (q.type === "image_card" || q.type === "markdown_card") continue;
+            if (q.type === "image_card" || q.type === "image_block" || q.type === "video_block" || q.type === "markdown_card" || q.type === "title_card") {
+                continue;
+            }
 
             const val = answers[q.id];
             const isProvided = val !== undefined && val !== null && (typeof val === "string" ? val.trim() !== "" : true);
@@ -318,9 +472,13 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
             if (q.required) {
                 if (q.type === "file_upload") {
                     const hasFile = fileAttachments.some((f) => f.questionId === q.id);
-                    if (!hasFile) errors[q.id] = "This question requires an uploaded file.";
+                    if (!hasFile) {
+                        errors[q.id] = "This question requires an uploaded file.";
+                        if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                    }
                 } else if (!isProvided) {
                     errors[q.id] = "This question is required.";
+                    if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
                 }
             }
 
@@ -328,44 +486,114 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
             if (typeof val === "string" && val.trim().length > 0) {
                 if (q.validation?.minLength && val.trim().length < q.validation.minLength) {
                     errors[q.id] = `Must be at least ${q.validation.minLength} characters.`;
+                    if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
                 }
                 if (q.validation?.maxLength && val.trim().length > q.validation.maxLength) {
                     errors[q.id] = `Must not exceed ${q.validation.maxLength} characters.`;
+                    if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
                 }
                 if (q.validation?.pattern) {
                     try {
                         const regex = new RegExp(q.validation.pattern);
                         if (!regex.test(val.trim())) {
                             errors[q.id] = q.validation.patternError || "Invalid format.";
+                            if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
                         }
                     } catch {}
                 }
             }
 
-            // Checkbox limits
+            // Number validation
+            if (q.type === "short_answer" && q.validation?.numberType && val !== undefined && val !== "") {
+                const numVal = Number(val);
+                if (isNaN(numVal)) {
+                    errors[q.id] = "Must be a valid number.";
+                    if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                } else {
+                    const t = q.validation.numberType;
+                    const target = Number(q.validation.numberValue ?? 0);
+                    const target2 = Number(q.validation.numberValue2 ?? 0);
+                    if (t === "greater_than" && numVal <= target) {
+                        errors[q.id] = `Must be greater than ${target}.`;
+                        if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                    } else if (t === "greater_or_equal" && numVal < target) {
+                        errors[q.id] = `Must be greater than or equal to ${target}.`;
+                        if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                    } else if (t === "less_than" && numVal >= target) {
+                        errors[q.id] = `Must be less than ${target}.`;
+                        if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                    } else if (t === "less_or_equal" && numVal > target) {
+                        errors[q.id] = `Must be less than or equal to ${target}.`;
+                        if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                    } else if (t === "equal" && numVal !== target) {
+                        errors[q.id] = `Must be equal to ${target}.`;
+                        if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                    } else if (t === "not_equal" && numVal === target) {
+                        errors[q.id] = `Must not be equal to ${target}.`;
+                        if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                    } else if (t === "between" && (numVal < target || numVal > target2)) {
+                        errors[q.id] = `Must be between ${target} and ${target2}.`;
+                        if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                    } else if (t === "whole_number" && !Number.isInteger(numVal)) {
+                        errors[q.id] = "Must be a whole number (integer).";
+                        if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                    }
+                }
+            }
+
+            // Checkbox selection limits
             if (q.type === "checkboxes" && Array.isArray(val)) {
                 if (q.validation?.minSelected && val.length < q.validation.minSelected) {
                     errors[q.id] = `Please select at least ${q.validation.minSelected} options.`;
+                    if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
                 }
                 if (q.validation?.maxSelected && val.length > q.validation.maxSelected) {
                     errors[q.id] = `Please select at most ${q.validation.maxSelected} options.`;
+                    if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                }
+                if (q.validation?.exactSelected && val.length !== q.validation.exactSelected) {
+                    errors[q.id] = `Please select exactly ${q.validation.exactSelected} options.`;
+                    if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                }
+            }
+
+            // Grid validation
+            if ((q.type === "multiple_choice_grid" || q.type === "checkbox_grid") && q.gridConfig) {
+                const rows = q.gridConfig.rows || [];
+                if (q.gridConfig.requireEachRow) {
+                    for (const row of rows) {
+                        const rowAns = val?.[row];
+                        if (!rowAns || (Array.isArray(rowAns) && rowAns.length === 0)) {
+                            errors[q.id] = `Please provide a response for each row ("${row}").`;
+                            if (!firstInvalidQuestionId) firstInvalidQuestionId = q.id;
+                            break;
+                        }
+                    }
                 }
             }
         }
 
         setValidationErrors(errors);
+
+        if (firstInvalidQuestionId) {
+            const el = document.getElementById(`q_wrapper_${firstInvalidQuestionId}`);
+            if (el) {
+                el.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+        }
+
         return Object.keys(errors).length === 0;
     };
 
-    // Next Section or Submit
+    // Multi-Section Navigation with Conditional Routing
     const handleNext = async () => {
         if (!activeSection) return;
         if (!validateSection(activeSection)) {
-            toast.error("Please answer all required questions before proceeding.");
+            toast.error("Please answer all required questions properly before proceeding.");
             return;
         }
 
-        // Determine next destination based on answer branching rules
+        // Determine next destination based on answer conditional branching rules
         let nextDestination: string | number = "next_section";
 
         for (const q of activeSection.questions) {
@@ -383,16 +611,19 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
             nextDestination = activeSection.afterSectionAction || "next_section";
         }
 
+        // If action is submit_form or this is the final physical section
         if (nextDestination === "submit_form" || currentSecIdx === totalSections - 1) {
             await handleSubmit();
             return;
         }
 
-        // Find target section index
+        // Find target section index (Conditional routing: skip irrelevant sections)
         let targetIdx = currentSecIdx + 1;
         if (typeof nextDestination === "string" && nextDestination !== "next_section") {
             const foundIdx = sections.findIndex((s) => s.id === nextDestination);
-            if (foundIdx !== -1) targetIdx = foundIdx;
+            if (foundIdx !== -1) {
+                targetIdx = foundIdx;
+            }
         }
 
         if (targetIdx < totalSections) {
@@ -404,7 +635,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         }
     };
 
-    // Back Section
+    // Previous Section Navigation (Traverse back through historical path)
     const handleBack = () => {
         if (sectionHistory.length > 1) {
             const newHistory = [...sectionHistory];
@@ -412,13 +643,17 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
             const prevIdx = newHistory[newHistory.length - 1];
             setSectionHistory(newHistory);
             setCurrentSecIdx(prevIdx);
+            window.scrollTo({ top: 0, behavior: "smooth" });
         } else if (currentSecIdx > 0) {
             setCurrentSecIdx(currentSecIdx - 1);
+            window.scrollTo({ top: 0, behavior: "smooth" });
         }
     };
 
-    // Form Submission
+    // Form Submission with Idempotency Key Guard & Double Click Prevention
     const handleSubmit = async () => {
+        if (isSubmitting) return;
+
         const studentName = answers["q_student_name"] || effectiveProfile.fullName || "Student";
         const studentEmail = answers["q_student_email"] || effectiveProfile.email || "";
 
@@ -427,15 +662,24 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 title: "Form Submission Simulation",
             });
             setSubmittedRegistration({
+                id: "preview_reg_" + Math.random().toString(36).substring(2, 9),
                 ticketCode: "PREVIEW-PASS",
                 status: "pending",
                 applicantName: studentName,
+                applicantEmail: studentEmail,
+                registeredAt: new Date().toISOString(),
+                answers,
+                fileAttachments,
             });
             return;
         }
 
         try {
             setIsSubmitting(true);
+
+            // Generate cryptographically unique idempotency key
+            const idempotencyKey = `idem_${user?.id || "guest"}_${form.eventId}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
             const res = await submitEventFormResponse(form.eventId, {
                 applicantName: studentName,
                 applicantEmail: studentEmail,
@@ -446,16 +690,35 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 notes: answers["q_notes"] || undefined,
                 answers,
                 fileAttachments,
+                idempotencyKey,
             });
 
-            setSubmittedRegistration(res.registration);
+            const regRecord = {
+                ...res.registration,
+                applicantName: studentName,
+                applicantEmail: studentEmail,
+                department: answers["q_department"] || effectiveProfile.department,
+                rollNumber: answers["q_roll_number"] || effectiveProfile.rollNumber,
+                yearOfStudy: answers["q_year"] || effectiveProfile.yearOfStudy,
+                answers: res.registration?.answers || answers,
+                fileAttachments: res.registration?.fileAttachments || fileAttachments,
+            };
+
+            setSubmittedRegistration(regRecord);
+
+            // Clean up autosaved drafts
             try {
-                localStorage.removeItem(`orbix_form_draft_${form.eventId}`);
+                localStorage.removeItem(storageKey);
+                if (user?.id) {
+                    await clearStudentDraft(form.eventId).catch(() => {});
+                }
             } catch {}
+
             toast.success(res.message || "Registration submitted successfully!");
             if (onSuccess) {
-                onSuccess(res.registration);
+                onSuccess(regRecord);
             }
+            window.scrollTo({ top: 0, behavior: "smooth" });
         } catch (err: any) {
             toast.error(err.message || "Failed to submit registration.");
         } finally {
@@ -467,99 +730,263 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     const handleCopyTicket = (code: string) => {
         navigator.clipboard.writeText(code);
         setCopiedTicket(true);
-        toast.success("Ticket code copied!");
+        toast.success("Ticket pass code copied!");
         setTimeout(() => setCopiedTicket(false), 2000);
     };
 
+    // Copy Registration ID
+    const handleCopyRegId = (regId: string) => {
+        navigator.clipboard.writeText(regId);
+        setCopiedRegId(true);
+        toast.success("Registration ID copied!");
+        setTimeout(() => setCopiedRegId(false), 2000);
+    };
+
     // -------------------------------------------------------------------------
-    // RENDER: SUCCESS SCREEN
+    // RENDER: SUCCESS SCREEN (4.5 Registration Success Screen)
     // -------------------------------------------------------------------------
     if (submittedRegistration) {
+        const formattedDate = event?.startsAt
+            ? new Date(event.startsAt).toLocaleDateString("en-US", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+              })
+            : null;
+        const formattedTime = event?.startsAt
+            ? new Date(event.startsAt).toLocaleTimeString("en-US", {
+                  hour: "numeric",
+                  minute: "2-digit",
+              })
+            : null;
+
+        const submissionTimeStr = submittedRegistration.registeredAt
+            ? new Date(submittedRegistration.registeredAt).toLocaleString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+              })
+            : new Date().toLocaleString();
+
         return (
-            <div className="max-w-xl mx-auto rounded-3xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] p-6 sm:p-8 text-center space-y-6">
+            <div className="max-w-xl mx-auto rounded-3xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-xl p-6 sm:p-8 text-center space-y-6 animate-in fade-in duration-200">
+                {/* Success Indicator Badge */}
                 <div
-                    className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center border-2 border-black shadow-[3px_3px_0px_#000]"
-                    style={{ backgroundColor: accentColor }}
+                    className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 shadow-sm text-emerald-600 dark:text-emerald-400"
                 >
-                    <CheckCircle2 className="w-9 h-9 text-black stroke-[2.5]" />
+                    <CheckCircle2 className="w-8 h-8 stroke-[2.5]" />
                 </div>
 
                 <div className="space-y-2">
-                    <span className="px-3 py-1 rounded-full text-black bg-[#a2ff86] border border-black text-xs font-black uppercase tracking-wider">
+                    <span className="px-3 py-1 rounded-full text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-xs font-semibold inline-flex items-center gap-1.5 shadow-sm">
+                        <CheckCheck className="w-3.5 h-3.5" />
                         Registration Confirmed
                     </span>
-                    <h2 className="text-xl sm:text-2xl font-black text-black">
+                    <h2 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100">
                         {form.title}
                     </h2>
-                    <p className="text-xs sm:text-sm text-neutral-700 font-medium whitespace-pre-line">
+                    <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 font-normal whitespace-pre-line leading-relaxed">
                         {form.settings?.confirmationMessage || "Your registration has been submitted successfully!"}
                     </p>
                 </div>
 
+                {/* Event Information Card */}
+                <div className="p-4 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200 dark:border-neutral-800 text-left space-y-2.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400 block">
+                        Event Details
+                    </span>
+                    <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 truncate">{event?.title || form.title}</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                        {formattedDate && (
+                            <span className="flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                                {formattedDate} {formattedTime ? `• ${formattedTime}` : ""}
+                            </span>
+                        )}
+                        <span className="flex items-center gap-1.5 truncate">
+                            <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                            {event?.venueOrLocation || "Campus"}
+                        </span>
+                        <span className="flex items-center gap-1.5 truncate sm:col-span-2 text-neutral-500">
+                            <School className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                            Hosted by {club?.name || "Verified Club"}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Registration Metadata (ID & Submission Timestamp) */}
+                <div className="p-4 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs text-left space-y-2 shadow-sm">
+                    <div className="flex items-center justify-between gap-2 border-b border-neutral-100 dark:border-neutral-800 pb-2">
+                        <span className="text-[11px] font-medium text-neutral-500">Registration ID:</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-medium text-neutral-900 dark:text-neutral-100 text-[11px] truncate max-w-[170px] sm:max-w-xs">
+                                {submittedRegistration.id}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => handleCopyRegId(submittedRegistration.id)}
+                                className="p-1 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 cursor-pointer transition-colors"
+                                title="Copy ID"
+                            >
+                                {copiedRegId ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                            </button>
+                        </div>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px]">
+                        <span className="font-medium text-neutral-500">Submitted at:</span>
+                        <span className="font-medium text-neutral-900 dark:text-neutral-100">{submissionTimeStr}</span>
+                    </div>
+                </div>
+
                 {/* Ticket Pass Box */}
                 {submittedRegistration.ticketCode && (
-                    <div className="p-5 rounded-2xl border-2 border-black bg-neutral-50 shadow-[3px_3px_0px_#000] space-y-3">
-                        <div className="flex items-center justify-between text-xs font-black text-neutral-500 uppercase tracking-wider">
+                    <div className="p-5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900/60 space-y-3">
+                        <div className="flex items-center justify-between text-xs font-semibold text-neutral-400 uppercase tracking-wider">
                             <span>Your Entry Pass</span>
-                            <Ticket className="w-4 h-4 text-black" />
+                            <Ticket className="w-4 h-4 text-neutral-500" />
                         </div>
                         <div className="flex items-center justify-center gap-3">
-                            <span className="font-mono text-xl sm:text-2xl font-black text-black tracking-widest bg-white px-4 py-2 rounded-xl border border-black shadow-inner">
+                            <span className="font-mono text-xl sm:text-2xl font-bold text-neutral-900 dark:text-neutral-100 tracking-widest bg-white dark:bg-[#0A0A0A] px-4 py-2 rounded-xl border border-neutral-200 dark:border-neutral-800 shadow-sm">
                                 {submittedRegistration.ticketCode}
                             </span>
                             <button
                                 type="button"
                                 onClick={() => handleCopyTicket(submittedRegistration.ticketCode)}
-                                className="p-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] shadow-[2px_2px_0px_#000] cursor-pointer"
+                                className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-700 text-neutral-700 dark:text-neutral-300 shadow-sm cursor-pointer transition-colors"
                                 title="Copy Pass Code"
                             >
-                                {copiedTicket ? <Check className="w-4 h-4 text-black" /> : <Copy className="w-4 h-4 text-black" />}
+                                {copiedTicket ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
                             </button>
                         </div>
-                        <span className="text-[11px] text-neutral-500 font-medium block">
+                        <span className="text-[11px] text-neutral-500 font-normal block">
                             Present this ticket code or QR pass at the entrance during event check-in.
                         </span>
                     </div>
                 )}
 
+                {/* Collapsible Registration Details Summary */}
+                <div className="border border-neutral-200 dark:border-neutral-800 rounded-2xl bg-white dark:bg-[#0A0A0A] shadow-sm overflow-hidden text-left">
+                    <button
+                        type="button"
+                        onClick={() => setShowAnswersSummary((prev) => !prev)}
+                        className="w-full p-3.5 bg-neutral-50 dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800/80 flex items-center justify-between text-xs font-semibold text-neutral-900 dark:text-neutral-100 cursor-pointer transition-colors"
+                    >
+                        <span>Submitted Registration Details</span>
+                        {showAnswersSummary ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </button>
+
+                    {showAnswersSummary && (
+                        <div className="p-4 space-y-3 border-t border-neutral-100 dark:border-neutral-800 text-xs max-h-72 overflow-y-auto">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pb-2 border-b border-neutral-100 dark:border-neutral-800 text-[11px]">
+                                <div>
+                                    <span className="text-neutral-400 font-medium block">Applicant Name</span>
+                                    <p className="font-semibold text-neutral-900 dark:text-neutral-100">{submittedRegistration.applicantName || effectiveProfile.fullName}</p>
+                                </div>
+                                <div>
+                                    <span className="text-neutral-400 font-medium block">Email</span>
+                                    <p className="font-semibold text-neutral-900 dark:text-neutral-100">{submittedRegistration.applicantEmail || effectiveProfile.email}</p>
+                                </div>
+                                {submittedRegistration.rollNumber && (
+                                    <div>
+                                        <span className="text-neutral-400 font-medium block">Roll / ID</span>
+                                        <p className="font-semibold text-neutral-900 dark:text-neutral-100">{submittedRegistration.rollNumber}</p>
+                                    </div>
+                                )}
+                                {submittedRegistration.department && (
+                                    <div>
+                                        <span className="text-neutral-400 font-medium block">Department</span>
+                                        <p className="font-semibold text-neutral-900 dark:text-neutral-100">{submittedRegistration.department}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Question answers list */}
+                            {allQuestions.map((q) => {
+                                const submittedAns = submittedRegistration.answers?.[q.id];
+                                if (submittedAns === undefined || submittedAns === null || submittedAns === "") return null;
+
+                                return (
+                                    <div key={q.id} className="p-2.5 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-1">
+                                        <span className="font-medium text-[11px] text-neutral-500 block">{q.title}</span>
+                                        <p className="font-semibold text-neutral-900 dark:text-neutral-100 text-xs whitespace-pre-wrap">
+                                            {typeof submittedAns === "object"
+                                                ? Array.isArray(submittedAns)
+                                                    ? submittedAns.join(", ")
+                                                    : JSON.stringify(submittedAns)
+                                                : String(submittedAns)}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+
+                            {/* Uploaded file attachments */}
+                            {submittedRegistration.fileAttachments && submittedRegistration.fileAttachments.length > 0 && (
+                                <div className="space-y-1.5 pt-1">
+                                    <span className="text-[11px] font-semibold uppercase text-neutral-400">Uploaded Files</span>
+                                    {submittedRegistration.fileAttachments.map((f: FileAttachmentMeta, idx: number) => (
+                                        <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-xs">
+                                            <div className="flex items-center gap-2 truncate">
+                                                <Paperclip className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                                                <span className="font-medium text-neutral-900 dark:text-neutral-100 truncate">{f.fileName}</span>
+                                            </div>
+                                            <a
+                                                href={f.fileUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline shrink-0 flex items-center gap-1"
+                                            >
+                                                <span>View</span>
+                                                <ExternalLink className="w-3 h-3" />
+                                            </a>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
                 {/* Quiz Assessment Result Card */}
                 {isQuiz && (
-                    <div className="p-5 rounded-2xl border-2 border-black bg-[#F0FDF4] shadow-[3px_3px_0px_#16A34A] space-y-4 text-left">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-[#16A34A]/20 pb-3">
+                    <div className="p-5 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/50 dark:bg-emerald-950/20 space-y-4 text-left shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-emerald-200/60 dark:border-emerald-800/40 pb-3">
                             <div className="flex items-center gap-2">
-                                <span className="p-2 rounded-xl bg-[#22C55E] border border-black text-black">
+                                <span className="p-2 rounded-xl bg-emerald-600 text-white">
                                     <Award className="w-5 h-5" />
                                 </span>
                                 <div>
-                                    <h4 className="text-sm sm:text-base font-black text-black">Quiz Assessment Result</h4>
-                                    <p className="text-[11px] text-neutral-600 font-medium">Evaluation and score breakdown</p>
+                                    <h4 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-neutral-100">Quiz Assessment Result</h4>
+                                    <p className="text-[11px] text-neutral-500 font-normal">Evaluation and score breakdown</p>
                                 </div>
                             </div>
                             {gradesReleased ? (
                                 <div className="text-right">
-                                    <span className="text-xl sm:text-2xl font-black text-[#15803D]">
+                                    <span className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-400">
                                         {submittedRegistration.quizScore ?? 0} / {submittedRegistration.quizMaxScore ?? 0}
                                     </span>
-                                    <span className="block text-[11px] font-bold text-neutral-500">
+                                    <span className="block text-[11px] font-medium text-neutral-500">
                                         ({Math.round(((submittedRegistration.quizScore ?? 0) / (submittedRegistration.quizMaxScore || 1)) * 100)}%)
                                     </span>
                                 </div>
                             ) : (
-                                <span className="text-xs font-black bg-amber-100 text-amber-800 px-3 py-1 rounded-xl border border-amber-300">
+                                <span className="text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 px-3 py-1 rounded-xl border border-amber-300 dark:border-amber-800">
                                     Review in Progress
                                 </span>
                             )}
                         </div>
 
                         {!gradesReleased && (
-                            <p className="text-xs text-neutral-600 font-medium bg-white p-3 rounded-xl border border-black/20">
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400 font-normal bg-white dark:bg-neutral-900 p-3 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 ⏳ Written and subjective answers are currently being evaluated by event staff. Your final score will be released here once review is complete.
                             </p>
                         )}
 
                         {gradesReleased && submittedRegistration.quizGradedAnswers && (
                             <div className="space-y-3 pt-1">
-                                <h5 className="text-xs font-black uppercase tracking-wider text-black">Question Breakdown:</h5>
+                                <h5 className="text-xs font-semibold uppercase tracking-wider text-neutral-900 dark:text-neutral-100">Question Breakdown:</h5>
                                 <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
                                     {allQuestions.map((q) => {
                                         const gradedInfo = submittedRegistration.quizGradedAnswers?.[q.id];
@@ -569,37 +996,37 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                         return (
                                             <div
                                                 key={q.id}
-                                                className={`p-3 rounded-xl border-2 space-y-2 ${
+                                                className={`p-3 rounded-xl border space-y-2 ${
                                                     isCorrect
-                                                        ? "bg-white border-[#16A34A]"
-                                                        : "bg-rose-50 border-rose-300"
+                                                        ? "bg-white dark:bg-neutral-900 border-emerald-500/50 shadow-sm"
+                                                        : "bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800/60"
                                                 }`}
                                             >
                                                 <div className="flex items-start justify-between gap-2">
-                                                    <span className="text-xs font-black text-black">{q.title}</span>
+                                                    <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">{q.title}</span>
                                                     <span
-                                                        className={`text-[11px] font-black px-2 py-0.5 rounded-md border ${
+                                                        className={`text-[11px] font-semibold px-2 py-0.5 rounded-md border ${
                                                             isCorrect
-                                                                ? "bg-[#DCFCE7] text-[#15803D] border-[#16A34A]"
-                                                                : "bg-rose-100 text-rose-800 border-rose-300"
+                                                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700"
+                                                                : "bg-rose-100 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border-rose-300 dark:border-rose-700"
                                                         }`}
                                                     >
                                                         {gradedInfo.earnedPoints ?? 0} / {gradedInfo.maxPoints ?? q.points ?? 1} pts
                                                     </span>
                                                 </div>
-                                                <div className="text-[11px] font-medium text-neutral-700">
-                                                    <strong>Your answer:</strong>{" "}
+                                                <div className="text-[11px] font-normal text-neutral-700 dark:text-neutral-300">
+                                                    <strong className="font-medium text-neutral-900 dark:text-neutral-100">Your answer:</strong>{" "}
                                                     {Array.isArray(gradedInfo.studentAnswer)
                                                         ? gradedInfo.studentAnswer.join(", ")
                                                         : String(gradedInfo.studentAnswer ?? "(No answer provided)")}
                                                 </div>
                                                 {form.settings?.quiz?.showCorrectAnswers && !isCorrect && q.correctAnswers && q.correctAnswers.length > 0 && (
-                                                    <div className="text-[11px] font-bold text-emerald-800">
-                                                        ✓ <strong>Correct answer:</strong> {q.correctAnswers.join(", ")}
+                                                    <div className="text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
+                                                        ✓ <strong className="font-semibold">Correct answer:</strong> {q.correctAnswers.join(", ")}
                                                     </div>
                                                 )}
                                                 {gradedInfo.feedback && (
-                                                    <div className="text-[11px] font-medium text-neutral-600 bg-neutral-100 p-2 rounded-lg border border-black/10">
+                                                    <div className="text-[11px] font-normal text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 p-2 rounded-lg border border-neutral-200 dark:border-neutral-700">
                                                         💡 {gradedInfo.feedback}
                                                     </div>
                                                 )}
@@ -611,7 +1038,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                                 href={link.url}
                                                                 target="_blank"
                                                                 rel="noreferrer"
-                                                                className="inline-flex items-center gap-1 text-[11px] font-black text-blue-700 hover:underline"
+                                                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:underline"
                                                             >
                                                                 <ExternalLink className="w-3 h-3" />
                                                                 {link.title || link.url}
@@ -630,15 +1057,33 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                    <Link
+                        to="/applications"
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-black dark:bg-white text-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 font-semibold text-xs shadow-sm cursor-pointer inline-flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                        <span>View My Applications</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
+
+                    <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-700 dark:text-neutral-300 shadow-sm cursor-pointer inline-flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                        <Printer className="w-3.5 h-3.5" />
+                        <span>Print Pass Receipt</span>
+                    </button>
+
                     {form.settings?.allowEditResponse && (
                         <button
                             type="button"
                             onClick={() => setSubmittedRegistration(null)}
-                            className="w-full sm:w-auto px-4 py-2 rounded-xl border-2 border-black font-black text-xs hover:bg-neutral-100 shadow-[2px_2px_0px_#000] cursor-pointer"
+                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-700 dark:text-neutral-300 shadow-sm cursor-pointer transition-colors"
                         >
-                            Edit Your Response
+                            Edit Response
                         </button>
                     )}
+
                     {form.settings?.presentation?.showSubmitAnotherLink && !form.settings?.limitOneResponse && (
                         <button
                             type="button"
@@ -649,18 +1094,19 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                 setCurrentSecIdx(0);
                                 setSectionHistory([0]);
                             }}
-                            className="w-full sm:w-auto px-4 py-2 rounded-xl border-2 border-black font-black text-xs hover:bg-neutral-100 shadow-[2px_2px_0px_#000] cursor-pointer"
+                            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-700 dark:text-neutral-300 shadow-sm cursor-pointer transition-colors"
                         >
-                            Submit Another Response
+                            Submit Another
                         </button>
                     )}
+
                     {onCancel && (
                         <button
                             type="button"
                             onClick={onCancel}
-                            className="w-full sm:w-auto px-5 py-2 rounded-xl bg-black text-white font-black text-xs hover:bg-neutral-800 shadow-[2px_2px_0px_#000] cursor-pointer"
+                            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-xs hover:bg-neutral-800 dark:hover:bg-neutral-200 shadow-sm cursor-pointer transition-colors"
                         >
-                            Close
+                            Done
                         </button>
                     )}
                 </div>
@@ -673,19 +1119,19 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     // -------------------------------------------------------------------------
     if (isClosed && !isPreview) {
         return (
-            <div className="max-w-xl mx-auto rounded-3xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] p-8 text-center space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-amber-300 border-2 border-black shadow-[3px_3px_0px_#000] mx-auto flex items-center justify-center">
-                    <AlertCircle className="w-7 h-7 text-black stroke-[2.5]" />
+            <div className="max-w-xl mx-auto rounded-3xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-xl p-8 text-center space-y-4 animate-in fade-in">
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 mx-auto flex items-center justify-center">
+                    <AlertCircle className="w-7 h-7 stroke-[2.5]" />
                 </div>
-                <h3 className="text-xl font-black text-black">Registration Closed</h3>
-                <p className="text-xs sm:text-sm text-neutral-600 font-medium whitespace-pre-line">
+                <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-100">Registration Closed</h3>
+                <p className="text-xs sm:text-sm text-neutral-500 font-normal whitespace-pre-line leading-relaxed">
                     {closedReason || form.settings?.closedMessage || "Registrations are currently closed for this event."}
                 </p>
                 {onCancel && (
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="px-5 py-2 rounded-xl border-2 border-black font-black text-xs hover:bg-neutral-100 shadow-[2px_2px_0px_#000] cursor-pointer"
+                        className="px-5 py-2 rounded-xl border border-neutral-200 dark:border-neutral-700 font-semibold text-xs text-neutral-700 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-800 shadow-sm cursor-pointer transition-colors"
                     >
                         Back
                     </button>
@@ -695,18 +1141,19 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     }
 
     // -------------------------------------------------------------------------
-    // RENDER: ACTIVE FORM RESPONDER
+    // RENDER: ACTIVE PUBLISHED FORM RESPONDER
     // -------------------------------------------------------------------------
     const progressPercent = totalSections > 1 ? Math.round(((currentSecIdx + 1) / totalSections) * 100) : 100;
 
     return (
-        <div className="max-w-2xl mx-auto space-y-6 text-black">
+        <div className="max-w-2xl mx-auto space-y-6 text-neutral-900 dark:text-neutral-100">
             {/* Header Banner if present */}
             {form.headerImageUrl && (
-                <div className="rounded-3xl border-2 border-black overflow-hidden shadow-[4px_4px_0px_#000] bg-neutral-100">
+                <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm bg-neutral-100 dark:bg-neutral-900">
                     <img
-                        src={form.headerImageUrl}
+                        src={getCloudinaryBannerUrl(form.headerImageUrl)}
                         alt="Form Banner"
+                        loading="lazy"
                         className="w-full h-36 sm:h-48 object-cover"
                     />
                 </div>
@@ -714,26 +1161,68 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
             {/* Form Title & Context Card */}
             <div
-                className="rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-6 sm:p-7 space-y-3 relative overflow-hidden"
-                style={{ borderTopWidth: "6px", borderTopColor: accentColor }}
+                className="rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm p-6 sm:p-7 space-y-3 relative overflow-hidden"
             >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-neutral-100 border border-black">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
                         {club?.name || "Verified Club Event"}
                     </span>
-                    {isPreview && (
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#FFE566] text-black border border-black">
-                            Simulator / Preview Mode
-                        </span>
-                    )}
+
+                    {/* Autosave Status Pill & Clear Form */}
+                    <div className="flex items-center gap-2">
+                        {isAutosaveEnabled && (
+                            <div className="flex items-center gap-2">
+                                {saveStatus === "saving" && (
+                                    <span className="flex items-center gap-1.5 text-[11px] font-medium text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-2.5 py-0.5 rounded-full">
+                                        <OrbixLoader size="xs" />
+                                        <span>Saving draft...</span>
+                                    </span>
+                                )}
+                                {saveStatus === "saved" && (
+                                    <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-700 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                        <span>Draft saved{lastSavedAt ? ` (${lastSavedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })})` : ""}</span>
+                                    </span>
+                                )}
+                                {saveStatus === "offline" && (
+                                    <span className="flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 dark:bg-amber-950/30 px-2.5 py-0.5 rounded-full border border-amber-200 dark:border-amber-800">
+                                        <WifiOff className="w-3.5 h-3.5 text-amber-600" />
+                                        <span>Saved locally</span>
+                                    </span>
+                                )}
+                                {saveStatus === "unsaved" && (
+                                    <span className="flex items-center gap-1 text-[11px] font-medium text-neutral-500 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
+                                        <Clock className="w-3 h-3" />
+                                        <span>Unsaved changes</span>
+                                    </span>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setShowClearConfirm(true)}
+                                    className="flex items-center gap-1 text-[11px] font-medium text-neutral-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                    title="Clear entered answers"
+                                >
+                                    <RotateCcw className="w-3 h-3" />
+                                    <span>Clear</span>
+                                </button>
+                            </div>
+                        )}
+
+                        {isPreview && (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-neutral-900 text-white dark:bg-white dark:text-neutral-900">
+                                Simulator / Preview Mode
+                            </span>
+                        )}
+                    </div>
                 </div>
 
-                <h1 className="text-xl sm:text-2xl font-black text-black tracking-tight">
+                <h1 className="text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white tracking-tight">
                     {form.title}
                 </h1>
 
                 {form.description && (
-                    <p className="text-xs sm:text-sm text-neutral-600 font-medium whitespace-pre-line leading-relaxed">
+                    <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 font-normal whitespace-pre-line leading-relaxed">
                         {form.description}
                     </p>
                 )}
@@ -751,21 +1240,38 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 </div>
             </div>
 
+            {/* Restored Draft Notice Banner */}
+            {draftRestoredNotice && (
+                <div className="p-3.5 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border border-neutral-800 dark:border-neutral-200 shadow-sm flex items-center justify-between text-xs font-medium animate-in fade-in">
+                    <span className="flex items-center gap-2">
+                        <span>📋</span>
+                        <span>{draftRestoredNotice}</span>
+                    </span>
+                    <button
+                        type="button"
+                        onClick={() => setDraftRestoredNotice(null)}
+                        className="text-[11px] underline underline-offset-2 opacity-80 hover:opacity-100 cursor-pointer"
+                    >
+                        Dismiss
+                    </button>
+                </div>
+            )}
+
             {/* Verified Orbix Student Identity Card */}
-            <div className="rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/10 pb-3">
+            <div className="rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm p-5 sm:p-6 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-neutral-100 dark:border-neutral-800 pb-3">
                     <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-xl bg-[#a2ff86] border border-black flex items-center justify-center shadow-[1px_1px_0px_#000]">
-                            <ShieldCheck className="w-5 h-5 text-black stroke-[2.5]" />
+                        <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center shadow-sm">
+                            <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
                         </div>
                         <div>
-                            <h3 className="text-sm font-black text-black flex items-center gap-1.5">
+                            <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
                                 Verified Orbix Student Identity
-                                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
                                     Orbix Verified
                                 </span>
                             </h3>
-                            <p className="text-[11px] text-neutral-500 font-medium">
+                            <p className="text-[11px] text-neutral-500 font-normal">
                                 Pre-populated from your authenticated student account.
                             </p>
                         </div>
@@ -785,8 +1291,9 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     {/* Name & Avatar */}
                     <div className="p-3 rounded-2xl bg-[#FAF6EE] border border-black/20 flex items-center gap-3">
                         <img
-                            src={effectiveProfile.avatarUrl}
+                            src={getCloudinaryAvatarUrl(effectiveProfile.avatarUrl)}
                             alt=""
+                            loading="lazy"
                             className="w-10 h-10 rounded-xl border border-black object-cover shrink-0"
                         />
                         <div className="min-w-0">
@@ -958,35 +1465,35 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 )}
             </div>
 
-            {/* Multi-Section Progress Bar */}
+            {/* Multi-Section Progress Bar (4.2 Multi-Section Forms) */}
             {totalSections > 1 && form.settings?.showProgressBar && (
                 <div className="space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-black text-neutral-600">
+                    <div className="flex items-center justify-between text-xs font-medium text-neutral-500">
                         <span>
                             Section {currentSecIdx + 1} of {totalSections}
                         </span>
                         <span>{progressPercent}% Complete</span>
                     </div>
-                    <div className="w-full h-2.5 bg-neutral-200 rounded-full border border-black overflow-hidden">
+                    <div className="w-full h-1.5 bg-neutral-100 dark:bg-neutral-800 rounded-full overflow-hidden">
                         <div
-                            className="h-full transition-all duration-300"
-                            style={{ width: `${progressPercent}%`, backgroundColor: accentColor }}
+                            className="h-full bg-neutral-900 dark:bg-white transition-all duration-300"
+                            style={{ width: `${progressPercent}%` }}
                         />
                     </div>
                 </div>
             )}
 
-            {/* Active Section Header Card (If titled) */}
+            {/* Active Section Header Card (Section Title & Description) */}
             {activeSection && (activeSection.title || activeSection.description) && (
-                <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-1">
-                    <h3 className="text-base font-black text-black">{activeSection.title}</h3>
+                <div className="p-5 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-1">
+                    <h3 className="text-base font-bold text-neutral-900 dark:text-white">{activeSection.title}</h3>
                     {activeSection.description && (
-                        <p className="text-xs text-neutral-600 font-medium">{activeSection.description}</p>
+                        <p className="text-xs text-neutral-500 font-normal">{activeSection.description}</p>
                     )}
                 </div>
             )}
 
-            {/* Questions List for Current Section */}
+            {/* Questions List for Current Relevant Section */}
             {activeSection && (
                 <div className="space-y-4">
                     {activeSection.questions.map((question, _qIdx) => {
@@ -998,13 +1505,14 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             return (
                                 <div
                                     key={question.id}
-                                    className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2"
+                                    id={`q_wrapper_${question.id}`}
+                                    className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-2"
                                 >
                                     {question.title && (
-                                        <h3 className="text-base sm:text-lg font-black text-black">{question.title}</h3>
+                                        <h3 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100">{question.title}</h3>
                                     )}
                                     {question.description && (
-                                        <p className="text-xs sm:text-sm text-neutral-700 font-medium whitespace-pre-line leading-relaxed">
+                                        <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 font-normal whitespace-pre-line leading-relaxed">
                                             {question.description}
                                         </p>
                                     )}
@@ -1024,22 +1532,24 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             return (
                                 <div
                                     key={question.id}
-                                    className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2.5"
+                                    id={`q_wrapper_${question.id}`}
+                                    className="p-5 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-2.5"
                                 >
                                     {question.title && (
-                                        <h4 className="text-sm font-black text-black">{question.title}</h4>
+                                        <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{question.title}</h4>
                                     )}
                                     {question.imageUrl && (
                                         <div className={`flex ${alignClass}`}>
                                             <img
-                                                src={question.imageUrl}
+                                                src={getOptimizedCloudinaryUrl(question.imageUrl, { width: 800, quality: "auto" })}
                                                 alt=""
-                                                className="rounded-xl border border-black object-cover max-h-80 max-w-full"
+                                                loading="lazy"
+                                                className="rounded-xl border border-neutral-200 dark:border-neutral-800 object-cover max-h-80 max-w-full"
                                             />
                                         </div>
                                     )}
                                     {question.imageCaption && (
-                                        <p className="text-xs text-neutral-500 font-medium italic text-center">
+                                        <p className="text-xs text-neutral-400 font-normal italic text-center">
                                             {question.imageCaption}
                                         </p>
                                     )}
@@ -1054,13 +1564,14 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             return (
                                 <div
                                     key={question.id}
-                                    className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3"
+                                    id={`q_wrapper_${question.id}`}
+                                    className="p-5 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-3"
                                 >
                                     {question.title && (
-                                        <h4 className="text-sm font-black text-black">{question.title}</h4>
+                                        <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{question.title}</h4>
                                     )}
                                     {embedUrl ? (
-                                        <div className="relative w-full aspect-video rounded-xl overflow-hidden border-2 border-black shadow-[2px_2px_0px_#000] bg-black">
+                                        <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-neutral-200 dark:border-neutral-800 shadow-sm bg-black">
                                             <iframe
                                                 src={embedUrl}
                                                 title={question.title || "Embedded Video"}
@@ -1070,12 +1581,12 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                             />
                                         </div>
                                     ) : (
-                                        <div className="p-6 border-2 border-dashed border-neutral-300 rounded-xl text-center text-xs text-neutral-500 font-bold">
+                                        <div className="p-6 border border-dashed border-neutral-300 dark:border-neutral-700 rounded-xl text-center text-xs text-neutral-400 font-medium">
                                             No valid video URL configured
                                         </div>
                                     )}
                                     {(question.videoTitle || question.description) && (
-                                        <p className="text-xs text-neutral-500 font-medium italic text-center">
+                                        <p className="text-xs text-neutral-400 font-normal italic text-center">
                                             {question.videoTitle || question.description}
                                         </p>
                                     )}
@@ -1088,12 +1599,13 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             return (
                                 <div
                                     key={question.id}
-                                    className="p-5 rounded-2xl bg-[#FFE566]/20 border-2 border-black shadow-[3px_3px_0px_#000] space-y-2"
+                                    id={`q_wrapper_${question.id}`}
+                                    className="p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-2"
                                 >
                                     {question.title && (
-                                        <h4 className="text-sm font-black text-black">{question.title}</h4>
+                                        <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{question.title}</h4>
                                     )}
-                                    <div className="text-xs text-neutral-800 font-medium whitespace-pre-line leading-relaxed">
+                                    <div className="text-xs text-neutral-700 dark:text-neutral-300 font-normal whitespace-pre-line leading-relaxed">
                                         {question.content || question.description}
                                     </div>
                                 </div>
@@ -1103,10 +1615,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                         return (
                             <div
                                 key={question.id}
-                                className={`p-5 sm:p-6 rounded-2xl bg-white border-2 transition-all space-y-3 ${
+                                id={`q_wrapper_${question.id}`}
+                                className={`p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#0A0A0A] border transition-all space-y-3 shadow-sm ${
                                     qError
-                                        ? "border-rose-500 shadow-[3px_3px_0px_#dc2626]"
-                                        : "border-black shadow-[3px_3px_0px_#000]"
+                                        ? "border-rose-500 ring-1 ring-rose-500/20"
+                                        : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700"
                                 }`}
                             >
                                 {/* Question Title & Description */}
@@ -1139,8 +1652,9 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                 {question.imageUrl && (
                                     <div className="rounded-xl border border-black overflow-hidden max-w-sm">
                                         <img
-                                            src={question.imageUrl}
+                                            src={getOptimizedCloudinaryUrl(question.imageUrl, { width: 800, quality: "auto" })}
                                             alt=""
+                                            loading="lazy"
                                             className="w-full max-h-60 object-contain bg-neutral-50"
                                         />
                                     </div>
@@ -1153,7 +1667,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                         value={val ?? ""}
                                         onChange={(e) => setAnswer(question.id, e.target.value)}
                                         placeholder={question.placeholder || "Your answer"}
-                                        className="w-full text-xs sm:text-sm font-medium border-2 border-black rounded-xl p-2.5 focus:outline-none bg-neutral-50 focus:bg-white"
+                                        className="w-full text-xs sm:text-sm font-normal border border-neutral-200 dark:border-neutral-800 rounded-xl p-2.5 focus:outline-none focus:border-neutral-900 dark:focus:border-white bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400"
                                     />
                                 )}
 
@@ -1164,7 +1678,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                         onChange={(e) => setAnswer(question.id, e.target.value)}
                                         placeholder={question.placeholder || "Your answer..."}
                                         rows={3}
-                                        className="w-full text-xs sm:text-sm font-medium border-2 border-black rounded-xl p-3 focus:outline-none bg-neutral-50 focus:bg-white resize-y"
+                                        className="w-full text-xs sm:text-sm font-normal border border-neutral-200 dark:border-neutral-800 rounded-xl p-3 focus:outline-none focus:border-neutral-900 dark:focus:border-white bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 resize-y"
                                     />
                                 )}
 
@@ -1180,10 +1694,10 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                             return (
                                                 <div key={opt.id} className="space-y-2">
                                                     <label
-                                                        className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                                                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
                                                             isChecked
-                                                                ? "border-black bg-[#FAF6EE] shadow-[2px_2px_0px_#000]"
-                                                                : "border-black/20 hover:border-black/60 bg-white"
+                                                                ? "border-neutral-900 dark:border-white bg-neutral-50 dark:bg-neutral-900 shadow-sm"
+                                                                : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 bg-white dark:bg-[#0A0A0A]"
                                                         }`}
                                                     >
                                                         <input
@@ -1197,16 +1711,17 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                                     setAnswer(question.id, opt.text);
                                                                 }
                                                             }}
-                                                            className="w-4 h-4 accent-black cursor-pointer"
+                                                            className="w-4 h-4 accent-neutral-900 dark:accent-white cursor-pointer"
                                                         />
-                                                        <span className="text-xs sm:text-sm font-bold text-black flex-1">
+                                                        <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 flex-1">
                                                             {opt.text}
                                                         </span>
                                                         {opt.imageUrl && (
                                                             <img
-                                                                src={opt.imageUrl}
+                                                                src={getCloudinaryThumbnailUrl(opt.imageUrl, 100)}
                                                                 alt=""
-                                                                className="w-8 h-8 rounded-lg border border-black object-cover shrink-0"
+                                                                loading="lazy"
+                                                                className="w-8 h-8 rounded-lg border border-neutral-200 dark:border-neutral-800 object-cover shrink-0"
                                                             />
                                                         )}
                                                     </label>
@@ -1216,7 +1731,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                             placeholder="Please specify other..."
                                                             value={typeof val === "string" && val.startsWith("Other: ") ? val.replace("Other: ", "") : ""}
                                                             onChange={(e) => setAnswer(question.id, `Other: ${e.target.value}`)}
-                                                            className="w-full text-xs sm:text-sm font-medium border-2 border-black rounded-xl p-2.5 ml-0 sm:ml-4 bg-white focus:outline-none shadow-sm"
+                                                            className="w-full text-xs sm:text-sm font-normal border border-neutral-200 dark:border-neutral-800 rounded-xl p-2.5 ml-0 sm:ml-4 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-white shadow-sm"
                                                             autoFocus
                                                         />
                                                     )}
@@ -1250,26 +1765,27 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                             return (
                                                 <div key={opt.id} className="space-y-2">
                                                     <label
-                                                        className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                                                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
                                                             isChecked
-                                                                ? "border-black bg-[#FAF6EE] shadow-[2px_2px_0px_#000]"
-                                                                : "border-black/20 hover:border-black/60 bg-white"
+                                                                ? "border-neutral-900 dark:border-white bg-neutral-50 dark:bg-neutral-900 shadow-sm"
+                                                                : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 bg-white dark:bg-[#0A0A0A]"
                                                         }`}
                                                     >
                                                         <input
                                                             type="checkbox"
                                                             checked={isChecked}
                                                             onChange={toggleCheck}
-                                                            className="w-4 h-4 accent-black rounded cursor-pointer"
+                                                            className="w-4 h-4 accent-neutral-900 dark:accent-white rounded cursor-pointer"
                                                         />
-                                                        <span className="text-xs sm:text-sm font-bold text-black flex-1">
+                                                        <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 flex-1">
                                                             {opt.text}
                                                         </span>
                                                         {opt.imageUrl && (
                                                             <img
-                                                                src={opt.imageUrl}
+                                                                src={getCloudinaryThumbnailUrl(opt.imageUrl, 100)}
                                                                 alt=""
-                                                                className="w-8 h-8 rounded-lg border border-black object-cover shrink-0"
+                                                                loading="lazy"
+                                                                className="w-8 h-8 rounded-lg border border-neutral-200 dark:border-neutral-800 object-cover shrink-0"
                                                             />
                                                         )}
                                                     </label>
@@ -1282,7 +1798,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                                 const updated = currentArr.filter((t) => !t.startsWith("Other: ") && t !== opt.text);
                                                                 setAnswer(question.id, [...updated, `Other: ${e.target.value}`]);
                                                             }}
-                                                            className="w-full text-xs sm:text-sm font-medium border-2 border-black rounded-xl p-2.5 ml-0 sm:ml-4 bg-white focus:outline-none shadow-sm"
+                                                            className="w-full text-xs sm:text-sm font-normal border border-neutral-200 dark:border-neutral-800 rounded-xl p-2.5 ml-0 sm:ml-4 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-white shadow-sm"
                                                             autoFocus
                                                         />
                                                     )}
@@ -1297,7 +1813,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                     <select
                                         value={val ?? ""}
                                         onChange={(e) => setAnswer(question.id, e.target.value)}
-                                        className="w-full text-xs sm:text-sm font-bold border-2 border-black rounded-xl p-2.5 bg-white focus:outline-none cursor-pointer"
+                                        className="w-full text-xs sm:text-sm font-medium border border-neutral-200 dark:border-neutral-800 rounded-xl p-2.5 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-white cursor-pointer"
                                     >
                                         <option value="">Select an option...</option>
                                         {(question.options || []).map((opt) => (
@@ -1322,12 +1838,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                         key={score}
                                                         type="button"
                                                         onClick={() => setAnswer(question.id, score)}
-                                                        className={`w-10 h-10 rounded-xl border-2 font-black text-xs sm:text-sm flex items-center justify-center cursor-pointer transition-transform active:scale-95 shrink-0 ${
+                                                        className={`w-10 h-10 rounded-xl border font-semibold text-xs sm:text-sm flex items-center justify-center cursor-pointer transition-all active:scale-95 shrink-0 ${
                                                             isSelected
-                                                                ? "border-black shadow-[2px_2px_0px_#000]"
-                                                                : "border-black/30 hover:border-black bg-white"
+                                                                ? "border-neutral-900 dark:border-white bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 shadow-sm"
+                                                                : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200"
                                                         }`}
-                                                        style={{ backgroundColor: isSelected ? accentColor : undefined }}
                                                     >
                                                         {score}
                                                     </button>
@@ -1336,7 +1851,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                         </div>
 
                                         {(question.scaleConfig?.minLabel || question.scaleConfig?.maxLabel) && (
-                                            <div className="flex items-center justify-between text-xs font-bold text-neutral-500">
+                                            <div className="flex items-center justify-between text-xs font-normal text-neutral-500">
                                                 <span>{question.scaleConfig?.minLabel}</span>
                                                 <span>{question.scaleConfig?.maxLabel}</span>
                                             </div>
@@ -1360,10 +1875,10 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                             key={lvl}
                                                             type="button"
                                                             onClick={() => setAnswer(question.id, lvl)}
-                                                            className={`p-2.5 rounded-xl border-2 cursor-pointer transition-all active:scale-95 flex items-center justify-center ${
+                                                            className={`p-2.5 rounded-xl border cursor-pointer transition-all active:scale-95 flex items-center justify-center ${
                                                                 isSelected
-                                                                    ? "border-black bg-[#FFE566] shadow-[2px_2px_0px_#000]"
-                                                                    : "border-black/20 hover:border-black bg-white"
+                                                                    ? "border-neutral-900 dark:border-white bg-neutral-50 dark:bg-neutral-900 shadow-sm"
+                                                                    : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 bg-white dark:bg-neutral-900"
                                                             }`}
                                                             title={`Rate ${lvl} / ${levels}`}
                                                         >
@@ -1372,7 +1887,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                                     className={`w-6 h-6 ${
                                                                         isSelected
                                                                             ? "text-amber-500 fill-amber-400"
-                                                                            : "text-neutral-400"
+                                                                            : "text-neutral-300 dark:text-neutral-600"
                                                                     }`}
                                                                 />
                                                             )}
@@ -1381,7 +1896,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                                     className={`w-6 h-6 ${
                                                                         isSelected
                                                                             ? "text-rose-500 fill-rose-500"
-                                                                            : "text-neutral-400"
+                                                                            : "text-neutral-300 dark:text-neutral-600"
                                                                     }`}
                                                                 />
                                                             )}
@@ -1390,7 +1905,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                                     className={`w-6 h-6 ${
                                                                         isSelected
                                                                             ? "text-sky-600 fill-sky-500"
-                                                                            : "text-neutral-400"
+                                                                            : "text-neutral-300 dark:text-neutral-600"
                                                                     }`}
                                                                 />
                                                             )}
@@ -1398,7 +1913,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                     );
                                                 })}
                                                 {currentRating > 0 && (
-                                                    <span className="text-xs font-black text-black ml-2 bg-neutral-100 px-2.5 py-1 rounded-xl border border-black/20">
+                                                    <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 ml-2 bg-neutral-100 dark:bg-neutral-800 px-2.5 py-1 rounded-xl border border-neutral-200 dark:border-neutral-700">
                                                         {currentRating} of {levels}
                                                     </span>
                                                 )}
@@ -1411,17 +1926,17 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                 {question.type === "file_upload" && (
                                     <div className="space-y-3">
                                         {fileAttachments.some((f) => f.questionId === question.id) ? (
-                                            <div className="flex items-center justify-between p-3 rounded-xl border-2 border-black bg-emerald-50">
+                                            <div className="flex items-center justify-between p-3 rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20">
                                                 <div className="flex items-center gap-2 truncate">
-                                                    <Paperclip className="w-4 h-4 text-emerald-700 shrink-0" />
-                                                    <span className="text-xs font-black text-black truncate">
+                                                    <Paperclip className="w-4 h-4 text-emerald-600 shrink-0" />
+                                                    <span className="text-xs font-medium text-neutral-900 dark:text-neutral-100 truncate">
                                                         {fileAttachments.find((f) => f.questionId === question.id)?.fileName}
                                                     </span>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleRemoveFile(question.id)}
-                                                    className="p-1 rounded-lg text-neutral-500 hover:text-rose-600 cursor-pointer"
+                                                    className="p-1 rounded-lg text-neutral-400 hover:text-rose-600 cursor-pointer transition-colors"
                                                     title="Remove file"
                                                 >
                                                     <Trash2 className="w-4 h-4" />
@@ -1432,19 +1947,19 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                 {/* 1-Click Verified Resume Quick-Attach */}
                                                 {effectiveProfile.resumeUrl &&
                                                     question.title.toLowerCase().includes("resume") && (
-                                                        <div className="flex items-center justify-between p-3 rounded-xl border-2 border-black bg-[#FAF6EE] shadow-[2px_2px_0px_#000]">
+                                                        <div className="flex items-center justify-between p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/70 dark:bg-neutral-900/60 shadow-sm">
                                                             <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                                                                <div className="w-8 h-8 rounded-lg bg-[#a2ff86] border border-black flex items-center justify-center shrink-0">
-                                                                    <FileText className="w-4 h-4 text-black" />
+                                                                <div className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800/60 flex items-center justify-center shrink-0">
+                                                                    <FileText className="w-4 h-4" />
                                                                 </div>
                                                                 <div className="min-w-0">
-                                                                    <p className="text-xs font-black text-black flex items-center gap-1.5">
+                                                                    <p className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 flex items-center gap-1.5">
                                                                         <span>Use Verified Orbix Resume</span>
-                                                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-semibold uppercase bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60">
                                                                             Verified
                                                                         </span>
                                                                     </p>
-                                                                    <p className="text-[11px] text-neutral-600 font-medium truncate">
+                                                                    <p className="text-[11px] text-neutral-500 font-normal truncate">
                                                                         {effectiveProfile.resumeFilename}
                                                                     </p>
                                                                 </div>
@@ -1470,21 +1985,21 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                                     setAnswer(question.id, effectiveProfile.resumeUrl!);
                                                                     toast.success("Attached verified Orbix resume!");
                                                                 }}
-                                                                className="px-3 py-1.5 rounded-xl bg-[#a2ff86] hover:bg-[#8fee72] border-2 border-black font-black text-xs text-black shadow-[2px_2px_0px_#000] cursor-pointer shrink-0 transition-transform active:translate-x-[0.5px] active:translate-y-[0.5px]"
+                                                                className="px-3.5 py-1.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-xs shadow-sm cursor-pointer shrink-0 hover:bg-neutral-800 transition-colors"
                                                             >
                                                                 Attach
                                                             </button>
                                                         </div>
                                                     )}
 
-                                                <label className="border-2 border-dashed border-black/40 hover:border-black rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer bg-neutral-50 hover:bg-neutral-100 transition-colors">
-                                                    <UploadCloud className="w-5 h-5 text-neutral-600" />
-                                                    <span className="text-xs font-black text-black">
+                                                <label className="border border-dashed border-neutral-300 dark:border-neutral-700 hover:border-neutral-900 dark:hover:border-neutral-400 rounded-xl p-4 flex flex-col items-center justify-center gap-2 cursor-pointer bg-neutral-50/70 dark:bg-neutral-900/50 hover:bg-neutral-100/70 transition-colors">
+                                                    <UploadCloud className="w-5 h-5 text-neutral-500" />
+                                                    <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">
                                                         {uploadProgress[question.id]
                                                             ? `Uploading (${uploadProgress[question.id]}%)...`
                                                             : "Select or Drop File to Upload"}
                                                     </span>
-                                                    <span className="text-[10px] text-neutral-500 font-medium">
+                                                    <span className="text-[10px] text-neutral-400 font-normal">
                                                         Max {question.validation?.maxFileSizeMb ?? 10} MB
                                                     </span>
                                                     <input
@@ -1531,7 +2046,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                                         ? Array.isArray(rowAnswers) && rowAnswers.includes(col)
                                                                         : rowAnswers === col;
 
-                                                                 const handleGridCheck = () => {
+                                                                const handleGridCheck = () => {
                                                                     const currentGridVal = { ...(val || {}) };
                                                                     if (question.type === "checkbox_grid") {
                                                                         const existingRowArr: string[] = Array.isArray(currentGridVal[row])
@@ -1583,7 +2098,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                         type={question.dateConfig?.includeTime ? "datetime-local" : "date"}
                                         value={val ?? ""}
                                         onChange={(e) => setAnswer(question.id, e.target.value)}
-                                        className="w-full text-xs sm:text-sm font-bold border-2 border-black rounded-xl p-2.5 bg-white focus:outline-none"
+                                        className="w-full text-xs sm:text-sm font-medium border border-neutral-200 dark:border-neutral-800 rounded-xl p-2.5 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-white"
                                     />
                                 )}
 
@@ -1604,11 +2119,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                             hours: e.target.value === "" ? "" : Number(e.target.value),
                                                         })
                                                     }
-                                                    className="w-16 text-center text-xs sm:text-sm font-bold border-2 border-black rounded-xl p-2.5 bg-white focus:outline-none"
+                                                    className="w-16 text-center text-xs sm:text-sm font-medium border border-neutral-200 dark:border-neutral-800 rounded-xl p-2.5 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-white"
                                                 />
-                                                <span className="text-xs font-bold text-neutral-600">hrs</span>
+                                                <span className="text-xs font-medium text-neutral-500">hrs</span>
                                             </div>
-                                            <span className="font-bold">:</span>
+                                            <span className="font-medium text-neutral-400">:</span>
                                             <div className="flex items-center gap-1.5">
                                                 <input
                                                     type="number"
@@ -1622,9 +2137,9 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                             minutes: e.target.value === "" ? "" : Number(e.target.value),
                                                         })
                                                     }
-                                                    className="w-16 text-center text-xs sm:text-sm font-bold border-2 border-black rounded-xl p-2.5 bg-white focus:outline-none"
+                                                    className="w-16 text-center text-xs sm:text-sm font-medium border border-neutral-200 dark:border-neutral-800 rounded-xl p-2.5 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-white"
                                                 />
-                                                <span className="text-xs font-bold text-neutral-600">mins</span>
+                                                <span className="text-xs font-medium text-neutral-500">mins</span>
                                             </div>
                                         </div>
                                     ) : (
@@ -1632,7 +2147,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                             type="time"
                                             value={typeof val === "string" ? val : ""}
                                             onChange={(e) => setAnswer(question.id, e.target.value)}
-                                            className="w-full text-xs sm:text-sm font-bold border-2 border-black rounded-xl p-2.5 bg-white focus:outline-none"
+                                            className="w-full text-xs sm:text-sm font-medium border border-neutral-200 dark:border-neutral-800 rounded-xl p-2.5 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-white"
                                         />
                                     )
                                 )}
@@ -1650,24 +2165,24 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 </div>
             )}
 
-            {/* Stepper Navigation Buttons */}
+            {/* Stepper Navigation Buttons (Next / Previous / Final Submission) */}
             <div className="pt-4 flex items-center justify-between gap-3">
                 {currentSecIdx > 0 ? (
                     <button
                         type="button"
                         onClick={handleBack}
                         disabled={isSubmitting}
-                        className="px-4 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 font-black text-xs text-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
+                        className="px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer transition-colors"
                     >
                         <ArrowLeft className="w-4 h-4" />
-                        <span>Back</span>
+                        <span>Previous Section</span>
                     </button>
                 ) : onCancel ? (
                     <button
                         type="button"
                         onClick={onCancel}
                         disabled={isSubmitting}
-                        className="px-4 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 font-black text-xs text-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                        className="px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-700 dark:text-neutral-300 cursor-pointer transition-colors"
                     >
                         Cancel
                     </button>
@@ -1679,24 +2194,35 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     type="button"
                     onClick={handleNext}
                     disabled={isSubmitting}
-                    className="px-6 py-2.5 rounded-xl border-2 border-black font-black text-xs text-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                    style={{ backgroundColor: accentColor }}
+                    className="px-6 py-2.5 rounded-xl bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 font-semibold text-xs text-white dark:text-black shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
                 >
                     {isSubmitting ? (
                         <>
                             <OrbixLoader size="xs" />
-                            <span>Submitting...</span>
+                            <span>Submitting registration...</span>
                         </>
                     ) : currentSecIdx === totalSections - 1 ? (
                         <span>Submit Registration</span>
                     ) : (
                         <>
-                            <span>Next</span>
+                            <span>Next Section</span>
                             <ArrowRight className="w-4 h-4" />
                         </>
                     )}
                 </button>
             </div>
+
+            {/* Clear Form Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={showClearConfirm}
+                onClose={() => setShowClearConfirm(false)}
+                onConfirm={handleClearForm}
+                title="Clear Registration Form?"
+                description="This will erase all your entered answers and attachments saved in this draft. This cannot be undone."
+                confirmText="Yes, Clear Form"
+                cancelText="Keep Editing"
+                variant="danger"
+            />
         </div>
     );
 };

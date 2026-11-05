@@ -1,7 +1,18 @@
 import crypto from "node:crypto";
 import { pool } from "../../database/client.js";
+import redis from "../../redis/client.js";
 import { assertCloudinaryConfigured, cloudinary } from "../../config/cloudinary.js";
 import { ClubTeamService } from "./clubTeamService.js";
+import { FormLogger } from "../../utils/formLogger.js";
+import { FormBackgroundQueue } from "../queue/formBackgroundQueue.js";
+import {
+    sanitizeText,
+    escapeCsvFormula,
+    validateAttachmentSecurity,
+    validateQuestionSchema,
+    sanitizeFormStructure,
+    sanitizeStudentAnswers,
+} from "../../utils/formSecuritySanitizer.js";
 import type {
     ClubEventFormRecord,
     FormStructure,
@@ -141,6 +152,7 @@ export class ClubEventFormService {
         club: any;
         studentProfile?: any;
         userResponse?: any;
+        draftResponse?: any;
         canSubmit: boolean;
         isClosed: boolean;
         closedReason?: string | undefined;
@@ -148,52 +160,87 @@ export class ClubEventFormService {
         publishedVersion?: FormVersionRecord | null;
         totalVersions: number;
     }> {
-        const eventRes = await query(
-            `SELECT e.id, e.club_id AS "clubId", e.title, e.summary, e.description,
-                    e.starts_at AS "startsAt", e.ends_at AS "endsAt", e.timezone,
-                    e.location_type AS "locationType", e.venue_or_location AS "venueOrLocation",
-                    e.status, e.capacity, e.registered_count AS "registeredCount",
-                    e.cover_image_url AS "coverImageUrl", e.eligibility,
-                    c.name AS "clubName", c.slug AS "clubSlug", c.logo_url AS "clubLogoUrl",
-                    c.college_id AS "clubCollegeId"
-             FROM club_events e
-             JOIN verified_clubs c ON c.id = e.club_id
-             WHERE e.id = $1 LIMIT 1;`,
-            [eventId]
-        );
-
-        if (!eventRes.rows[0]) {
-            const error: any = new Error("Event not found.");
-            error.statusCode = 404;
-            throw error;
+        // Fast Redis Cache Check for shared public published form metadata (Requirement 4.2)
+        const publicCacheKey = `orbix:form:public:${eventId}`;
+        let cachedShared: any = null;
+        if (redis && redis.status === "ready") {
+            try {
+                const raw = await redis.get(publicCacheKey);
+                if (raw) {
+                    cachedShared = JSON.parse(raw);
+                }
+            } catch {
+                // Ignore redis error and fall back to database
+            }
         }
 
-        const event = eventRes.rows[0];
-        const club = {
-            id: event.clubId,
-            name: event.clubName,
-            slug: event.clubSlug,
-            logoUrl: event.clubLogoUrl,
-            collegeId: event.clubCollegeId,
-        };
-
-        // Fetch form definition
-        const formRes = await query(
-            `SELECT id, event_id AS "eventId", club_id AS "clubId", created_by AS "createdBy",
-                    title, description, status, current_draft_version_id AS "currentDraftVersionId",
-                    published_version_id AS "publishedVersionId", header_image_url AS "headerImageUrl",
-                    header_image_public_id AS "headerImagePublicId", theme_settings AS "themeSettings",
-                    settings, default_settings AS "defaultSettings", structure,
-                    is_published AS "isPublished", version_count AS "versionCount",
-                    schema_version AS "schemaVersion", created_at AS "createdAt",
-                    updated_at AS "updatedAt", published_at AS "publishedAt"
-             FROM club_event_forms
-             WHERE event_id = $1 LIMIT 1;`,
-            [eventId]
-        );
-
-        let form: ClubEventFormRecord;
+        let form: ClubEventFormRecord = null as any;
         let isNew = false;
+        let event: any = null;
+        let club: any = null;
+        let registeredCount = 0;
+        let publishedVersion: FormVersionRecord | null = null;
+        let totalVersions = 1;
+        let canSubmit = true;
+        let isClosed = false;
+        let closedReason: string | undefined = undefined;
+
+        if (cachedShared) {
+            form = cachedShared.form;
+            isNew = cachedShared.isNew;
+            event = cachedShared.event;
+            club = cachedShared.club;
+            registeredCount = cachedShared.registeredCount;
+            publishedVersion = cachedShared.publishedVersion;
+            totalVersions = cachedShared.totalVersions;
+            canSubmit = cachedShared.canSubmit;
+            isClosed = cachedShared.isClosed;
+            closedReason = cachedShared.closedReason;
+            FormLogger.info("CACHE_HIT", "Public form schema served from Redis cache", { eventId });
+        } else {
+            const eventRes = await query(
+                `SELECT e.id, e.club_id AS "clubId", e.title, e.summary, e.description,
+                        e.starts_at AS "startsAt", e.ends_at AS "endsAt", e.timezone,
+                        e.location_type AS "locationType", e.venue_or_location AS "venueOrLocation",
+                        e.status, e.capacity, e.registered_count AS "registeredCount",
+                        e.cover_image_url AS "coverImageUrl", e.eligibility,
+                        c.name AS "clubName", c.slug AS "clubSlug", c.logo_url AS "clubLogoUrl",
+                        c.college_id AS "clubCollegeId"
+                 FROM club_events e
+                 JOIN verified_clubs c ON c.id = e.club_id
+                 WHERE e.id = $1 LIMIT 1;`,
+                [eventId]
+            );
+
+            if (!eventRes.rows[0]) {
+                const error: any = new Error("Event not found.");
+                error.statusCode = 404;
+                throw error;
+            }
+
+            event = eventRes.rows[0];
+            club = {
+                id: event.clubId,
+                name: event.clubName,
+                slug: event.clubSlug,
+                logoUrl: event.clubLogoUrl,
+                collegeId: event.clubCollegeId,
+            };
+
+            // Fetch form definition
+            const formRes = await query(
+                `SELECT id, event_id AS "eventId", club_id AS "clubId", created_by AS "createdBy",
+                        title, description, status, current_draft_version_id AS "currentDraftVersionId",
+                        published_version_id AS "publishedVersionId", header_image_url AS "headerImageUrl",
+                        header_image_public_id AS "headerImagePublicId", theme_settings AS "themeSettings",
+                        settings, default_settings AS "defaultSettings", structure,
+                        is_published AS "isPublished", version_count AS "versionCount",
+                        schema_version AS "schemaVersion", created_at AS "createdAt",
+                        updated_at AS "updatedAt", published_at AS "publishedAt"
+                 FROM club_event_forms
+                 WHERE event_id = $1 LIMIT 1;`,
+                [eventId]
+            );
 
         const defaultFormSettings: FormSettings = {
             isOpen: true,
@@ -246,7 +293,6 @@ export class ClubEventFormService {
         }
 
         // Fetch published version snapshot if exists
-        let publishedVersion: FormVersionRecord | null = null;
         if (form.publishedVersionId) {
             const versionRes = await query(
                 `SELECT id, form_id AS "formId", event_id AS "eventId", version_number AS "versionNumber",
@@ -269,7 +315,7 @@ export class ClubEventFormService {
             `SELECT COUNT(*)::int AS count FROM club_event_form_versions WHERE event_id = $1;`,
             [eventId]
         );
-        const totalVersions = totalVersionsRes.rows[0]?.count || 0;
+        totalVersions = totalVersionsRes.rows[0]?.count || 0;
 
         // Count current registrations
         const countRes = await query(
@@ -278,12 +324,9 @@ export class ClubEventFormService {
              WHERE event_id = $1 AND status NOT IN ('cancelled', 'rejected');`,
             [eventId]
         );
-        const registeredCount = countRes.rows[0]?.count || 0;
+        registeredCount = countRes.rows[0]?.count || 0;
 
         // Check if closed
-        let isClosed = false;
-        let closedReason: string | undefined;
-
         if (event.status === "completed" || event.status === "cancelled") {
             isClosed = true;
             closedReason = `This event is ${event.status}.`;
@@ -299,10 +342,12 @@ export class ClubEventFormService {
             closedReason = "Registration limit has been reached for this event.";
         }
 
+        canSubmit = !isClosed;
+        } // End of if (!cachedShared) DB fetch block
+
         // Check user's existing registration and verified student identity if logged in
         let userResponse: any = null;
         let studentProfile: any = null;
-        let canSubmit = !isClosed;
         let isStaff = false;
 
         if (userId) {
@@ -420,20 +465,62 @@ export class ClubEventFormService {
             }
         }
 
+        // Fetch student's in-progress response draft if authenticated and has no submitted response
+        let draftResponse: any = null;
+        if (userId && !userResponse) {
+            try {
+                const draftRes = await query(
+                    `SELECT answers, file_attachments AS "fileAttachments",
+                            current_section_index AS "currentSectionIndex",
+                            section_history AS "sectionHistory",
+                            form_version_id AS "formVersionId",
+                            updated_at AS "updatedAt"
+                     FROM club_event_response_drafts
+                     WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
+                    [eventId, userId]
+                );
+                if (draftRes.rows[0]) {
+                    draftResponse = draftRes.rows[0];
+                }
+            } catch (draftErr) {
+                console.warn("[getFormForEvent] Could not query student draft:", draftErr);
+            }
+        }
+
+        // Student Access Control: Never expose unpublished form structure to non-staff students (Phase 5)
+        let sanitizedForm: ClubEventFormRecord = { ...form };
+        if (!isStaff && sanitizedForm.status !== "published" && !publishedVersion) {
+            canSubmit = false;
+            isClosed = true;
+            closedReason = form.settings?.closedMessage || "Registration is not published or currently unavailable.";
+            sanitizedForm = {
+                ...sanitizedForm,
+                structure: { sections: [] },
+            };
+        }
+
+        // Student Eligibility Restriction: Enforce same-college only when configured
+        if (!isStaff && event.eligibility && event.eligibility === "same_college_only" && studentProfile?.collegeId && club.collegeId) {
+            if (studentProfile.collegeId !== club.collegeId) {
+                canSubmit = false;
+                isClosed = true;
+                closedReason = `Eligibility restriction: This event is only open to students of ${club.collegeName || "the host institution"}.`;
+            }
+        }
+
         // Sanitize Quiz Answer Keys for Students: Never expose answers before release
         // Club staff always have full access to answer keys for editing and grading
-        let sanitizedForm = form;
         const isQuiz = Boolean(form.settings.quiz?.isQuiz);
         const gradesReleased = Boolean(userResponse?.quizGradesReleased);
 
-        if (!isStaff && isQuiz && !gradesReleased && form.structure?.sections) {
+        if (!isStaff && isQuiz && !gradesReleased && sanitizedForm.structure?.sections) {
             sanitizedForm = {
-                ...form,
+                ...sanitizedForm,
                 structure: {
-                    ...form.structure,
-                    sections: form.structure.sections.map((sec) => ({
+                    ...sanitizedForm.structure,
+                    sections: sanitizedForm.structure.sections.map((sec: FormSection) => ({
                         ...sec,
-                        questions: sec.questions.map((q) => {
+                        questions: (sec.questions || []).map((q: FormQuestion) => {
                             const sanitizedQ: any = { ...q };
                             delete sanitizedQ.correctAnswers;
                             delete sanitizedQ.answerExplanation;
@@ -445,6 +532,29 @@ export class ClubEventFormService {
             };
         }
 
+        // Cache public published form metadata in Redis (Requirement 4.2)
+        // Public cache strictly excludes studentProfile, userResponse, or draftResponse
+        if (!cachedShared && redis && redis.status === "ready" && (sanitizedForm.status === "published" || publishedVersion)) {
+            try {
+                const publicSharedData = {
+                    form: sanitizedForm,
+                    isNew,
+                    event,
+                    club,
+                    canSubmit,
+                    isClosed,
+                    closedReason,
+                    registeredCount,
+                    publishedVersion,
+                    totalVersions,
+                };
+                await redis.set(publicCacheKey, JSON.stringify(publicSharedData), "EX", 300);
+                FormLogger.info("CACHE_MISS", "Cached published form schema in Redis", { eventId });
+            } catch {
+                // Ignore cache write error
+            }
+        }
+
         return {
             form: sanitizedForm,
             isNew,
@@ -452,6 +562,7 @@ export class ClubEventFormService {
             club,
             studentProfile,
             userResponse,
+            draftResponse,
             canSubmit,
             isClosed,
             closedReason,
@@ -594,9 +705,24 @@ export class ClubEventFormService {
             }
         }
 
-        const validatedStructure = this.sanitizeStructure(payload.structure, evCheck.rows[0].title);
-        const title = payload.title?.trim() || `${evCheck.rows[0].title} — Registration`;
-        const description = payload.description !== undefined ? payload.description : null;
+        // Dynamic Question Schema Validation: Ensure all questions comply with allowed types and constraints
+        if (payload.structure?.sections) {
+            for (const sec of payload.structure.sections) {
+                for (const q of sec.questions || []) {
+                    const validation = validateQuestionSchema(q);
+                    if (!validation.valid) {
+                        const error: any = new Error(validation.error || "Invalid dynamic question schema.");
+                        error.statusCode = 400;
+                        throw error;
+                    }
+                }
+            }
+        }
+
+        const rawStructure = this.sanitizeStructure(payload.structure, evCheck.rows[0].title);
+        const validatedStructure = sanitizeFormStructure(rawStructure);
+        const title = sanitizeText(payload.title?.trim() || `${evCheck.rows[0].title} — Registration`, 200);
+        const description = payload.description !== undefined && payload.description !== null ? sanitizeText(payload.description, 2000) : null;
         const headerImageUrl = payload.headerImageUrl !== undefined ? payload.headerImageUrl : null;
         const headerImagePublicId = payload.headerImagePublicId !== undefined ? payload.headerImagePublicId : null;
 
@@ -930,13 +1056,33 @@ export class ClubEventFormService {
 
             await client.query("COMMIT;");
 
+            // Invalidate Redis cached public form metadata (Requirement 4.2)
+            if (redis && redis.status === "ready") {
+                await redis.del(`orbix:form:public:${eventId}`);
+                FormLogger.info("CACHE_INVALIDATED", `Form Version ${newVersion.versionNumber} published - cache cleared`, {
+                    eventId,
+                    clubId,
+                    userId,
+                });
+            }
+
             return {
                 success: true,
                 version: newVersion,
                 form: formUpdate.rows[0],
             };
-        } catch (err) {
+        } catch (err: any) {
             await client.query("ROLLBACK;");
+            FormLogger.error(
+                "FORM_PUBLISH_ERROR",
+                "Failed to publish form version",
+                {
+                    eventId,
+                    userId,
+                    meta: { error: err.message },
+                },
+                err
+            );
             throw err;
         } finally {
             client.release();
@@ -977,6 +1123,10 @@ export class ClubEventFormService {
                 eventId,
             ]
         );
+
+        if (redis && redis.status === "ready") {
+            await redis.del(`orbix:form:public:${eventId}`);
+        }
 
         return res.rows[0];
     }
@@ -1029,6 +1179,10 @@ export class ClubEventFormService {
                 eventId,
             ]
         );
+
+        if (redis && redis.status === "ready") {
+            await redis.del(`orbix:form:public:${eventId}`);
+        }
 
         return updated.rows[0];
     }
@@ -1269,6 +1423,417 @@ export class ClubEventFormService {
     }
 
     /**
+     * Phase 6.1 Question Library: Retrieve questions from club's previous events for reuse
+     */
+    static async getClubQuestionLibrary(eventId: string, userId: string): Promise<{
+        success: boolean;
+        library: Array<{
+            eventId: string;
+            eventTitle: string;
+            formTitle: string;
+            createdAt: string;
+            sectionsCount: number;
+            questions: FormQuestion[];
+        }>;
+    }> {
+        const evCheck = await query(`SELECT club_id AS "clubId" FROM club_events WHERE id = $1;`, [eventId]);
+        if (!evCheck.rows[0]) {
+            const error: any = new Error("Event not found.");
+            error.statusCode = 404;
+            throw error;
+        }
+        const clubId = evCheck.rows[0].clubId;
+        await this.assertStaffAccess(userId, clubId);
+
+        const listRes = await query(
+            `SELECT e.id AS "eventId", e.title AS "eventTitle", e.created_at AS "createdAt",
+                    f.title AS "formTitle",
+                    COALESCE(v.structure, f.structure) AS structure
+             FROM club_events e
+             JOIN club_event_forms f ON f.event_id = e.id
+             LEFT JOIN club_event_form_versions v ON v.id = f.published_version_id
+             WHERE e.club_id = $1 AND e.id != $2
+             ORDER BY e.created_at DESC
+             LIMIT 30;`,
+            [clubId, eventId]
+        );
+
+        const library = listRes.rows.map((row) => {
+            const structure: FormStructure = row.structure || { sections: [] };
+            const questions: FormQuestion[] = [];
+            (structure.sections || []).forEach((sec) => {
+                (sec.questions || []).forEach((q) => {
+                    if (q.type !== "image_card" && q.type !== "markdown_card") {
+                        questions.push(q);
+                    }
+                });
+            });
+            return {
+                eventId: row.eventId,
+                eventTitle: row.eventTitle,
+                formTitle: row.formTitle || row.eventTitle,
+                createdAt: row.createdAt,
+                sectionsCount: (structure.sections || []).length,
+                questions,
+            };
+        }).filter((item) => item.questions.length > 0);
+
+        return { success: true, library };
+    }
+
+    /**
+     * Phase 6.3 AI-Assisted Form Creation: Suggest questionnaire based on event description & prompt
+     */
+    static async aiSuggestQuestions(
+        eventId: string,
+        userId: string,
+        payload: { prompt?: string; eventType?: string; eventDescription?: string }
+    ): Promise<{
+        success: boolean;
+        suggestedQuestions: FormQuestion[];
+        generatedBy: "gemini" | "deterministic-engine";
+        summary: string;
+    }> {
+        const evCheck = await query(`SELECT club_id AS "clubId", title, summary, starts_at AS "startsAt" FROM club_events WHERE id = $1;`, [eventId]);
+        if (!evCheck.rows[0]) {
+            const error: any = new Error("Event not found.");
+            error.statusCode = 404;
+            throw error;
+        }
+        await this.assertStaffAccess(userId, evCheck.rows[0].clubId);
+
+        const event = evCheck.rows[0];
+        const eventTitle = event.title || "Campus Event";
+        const eventSummary = payload.eventDescription || event.summary || "";
+        const userPrompt = payload.prompt || `Generate questions for ${eventTitle}`;
+
+        const apiKey = process.env.GEMINI_API_KEY;
+        let generatedQuestions: FormQuestion[] = [];
+        let generatedBy: "gemini" | "deterministic-engine" = "deterministic-engine";
+        let summary = "Questions generated tailored to your event requirements.";
+
+        if (apiKey) {
+            try {
+                const systemPrompt = `You are an expert event organizer assistant for Orbix, a campus club event management platform.
+Your task is to generate relevant, high-quality, practical registration questionnaire items based on the event description or user prompt.
+Respond with a STRICT JSON array of question objects matching this schema:
+[
+  {
+    "title": string,
+    "description": string,
+    "type": "short_answer" | "paragraph" | "multiple_choice" | "checkboxes" | "dropdown" | "linear_scale" | "file_upload" | "date" | "time",
+    "required": boolean,
+    "options": [{ "text": string }],
+    "scaleConfig": { "min": 1, "max": 5, "minLabel": "Beginner", "maxLabel": "Advanced" }
+  }
+]
+Do not output markdown code blocks, backticks, or any conversational text. Return between 4 and 8 tailored questions.`;
+
+                const promptText = `Event Title: ${eventTitle}
+Event Description: ${eventSummary}
+Organizer Request: ${userPrompt}`;
+
+                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+                const res = await fetch(endpoint, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        system_instruction: { parts: [{ text: systemPrompt }] },
+                        contents: [{ parts: [{ text: promptText }] }],
+                        generationConfig: {
+                            response_mime_type: "application/json",
+                            temperature: 0.3,
+                        },
+                    }),
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+                    if (text) {
+                        const parsed = JSON.parse(text);
+                        if (Array.isArray(parsed) && parsed.length > 0) {
+                            generatedQuestions = parsed.map((item: any) => ({
+                                id: generateStableId("q"),
+                                type: item.type || "short_answer",
+                                title: item.title || "Custom Question",
+                                description: item.description || undefined,
+                                required: Boolean(item.required),
+                                options: Array.isArray(item.options)
+                                    ? item.options.map((opt: any) => ({
+                                          id: generateStableId("opt"),
+                                          text: typeof opt === "string" ? opt : (opt.text || "Option"),
+                                      }))
+                                    : undefined,
+                                scaleConfig: item.scaleConfig || undefined,
+                            }));
+                            generatedBy = "gemini";
+                            summary = `Gemini AI generated ${generatedQuestions.length} tailored questions for "${eventTitle}".`;
+                        }
+                    }
+                }
+            } catch (aiErr) {
+                console.warn("[aiSuggestQuestions] Gemini call failed, falling back to deterministic generator:", aiErr);
+            }
+        }
+
+        // Resilient Fallback Engine if Gemini is unavailable or not configured
+        if (generatedQuestions.length === 0) {
+            generatedQuestions = ClubEventFormService.generateDeterministicFallbackQuestions(eventTitle, userPrompt);
+            generatedBy = "deterministic-engine";
+            summary = `Deterministic template engine generated ${generatedQuestions.length} tailored questions for "${eventTitle}".`;
+        }
+
+        return {
+            success: true,
+            suggestedQuestions: generatedQuestions,
+            generatedBy,
+            summary,
+        };
+    }
+
+    /**
+     * Resilient deterministic fallback generator when AI API key is not present or offline (Phase 6.3)
+     */
+    static generateDeterministicFallbackQuestions(eventTitle: string, promptText: string): FormQuestion[] {
+        const lower = `${eventTitle} ${promptText}`.toLowerCase();
+
+        if (lower.includes("hackathon") || lower.includes("hack")) {
+            return [
+                {
+                    id: generateStableId("q"),
+                    type: "multiple_choice",
+                    title: "Participation Track",
+                    description: "Select the primary challenge theme your project will target.",
+                    required: true,
+                    options: [
+                        { id: generateStableId("opt"), text: "AI & Autonomous Agents" },
+                        { id: generateStableId("opt"), text: "Web3 & Decentralized Apps" },
+                        { id: generateStableId("opt"), text: "FinTech & Open Banking" },
+                        { id: generateStableId("opt"), text: "Healthcare & MedTech" },
+                        { id: generateStableId("opt"), text: "Open Innovation Track" },
+                    ],
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "checkboxes",
+                    title: "Core Technical Stack",
+                    description: "Select frameworks and languages you intend to build with.",
+                    required: true,
+                    options: [
+                        { id: generateStableId("opt"), text: "React / Next.js / TypeScript" },
+                        { id: generateStableId("opt"), text: "Python / FastAPI / PyTorch" },
+                        { id: generateStableId("opt"), text: "Node.js / Express / PostgreSQL" },
+                        { id: generateStableId("opt"), text: "Flutter / React Native" },
+                        { id: generateStableId("opt"), text: "Go / Rust / Systems" },
+                        { id: generateStableId("opt"), text: "Cloud / Docker / Kubernetes" },
+                    ],
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "short_answer",
+                    title: "GitHub or Portfolio URL",
+                    description: "Share a link showcasing your code, repositories, or previous hacks.",
+                    required: false,
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "multiple_choice",
+                    title: "Team Registration Status",
+                    description: "Are you applying with a pre-formed team or seeking teammates?",
+                    required: true,
+                    options: [
+                        { id: generateStableId("opt"), text: "Registered Team Lead (Registering team)" },
+                        { id: generateStableId("opt"), text: "Team Member (Joining an existing team)" },
+                        { id: generateStableId("opt"), text: "Solo Hacker (Seeking a team at mixer)" },
+                        { id: generateStableId("opt"), text: "Solo Hacker (Building independently)" },
+                    ],
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "dropdown",
+                    title: "T-Shirt Size & Logistics",
+                    description: "For hackathon kit distribution.",
+                    required: true,
+                    options: [
+                        { id: generateStableId("opt"), text: "Small (S)" },
+                        { id: generateStableId("opt"), text: "Medium (M)" },
+                        { id: generateStableId("opt"), text: "Large (L)" },
+                        { id: generateStableId("opt"), text: "Extra Large (XL)" },
+                        { id: generateStableId("opt"), text: "Double Extra Large (XXL)" },
+                    ],
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "paragraph",
+                    title: "Preliminary Project Pitch / Concept",
+                    description: "A brief 2-3 sentence overview of the problem you aim to solve.",
+                    required: false,
+                },
+            ];
+        }
+
+        if (lower.includes("workshop") || lower.includes("bootcamp") || lower.includes("hands-on")) {
+            return [
+                {
+                    id: generateStableId("q"),
+                    type: "linear_scale",
+                    title: "Current Topic Familiarity",
+                    description: "Rate your existing experience with the subject matter.",
+                    required: true,
+                    scaleConfig: { min: 1, max: 5, minLabel: "Absolute Beginner", maxLabel: "Proficient" },
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "multiple_choice",
+                    title: "Primary Laptop Operating System",
+                    description: "Helps instructors verify prerequisite commands.",
+                    required: true,
+                    options: [
+                        { id: generateStableId("opt"), text: "macOS (Apple Silicon / Intel)" },
+                        { id: generateStableId("opt"), text: "Windows 11 / WSL2" },
+                        { id: generateStableId("opt"), text: "Linux (Ubuntu / Fedora / Arch)" },
+                    ],
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "checkboxes",
+                    title: "Prerequisite Software Setup",
+                    description: "Check all items already installed on your device.",
+                    required: true,
+                    options: [
+                        { id: generateStableId("opt"), text: "Git & GitHub CLI installed" },
+                        { id: generateStableId("opt"), text: "Node.js v20+ or Python 3.11+" },
+                        { id: generateStableId("opt"), text: "Visual Studio Code or Cursor" },
+                        { id: generateStableId("opt"), text: "Docker Desktop installed" },
+                    ],
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "paragraph",
+                    title: "What is your main goal for this workshop?",
+                    description: "What project or practical capability do you want to achieve?",
+                    required: true,
+                },
+            ];
+        }
+
+        if (lower.includes("competition") || lower.includes("contest") || lower.includes("cp") || lower.includes("coding")) {
+            return [
+                {
+                    id: generateStableId("q"),
+                    type: "short_answer",
+                    title: "Competitive Programming Profile",
+                    description: "LeetCode, Codeforces, or CodeChef username/handle.",
+                    required: true,
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "dropdown",
+                    title: "Primary Contest Language",
+                    description: "Select your preferred submission compiler.",
+                    required: true,
+                    options: [
+                        { id: generateStableId("opt"), text: "C++ (GCC 14 / C++20)" },
+                        { id: generateStableId("opt"), text: "Java (OpenJDK 21)" },
+                        { id: generateStableId("opt"), text: "Python (PyPy 3.10)" },
+                        { id: generateStableId("opt"), text: "Rust (Edition 2021)" },
+                    ],
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "multiple_choice",
+                    title: "Experience Tier",
+                    description: "Select your bracket level.",
+                    required: true,
+                    options: [
+                        { id: generateStableId("opt"), text: "Novice Bracket (First year / beginners)" },
+                        { id: generateStableId("opt"), text: "Intermediate Bracket" },
+                        { id: generateStableId("opt"), text: "Grandmaster / Open Bracket" },
+                    ],
+                },
+            ];
+        }
+
+        if (lower.includes("recruit") || lower.includes("hiring") || lower.includes("team") || lower.includes("induction")) {
+            return [
+                {
+                    id: generateStableId("q"),
+                    type: "multiple_choice",
+                    title: "Primary Department Preference",
+                    description: "Choose the wing of the club you are most eager to join.",
+                    required: true,
+                    options: [
+                        { id: generateStableId("opt"), text: "Technical & Software Engineering" },
+                        { id: generateStableId("opt"), text: "UI/UX & Creative Graphic Design" },
+                        { id: generateStableId("opt"), text: "Event Logistics & Stage Management" },
+                        { id: generateStableId("opt"), text: "Corporate Relations, PR & Sponsorship" },
+                        { id: generateStableId("opt"), text: "Media, Content & Social Strategy" },
+                    ],
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "paragraph",
+                    title: "Why do you want to join our organization?",
+                    description: "Share your motivation, relevant skills, and expectations.",
+                    required: true,
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "short_answer",
+                    title: "Portfolio, GitHub, or LinkedIn URL",
+                    description: "Provide a link highlighting your previous projects or work.",
+                    required: false,
+                },
+                {
+                    id: generateStableId("q"),
+                    type: "multiple_choice",
+                    title: "Weekly Time Commitment",
+                    description: "How many hours per week can you actively dedicate?",
+                    required: true,
+                    options: [
+                        { id: generateStableId("opt"), text: "3 to 5 hours / week" },
+                        { id: generateStableId("opt"), text: "6 to 10 hours / week" },
+                        { id: generateStableId("opt"), text: "10+ hours / week" },
+                    ],
+                },
+            ];
+        }
+
+        // Standard Default Event Questionnaire
+        return [
+            {
+                id: generateStableId("q"),
+                type: "multiple_choice",
+                title: "How did you find out about this event?",
+                description: "Help us understand our most effective outreach channels.",
+                required: false,
+                options: [
+                    { id: generateStableId("opt"), text: "Campus WhatsApp & Discord Channels" },
+                    { id: generateStableId("opt"), text: "Instagram Story & Club Page" },
+                    { id: generateStableId("opt"), text: "Campus Posters & Notice Boards" },
+                    { id: generateStableId("opt"), text: "Classmate / Peer Recommendation" },
+                ],
+            },
+            {
+                id: generateStableId("q"),
+                type: "linear_scale",
+                title: "Familiarity with Event Agenda",
+                description: "Rate your background knowledge.",
+                required: false,
+                scaleConfig: { min: 1, max: 5, minLabel: "Introductory", maxLabel: "Expert" },
+            },
+            {
+                id: generateStableId("q"),
+                type: "paragraph",
+                title: "Specific Questions or Expectations",
+                description: "What would you like the organizers to address during the session?",
+                required: false,
+            },
+        ];
+    }
+
+    /**
      * List all immutable form versions for an event
      */
     static async getFormVersions(eventId: string, userId: string): Promise<{
@@ -1392,6 +1957,17 @@ export class ClubEventFormService {
         purpose: "banner" | "question" | "attachment",
         options?: { questionId?: string; fileType?: string }
     ) {
+        // Enforce club staff authorization for form banners and question images
+        if (purpose === "banner" || purpose === "question") {
+            const evCheck = await query(`SELECT club_id AS "clubId" FROM club_events WHERE id = $1 LIMIT 1;`, [eventId]);
+            if (!evCheck.rows[0]) {
+                const error: any = new Error("Event not found.");
+                error.statusCode = 404;
+                throw error;
+            }
+            await this.assertStaffAccess(userId, evCheck.rows[0].clubId);
+        }
+
         const { cloudName, apiKey, apiSecret } = assertCloudinaryConfigured();
         const timestamp = Math.round(new Date().getTime() / 1000);
 
@@ -1555,23 +2131,35 @@ export class ClubEventFormService {
                 throw error;
             }
 
-            // Atomic Capacity Check
+            // Atomic Capacity Check (Requirement 4.3)
             const countRes = await client.query(
                 `SELECT COUNT(*)::int AS count
                  FROM club_event_registrations
                  WHERE event_id = $1 AND status NOT IN ('cancelled', 'rejected');`,
                 [eventId]
             );
-            const currentCount = countRes.rows[0]?.count || 0;
+            const currentCount = Math.max(countRes.rows[0]?.count || 0, event.registeredCount || 0);
 
-            const maxResponsesCap = formSettings.responses?.maxResponses ?? formSettings.maxResponses;
-            if (maxResponsesCap !== null && maxResponsesCap > 0 && currentCount >= maxResponsesCap) {
+            const maxResponsesCap = formSettings.responses?.maxResponses ?? formSettings.maxResponses ?? event.capacity;
+            if (maxResponsesCap !== null && maxResponsesCap !== undefined && maxResponsesCap > 0 && currentCount >= maxResponsesCap) {
+                FormLogger.warn("CAPACITY_CONFLICT", "Registration attempt rejected: event capacity limit reached", {
+                    eventId,
+                    clubId: event.clubId,
+                    userId,
+                    meta: { currentCount, capacity: maxResponsesCap },
+                });
                 const error: any = new Error("Registration limit has been reached for this event.");
                 error.statusCode = 409;
                 throw error;
             }
 
             if (event.capacity && currentCount >= event.capacity) {
+                FormLogger.warn("CAPACITY_CONFLICT", "Registration attempt rejected: venue capacity reached", {
+                    eventId,
+                    clubId: event.clubId,
+                    userId,
+                    meta: { currentCount, capacity: event.capacity },
+                });
                 const error: any = new Error("Event venue / participation capacity has been reached.");
                 error.statusCode = 409;
                 throw error;
@@ -1604,9 +2192,48 @@ export class ClubEventFormService {
             }
 
             // 5. Server-Side Schema Validation against the Published Version
+            if (!formRow?.publishedVersionId && !formRow?.isPublished) {
+                const error: any = new Error("Registration is currently closed: This form has not been published yet.");
+                error.statusCode = 403;
+                throw error;
+            }
+
             const activeStructure: FormStructure = formRow?.publishedStructure || formRow?.draftStructure || { sections: [] };
-            const answers = payload.answers || {};
+            const rawAnswers = payload.answers || {};
+            const answers = sanitizeStudentAnswers(rawAnswers);
             const fileAttachments = payload.fileAttachments || [];
+
+            // Validate file attachment security, MIME restrictions, size limits, and Cloudinary upload ownership (Phase 5)
+            for (const att of fileAttachments) {
+                const matchingQ = (activeStructure.sections || [])
+                    .flatMap((s) => s.questions || [])
+                    .find((q) => q.id === att.questionId);
+                const allowedTypes = matchingQ?.validation?.allowedFileTypes;
+
+                const secValidation = validateAttachmentSecurity(att, allowedTypes);
+                if (!secValidation.valid) {
+                    const error: any = new Error(secValidation.error || `Invalid file attachment "${att.fileName}".`);
+                    error.statusCode = 400;
+                    throw error;
+                }
+
+                // Enforce Cloudinary upload ownership path for authenticated student
+                if (att.filePublicId && att.filePublicId !== "verified_profile_resume" && userId) {
+                    const expectedPrefix = `orbix/forms/${eventId}/attachments/${userId}`;
+                    if (!att.filePublicId.startsWith(expectedPrefix)) {
+                        const assetCheck = await client.query(
+                            `SELECT id FROM club_form_media_assets
+                             WHERE public_id = $1 AND uploader_user_id = $2 LIMIT 1;`,
+                            [att.filePublicId, userId]
+                        );
+                        if (!assetCheck.rows[0]) {
+                            const error: any = new Error(`Unauthorized file upload metadata for "${att.fileName}".`);
+                            error.statusCode = 403;
+                            throw error;
+                        }
+                    }
+                }
+            }
 
             for (const section of activeStructure.sections || []) {
                 for (const question of section.questions || []) {
@@ -1856,9 +2483,21 @@ export class ClubEventFormService {
                     }
 
                     if (currentStatus === "registered" || currentStatus === "attended" || currentStatus === "pending") {
-                        if (!formSettings.allowEditResponse) {
-                            const error: any = new Error("You have already submitted a response for this event.");
+                        const canEdit = Boolean(
+                            formSettings.allowEditResponse ||
+                            (formSettings as any).allowEditResponses ||
+                            formSettings.responses?.allowEditResponse ||
+                            (formSettings.responses as any)?.allowEditResponses
+                        );
+                        if (!canEdit) {
+                            const error: any = new Error("You have already submitted a response for this event. Response editing is not permitted.");
                             error.statusCode = 409;
+                            throw error;
+                        }
+
+                        if (event.startsAt && new Date(event.startsAt).getTime() < Date.now()) {
+                            const error: any = new Error("Response editing is not permitted once the event has started.");
+                            error.statusCode = 403;
                             throw error;
                         }
 
@@ -1886,6 +2525,10 @@ export class ClubEventFormService {
                                  updated_at = NOW()
                              WHERE id = $17
                              RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode",
+                                       applicant_name AS "applicantName", applicant_email AS "applicantEmail",
+                                       department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
+                                       phone_number AS "phoneNumber", answers, file_attachments AS "fileAttachments", notes,
+                                       form_version_id AS "formVersionId",
                                        quiz_score AS "quizScore", quiz_max_score AS "quizMaxScore",
                                        quiz_graded_answers AS "quizGradedAnswers", quiz_grades_released AS "quizGradesReleased",
                                        registered_at AS "registeredAt";`,
@@ -1965,6 +2608,10 @@ export class ClubEventFormService {
                                  updated_at = NOW()
                              WHERE id = $17
                              RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode",
+                                       applicant_name AS "applicantName", applicant_email AS "applicantEmail",
+                                       department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
+                                       phone_number AS "phoneNumber", answers, file_attachments AS "fileAttachments", notes,
+                                       form_version_id AS "formVersionId",
                                        quiz_score AS "quizScore", quiz_max_score AS "quizMaxScore",
                                        quiz_graded_answers AS "quizGradedAnswers", quiz_grades_released AS "quizGradesReleased",
                                        registered_at AS "registeredAt";`,
@@ -1998,6 +2645,19 @@ export class ClubEventFormService {
                         };
                     }
                 }
+            } else if (applicantEmail && (formSettings.limitOneResponse || formSettings.responses?.limitOneResponse)) {
+                // For non-authenticated submissions, enforce single submission per email
+                const existingEmailReg = await client.query(
+                    `SELECT id, status FROM club_event_registrations
+                     WHERE event_id = $1 AND LOWER(applicant_email) = LOWER($2)
+                     AND status NOT IN ('cancelled', 'rejected') LIMIT 1;`,
+                    [eventId, applicantEmail.trim()]
+                );
+                if (existingEmailReg.rows[0]) {
+                    const error: any = new Error("A registration has already been submitted with this email address.");
+                    error.statusCode = 409;
+                    throw error;
+                }
             }
 
             // 7. Insert new registration record
@@ -2030,6 +2690,10 @@ export class ClubEventFormService {
                     updated_at
                 ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10, $11, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW(), NOW(), NOW())
                 RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode",
+                          applicant_name AS "applicantName", applicant_email AS "applicantEmail",
+                          department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
+                          phone_number AS "phoneNumber", answers, file_attachments AS "fileAttachments", notes,
+                          form_version_id AS "formVersionId",
                           quiz_score AS "quizScore", quiz_max_score AS "quizMaxScore",
                           quiz_graded_answers AS "quizGradedAnswers", quiz_grades_released AS "quizGradesReleased",
                           registered_at AS "registeredAt";`,
@@ -2088,13 +2752,177 @@ export class ClubEventFormService {
                 );
             }
 
+            // Remove unfinished autosave draft on successful submission
+            if (userId) {
+                try {
+                    await client.query(
+                        `DELETE FROM club_event_response_drafts WHERE event_id = $1 AND user_id = $2;`,
+                        [eventId, userId]
+                    );
+                } catch (draftCleanErr) {
+                    console.warn("Could not clean up student response draft:", draftCleanErr);
+                }
+            }
+
+            // Atomically increment registered_count with strict capacity check (Requirement 4.3)
+            const capUpdate = await client.query(
+                `UPDATE club_events
+                 SET registered_count = registered_count + 1
+                 WHERE id = $1
+                   AND ($2::int IS NULL OR $2::int <= 0 OR registered_count < $2::int)
+                 RETURNING registered_count;`,
+                [eventId, maxResponsesCap]
+            );
+
+            if (!capUpdate.rows[0]) {
+                FormLogger.warn("CAPACITY_CONFLICT", "Atomic capacity guard triggered: event capacity was filled during transaction", {
+                    eventId,
+                    clubId: event.clubId,
+                    userId,
+                    meta: { capacity: maxResponsesCap },
+                });
+                const error: any = new Error("Event capacity was just filled. No seats remaining.");
+                error.statusCode = 409;
+                throw error;
+            }
+
             await client.query("COMMIT;");
+
+            // Invalidate Redis cached public form metadata (Requirement 4.2)
+            if (redis && redis.status === "ready") {
+                await redis.del(`orbix:form:public:${eventId}`);
+            }
+
+            // Enqueue background notifications & analytics cache refresh (Requirement 4.5)
+            await FormBackgroundQueue.enqueue(
+                "DISPATCH_NOTIFICATIONS",
+                eventId,
+                {
+                    eventId,
+                    eventTitle: String(event.title || "Event"),
+                    clubId: String(event.clubId),
+                    userId: userId || undefined,
+                    applicantName: String(newReg.applicantName || "Student"),
+                    applicantEmail: String(newReg.applicantEmail || ""),
+                    ticketCode: newReg.ticketCode || undefined,
+                    registrationId: String(newReg.id),
+                    status: String(newReg.status),
+                },
+                { clubId: String(event.clubId), userId }
+            );
+
+            await FormBackgroundQueue.enqueue(
+                "INVALIDATE_ANALYTICS_CACHE",
+                eventId,
+                {},
+                { clubId: String(event.clubId), userId }
+            );
+
+            FormLogger.info("REGISTRATION_SUBMITTED", "Registration transaction completed successfully", {
+                eventId,
+                clubId: event.clubId,
+                userId,
+                meta: {
+                    registrationId: newReg.id,
+                    ticketCode: newReg.ticketCode,
+                },
+            });
 
             return {
                 success: true,
                 message: formSettings.confirmationMessage || `Your application for ${event.title} has been submitted!`,
                 registration: newReg,
                 isUpdate: false,
+            };
+        } catch (err: any) {
+            await client.query("ROLLBACK;");
+            if (err.statusCode === 409) {
+                // Handled concurrency / capacity conflict
+            } else if (err.statusCode === 400) {
+                FormLogger.warn("INVALID_SUBMISSION", "Registration validation error", {
+                    eventId,
+                    userId,
+                    meta: { error: err.message },
+                });
+            } else {
+                FormLogger.error(
+                    "DB_ERROR",
+                    "Unexpected database error during registration submission",
+                    {
+                        eventId,
+                        userId,
+                        meta: { error: err.message },
+                    },
+                    err
+                );
+            }
+            throw err;
+        } finally {
+            client.release();
+        }
+    }
+
+    /**
+     * Cancel an existing student registration and atomically release the capacity seat (Requirement 4.3)
+     */
+    static async cancelStudentRegistration(eventId: string, userId: string): Promise<{
+        success: boolean;
+        message: string;
+    }> {
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN;");
+
+            const regRes = await client.query(
+                `SELECT id, status FROM club_event_registrations
+                 WHERE event_id = $1 AND user_id = $2 FOR UPDATE;`,
+                [eventId, userId]
+            );
+
+            if (!regRes.rows[0]) {
+                const error: any = new Error("No active registration found to cancel.");
+                error.statusCode = 404;
+                throw error;
+            }
+
+            const currentStatus = regRes.rows[0].status;
+            if (currentStatus === "cancelled") {
+                await client.query("COMMIT;");
+                return { success: true, message: "Registration is already cancelled." };
+            }
+
+            // Mark registration cancelled
+            await client.query(
+                `UPDATE club_event_registrations
+                 SET status = 'cancelled', updated_at = NOW()
+                 WHERE id = $1;`,
+                [regRes.rows[0].id]
+            );
+
+            // Atomically decrement event registered_count
+            await client.query(
+                `UPDATE club_events
+                 SET registered_count = GREATEST(0, registered_count - 1)
+                 WHERE id = $1;`,
+                [eventId]
+            );
+
+            await client.query("COMMIT;");
+
+            // Invalidate Redis cache
+            if (redis && redis.status === "ready") {
+                await redis.del(`orbix:form:public:${eventId}`);
+            }
+
+            FormLogger.info("REGISTRATION_CANCELLED", "Registration cancelled and capacity seat released", {
+                eventId,
+                userId,
+                meta: { registrationId: regRes.rows[0].id },
+            });
+
+            return {
+                success: true,
+                message: "Your registration has been cancelled and seat released.",
             };
         } catch (err) {
             await client.query("ROLLBACK;");
@@ -2149,7 +2977,103 @@ export class ClubEventFormService {
     }
 
     /**
-     * Retrieve responses with pagination, filtering, and form version metadata
+     * Retrieve student's unfinished draft for an event form
+     */
+    static async getStudentDraft(eventId: string, userId: string) {
+        const res = await query(
+            `SELECT id, event_id AS "eventId", form_id AS "formId",
+                    form_version_id AS "formVersionId", user_id AS "userId",
+                    answers, file_attachments AS "fileAttachments",
+                    current_section_index AS "currentSectionIndex",
+                    section_history AS "sectionHistory",
+                    created_at AS "createdAt", updated_at AS "updatedAt"
+             FROM club_event_response_drafts
+             WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
+            [eventId, userId]
+        );
+        return res.rows[0] || null;
+    }
+
+    /**
+     * Save/upsert student's unfinished draft (debounced autosave)
+     */
+    static async saveStudentDraft(
+        eventId: string,
+        userId: string,
+        payload: {
+            answers?: Record<string, any>;
+            fileAttachments?: FileAttachmentMeta[];
+            currentSectionIndex?: number;
+            sectionHistory?: number[];
+            formVersionId?: string;
+        }
+    ) {
+        // Fetch form info
+        const formRes = await query(
+            `SELECT id, published_version_id AS "publishedVersionId" FROM club_event_forms WHERE event_id = $1 LIMIT 1;`,
+            [eventId]
+        );
+        const formId = formRes.rows[0]?.id || null;
+        const formVersionId = payload.formVersionId || formRes.rows[0]?.publishedVersionId || null;
+
+        const answers = payload.answers || {};
+        const fileAttachments = payload.fileAttachments || [];
+        const currentSectionIndex = Number(payload.currentSectionIndex ?? 0);
+        const sectionHistory = Array.isArray(payload.sectionHistory) ? payload.sectionHistory : [0];
+
+        const res = await query(
+            `INSERT INTO club_event_response_drafts (
+                event_id,
+                form_id,
+                form_version_id,
+                user_id,
+                answers,
+                file_attachments,
+                current_section_index,
+                section_history,
+                updated_at
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+            ON CONFLICT (event_id, user_id) DO UPDATE SET
+                form_id = COALESCE(EXCLUDED.form_id, club_event_response_drafts.form_id),
+                form_version_id = COALESCE(EXCLUDED.form_version_id, club_event_response_drafts.form_version_id),
+                answers = EXCLUDED.answers,
+                file_attachments = EXCLUDED.file_attachments,
+                current_section_index = EXCLUDED.current_section_index,
+                section_history = EXCLUDED.section_history,
+                updated_at = NOW()
+            RETURNING id, event_id AS "eventId", form_version_id AS "formVersionId",
+                      answers, file_attachments AS "fileAttachments",
+                      current_section_index AS "currentSectionIndex",
+                      section_history AS "sectionHistory",
+                      updated_at AS "updatedAt";`,
+            [
+                eventId,
+                formId,
+                formVersionId,
+                userId,
+                JSON.stringify(answers),
+                JSON.stringify(fileAttachments),
+                currentSectionIndex,
+                JSON.stringify(sectionHistory),
+            ]
+        );
+
+        return res.rows[0];
+    }
+
+    /**
+     * Clear student's unfinished draft
+     */
+    static async clearStudentDraft(eventId: string, userId: string) {
+        await query(
+            `DELETE FROM club_event_response_drafts WHERE event_id = $1 AND user_id = $2;`,
+            [eventId, userId]
+        );
+        return { success: true };
+    }
+
+    /**
+     * Retrieve responses with pagination, filtering, and form version metadata (Phase 5.3 & 5.4)
      */
     static async getResponsesForClub(
         eventId: string,
@@ -2160,6 +3084,13 @@ export class ClubEventFormService {
             versionId?: string;
             status?: string;
             search?: string;
+            startDate?: string;
+            endDate?: string;
+            questionId?: string;
+            answerSearch?: string;
+            sortBy?: string;
+            sortOrder?: "ASC" | "DESC" | string;
+            responseIds?: string[];
         } = {}
     ) {
         const evCheck = await query(`SELECT club_id AS "clubId", title FROM club_events WHERE id = $1;`, [eventId]);
@@ -2174,6 +3105,28 @@ export class ClubEventFormService {
         const limit = Math.max(1, Math.min(100, Number(options.limit || 50)));
         const offset = (page - 1) * limit;
 
+        // Query status aggregate counts across this event
+        const statusCountsRes = await query(
+            `SELECT 
+                COUNT(*)::int AS "totalCount",
+                COUNT(CASE WHEN r.status IN ('registered', 'attended') THEN 1 END)::int AS "successfulCount",
+                COUNT(CASE WHEN r.status = 'pending' THEN 1 END)::int AS "pendingCount",
+                COUNT(CASE WHEN r.status = 'attended' THEN 1 END)::int AS "attendedCount",
+                COUNT(CASE WHEN r.status = 'rejected' THEN 1 END)::int AS "rejectedCount",
+                COUNT(CASE WHEN r.status = 'cancelled' THEN 1 END)::int AS "cancelledCount"
+             FROM club_event_registrations r
+             WHERE r.event_id = $1;`,
+            [eventId]
+        );
+        const statusCounts = statusCountsRes.rows[0] || {
+            totalCount: 0,
+            successfulCount: 0,
+            pendingCount: 0,
+            attendedCount: 0,
+            rejectedCount: 0,
+            cancelledCount: 0,
+        };
+
         const whereClauses: string[] = ["r.event_id = $1"];
         const params: any[] = [eventId];
 
@@ -2182,20 +3135,61 @@ export class ClubEventFormService {
             whereClauses.push(`r.form_version_id = $${params.length}`);
         }
 
-        if (options.status) {
+        if (options.status && options.status !== "all") {
             params.push(options.status);
             whereClauses.push(`r.status = $${params.length}`);
         }
 
-        if (options.search) {
+        if (options.search && options.search.trim()) {
             params.push(`%${options.search.trim()}%`);
-            whereClauses.push(`(r.applicant_name ILIKE $${params.length} OR r.applicant_email ILIKE $${params.length} OR r.ticket_code ILIKE $${params.length} OR r.roll_number ILIKE $${params.length})`);
+            whereClauses.push(
+                `(r.applicant_name ILIKE $${params.length} OR r.applicant_email ILIKE $${params.length} OR r.ticket_code ILIKE $${params.length} OR r.roll_number ILIKE $${params.length} OR u.username ILIKE $${params.length})`
+            );
+        }
+
+        if (options.startDate) {
+            params.push(options.startDate);
+            whereClauses.push(`r.registered_at >= $${params.length}`);
+        }
+
+        if (options.endDate) {
+            const isIsoDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(options.endDate);
+            const endTimestamp = isIsoDateOnly ? `${options.endDate}T23:59:59.999Z` : options.endDate;
+            params.push(endTimestamp);
+            whereClauses.push(`r.registered_at <= $${params.length}`);
+        }
+
+        if (options.questionId && options.answerSearch && options.answerSearch.trim()) {
+            params.push(options.questionId);
+            params.push(`%${options.answerSearch.trim()}%`);
+            whereClauses.push(
+                `(r.answers->>$${params.length - 1} ILIKE $${params.length} OR r.form_response->>$${params.length - 1} ILIKE $${params.length})`
+            );
+        }
+
+        if (Array.isArray(options.responseIds) && options.responseIds.length > 0) {
+            params.push(options.responseIds);
+            whereClauses.push(`r.id = ANY($${params.length})`);
         }
 
         const whereStr = whereClauses.join(" AND ");
 
-        const totalRes = await query(`SELECT COUNT(*)::int AS count FROM club_event_registrations r WHERE ${whereStr};`, params);
+        const totalRes = await query(
+            `SELECT COUNT(*)::int AS count 
+             FROM club_event_registrations r
+             LEFT JOIN users u ON u.id = r.user_id
+             WHERE ${whereStr};`,
+            params
+        );
         const total = totalRes.rows[0]?.count || 0;
+
+        let sortCol = "r.registered_at";
+        if (options.sortBy === "applicant_name") sortCol = "r.applicant_name";
+        else if (options.sortBy === "quiz_score") sortCol = "COALESCE(r.quiz_score, -1)";
+        else if (options.sortBy === "status") sortCol = "r.status";
+        else if (options.sortBy === "roll_number") sortCol = "r.roll_number";
+
+        const sortDir = options.sortOrder?.toUpperCase() === "ASC" ? "ASC" : "DESC";
 
         params.push(limit, offset);
         const listRes = await query(
@@ -2208,13 +3202,14 @@ export class ClubEventFormService {
                     r.last_updated_at AS "lastUpdatedAt",
                     r.quiz_score AS "quizScore", r.quiz_max_score AS "quizMaxScore",
                     r.quiz_graded_answers AS "quizGradedAnswers", r.quiz_grades_released AS "quizGradesReleased",
+                    r.reviewed_at AS "reviewedAt", r.review_notes AS "reviewNotes",
                     v.version_number AS "versionNumber",
                     u.username, u.photo_url AS "userPhotoUrl"
              FROM club_event_registrations r
              LEFT JOIN club_event_form_versions v ON v.id = r.form_version_id
              LEFT JOIN users u ON u.id = r.user_id
              WHERE ${whereStr}
-             ORDER BY r.registered_at DESC
+             ORDER BY ${sortCol} ${sortDir}
              LIMIT $${params.length - 1} OFFSET $${params.length};`,
             params
         );
@@ -2224,6 +3219,7 @@ export class ClubEventFormService {
             page,
             limit,
             totalPages: Math.ceil(total / limit),
+            statusCounts,
             responses: listRes.rows.map((row) => ({
                 ...row,
                 answers: row.answers || row.formResponse || {},
@@ -2233,9 +3229,83 @@ export class ClubEventFormService {
     }
 
     /**
-     * Dynamic CSV export with version-aware question headers
+     * Update individual response status (e.g. approve, mark attended, reject)
      */
-    static async exportResponsesCsv(eventId: string, userId: string, versionId?: string): Promise<{
+    static async updateResponseStatus(
+        eventId: string,
+        userId: string,
+        registrationId: string,
+        status: string,
+        reviewNotes?: string
+    ) {
+        const evCheck = await query(`SELECT club_id AS "clubId", title FROM club_events WHERE id = $1;`, [eventId]);
+        if (!evCheck.rows[0]) {
+            const error: any = new Error("Event not found.");
+            error.statusCode = 404;
+            throw error;
+        }
+        await this.assertStaffAccess(userId, evCheck.rows[0].clubId);
+
+        const validStatuses = ["pending", "registered", "attended", "rejected", "cancelled"];
+        if (!validStatuses.includes(status)) {
+            const error: any = new Error(`Invalid status: ${status}. Must be one of ${validStatuses.join(", ")}`);
+            error.statusCode = 400;
+            throw error;
+        }
+
+        const isAttended = status === "attended";
+        const updateRes = await query(
+            `UPDATE club_event_registrations
+             SET status = $1,
+                 reviewed_at = NOW(),
+                 reviewed_by_user_id = $2,
+                 review_notes = COALESCE($3, review_notes),
+                 checked_in_at = CASE WHEN $4 = true AND checked_in_at IS NULL THEN NOW() ELSE checked_in_at END,
+                 updated_at = NOW()
+             WHERE id = $5 AND event_id = $6
+             RETURNING id, user_id AS "userId", status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
+            [status, userId, reviewNotes || null, isAttended, registrationId, eventId]
+        );
+
+        if (!updateRes.rows[0]) {
+            const error: any = new Error("Registration record not found.");
+            error.statusCode = 404;
+            throw error;
+        }
+
+        // Keep event registered count synchronized
+        try {
+            await query(
+                `UPDATE club_events
+                 SET registered_count = (
+                     SELECT COUNT(*)::int FROM club_event_registrations
+                     WHERE event_id = $1 AND status NOT IN ('cancelled', 'rejected')
+                 )
+                 WHERE id = $1;`,
+                [eventId]
+            );
+        } catch (countErr) {
+            console.warn("Could not synchronize event registered_count:", countErr);
+        }
+
+        return updateRes.rows[0];
+    }
+
+    /**
+     * Dynamic CSV export with version-aware question headers, filtering, selection, and CSV sanitization (Phase 5.5)
+     */
+    static async exportResponsesCsv(
+        eventId: string,
+        userId: string,
+        optionsOrVersionId?: string | {
+            versionId?: string;
+            status?: string;
+            responseIds?: string[];
+            search?: string;
+            startDate?: string;
+            endDate?: string;
+        }
+    ): Promise<{
         filename: string;
         csvContent: string;
     }> {
@@ -2247,10 +3317,12 @@ export class ClubEventFormService {
         }
         await this.assertStaffAccess(userId, evCheck.rows[0].clubId);
 
+        const options = typeof optionsOrVersionId === "string" ? { versionId: optionsOrVersionId } : (optionsOrVersionId || {});
+
         // Fetch form structure (use specific version or latest published/draft)
         let structure: FormStructure = { sections: [] };
-        if (versionId) {
-            const vRes = await query(`SELECT structure FROM club_event_form_versions WHERE id = $1 AND event_id = $2;`, [versionId, eventId]);
+        if (options.versionId) {
+            const vRes = await query(`SELECT structure FROM club_event_form_versions WHERE id = $1 AND event_id = $2;`, [options.versionId, eventId]);
             if (vRes.rows[0]?.structure) structure = vRes.rows[0].structure;
         } else {
             const fRes = await query(
@@ -2273,36 +3345,80 @@ export class ClubEventFormService {
             });
         });
 
-        // Fetch all registrations
+        const whereClauses: string[] = ["r.event_id = $1"];
+        const params: any[] = [eventId];
+
+        if (Array.isArray(options.responseIds) && options.responseIds.length > 0) {
+            params.push(options.responseIds);
+            whereClauses.push(`r.id = ANY($${params.length})`);
+        } else {
+            if (options.status && options.status !== "all") {
+                params.push(options.status);
+                whereClauses.push(`r.status = $${params.length}`);
+            } else if (!options.status) {
+                whereClauses.push(`r.status NOT IN ('cancelled', 'rejected')`);
+            }
+
+            if (options.versionId) {
+                params.push(options.versionId);
+                whereClauses.push(`r.form_version_id = $${params.length}`);
+            }
+
+            if (options.search && options.search.trim()) {
+                params.push(`%${options.search.trim()}%`);
+                whereClauses.push(
+                    `(r.applicant_name ILIKE $${params.length} OR r.applicant_email ILIKE $${params.length} OR r.ticket_code ILIKE $${params.length} OR r.roll_number ILIKE $${params.length} OR u.username ILIKE $${params.length})`
+                );
+            }
+
+            if (options.startDate) {
+                params.push(options.startDate);
+                whereClauses.push(`r.registered_at >= $${params.length}`);
+            }
+
+            if (options.endDate) {
+                const isIsoDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(options.endDate);
+                const endTimestamp = isIsoDateOnly ? `${options.endDate}T23:59:59.999Z` : options.endDate;
+                params.push(endTimestamp);
+                whereClauses.push(`r.registered_at <= $${params.length}`);
+            }
+        }
+
+        const whereStr = whereClauses.join(" AND ");
+
+        // Fetch matching registrations
         const regRes = await query(
-            `SELECT r.ticket_code, r.applicant_name, r.applicant_email, r.roll_number,
+            `SELECT r.id, r.ticket_code, r.applicant_name, r.applicant_email, r.roll_number,
                     r.department, r.year_of_study, r.phone_number, r.status,
                     r.answers, r.form_response, r.file_attachments,
+                    r.quiz_score, r.quiz_max_score,
                     v.version_number AS version_number,
+                    u.username,
                     r.registered_at
              FROM club_event_registrations r
              LEFT JOIN club_event_form_versions v ON v.id = r.form_version_id
-             WHERE r.event_id = $1 AND r.status NOT IN ('cancelled', 'rejected')
+             LEFT JOIN users u ON u.id = r.user_id
+             WHERE ${whereStr}
              ORDER BY r.registered_at ASC;`,
-            [eventId]
+            params
         );
 
-        const escapeCsv = (val: any) => {
-            if (val === null || val === undefined) return '""';
-            const str = typeof val === "object" ? JSON.stringify(val) : String(val);
-            return `"${str.replace(/"/g, '""')}"`;
-        };
+        // Protect all cells against CSV / Spreadsheet formula injection (Phase 5)
+        const escapeCsv = escapeCsvFormula;
 
         const headers = [
+            "Registration ID",
             "Ticket Code",
             "Full Name",
             "Email",
+            "Username",
             "Roll Number",
             "Department",
             "Year of Study",
             "Phone",
             "Status",
             "Form Version",
+            "Quiz Score",
             "Submitted At",
             ...customQuestions.map((q) => q.title),
         ];
@@ -2322,16 +3438,23 @@ export class ClubEventFormService {
                 return ans ?? "";
             });
 
+            const quizStr = r.quiz_score !== null && r.quiz_score !== undefined
+                ? `${r.quiz_score} / ${r.quiz_max_score ?? "?"}`
+                : "N/A";
+
             return [
+                escapeCsv(r.id),
                 escapeCsv(r.ticket_code),
                 escapeCsv(r.applicant_name),
                 escapeCsv(r.applicant_email),
+                escapeCsv(r.username || ""),
                 escapeCsv(r.roll_number || ""),
                 escapeCsv(r.department || ""),
                 escapeCsv(r.year_of_study || ""),
                 escapeCsv(r.phone_number || ""),
                 escapeCsv(r.status),
                 escapeCsv(r.version_number ? `v${r.version_number}` : "v1"),
+                escapeCsv(quizStr),
                 escapeCsv(new Date(r.registered_at).toLocaleString()),
                 ...customVals.map(escapeCsv),
             ].join(",");
@@ -2345,7 +3468,7 @@ export class ClubEventFormService {
     }
 
     /**
-     * Compute analytics and summary breakdown per question
+     * Compute analytics, summary metrics, and question-by-question breakdown analytics (Phase 5.1 & 5.2)
      */
     static async getFormStats(eventId: string, userId: string) {
         const evCheck = await query(`SELECT club_id AS "clubId", title FROM club_events WHERE id = $1 LIMIT 1;`, [eventId]);
@@ -2368,18 +3491,303 @@ export class ClubEventFormService {
 
         const structure: FormStructure = formRes.rows[0]?.structure || { sections: [] };
 
+        // Fetch all registrations for this event across all statuses
         const regRes = await query(
-            `SELECT id, answers, form_response AS "formResponse", file_attachments AS "fileAttachments",
-                    quiz_score AS "quizScore", quiz_max_score AS "quizMaxScore",
-                    quiz_grades_released AS "quizGradesReleased",
-                    registered_at AS "registeredAt", status
-             FROM club_event_registrations
-             WHERE event_id = $1 AND status NOT IN ('cancelled', 'rejected');`,
+            `SELECT r.id, r.answers, r.form_response AS "formResponse", r.file_attachments AS "fileAttachments",
+                    r.quiz_score AS "quizScore", r.quiz_max_score AS "quizMaxScore",
+                    r.quiz_graded_answers AS "quizGradedAnswers",
+                    r.quiz_grades_released AS "quizGradesReleased",
+                    r.registered_at AS "registeredAt", r.status,
+                    r.applicant_name AS "applicantName", r.applicant_email AS "applicantEmail",
+                    u.username
+             FROM club_event_registrations r
+             LEFT JOIN users u ON u.id = r.user_id
+             WHERE r.event_id = $1;`,
             [eventId]
         );
 
-        const registrations = regRes.rows;
-        const totalResponses = registrations.length;
+        const allRegistrations = regRes.rows;
+        const totalRegistrations = allRegistrations.length;
+
+        // Metric tallies for Phase 5.1 Summary View
+        const successfulCount = allRegistrations.filter((r) => r.status === "registered" || r.status === "attended").length;
+        const pendingCount = allRegistrations.filter((r) => r.status === "pending").length;
+        const attendedCount = allRegistrations.filter((r) => r.status === "attended").length;
+        const rejectedCount = allRegistrations.filter((r) => r.status === "rejected").length;
+        const cancelledCount = allRegistrations.filter((r) => r.status === "cancelled").length;
+
+        const statusDistribution = {
+            registered: allRegistrations.filter((r) => r.status === "registered").length,
+            pending: pendingCount,
+            attended: attendedCount,
+            rejected: rejectedCount,
+            cancelled: cancelledCount,
+        };
+
+        // File upload aggregate metrics
+        let totalFilesCount = 0;
+        let totalFilesBytes = 0;
+        allRegistrations.forEach((r) => {
+            const atts = Array.isArray(r.fileAttachments) ? r.fileAttachments : [];
+            totalFilesCount += atts.length;
+            atts.forEach((f: any) => {
+                if (typeof f.fileSize === "number") totalFilesBytes += f.fileSize;
+            });
+        });
+
+        // Question-by-question analytics (active respondents)
+        const activeRegistrations = allRegistrations.filter((r) => r.status !== "cancelled");
+        const questionStats: Record<string, any> = {};
+
+        for (const sec of structure.sections || []) {
+            for (const q of sec.questions || []) {
+                if (q.type === "image_card" || q.type === "markdown_card") continue;
+
+                let answeredCount = 0;
+                let skippedCount = 0;
+
+                if (q.type === "multiple_choice" || q.type === "dropdown") {
+                    const optionCounts: Record<string, number> = {};
+                    (q.options || []).forEach((opt) => (optionCounts[opt.text] = 0));
+                    const otherAnswers: string[] = [];
+
+                    activeRegistrations.forEach((r) => {
+                        const ansMap = r.answers || r.formResponse || {};
+                        const val = ansMap[q.id];
+                        if (val !== undefined && val !== null && String(val).trim() !== "") {
+                            answeredCount++;
+                            const valStr = String(val);
+                            if (optionCounts[valStr] !== undefined) {
+                                optionCounts[valStr]++;
+                            } else {
+                                optionCounts[valStr] = (optionCounts[valStr] || 0) + 1;
+                                otherAnswers.push(valStr);
+                            }
+                        } else {
+                            skippedCount++;
+                        }
+                    });
+
+                    const optionPercentages: Record<string, number> = {};
+                    let popularChoice = { text: "None", count: 0, percentage: 0 };
+
+                    Object.entries(optionCounts).forEach(([text, count]) => {
+                        const pct = answeredCount > 0 ? Math.round((count / answeredCount) * 100) : 0;
+                        optionPercentages[text] = pct;
+                        if (count > popularChoice.count) {
+                            popularChoice = { text, count, percentage: pct };
+                        }
+                    });
+
+                    questionStats[q.id] = {
+                        id: q.id,
+                        title: q.title,
+                        type: q.type,
+                        description: q.description,
+                        required: Boolean(q.required),
+                        sectionTitle: sec.title,
+                        answeredCount,
+                        skippedCount,
+                        responseRate: totalRegistrations > 0 ? Math.round((answeredCount / totalRegistrations) * 100) : 0,
+                        optionCounts,
+                        optionPercentages,
+                        popularChoice: popularChoice.count > 0 ? popularChoice : null,
+                        otherAnswers,
+                        options: q.options || [],
+                        points: q.points || 0,
+                        isQuizQuestion: Boolean(q.points && q.correctAnswers && q.correctAnswers.length > 0),
+                        correctAnswers: q.correctAnswers || [],
+                    };
+                } else if (q.type === "checkboxes") {
+                    const counts: Record<string, number> = {};
+                    (q.options || []).forEach((opt) => (counts[opt.text] = 0));
+
+                    activeRegistrations.forEach((r) => {
+                        const ansMap = r.answers || r.formResponse || {};
+                        const val = ansMap[q.id];
+                        if (Array.isArray(val) && val.length > 0) {
+                            answeredCount++;
+                            val.forEach((item) => {
+                                const itemStr = String(item);
+                                counts[itemStr] = (counts[itemStr] || 0) + 1;
+                            });
+                        } else if (val && typeof val === "string") {
+                            answeredCount++;
+                            counts[val] = (counts[val] || 0) + 1;
+                        } else {
+                            skippedCount++;
+                        }
+                    });
+
+                    const optionPercentages: Record<string, number> = {};
+                    let popularChoice = { text: "None", count: 0, percentage: 0 };
+
+                    Object.entries(counts).forEach(([text, count]) => {
+                        const pct = answeredCount > 0 ? Math.round((count / answeredCount) * 100) : 0;
+                        optionPercentages[text] = pct;
+                        if (count > popularChoice.count) {
+                            popularChoice = { text, count, percentage: pct };
+                        }
+                    });
+
+                    questionStats[q.id] = {
+                        id: q.id,
+                        title: q.title,
+                        type: q.type,
+                        description: q.description,
+                        required: Boolean(q.required),
+                        sectionTitle: sec.title,
+                        answeredCount,
+                        skippedCount,
+                        responseRate: totalRegistrations > 0 ? Math.round((answeredCount / totalRegistrations) * 100) : 0,
+                        selectionCounts: counts,
+                        optionPercentages,
+                        popularChoice: popularChoice.count > 0 ? popularChoice : null,
+                        options: q.options || [],
+                        points: q.points || 0,
+                        isQuizQuestion: Boolean(q.points && q.correctAnswers && q.correctAnswers.length > 0),
+                        correctAnswers: q.correctAnswers || [],
+                    };
+                } else if (q.type === "linear_scale") {
+                    const scores: number[] = [];
+                    const distribution: Record<number, number> = {};
+
+                    const min = q.scaleConfig?.min ?? 1;
+                    const max = q.scaleConfig?.max ?? 5;
+                    for (let i = min; i <= max; i++) {
+                        distribution[i] = 0;
+                    }
+
+                    activeRegistrations.forEach((r) => {
+                        const ansMap = r.answers || r.formResponse || {};
+                        const val = Number(ansMap[q.id]);
+                        if (!isNaN(val) && val >= min && val <= max) {
+                            answeredCount++;
+                            scores.push(val);
+                            distribution[val] = (distribution[val] || 0) + 1;
+                        } else {
+                            skippedCount++;
+                        }
+                    });
+
+                    const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+                    const distributionPercentages: Record<number, number> = {};
+                    let popularChoice = { text: "None", count: 0, percentage: 0 };
+
+                    Object.entries(distribution).forEach(([scStr, count]) => {
+                        const pct = answeredCount > 0 ? Math.round((count / answeredCount) * 100) : 0;
+                        distributionPercentages[Number(scStr)] = pct;
+                        if (count > popularChoice.count) {
+                            popularChoice = { text: `${scStr} pts`, count, percentage: pct };
+                        }
+                    });
+
+                    questionStats[q.id] = {
+                        id: q.id,
+                        title: q.title,
+                        type: q.type,
+                        description: q.description,
+                        required: Boolean(q.required),
+                        sectionTitle: sec.title,
+                        answeredCount,
+                        skippedCount,
+                        responseRate: totalRegistrations > 0 ? Math.round((answeredCount / totalRegistrations) * 100) : 0,
+                        average: Number(avg.toFixed(2)),
+                        distribution,
+                        distributionPercentages,
+                        minScale: min,
+                        maxScale: max,
+                        minLabel: q.scaleConfig?.minLabel,
+                        maxLabel: q.scaleConfig?.maxLabel,
+                        popularChoice: popularChoice.count > 0 ? popularChoice : null,
+                    };
+                } else if (q.type === "file_upload") {
+                    const files: any[] = [];
+                    let questionFileBytes = 0;
+
+                    activeRegistrations.forEach((r) => {
+                        const atts = r.fileAttachments || [];
+                        const matchingFiles = atts.filter((item: any) => item.questionId === q.id);
+                        if (matchingFiles.length > 0) {
+                            answeredCount++;
+                            matchingFiles.forEach((f: any) => {
+                                questionFileBytes += f.fileSize || 0;
+                                files.push({
+                                    ...f,
+                                    respondentName: r.applicantName || r.username || "Student",
+                                    applicantEmail: r.applicantEmail,
+                                    submittedAt: r.registeredAt,
+                                });
+                            });
+                        } else {
+                            skippedCount++;
+                        }
+                    });
+
+                    questionStats[q.id] = {
+                        id: q.id,
+                        title: q.title,
+                        type: q.type,
+                        description: q.description,
+                        required: Boolean(q.required),
+                        sectionTitle: sec.title,
+                        answeredCount,
+                        skippedCount,
+                        responseRate: totalRegistrations > 0 ? Math.round((answeredCount / totalRegistrations) * 100) : 0,
+                        fileCount: files.length,
+                        totalBytes: questionFileBytes,
+                        recentFiles: files.slice(0, 50),
+                    };
+                } else {
+                    // Textual descriptive answers: show readable samples rather than forcing a chart (Phase 5.2)
+                    const readableSamples: any[] = [];
+
+                    activeRegistrations.forEach((r) => {
+                        const ansMap = r.answers || r.formResponse || {};
+                        const val = ansMap[q.id];
+                        if (val !== undefined && val !== null && String(val).trim() !== "") {
+                            answeredCount++;
+                            if (readableSamples.length < 50) {
+                                readableSamples.push({
+                                    id: r.id,
+                                    answer: String(val).trim(),
+                                    respondentName: r.applicantName || r.username || "Student",
+                                    applicantEmail: r.applicantEmail,
+                                    submittedAt: r.registeredAt,
+                                });
+                            }
+                        } else {
+                            skippedCount++;
+                        }
+                    });
+
+                    questionStats[q.id] = {
+                        id: q.id,
+                        title: q.title,
+                        type: q.type,
+                        description: q.description,
+                        required: Boolean(q.required),
+                        sectionTitle: sec.title,
+                        answeredCount,
+                        skippedCount,
+                        responseRate: totalRegistrations > 0 ? Math.round((answeredCount / totalRegistrations) * 100) : 0,
+                        readableSamples,
+                        points: q.points || 0,
+                        isQuizQuestion: Boolean(q.points && q.correctAnswers && q.correctAnswers.length > 0),
+                        correctAnswers: q.correctAnswers || [],
+                    };
+                }
+            }
+        }
+
+        // Daily registration timeline (Phase 5.1)
+        const timeline: Record<string, number> = {};
+        allRegistrations.forEach((r) => {
+            if (r.registeredAt) {
+                const dateStr = new Date(r.registeredAt).toISOString().split("T")[0] || "unknown";
+                timeline[dateStr] = (timeline[dateStr] || 0) + 1;
+            }
+        });
 
         // Phase 3 Quiz Metrics Computation
         let quizStats: any = null;
@@ -2389,7 +3797,7 @@ export class ClubEventFormService {
             let maxPoints = 0;
             let releasedCount = 0;
 
-            registrations.forEach((r) => {
+            allRegistrations.forEach((r) => {
                 if (r.quizScore !== null && r.quizScore !== undefined) {
                     validScores.push(Number(r.quizScore));
                 }
@@ -2428,98 +3836,19 @@ export class ClubEventFormService {
             }
         }
 
-        const questionStats: Record<string, any> = {};
-
-        for (const sec of structure.sections || []) {
-            for (const q of sec.questions || []) {
-                if (q.type === "image_card" || q.type === "markdown_card") continue;
-
-                if (q.type === "multiple_choice" || q.type === "dropdown") {
-                    const optionCounts: Record<string, number> = {};
-                    (q.options || []).forEach((opt) => (optionCounts[opt.text] = 0));
-
-                    registrations.forEach((r) => {
-                        const ansMap = r.answers || r.formResponse || {};
-                        const val = ansMap[q.id];
-                        if (val && typeof val === "string") {
-                            optionCounts[val] = (optionCounts[val] || 0) + 1;
-                        }
-                    });
-
-                    questionStats[q.id] = {
-                        type: q.type,
-                        title: q.title,
-                        totalAnswers: Object.values(optionCounts).reduce((a, b) => a + b, 0),
-                        optionCounts,
-                    };
-                } else if (q.type === "checkboxes") {
-                    const counts: Record<string, number> = {};
-                    (q.options || []).forEach((opt) => (counts[opt.text] = 0));
-
-                    registrations.forEach((r) => {
-                        const ansMap = r.answers || r.formResponse || {};
-                        const val = ansMap[q.id];
-                        if (Array.isArray(val)) {
-                            val.forEach((item) => {
-                                counts[item] = (counts[item] || 0) + 1;
-                            });
-                        }
-                    });
-
-                    questionStats[q.id] = {
-                        type: q.type,
-                        title: q.title,
-                        selectionCounts: counts,
-                    };
-                } else if (q.type === "linear_scale") {
-                    const scores: number[] = [];
-                    const scoreDistribution: Record<number, number> = {};
-
-                    registrations.forEach((r) => {
-                        const ansMap = r.answers || r.formResponse || {};
-                        const val = Number(ansMap[q.id]);
-                        if (!isNaN(val) && val > 0) {
-                            scores.push(val);
-                            scoreDistribution[val] = (scoreDistribution[val] || 0) + 1;
-                        }
-                    });
-
-                    const avg = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-                    questionStats[q.id] = {
-                        type: q.type,
-                        title: q.title,
-                        average: Number(avg.toFixed(2)),
-                        distribution: scoreDistribution,
-                        count: scores.length,
-                    };
-                } else if (q.type === "file_upload") {
-                    const files: any[] = [];
-                    registrations.forEach((r) => {
-                        const atts = r.fileAttachments || [];
-                        const f = atts.find((item: any) => item.questionId === q.id);
-                        if (f) files.push(f);
-                    });
-
-                    questionStats[q.id] = {
-                        type: q.type,
-                        title: q.title,
-                        fileCount: files.length,
-                        recentFiles: files.slice(0, 10),
-                    };
-                }
-            }
-        }
-
-        const timeline: Record<string, number> = {};
-        registrations.forEach((r) => {
-            const dateStr = (new Date(r.registeredAt).toISOString().split("T")[0]) || "unknown";
-            timeline[dateStr] = (timeline[dateStr] || 0) + 1;
-        });
-
         return {
-            totalResponses,
-            questionStats,
+            totalResponses: totalRegistrations,
+            totalRegistrations,
+            successfulCount,
+            pendingCount,
+            attendedCount,
+            rejectedCount,
+            cancelledCount,
+            statusDistribution,
             timeline,
+            totalFilesCount,
+            totalFilesBytes,
+            questionStats,
             quizStats,
             eventTitle: evCheck.rows[0].title,
         };
@@ -2567,6 +3896,217 @@ export class ClubEventFormService {
             success: true,
             message: `Quiz grades successfully released to ${updateRes.rowCount || 0} student(s).`,
             releasedCount: updateRes.rowCount || 0,
+        };
+    }
+
+    /**
+     * Non-blocking background notification dispatcher for event registrations (Phase 5.6)
+     */
+    static async dispatchSubmissionNotifications(payload: {
+        eventId: string;
+        eventTitle: string;
+        clubId: string;
+        userId?: string | undefined;
+        applicantName: string;
+        applicantEmail: string;
+        ticketCode?: string | undefined;
+        registrationId: string;
+        status: string;
+    }) {
+        try {
+            // 1. Notify student (in-app user_notifications)
+            if (payload.userId) {
+                const userRes = await query(`SELECT username FROM users WHERE id = $1 LIMIT 1;`, [payload.userId]);
+                const username = userRes.rows[0]?.username || "student";
+                const idempotencyKey = `reg_notif_student_${payload.registrationId}`;
+
+                await query(
+                    `INSERT INTO user_notifications (
+                        user_id,
+                        recipient_id,
+                        username,
+                        title,
+                        body,
+                        type,
+                        notification_type,
+                        metadata,
+                        idempotency_key,
+                        is_read,
+                        created_at
+                    ) VALUES ($1, $1, $2, $3, $4, 'event_registration', 'event_registration', $5, $6, false, NOW())
+                    ON CONFLICT (idempotency_key) DO NOTHING;`,
+                    [
+                        payload.userId,
+                        username,
+                        `Registration Confirmed: ${payload.eventTitle}`,
+                        `Your registration for "${payload.eventTitle}" was received! Ticket Pass: ${payload.ticketCode || "PENDING"}`,
+                        JSON.stringify({
+                            eventId: payload.eventId,
+                            registrationId: payload.registrationId,
+                            ticketCode: payload.ticketCode,
+                            eventTitle: payload.eventTitle,
+                        }),
+                        idempotencyKey,
+                    ]
+                );
+            }
+
+            // 2. Notify club owner & coordinators
+            const clubRes = await query(`SELECT auth_user_id AS "ownerId", name FROM verified_clubs WHERE id = $1 LIMIT 1;`, [payload.clubId]);
+            const ownerId = clubRes.rows[0]?.ownerId;
+            if (ownerId && ownerId !== payload.userId) {
+                const ownerUserRes = await query(`SELECT username FROM users WHERE id = $1 LIMIT 1;`, [ownerId]);
+                const ownerUsername = ownerUserRes.rows[0]?.username || "organizer";
+                const idempotencyKey = `reg_notif_club_${payload.registrationId}`;
+
+                await query(
+                    `INSERT INTO user_notifications (
+                        user_id,
+                        recipient_id,
+                        username,
+                        title,
+                        body,
+                        type,
+                        notification_type,
+                        metadata,
+                        idempotency_key,
+                        is_read,
+                        created_at
+                    ) VALUES ($1, $1, $2, $3, $4, 'event_registration_received', 'event_registration_received', $5, $6, false, NOW())
+                    ON CONFLICT (idempotency_key) DO NOTHING;`,
+                    [
+                        ownerId,
+                        ownerUsername,
+                        `New RSVP: ${payload.eventTitle}`,
+                        `${payload.applicantName} registered (${payload.ticketCode || "RSVP"}). Status: ${payload.status}.`,
+                        JSON.stringify({
+                            eventId: payload.eventId,
+                            registrationId: payload.registrationId,
+                            applicantName: payload.applicantName,
+                            applicantEmail: payload.applicantEmail,
+                            ticketCode: payload.ticketCode,
+                        }),
+                        idempotencyKey,
+                    ]
+                );
+            }
+        } catch (err) {
+            console.warn("[dispatchSubmissionNotifications] Non-critical notification error:", err);
+        }
+    }
+
+    /**
+     * Phase 6.4 QR Code Verification Architecture: Validate ticket pass and mark attendance
+     */
+    static async verifyRegistrationQrCode(
+        eventId: string,
+        userId: string,
+        ticketCode: string
+    ): Promise<{
+        success: boolean;
+        valid: boolean;
+        message: string;
+        registration?: any;
+    }> {
+        const evCheck = await query(`SELECT club_id AS "clubId", title FROM club_events WHERE id = $1;`, [eventId]);
+        if (!evCheck.rows[0]) {
+            const error: any = new Error("Event not found.");
+            error.statusCode = 404;
+            throw error;
+        }
+        await this.assertStaffAccess(userId, evCheck.rows[0].clubId);
+
+        const regRes = await query(
+            `SELECT r.id, r.applicant_name AS "applicantName", r.applicant_email AS "applicantEmail",
+                    r.ticket_code AS "ticketCode", r.status, r.checked_in_at AS "checkedInAt",
+                    u.username, u.photo_url AS "photoUrl"
+             FROM club_event_registrations r
+             LEFT JOIN users u ON u.id = r.user_id
+             WHERE r.event_id = $1 AND (r.ticket_code = $2 OR r.id::text = $2);`,
+            [eventId, ticketCode.trim()]
+        );
+
+        if (!regRes.rows[0]) {
+            return {
+                success: false,
+                valid: false,
+                message: "No registration matching this ticket QR pass code.",
+            };
+        }
+
+        const reg = regRes.rows[0];
+        const alreadyCheckedIn = Boolean(reg.checkedInAt);
+
+        // Mark attended & checked in if not yet
+        if (!alreadyCheckedIn) {
+            await query(
+                `UPDATE club_event_registrations
+                 SET status = 'attended', checked_in_at = NOW(), updated_at = NOW()
+                 WHERE id = $1;`,
+                [reg.id]
+            );
+            reg.status = "attended";
+            reg.checkedInAt = new Date().toISOString();
+        }
+
+        return {
+            success: true,
+            valid: true,
+            message: alreadyCheckedIn
+                ? `Attendee already checked in at ${new Date(reg.checkedInAt).toLocaleTimeString()}.`
+                : `Verified pass for ${reg.applicantName}. Check-in confirmed!`,
+            registration: reg,
+        };
+    }
+
+    /**
+     * Phase 6.4 Cross-Event Analytics: Aggregate metrics across all events hosted by this club
+     */
+    static async getClubCrossEventStats(clubId: string, userId: string): Promise<{
+        success: boolean;
+        totalEvents: number;
+        totalRegistrations: number;
+        totalAttendees: number;
+        overallTurnoutRate: number;
+        events: Array<{
+            eventId: string;
+            title: string;
+            startsAt: string;
+            registeredCount: number;
+            attendedCount: number;
+            publishedVersion: number;
+        }>;
+    }> {
+        await this.assertStaffAccess(userId, clubId);
+
+        const res = await query(
+            `SELECT e.id AS "eventId", e.title, e.starts_at AS "startsAt",
+                    COUNT(r.id)::int AS "registeredCount",
+                    COUNT(CASE WHEN r.status = 'attended' THEN 1 END)::int AS "attendedCount",
+                    COALESCE(v.version_number, 1) AS "publishedVersion"
+             FROM club_events e
+             LEFT JOIN club_event_registrations r ON r.event_id = e.id AND r.status NOT IN ('cancelled', 'rejected')
+             LEFT JOIN club_event_forms f ON f.event_id = e.id
+             LEFT JOIN club_event_form_versions v ON v.id = f.published_version_id
+             WHERE e.club_id = $1
+             GROUP BY e.id, e.title, e.starts_at, v.version_number
+             ORDER BY e.starts_at DESC;`,
+            [clubId]
+        );
+
+        const rows = res.rows;
+        const totalEvents = rows.length;
+        const totalRegistrations = rows.reduce((acc, row) => acc + (row.registeredCount || 0), 0);
+        const totalAttendees = rows.reduce((acc, row) => acc + (row.attendedCount || 0), 0);
+        const overallTurnoutRate = totalRegistrations > 0 ? Math.round((totalAttendees / totalRegistrations) * 100) : 0;
+
+        return {
+            success: true,
+            totalEvents,
+            totalRegistrations,
+            totalAttendees,
+            overallTurnoutRate,
+            events: rows,
         };
     }
 }

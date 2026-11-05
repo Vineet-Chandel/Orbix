@@ -192,6 +192,32 @@ export interface FormSettings {
     presentation?: PresentationSettings | undefined;
     questionDefaults?: QuestionDefaults | undefined;
     saveAsClubDefault?: boolean | undefined;
+
+    // Phase 6.4 Architectural Future Expansion Definitions
+    waitlist?: {
+        enabled: boolean;
+        maxWaitlistCapacity?: number | undefined;
+        autoPromote?: boolean | undefined;
+    } | undefined;
+    teamRegistration?: {
+        enabled: boolean;
+        minTeamSize?: number | undefined;
+        maxTeamSize?: number | undefined;
+        requireTeamLead?: boolean | undefined;
+    } | undefined;
+    qrCheckIn?: {
+        enabled: boolean;
+        allowSelfCheckIn?: boolean | undefined;
+    } | undefined;
+    approvalWorkflow?: {
+        mode?: "automatic" | "manual" | "tiered" | undefined;
+    } | undefined;
+    ticketTiers?: Array<{
+        id: string;
+        name: string;
+        capacity: number;
+        price?: number | undefined;
+    }> | undefined;
 }
 
 export type FormStatus = "draft" | "published" | "archived" | "closed";

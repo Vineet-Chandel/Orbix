@@ -20,12 +20,12 @@ export interface SectionCardProps {
     onMoveDown: () => void;
 }
 
-export const SectionCard: React.FC<SectionCardProps> = ({
+export const SectionCard: React.FC<SectionCardProps> = React.memo(({
     section,
     index,
     totalSections,
     allSections,
-    accentColor,
+    accentColor: _accentColor,
     onChange,
     onDelete,
     onDuplicate,
@@ -33,94 +33,91 @@ export const SectionCard: React.FC<SectionCardProps> = ({
     onMoveDown,
 }) => {
     return (
-        <div className="rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4">
+        <div className="rounded-2xl bg-white border border-neutral-200 dark:border-neutral-800 shadow-sm p-5 sm:p-6 space-y-4">
             {/* Top Section Header Row */}
-            <div className="flex items-center justify-between gap-3 border-b-2 border-black/10 pb-3">
-                <div className="flex items-center gap-2">
-                    <span
-                        className="px-2.5 py-1 rounded-xl text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[1.5px_1.5px_0px_#000]"
-                        style={{ backgroundColor: accentColor }}
-                    >
+            <div className="flex items-center justify-between gap-3 border-b border-neutral-100 dark:border-neutral-800 pb-3">
+                <div className="flex items-center gap-2.5">
+                    <span className="px-3 py-1 rounded-full text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 font-semibold text-xs uppercase tracking-wider">
                         Section {index + 1} of {totalSections}
                     </span>
-                    <span className="text-xs font-bold text-neutral-500">
-                        ({section.questions.length} questions)
+                    <span className="text-xs font-medium text-neutral-500">
+                        {section.questions.length} {section.questions.length === 1 ? "question" : "questions"}
                     </span>
                 </div>
 
                 {/* Section Action Icons */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1">
                     <button
                         type="button"
                         onClick={onMoveUp}
                         disabled={index === 0}
-                        className="p-1.5 rounded-lg border border-black/20 hover:border-black hover:bg-neutral-100 disabled:opacity-30 cursor-pointer"
+                        className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer transition-colors"
                         title="Move Section Up"
                     >
-                        <ArrowUp className="w-3.5 h-3.5 text-black" />
+                        <ArrowUp className="w-4 h-4" />
                     </button>
                     <button
                         type="button"
                         onClick={onMoveDown}
                         disabled={index === totalSections - 1}
-                        className="p-1.5 rounded-lg border border-black/20 hover:border-black hover:bg-neutral-100 disabled:opacity-30 cursor-pointer"
+                        className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer transition-colors"
                         title="Move Section Down"
                     >
-                        <ArrowDown className="w-3.5 h-3.5 text-black" />
+                        <ArrowDown className="w-4 h-4" />
                     </button>
                     <button
                         type="button"
                         onClick={onDuplicate}
-                        className="p-1.5 rounded-lg border border-black/20 hover:border-black hover:bg-neutral-100 cursor-pointer"
+                        className="p-1.5 rounded-lg text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
                         title="Duplicate Section"
                     >
-                        <Copy className="w-3.5 h-3.5 text-black" />
+                        <Copy className="w-4 h-4" />
                     </button>
                     {totalSections > 1 && (
                         <button
                             type="button"
                             onClick={onDelete}
-                            className="p-1.5 rounded-lg border border-black/20 hover:border-rose-600 hover:bg-rose-50 text-neutral-600 hover:text-rose-600 cursor-pointer"
-                            title="Delete Section"
+                            className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 cursor-pointer transition-colors"
+                            title="Delete Section (with Undo)"
                         >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4" />
                         </button>
                     )}
                 </div>
             </div>
 
             {/* Section Title & Description Inputs */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
                 <input
                     type="text"
                     value={section.title}
                     onChange={(e) => onChange({ ...section, title: e.target.value })}
                     placeholder="Section Title..."
-                    className="w-full text-lg sm:text-xl font-black text-black border-b-2 border-black/20 focus:border-black focus:outline-none bg-transparent py-1 placeholder:text-neutral-400"
+                    className="w-full text-base sm:text-lg font-bold text-neutral-900 dark:text-white border-b border-transparent hover:border-neutral-200 focus:border-neutral-900 dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 transition-colors"
                 />
                 <textarea
                     value={section.description || ""}
                     onChange={(e) => onChange({ ...section, description: e.target.value })}
                     placeholder="Description (optional guidelines or context for this step)..."
                     rows={2}
-                    className="w-full text-xs sm:text-sm font-medium text-neutral-600 border-b border-black/15 focus:border-black focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 resize-none"
+                    className="w-full text-xs sm:text-sm font-normal text-neutral-600 dark:text-neutral-300 border-b border-transparent hover:border-neutral-200 focus:border-neutral-900 dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 resize-none transition-colors"
                 />
             </div>
 
             {/* After Section Navigation Flow */}
-            <div className="pt-2 border-t border-black/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                <span className="font-bold text-neutral-700">After section {index + 1}:</span>
+            <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <span className="font-medium text-neutral-500">After section {index + 1}:</span>
                 <select
                     value={section.afterSectionAction}
                     onChange={(e) => onChange({ ...section, afterSectionAction: e.target.value })}
-                    className="font-black bg-neutral-50 border-2 border-black rounded-xl px-3 py-1.5 shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
+                    className="font-medium bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-lg px-3 py-1.5 focus:outline-none focus:border-neutral-400 cursor-pointer transition-colors"
                 >
                     <option value="next_section">Continue to next section</option>
                     {allSections.map((s, sIdx) => {
                         if (sIdx === index) return null;
                         return (
                             <option key={s.id} value={s.id}>
-                                Go to section {sIdx + 1} ({s.title.slice(0, 20)})
+                                Go to section {sIdx + 1} ({s.title.slice(0, 24)})
                             </option>
                         );
                     })}
@@ -129,4 +126,4 @@ export const SectionCard: React.FC<SectionCardProps> = ({
             </div>
         </div>
     );
-};
+});

@@ -50,16 +50,16 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
     if (!isOpen || !event || typeof document === "undefined") return null;
 
     return createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-            <div className="relative w-full max-w-3xl bg-[#FAF6EE] rounded-3xl border-2 border-black shadow-[6px_6px_0px_#000] p-5 sm:p-8 max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-md animate-in fade-in duration-150">
+            <div className="relative w-full max-w-3xl bg-white dark:bg-[#0A0A0A] rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-2xl p-5 sm:p-8 max-h-[92vh] overflow-y-auto text-neutral-900 dark:text-neutral-100">
                 {/* Close Button */}
                 <button
                     type="button"
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-2 rounded-xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] hover:bg-neutral-100 text-black cursor-pointer transition-transform active:translate-x-[0.5px] active:translate-y-[0.5px] z-20"
+                    className="absolute top-4 right-4 p-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 cursor-pointer transition-colors z-20"
                     title="Close"
                 >
-                    <X className="w-4 h-4 stroke-[2.5]" />
+                    <X className="w-4 h-4" />
                 </button>
 
                 {loading ? (
@@ -77,6 +77,7 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
                         user={user}
                         studentProfile={formData.studentProfile}
                         userResponse={formData.userResponse}
+                        draftResponse={formData.draftResponse}
                         isClosed={formData.isClosed}
                         closedReason={formData.closedReason}
                         onSuccess={(reg) => {
@@ -94,8 +95,8 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
                 ) : (
                     <div className="py-16 text-center space-y-3">
                         <AlertCircle className="w-10 h-10 text-amber-500 mx-auto" />
-                        <h4 className="text-base font-black text-black">Form Unavailable</h4>
-                        <p className="text-xs text-neutral-600">
+                        <h4 className="text-base font-semibold text-neutral-900 dark:text-neutral-100">Form Unavailable</h4>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400">
                             The registration form for this event is currently not accessible.
                         </p>
                     </div>

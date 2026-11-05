@@ -91,17 +91,17 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
     };
 
     return (
-        <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-white border-l-2 border-black shadow-[-6px_0px_0px_#000] z-50 p-6 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200">
+        <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-white dark:bg-[#0A0A0A] border-l border-neutral-200 dark:border-neutral-800 shadow-2xl z-50 p-6 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200">
             <div className="space-y-6">
                 {/* Header */}
-                <div className="flex items-center justify-between border-b-2 border-black/10 pb-4">
+                <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-4">
                     <div className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-xl bg-[#FFE566] border border-black shadow-[2px_2px_0px_#000]">
-                            <Palette className="w-5 h-5 text-black" />
+                        <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
+                            <Palette className="w-5 h-5 text-neutral-900 dark:text-neutral-100" />
                         </div>
                         <div>
-                            <h3 className="text-base font-black text-black">Theme & Aesthetics</h3>
-                            <p className="text-[11px] text-neutral-500 font-medium">
+                            <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100">Theme & Aesthetics</h3>
+                            <p className="text-[11px] text-neutral-500 font-normal">
                                 Customize fonts, surfaces, and colors
                             </p>
                         </div>
@@ -109,28 +109,28 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 rounded-xl border border-black hover:bg-neutral-100 cursor-pointer shadow-[1px_1px_0px_#000]"
+                        className="p-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
                     >
-                        <X className="w-4 h-4 text-black" />
+                        <X className="w-4 h-4" />
                     </button>
                 </div>
 
                 {/* 1. Header Banner Image */}
                 <div className="space-y-2.5">
-                    <label className="block text-xs font-black uppercase tracking-wider text-black flex items-center justify-between">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
                         <span>Form Banner Header</span>
-                        <span className="text-[10px] text-neutral-500 font-bold lowercase">Cloudinary</span>
+                        <span className="text-[10px] text-neutral-400 font-medium lowercase">Cloudinary</span>
                     </label>
 
                     {headerImageUrl ? (
-                        <div className="relative rounded-2xl border-2 border-black overflow-hidden shadow-[2px_2px_0px_#000] group">
+                        <div className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm group">
                             <img
                                 src={headerImageUrl}
                                 alt="Form Header"
                                 className="w-full h-28 object-cover"
                             />
                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
-                                <label className="px-3 py-1.5 rounded-xl bg-white text-black font-black text-xs border border-black shadow cursor-pointer hover:bg-neutral-100">
+                                <label className="px-3 py-1.5 rounded-xl bg-white/95 backdrop-blur-sm text-neutral-900 font-semibold text-xs border border-neutral-200 shadow-sm cursor-pointer hover:bg-white">
                                     Change
                                     <input
                                         type="file"
@@ -143,7 +143,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => onChangeHeaderImage(null, null)}
-                                    className="p-1.5 rounded-xl bg-rose-500 text-white border border-black shadow cursor-pointer hover:bg-rose-600"
+                                    className="p-1.5 rounded-xl bg-rose-500 text-white border border-rose-600 shadow-sm cursor-pointer hover:bg-rose-600"
                                     title="Remove header image"
                                 >
                                     <Trash2 className="w-4 h-4" />
@@ -151,12 +151,12 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                             </div>
                         </div>
                     ) : (
-                        <label className="border-2 border-dashed border-black/40 hover:border-black rounded-2xl p-5 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-neutral-50 hover:bg-neutral-100 transition-colors">
-                            <UploadCloud className="w-6 h-6 text-neutral-600" />
-                            <span className="text-xs font-black text-black">
+                        <label className="border border-dashed border-neutral-300 dark:border-neutral-700 hover:border-neutral-900 dark:hover:border-neutral-400 rounded-2xl p-5 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-neutral-50/70 dark:bg-neutral-900/60 hover:bg-neutral-100/70 dark:hover:bg-neutral-900 transition-colors">
+                            <UploadCloud className="w-6 h-6 text-neutral-500" />
+                            <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
                                 {isUploading ? "Uploading to Cloudinary..." : "Upload Header Banner"}
                             </span>
-                            <span className="text-[10px] text-neutral-500 font-medium">
+                            <span className="text-[10px] text-neutral-400 font-normal">
                                 Recommended 1200 x 320 px (JPG, PNG, WebP)
                             </span>
                             <input
@@ -172,7 +172,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
 
                 {/* 2. Primary Accent Color */}
                 <div className="space-y-2.5">
-                    <label className="block text-xs font-black uppercase tracking-wider text-black">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
                         Accent Theme Color
                     </label>
                     <div className="grid grid-cols-4 gap-2">
@@ -183,14 +183,14 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                                     key={palette.value}
                                     type="button"
                                     onClick={() => onChangeTheme({ ...theme, accentColor: palette.value })}
-                                    className={`h-10 rounded-xl border-2 border-black flex items-center justify-center transition-transform active:scale-95 cursor-pointer ${
+                                    className={`h-10 rounded-xl border border-neutral-200 dark:border-neutral-700 flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
                                         palette.bgClass
-                                    } ${isSelected ? "shadow-[2px_2px_0px_#000] ring-2 ring-black" : ""}`}
+                                    } ${isSelected ? "ring-2 ring-neutral-900 dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-[#0A0A0A]" : "hover:border-neutral-400"}`}
                                     title={palette.label}
                                 >
                                     {isSelected && (
                                         <Check
-                                            className={`w-4 h-4 stroke-[3] ${
+                                            className={`w-4 h-4 stroke-[2.5] ${
                                                 palette.value === "#18181b" ? "text-white" : "text-black"
                                             }`}
                                         />
@@ -203,7 +203,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
 
                 {/* 3. Canvas Background Color */}
                 <div className="space-y-2.5">
-                    <label className="block text-xs font-black uppercase tracking-wider text-black">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
                         Canvas Background Tone
                     </label>
                     <div className="grid grid-cols-5 gap-2">
@@ -214,12 +214,12 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                                     key={bg.value}
                                     type="button"
                                     onClick={() => onChangeTheme({ ...theme, backgroundColor: bg.value })}
-                                    className={`h-9 rounded-xl border-2 border-black flex items-center justify-center cursor-pointer transition-transform active:scale-95 ${
+                                    className={`h-9 rounded-xl border border-neutral-200 dark:border-neutral-700 flex items-center justify-center cursor-pointer transition-all active:scale-95 ${
                                         bg.preview
-                                    } ${isSelected ? "shadow-[2px_2px_0px_#000] ring-2 ring-black" : ""}`}
+                                    } ${isSelected ? "ring-2 ring-neutral-900 dark:ring-white ring-offset-2" : "hover:border-neutral-400"}`}
                                     title={bg.label}
                                 >
-                                    {isSelected && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                                    {isSelected && <Check className="w-3.5 h-3.5 text-neutral-900 stroke-[2.5]" />}
                                 </button>
                             );
                         })}
@@ -228,7 +228,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
 
                 {/* 4. Card Surface Tone */}
                 <div className="space-y-2">
-                    <label className="block text-xs font-black uppercase tracking-wider text-black">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
                         Card Surface Color
                     </label>
                     <div className="grid grid-cols-3 gap-2">
@@ -239,8 +239,10 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                                     key={sf.value}
                                     type="button"
                                     onClick={() => onChangeTheme({ ...theme, cardSurfaceColor: sf.value })}
-                                    className={`p-2 rounded-xl border-2 border-black text-[11px] font-black cursor-pointer text-center ${
-                                        isSelected ? "bg-black text-white shadow-[2px_2px_0px_#000]" : "bg-white text-black hover:bg-neutral-50"
+                                    className={`p-2 rounded-xl border text-[11px] font-semibold cursor-pointer text-center transition-colors ${
+                                        isSelected
+                                            ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-sm"
+                                            : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                                     }`}
                                 >
                                     {sf.label}
@@ -252,8 +254,8 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
 
                 {/* 5. Card Shadow Style */}
                 <div className="space-y-2">
-                    <label className="block text-xs font-black uppercase tracking-wider text-black">
-                        Neo Card Shadow
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
+                        Card Elevation
                     </label>
                     <div className="grid grid-cols-3 gap-2">
                         {SHADOW_STYLES.map((sh) => {
@@ -263,8 +265,10 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                                     key={sh.value}
                                     type="button"
                                     onClick={() => onChangeTheme({ ...theme, cardShadowStyle: sh.value })}
-                                    className={`p-2 rounded-xl border-2 border-black text-[11px] font-black cursor-pointer text-center ${
-                                        isSelected ? "bg-black text-white shadow-[2px_2px_0px_#000]" : "bg-white text-black hover:bg-neutral-50"
+                                    className={`p-2 rounded-xl border text-[11px] font-semibold cursor-pointer text-center transition-colors ${
+                                        isSelected
+                                            ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-sm"
+                                            : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                                     }`}
                                     title={sh.desc}
                                 >
@@ -277,7 +281,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
 
                 {/* 6. Button Style */}
                 <div className="space-y-2">
-                    <label className="block text-xs font-black uppercase tracking-wider text-black">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
                         Button Geometry
                     </label>
                     <div className="grid grid-cols-3 gap-2">
@@ -288,8 +292,10 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                                     key={b.value}
                                     type="button"
                                     onClick={() => onChangeTheme({ ...theme, buttonStyle: b.value })}
-                                    className={`p-2 rounded-xl border-2 border-black text-[11px] font-black cursor-pointer text-center ${
-                                        isSelected ? "bg-black text-white shadow-[2px_2px_0px_#000]" : "bg-white text-black hover:bg-neutral-50"
+                                    className={`p-2 rounded-xl border text-[11px] font-semibold cursor-pointer text-center transition-colors ${
+                                        isSelected
+                                            ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-sm"
+                                            : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800"
                                     }`}
                                 >
                                     {b.label}
@@ -301,7 +307,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
 
                 {/* 7. Font Family */}
                 <div className="space-y-2.5">
-                    <label className="block text-xs font-black uppercase tracking-wider text-black">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
                         Typography Style
                     </label>
                     <div className="space-y-2">
@@ -310,20 +316,20 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                                 key={font.value}
                                 type="button"
                                 onClick={() => onChangeTheme({ ...theme, fontFamily: font.value })}
-                                className={`w-full text-left p-3 rounded-xl border-2 border-black font-black text-xs flex items-center justify-between cursor-pointer transition-colors ${
+                                className={`w-full text-left p-3 rounded-xl border font-medium text-xs flex items-center justify-between cursor-pointer transition-colors ${
                                     (theme.fontFamily || "sans") === font.value
-                                        ? "bg-neutral-100 shadow-[2px_2px_0px_#000]"
-                                        : "bg-white hover:bg-neutral-50"
+                                        ? "bg-neutral-100 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
+                                        : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 text-neutral-700 dark:text-neutral-300"
                                 }`}
                             >
                                 <div>
-                                    <span className="block">{font.label}</span>
-                                    <span className="text-[10px] text-neutral-500 font-medium block">
+                                    <span className="block font-semibold">{font.label}</span>
+                                    <span className="text-[10px] text-neutral-500 font-normal block">
                                         {font.sub}
                                     </span>
                                 </div>
                                 {(theme.fontFamily || "sans") === font.value && (
-                                    <Check className="w-4 h-4 text-black stroke-[3]" />
+                                    <Check className="w-4 h-4 text-neutral-900 dark:text-neutral-100 stroke-[2.5]" />
                                 )}
                             </button>
                         ))}
@@ -331,11 +337,11 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                 </div>
             </div>
 
-            <div className="pt-6 border-t-2 border-black/10 mt-6">
+            <div className="pt-6 border-t border-neutral-200 dark:border-neutral-800 mt-6">
                 <button
                     type="button"
                     onClick={onClose}
-                    className="w-full py-2.5 rounded-xl bg-black text-white font-black text-xs hover:bg-neutral-800 transition-colors shadow-[2px_2px_0px_#000] cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full py-2.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-xs hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
                 >
                     <Sparkles className="w-4 h-4 text-amber-300" />
                     <span>Apply Theme</span>

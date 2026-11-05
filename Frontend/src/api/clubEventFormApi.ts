@@ -261,6 +261,8 @@ export interface FormSubmissionPayload {
     notes?: string;
     answers: Record<string, any>;
     fileAttachments?: FileAttachmentMeta[];
+    idempotencyKey?: string;
+    formVersionId?: string;
 }
 
 export interface UploadSignatureConfig {
@@ -321,6 +323,14 @@ export interface PublicFormResponse {
     closedReason?: string;
     canSubmit: boolean;
     userResponse?: any;
+    draftResponse?: {
+        answers?: Record<string, any>;
+        fileAttachments?: FileAttachmentMeta[];
+        currentSectionIndex?: number;
+        sectionHistory?: number[];
+        formVersionId?: string;
+        updatedAt?: string;
+    } | null;
     registeredCount: number;
 }
 
@@ -328,6 +338,21 @@ export interface FormStatsResponse {
     success: boolean;
     stats: {
         totalResponses: number;
+        totalRegistrations?: number;
+        successfulCount?: number;
+        pendingCount?: number;
+        attendedCount?: number;
+        rejectedCount?: number;
+        cancelledCount?: number;
+        statusDistribution?: {
+            registered: number;
+            pending: number;
+            attended: number;
+            rejected: number;
+            cancelled: number;
+        };
+        totalFilesCount?: number;
+        totalFilesBytes?: number;
         questionStats: Record<string, any>;
         timeline: Record<string, number>;
         eventTitle: string;
@@ -633,32 +658,60 @@ export async function fetchFormVersionSnapshot(eventId: string, versionId: strin
     return data;
 }
 
-/**
- * Fetch responses with pagination, search, and version filter
- */
-export async function fetchFormResponses(
-    eventId: string,
-    params?: {
-        page?: number;
-        limit?: number;
-        versionId?: string;
-        status?: string;
-        search?: string;
-    }
-): Promise<{
+export interface FetchResponsesParams {
+    page?: number;
+    limit?: number;
+    versionId?: string;
+    status?: string;
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    questionId?: string;
+    answerSearch?: string;
+    sortBy?: string;
+    sortOrder?: "ASC" | "DESC" | string;
+    responseIds?: string[];
+}
+
+export interface FetchResponsesResult {
     success: boolean;
     total: number;
     page: number;
     limit: number;
     totalPages: number;
+    statusCounts?: {
+        totalCount: number;
+        successfulCount: number;
+        pendingCount: number;
+        attendedCount: number;
+        rejectedCount: number;
+        cancelledCount: number;
+    };
     responses: any[];
-}> {
+}
+
+/**
+ * Fetch responses with pagination, search, question filtering, date range, and sorting (Phase 5.4)
+ */
+export async function fetchFormResponses(
+    eventId: string,
+    params?: FetchResponsesParams
+): Promise<FetchResponsesResult> {
     const query = new URLSearchParams();
     if (params?.page) query.set("page", String(params.page));
     if (params?.limit) query.set("limit", String(params.limit));
     if (params?.versionId) query.set("versionId", params.versionId);
     if (params?.status) query.set("status", params.status);
     if (params?.search) query.set("search", params.search);
+    if (params?.startDate) query.set("startDate", params.startDate);
+    if (params?.endDate) query.set("endDate", params.endDate);
+    if (params?.questionId) query.set("questionId", params.questionId);
+    if (params?.answerSearch) query.set("answerSearch", params.answerSearch);
+    if (params?.sortBy) query.set("sortBy", params.sortBy);
+    if (params?.sortOrder) query.set("sortOrder", params.sortOrder);
+    if (params?.responseIds && params.responseIds.length > 0) {
+        query.set("responseIds", params.responseIds.join(","));
+    }
 
     const qs = query.toString();
     const url = `/api/club/events/${encodeURIComponent(eventId)}/form/responses${qs ? `?${qs}` : ""}`;
@@ -671,17 +724,68 @@ export async function fetchFormResponses(
 }
 
 /**
- * Export responses as CSV file
+ * Export responses as CSV file (Phase 5.5)
  */
-export async function exportFormResponsesCsv(eventId: string, versionId?: string): Promise<Blob> {
-    const qs = versionId ? `?versionId=${encodeURIComponent(versionId)}` : "";
-    const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form/responses/export${qs}`, {
+export async function exportFormResponsesCsv(
+    eventId: string,
+    options?: {
+        versionId?: string;
+        status?: string;
+        search?: string;
+        startDate?: string;
+        endDate?: string;
+        responseIds?: string[];
+    }
+): Promise<Blob> {
+    const query = new URLSearchParams();
+    if (options?.versionId) query.set("versionId", options.versionId);
+    if (options?.status) query.set("status", options.status);
+    if (options?.search) query.set("search", options.search);
+    if (options?.startDate) query.set("startDate", options.startDate);
+    if (options?.endDate) query.set("endDate", options.endDate);
+    if (options?.responseIds && options.responseIds.length > 0) {
+        query.set("responseIds", options.responseIds.join(","));
+    }
+
+    const qs = query.toString();
+    const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form/responses/export${qs ? `?${qs}` : ""}`, {
         credentials: "include",
     });
     if (!res.ok) {
         throw new Error("Failed to export responses CSV.");
     }
-    return res.blob();
+    const blob = await res.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = `event_responses_${Date.now()}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(blobUrl);
+    return blob;
+}
+
+/**
+ * Update individual response registration status (Phase 5.3)
+ */
+export async function updateResponseStatus(
+    eventId: string,
+    registrationId: string,
+    status: string,
+    reviewNotes?: string
+): Promise<{ success: boolean; message: string; registration: any }> {
+    const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form/responses/${encodeURIComponent(registrationId)}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ status, reviewNotes }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to update response status.");
+    }
+    return data;
 }
 
 /**
@@ -731,6 +835,194 @@ export async function releaseFormQuizGrades(
     const data = await res.json();
     if (!res.ok || !data.success) {
         throw new Error(data?.message || "Failed to release quiz grades.");
+    }
+    return data;
+}
+
+/**
+ * Fetch authenticated student's autosaved registration draft
+ */
+export async function fetchStudentDraft(eventId: string): Promise<{
+    success: boolean;
+    draft: {
+        answers?: Record<string, any>;
+        fileAttachments?: FileAttachmentMeta[];
+        currentSectionIndex?: number;
+        sectionHistory?: number[];
+        formVersionId?: string;
+        updatedAt?: string;
+    } | null;
+}> {
+    const res = await fetch(`/api/events/${encodeURIComponent(eventId)}/form/draft`, {
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to load draft.");
+    }
+    return data;
+}
+
+/**
+ * Autosave student's unfinished registration draft
+ */
+export async function saveStudentDraft(
+    eventId: string,
+    payload: {
+        answers?: Record<string, any>;
+        fileAttachments?: FileAttachmentMeta[];
+        currentSectionIndex?: number;
+        sectionHistory?: number[];
+        formVersionId?: string;
+    }
+): Promise<{ success: boolean; message: string; draft: any }> {
+    const res = await fetch(`/api/events/${encodeURIComponent(eventId)}/form/draft`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to save draft.");
+    }
+    return data;
+}
+
+/**
+ * Clear student's autosaved draft
+ */
+export async function clearStudentDraft(eventId: string): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`/api/events/${encodeURIComponent(eventId)}/form/draft`, {
+        method: "DELETE",
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to clear draft.");
+    }
+    return data;
+}
+
+/**
+ * Phase 6.1 Question Library: Fetch questions from past club events
+ */
+export async function fetchClubQuestionLibrary(eventId: string): Promise<{
+    success: boolean;
+    library: Array<{
+        eventId: string;
+        eventTitle: string;
+        formTitle: string;
+        createdAt: string;
+        sectionsCount: number;
+        questions: FormQuestion[];
+    }>;
+}> {
+    const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form/question-library`, {
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to load club question library.");
+    }
+    return data;
+}
+
+/**
+ * Import questions into the form (Phase 6.1)
+ */
+export async function importQuestionsToForm(
+    eventId: string,
+    questions: FormQuestion[],
+    targetSectionId?: string
+): Promise<{ success: boolean; message: string; form: ClubEventFormRecord }> {
+    const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form/import-questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ questions, targetSectionId }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to import questions.");
+    }
+    return data;
+}
+
+/**
+ * Phase 6.3 AI-Assisted Form Creation: Suggest questionnaire based on prompt & event info
+ */
+export async function requestAiQuestionSuggestions(
+    eventId: string,
+    payload: { prompt?: string; eventType?: string; eventDescription?: string }
+): Promise<{
+    success: boolean;
+    suggestedQuestions: FormQuestion[];
+    generatedBy: "gemini" | "deterministic-engine";
+    summary: string;
+}> {
+    const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form/ai-suggest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to generate AI question suggestions.");
+    }
+    return data;
+}
+
+/**
+ * Phase 6.4 QR Code Verification: Verify ticket pass code for quick check-in
+ */
+export async function verifyRegistrationQrCheckIn(
+    eventId: string,
+    ticketCode: string
+): Promise<{
+    success: boolean;
+    valid: boolean;
+    message: string;
+    registration?: any;
+}> {
+    const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form/qr-checkin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ ticketCode }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "QR Check-in verification failed.");
+    }
+    return data;
+}
+
+/**
+ * Phase 6.4 Cross-Event Analytics: Multi-event registration & turnout metrics
+ */
+export async function fetchClubCrossEventAnalytics(clubId: string): Promise<{
+    success: boolean;
+    totalEvents: number;
+    totalRegistrations: number;
+    totalAttendees: number;
+    overallTurnoutRate: number;
+    events: Array<{
+        eventId: string;
+        title: string;
+        startsAt: string;
+        registeredCount: number;
+        attendedCount: number;
+        publishedVersion: number;
+    }>;
+}> {
+    const res = await fetch(`/api/club/${encodeURIComponent(clubId)}/forms/cross-event-analytics`, {
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+        throw new Error(data?.message || "Failed to load cross-event analytics.");
     }
     return data;
 }

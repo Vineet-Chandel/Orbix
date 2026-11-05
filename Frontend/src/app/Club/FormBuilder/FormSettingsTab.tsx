@@ -3,18 +3,11 @@ import {
     Award,
     Mail,
     Sliders,
-    Eye,
-    Clock,
-    Users,
-    CheckCircle2,
     ChevronDown,
     ChevronUp,
     Bookmark,
     Shield,
-    Calendar,
     Settings,
-    FileCheck,
-    AlertTriangle,
 } from "lucide-react";
 import { NeoToggle } from "../../../components/NeoToggle";
 import type { ClubEventFormRecord, FormSettings } from "../../../api/clubEventFormApi";
@@ -23,19 +16,19 @@ import { useToast } from "../../../context/ToastContext";
 export interface FormSettingsTabProps {
     form: ClubEventFormRecord;
     event?: any;
-    accentColor: string;
+    accentColor?: string;
     onUpdateSettings: (newSettings: FormSettings) => void;
 }
 
 export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
     form,
     event,
-    accentColor,
+    accentColor: _accentColor,
     onUpdateSettings,
 }) => {
     const toast = useToast();
 
-    // Accordion state (Google Forms expandable sections)
+    // Accordion state
     const [openSections, setOpenSections] = useState<Record<string, boolean>>({
         quiz: true,
         responses: true,
@@ -49,12 +42,11 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
 
     const s = form.settings;
 
-    // Helper to deeply merge updates and sync top-level flat compatibility fields
+    // Deep merge helper
     const updateSettings = (partial: Partial<FormSettings>) => {
         const merged: FormSettings = {
             ...s,
             ...partial,
-            // Ensure nested models exist
             quiz: {
                 isQuiz: false,
                 releaseGrades: "immediately",
@@ -125,26 +117,26 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
     return (
         <div className="max-w-3xl mx-auto space-y-5 pb-16">
             {/* Page Header Notice */}
-            <div className="p-4 rounded-2xl bg-amber-50 border-2 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
-                <Settings className="w-5 h-5 text-amber-700 shrink-0" />
-                <div className="text-xs font-bold text-amber-900">
-                    Settings configured here apply to registrations, quiz grading, respondent visibility, and event availability.
+            <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center gap-3">
+                <Settings className="w-4 h-4 text-neutral-500 shrink-0" />
+                <div className="text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                    Configure registration rules, automated quiz grading, respondent visibility, and event capacity.
                 </div>
             </div>
 
             {/* ------------------------------------------------------------------------- */}
             {/* GROUP 1: QUIZ SETTINGS */}
             {/* ------------------------------------------------------------------------- */}
-            <div className="rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden">
+            <div className="rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden">
                 {/* Header with Master Switch */}
-                <div className="p-5 sm:p-6 bg-neutral-50 border-b-2 border-black flex flex-wrap items-center justify-between gap-4">
+                <div className="p-5 sm:p-6 bg-white dark:bg-[#0A0A0A] border-b border-neutral-100 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <span className="p-2.5 rounded-2xl bg-[#A3E635] border-2 border-black shadow-[2px_2px_0px_#000]">
-                            <Award className="w-5 h-5 text-black" />
+                        <span className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100">
+                            <Award className="w-5 h-5" />
                         </span>
                         <div>
-                            <h3 className="text-base sm:text-lg font-black text-black">Make this a quiz</h3>
-                            <p className="text-xs text-neutral-600 font-medium">
+                            <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">Make this a quiz</h3>
+                            <p className="text-xs text-neutral-500 font-normal">
                                 Assign point values, set answer keys, and automatically grade student submissions.
                             </p>
                         </div>
@@ -161,23 +153,23 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                         <button
                             type="button"
                             onClick={() => toggleSection("quiz")}
-                            className="p-1 rounded-xl text-neutral-500 hover:text-black cursor-pointer"
+                            className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white cursor-pointer transition-colors"
                         >
-                            {openSections.quiz ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                            {openSections.quiz ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                         </button>
                     </div>
                 </div>
 
                 {/* Expanded Quiz Options */}
                 {s.quiz?.isQuiz && openSections.quiz && (
-                    <div className="p-5 sm:p-6 space-y-6 divide-y-2 divide-black/10">
+                    <div className="p-5 sm:p-6 space-y-6 divide-y divide-neutral-100 dark:divide-neutral-800">
                         {/* 1. Release Grades */}
                         <div className="space-y-3 pt-1">
-                            <span className="text-xs font-black uppercase tracking-wider text-black block">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
                                 Release Grades
                             </span>
-                            <div className="space-y-2.5">
-                                <label className="flex items-start gap-3 p-3 rounded-2xl border-2 border-black cursor-pointer transition-all hover:bg-neutral-50 bg-white">
+                            <div className="space-y-2">
+                                <label className="flex items-start gap-3 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 cursor-pointer transition-all hover:bg-neutral-50 dark:hover:bg-neutral-900/50 bg-white dark:bg-neutral-950">
                                     <input
                                         type="radio"
                                         name="releaseGrades"
@@ -187,19 +179,19 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                                 quiz: { ...s.quiz, releaseGrades: "immediately" },
                                             })
                                         }
-                                        className="mt-0.5 accent-black"
+                                        className="mt-0.5 accent-black dark:accent-white"
                                     />
                                     <div>
-                                        <span className="text-xs sm:text-sm font-black text-black block">
+                                        <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                             Immediately after each submission
                                         </span>
-                                        <span className="text-[11px] text-neutral-500 font-medium block">
+                                        <span className="text-[11px] text-neutral-500 font-normal block">
                                             Respondents instantly see their calculated score upon submitting the form.
                                         </span>
                                     </div>
                                 </label>
 
-                                <label className="flex items-start gap-3 p-3 rounded-2xl border-2 border-black cursor-pointer transition-all hover:bg-neutral-50 bg-white">
+                                <label className="flex items-start gap-3 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 cursor-pointer transition-all hover:bg-neutral-50 dark:hover:bg-neutral-900/50 bg-white dark:bg-neutral-950">
                                     <input
                                         type="radio"
                                         name="releaseGrades"
@@ -209,13 +201,13 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                                 quiz: { ...s.quiz, releaseGrades: "after_review" },
                                             })
                                         }
-                                        className="mt-0.5 accent-black"
+                                        className="mt-0.5 accent-black dark:accent-white"
                                     />
                                     <div>
-                                        <span className="text-xs sm:text-sm font-black text-black block">
+                                        <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                             Later, after manual review
                                         </span>
-                                        <span className="text-[11px] text-neutral-500 font-medium block">
+                                        <span className="text-[11px] text-neutral-500 font-normal block">
                                             Club staff can review text questions, adjust scores, and release grades from the Responses tab.
                                         </span>
                                     </div>
@@ -225,17 +217,17 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
 
                         {/* 2. Respondent Settings */}
                         <div className="space-y-3 pt-5">
-                            <span className="text-xs font-black uppercase tracking-wider text-black block">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
                                 Respondent Settings
                             </span>
 
                             {/* Missed questions toggle */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Missed questions
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Respondents can see which questions were answered incorrectly.
                                     </span>
                                 </div>
@@ -251,12 +243,12 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                             </div>
 
                             {/* Correct answers toggle */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Correct answers
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Respondents can see correct answers after grades are released.
                                     </span>
                                 </div>
@@ -272,12 +264,12 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                             </div>
 
                             {/* Point values toggle */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Point values
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Respondents can see total points and points received for each question.
                                     </span>
                                 </div>
@@ -296,10 +288,10 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                         {/* 3. Default question points */}
                         <div className="pt-5 flex items-center justify-between gap-4">
                             <div>
-                                <span className="text-xs sm:text-sm font-black text-black block">
+                                <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                     Default question point value
                                 </span>
-                                <span className="text-[11px] text-neutral-500 font-medium">
+                                <span className="text-[11px] text-neutral-500 font-normal">
                                     Points automatically assigned to newly added questions.
                                 </span>
                             </div>
@@ -320,7 +312,7 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                         },
                                     })
                                 }
-                                className="w-20 p-2 rounded-xl border-2 border-black text-center text-xs font-black bg-white focus:outline-none shadow-[2px_2px_0px_#000]"
+                                className="w-20 p-2 rounded-lg border border-neutral-200 dark:border-neutral-800 text-center text-xs font-semibold bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-400"
                             />
                         </div>
                     </div>
@@ -330,40 +322,40 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
             {/* ------------------------------------------------------------------------- */}
             {/* GROUP 2: RESPONSES SETTINGS */}
             {/* ------------------------------------------------------------------------- */}
-            <div className="rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden">
+            <div className="rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden">
                 <div
                     onClick={() => toggleSection("responses")}
-                    className="p-5 sm:p-6 bg-neutral-50 border-b-2 border-black flex items-center justify-between gap-4 cursor-pointer hover:bg-neutral-100 transition-colors"
+                    className="p-5 sm:p-6 bg-white dark:bg-[#0A0A0A] border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-4 cursor-pointer hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50 transition-colors"
                 >
                     <div className="flex items-center gap-3">
-                        <span className="p-2.5 rounded-2xl bg-[#38BDF8] border-2 border-black shadow-[2px_2px_0px_#000]">
-                            <Mail className="w-5 h-5 text-black" />
+                        <span className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100">
+                            <Mail className="w-5 h-5" />
                         </span>
                         <div>
-                            <h3 className="text-base sm:text-lg font-black text-black">Responses</h3>
-                            <p className="text-xs text-neutral-600 font-medium">
+                            <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">Responses</h3>
+                            <p className="text-xs text-neutral-500 font-normal">
                                 Manage identity collection, participant limits, response editing, and receipts.
                             </p>
                         </div>
                     </div>
-                    {openSections.responses ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    {openSections.responses ? <ChevronUp className="w-4 h-4 text-neutral-400" /> : <ChevronDown className="w-4 h-4 text-neutral-400" />}
                 </div>
 
                 {openSections.responses && (
-                    <div className="p-5 sm:p-6 space-y-6 divide-y-2 divide-black/10">
+                    <div className="p-5 sm:p-6 space-y-6 divide-y divide-neutral-100 dark:divide-neutral-800">
                         {/* 1. Identity Collection */}
                         <div className="space-y-3 pt-1">
-                            <span className="text-xs font-black uppercase tracking-wider text-black block">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
                                 Identity & Account Collection
                             </span>
 
                             {/* Collect Orbix Identity */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Collect verified Orbix account & student email
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Automatically links registration to the student's campus profile.
                                     </span>
                                 </div>
@@ -379,12 +371,12 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                             </div>
 
                             {/* Use existing student profile information */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Pre-fill profile information
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Pre-populates verified student name, college, roll number, and department.
                                     </span>
                                 </div>
@@ -402,17 +394,17 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
 
                         {/* 2. Submission Control */}
                         <div className="space-y-3 pt-5">
-                            <span className="text-xs font-black uppercase tracking-wider text-black block">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
                                 Submission Control
                             </span>
 
                             {/* Limit to 1 response */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Limit to 1 response per student
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Requires login and enforces single entry per student account.
                                     </span>
                                 </div>
@@ -429,12 +421,12 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                             </div>
 
                             {/* Allow response editing */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Allow response editing
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Students can revisit and modify their answers after submission.
                                     </span>
                                 </div>
@@ -451,12 +443,12 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                             </div>
 
                             {/* Require Orbix login */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Require Orbix student login
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Prevents anonymous submissions and validates campus credentials.
                                     </span>
                                 </div>
@@ -473,8 +465,8 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                             </div>
 
                             {/* Campus Eligibility Notice */}
-                            <div className="p-3 bg-neutral-100 rounded-xl border border-black/20 flex items-center gap-2.5 text-xs text-neutral-700 font-medium">
-                                <Shield className="w-4 h-4 text-neutral-600 shrink-0" />
+                            <div className="p-3 bg-neutral-50 dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 flex items-center gap-2.5 text-xs text-neutral-600 dark:text-neutral-400 font-medium">
+                                <Shield className="w-4 h-4 text-neutral-500 shrink-0" />
                                 <span>
                                     <strong>Campus Eligibility:</strong> Synchronized with Event settings (
                                     {event?.eligibility === "college_only" ? "Restricted to host college students" : "Open to all verified students"}
@@ -485,16 +477,16 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
 
                         {/* 3. Response Receipts & Notifications */}
                         <div className="space-y-3 pt-5">
-                            <span className="text-xs font-black uppercase tracking-wider text-black block">
-                                Response Receipts & Notifications
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
+                                Receipts & Notifications
                             </span>
 
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Send registration confirmation email
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Emails confirmation and registration ticket code to the respondent.
                                     </span>
                                 </div>
@@ -509,12 +501,12 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Notify club administrators on new submissions
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Sends notification to club team members when a student completes registration.
                                     </span>
                                 </div>
@@ -533,15 +525,15 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
 
                         {/* 4. Response Availability & Closing */}
                         <div className="space-y-4 pt-5">
-                            <span className="text-xs font-black uppercase tracking-wider text-black block">
-                                Response Availability & Deadlines
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
+                                Response Availability & Limits
                             </span>
 
                             {/* Accepting Responses Master Toggle */}
-                            <div className="p-4 rounded-2xl border-2 border-black bg-neutral-50 flex items-center justify-between gap-4 shadow-[2px_2px_0px_#000]">
+                            <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 flex items-center justify-between gap-4">
                                 <div>
-                                    <span className="font-black text-sm text-black block">Accepting Responses</span>
-                                    <span className="text-xs text-neutral-500 font-medium">
+                                    <span className="font-semibold text-sm text-neutral-900 dark:text-white block">Accepting Responses</span>
+                                    <span className="text-xs text-neutral-500 font-normal">
                                         When turned off, respondents see the custom closed message.
                                     </span>
                                 </div>
@@ -558,7 +550,7 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
 
                             {/* Scheduled Closing Date & Time */}
                             <div className="space-y-1.5">
-                                <label className="block text-xs font-black text-black">
+                                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300">
                                     Scheduled Closing Date & Time (Optional)
                                 </label>
                                 <div className="flex items-center gap-2">
@@ -573,7 +565,7 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                                 },
                                             })
                                         }
-                                        className="w-full border-2 border-black rounded-xl p-2.5 text-xs sm:text-sm font-bold bg-white focus:outline-none"
+                                        className="w-full border border-neutral-200 dark:border-neutral-800 rounded-lg p-2.5 text-xs sm:text-sm font-medium bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-400"
                                     />
                                     {s.responses?.closingDateTime && (
                                         <button
@@ -583,20 +575,20 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                                     responses: { ...s.responses, closingDateTime: null },
                                                 })
                                             }
-                                            className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 border-2 border-black rounded-xl text-xs font-black cursor-pointer"
+                                            className="px-3 py-2 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 border border-neutral-200 dark:border-neutral-700 rounded-lg text-xs font-semibold cursor-pointer"
                                         >
                                             Clear
                                         </button>
                                     )}
                                 </div>
-                                <span className="text-[11px] text-neutral-500 font-medium block">
+                                <span className="text-[11px] text-neutral-500 font-normal block">
                                     Forms will automatically stop accepting responses past this date.
                                 </span>
                             </div>
 
                             {/* Maximum Responses Cap */}
                             <div className="space-y-1.5">
-                                <label className="block text-xs font-black text-black">
+                                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300">
                                     Maximum Response Capacity Limit
                                 </label>
                                 <input
@@ -613,9 +605,9 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                         })
                                     }
                                     placeholder="Leave empty for unlimited participants"
-                                    className="w-full border-2 border-black rounded-xl p-2.5 text-xs sm:text-sm font-bold bg-white focus:outline-none"
+                                    className="w-full border border-neutral-200 dark:border-neutral-800 rounded-lg p-2.5 text-xs sm:text-sm font-medium bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-400"
                                 />
-                                <span className="text-[11px] text-neutral-500 font-medium block">
+                                <span className="text-[11px] text-neutral-500 font-normal block">
                                     {event?.capacity
                                         ? `Event seat limit is currently set to ${event.capacity} in event settings.`
                                         : "Leave blank to accept registrations up to total event capacity."}
@@ -624,7 +616,7 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
 
                             {/* Custom Closed Form Message */}
                             <div className="space-y-1.5">
-                                <label className="block text-xs font-black text-black">
+                                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300">
                                     Message for Respondents when Form is Closed
                                 </label>
                                 <textarea
@@ -637,7 +629,7 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                     }
                                     placeholder="Registrations are currently closed for this event."
                                     rows={2}
-                                    className="w-full border-2 border-black rounded-xl p-3 text-xs sm:text-sm font-medium focus:outline-none bg-white"
+                                    className="w-full border border-neutral-200 dark:border-neutral-800 rounded-lg p-2.5 text-xs sm:text-sm font-normal focus:outline-none focus:border-neutral-400 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white resize-none"
                                 />
                             </div>
                         </div>
@@ -648,40 +640,40 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
             {/* ------------------------------------------------------------------------- */}
             {/* GROUP 3: PRESENTATION SETTINGS */}
             {/* ------------------------------------------------------------------------- */}
-            <div className="rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden">
+            <div className="rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden">
                 <div
                     onClick={() => toggleSection("presentation")}
-                    className="p-5 sm:p-6 bg-neutral-50 border-b-2 border-black flex items-center justify-between gap-4 cursor-pointer hover:bg-neutral-100 transition-colors"
+                    className="p-5 sm:p-6 bg-white dark:bg-[#0A0A0A] border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-4 cursor-pointer hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50 transition-colors"
                 >
                     <div className="flex items-center gap-3">
-                        <span className="p-2.5 rounded-2xl bg-[#C084FC] border-2 border-black shadow-[2px_2px_0px_#000]">
-                            <Sliders className="w-5 h-5 text-black" />
+                        <span className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100">
+                            <Sliders className="w-5 h-5" />
                         </span>
                         <div>
-                            <h3 className="text-base sm:text-lg font-black text-black">Presentation</h3>
-                            <p className="text-xs text-neutral-600 font-medium">
+                            <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">Presentation</h3>
+                            <p className="text-xs text-neutral-500 font-normal">
                                 Configure progress indicator, shuffling, confirmation messages, and autosave.
                             </p>
                         </div>
                     </div>
-                    {openSections.presentation ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    {openSections.presentation ? <ChevronUp className="w-4 h-4 text-neutral-400" /> : <ChevronDown className="w-4 h-4 text-neutral-400" />}
                 </div>
 
                 {openSections.presentation && (
-                    <div className="p-5 sm:p-6 space-y-6 divide-y-2 divide-black/10">
+                    <div className="p-5 sm:p-6 space-y-6 divide-y divide-neutral-100 dark:divide-neutral-800">
                         {/* 1. Form Presentation */}
                         <div className="space-y-3 pt-1">
-                            <span className="text-xs font-black uppercase tracking-wider text-black block">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
                                 Form Layout & Ordering
                             </span>
 
                             {/* Progress bar */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Show progress bar
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Display step and page indicators on multi-section registration forms.
                                     </span>
                                 </div>
@@ -698,12 +690,12 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                             </div>
 
                             {/* Shuffle question order */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Shuffle question order
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Randomizes question sequence for each respondent (ideal for quizzes).
                                     </span>
                                 </div>
@@ -719,12 +711,12 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                             </div>
 
                             {/* Shuffle answer options */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Shuffle answer options globally
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Randomizes multiple-choice and checkbox choices for all questions.
                                     </span>
                                 </div>
@@ -742,13 +734,13 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
 
                         {/* 2. Post-Submission Experience */}
                         <div className="space-y-4 pt-5">
-                            <span className="text-xs font-black uppercase tracking-wider text-black block">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
                                 After Submission
                             </span>
 
                             {/* Confirmation message */}
                             <div className="space-y-1.5">
-                                <label className="block text-xs font-black text-black">
+                                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300">
                                     Confirmation Message
                                 </label>
                                 <textarea
@@ -761,17 +753,17 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                     }
                                     placeholder="Thank you! Your registration has been submitted successfully."
                                     rows={3}
-                                    className="w-full border-2 border-black rounded-xl p-3 text-xs sm:text-sm font-medium focus:outline-none bg-white"
+                                    className="w-full border border-neutral-200 dark:border-neutral-800 rounded-lg p-2.5 text-xs sm:text-sm font-normal focus:outline-none focus:border-neutral-400 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white resize-none"
                                 />
                             </div>
 
                             {/* Submit another response link */}
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Show link to submit another response
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Applicable when multiple responses per student are permitted.
                                     </span>
                                 </div>
@@ -786,14 +778,14 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                 />
                             </div>
 
-                            {/* View results summary toggle with privacy note */}
-                            <div className="p-4 rounded-2xl border-2 border-black bg-neutral-50 space-y-3">
+                            {/* View results summary toggle */}
+                            <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-900 space-y-3">
                                 <div className="flex items-center justify-between gap-4">
                                     <div>
-                                        <span className="text-xs sm:text-sm font-black text-black block">
+                                        <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                             View results summary
                                         </span>
-                                        <span className="text-[11px] text-neutral-500 font-medium">
+                                        <span className="text-[11px] text-neutral-500 font-normal">
                                             Allow respondents to view aggregate charts after submitting.
                                         </span>
                                     </div>
@@ -807,7 +799,7 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                         size="sm"
                                     />
                                 </div>
-                                <div className="p-2.5 rounded-xl bg-white border border-black/20 text-[11px] text-neutral-600 font-medium flex items-center gap-2">
+                                <div className="p-2.5 rounded-lg bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-500 font-normal flex items-center gap-2">
                                     <Shield className="w-4 h-4 text-emerald-600 shrink-0" />
                                     <span>
                                         <strong>Privacy Guard Active:</strong> Individual answers, personal identification, and files of other students are never exposed to respondents.
@@ -818,15 +810,15 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
 
                         {/* 3. Autosave respondent progress */}
                         <div className="space-y-3 pt-5">
-                            <span className="text-xs font-black uppercase tracking-wider text-black block">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
                                 Autosave Progress
                             </span>
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Autosave respondent answers locally
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Automatically saves student progress in their browser to prevent loss if closed.
                                     </span>
                                 </div>
@@ -848,39 +840,39 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
             {/* ------------------------------------------------------------------------- */}
             {/* GROUP 4: FORM & QUESTION DEFAULTS */}
             {/* ------------------------------------------------------------------------- */}
-            <div className="rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] overflow-hidden">
+            <div className="rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm overflow-hidden">
                 <div
                     onClick={() => toggleSection("defaults")}
-                    className="p-5 sm:p-6 bg-neutral-50 border-b-2 border-black flex items-center justify-between gap-4 cursor-pointer hover:bg-neutral-100 transition-colors"
+                    className="p-5 sm:p-6 bg-white dark:bg-[#0A0A0A] border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-4 cursor-pointer hover:bg-neutral-50/50 dark:hover:bg-neutral-900/50 transition-colors"
                 >
                     <div className="flex items-center gap-3">
-                        <span className="p-2.5 rounded-2xl bg-[#FB7185] border-2 border-black shadow-[2px_2px_0px_#000]">
-                            <Bookmark className="w-5 h-5 text-black" />
+                        <span className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100">
+                            <Bookmark className="w-5 h-5" />
                         </span>
                         <div>
-                            <h3 className="text-base sm:text-lg font-black text-black">Defaults & Presets</h3>
-                            <p className="text-xs text-neutral-600 font-medium">
+                            <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">Defaults & Presets</h3>
+                            <p className="text-xs text-neutral-500 font-normal">
                                 Default rules applied to all new questions and form templates for your club.
                             </p>
                         </div>
                     </div>
-                    {openSections.defaults ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    {openSections.defaults ? <ChevronUp className="w-4 h-4 text-neutral-400" /> : <ChevronDown className="w-4 h-4 text-neutral-400" />}
                 </div>
 
                 {openSections.defaults && (
-                    <div className="p-5 sm:p-6 space-y-6 divide-y-2 divide-black/10">
+                    <div className="p-5 sm:p-6 space-y-6 divide-y divide-neutral-100 dark:divide-neutral-800">
                         {/* Question Defaults */}
                         <div className="space-y-3 pt-1">
-                            <span className="text-xs font-black uppercase tracking-wider text-black block">
+                            <span className="text-xs font-semibold uppercase tracking-wider text-neutral-500 block">
                                 Question Defaults
                             </span>
 
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Make questions required by default
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         New questions will automatically be toggled as required.
                                     </span>
                                 </div>
@@ -895,12 +887,12 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                 />
                             </div>
 
-                            <div className="flex items-center justify-between gap-4 p-3 rounded-2xl border border-black/20 hover:border-black transition-colors">
+                            <div className="flex items-center justify-between gap-4 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800">
                                 <div>
-                                    <span className="text-xs sm:text-sm font-black text-black block">
+                                    <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                         Enable response validation by default
                                     </span>
-                                    <span className="text-[11px] text-neutral-500 font-medium">
+                                    <span className="text-[11px] text-neutral-500 font-normal">
                                         Suggests standard length and format validation when creating text questions.
                                     </span>
                                 </div>
@@ -919,17 +911,17 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                         {/* Save Club Defaults */}
                         <div className="pt-5 flex flex-wrap items-center justify-between gap-4">
                             <div>
-                                <span className="text-xs sm:text-sm font-black text-black block">
+                                <span className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white block">
                                     Club Default Form Settings
                                 </span>
-                                <span className="text-[11px] text-neutral-500 font-medium">
+                                <span className="text-[11px] text-neutral-500 font-normal">
                                     Save current settings configuration as the club standard for future events.
                                 </span>
                             </div>
                             <button
                                 type="button"
                                 onClick={handleSaveClubDefaults}
-                                className="px-4 py-2 rounded-xl bg-black text-white text-xs font-black shadow-[2px_2px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer"
+                                className="px-4 py-2 rounded-lg bg-black dark:bg-white text-white dark:text-black text-xs font-semibold hover:bg-neutral-800 dark:hover:bg-neutral-200 cursor-pointer shadow-sm transition-colors"
                             >
                                 Save as Club Default
                             </button>
