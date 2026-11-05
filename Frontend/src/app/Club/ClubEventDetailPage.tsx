@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import {
     ArrowLeft,
     Calendar,
@@ -25,6 +25,7 @@ import {
     Check,
     RefreshCw,
     Award,
+    ScanLine,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -46,9 +47,10 @@ import { ClubEventModal } from "./ClubEventModal";
 import { EventSecurityConfirmModal } from "./EventSecurityConfirmModal";
 import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
 import { EventLiveListingCard } from "../../components/EventLiveListingCard";
+import { ClubEventCheckinTerminal } from "./ClubEventCheckinTerminal";
 import { OrbixLoader } from "../../components/ui/loader";
 
-type EventTab = "roster" | "analytics" | "pass";
+type EventTab = "roster" | "checkin" | "analytics" | "pass";
 
 export interface ClubEventDetailWorkspaceProps {
     eventId?: string;
@@ -84,7 +86,23 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     } | null>(propClub || null);
     const [loading, setLoading] = useState(true);
     const [accessDenied, setAccessDenied] = useState(false);
-    const [activeTab, setActiveTab] = useState<EventTab>("roster");
+    const [searchParams, setSearchParams] = useSearchParams();
+    const location = useLocation();
+    const isCheckinRoute = location.pathname.endsWith("/checkin") || searchParams.get("tab") === "checkin";
+    const [activeTab, setActiveTab] = useState<EventTab>(isCheckinRoute ? "checkin" : "roster");
+
+    const handleTabChange = (tab: EventTab) => {
+        setActiveTab(tab);
+        setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            if (tab === "roster") {
+                next.delete("tab");
+            } else {
+                next.set("tab", tab);
+            }
+            return next;
+        });
+    };
 
     // Modal states
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -670,8 +688,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                 <div className="flex items-center gap-2 border-b-2 border-black/10 pb-2 overflow-x-auto">
                     <button
                         type="button"
-                        onClick={() => setActiveTab("roster")}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 ${
+                        onClick={() => handleTabChange("roster")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
                             activeTab === "roster"
                                 ? "bg-[#38BDF8] text-black shadow-[3px_3px_0px_#000]"
                                 : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
@@ -686,10 +704,26 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
                     <button
                         type="button"
-                        onClick={() => setActiveTab("analytics")}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 ${
-                            activeTab === "analytics"
+                        onClick={() => handleTabChange("checkin")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                            activeTab === "checkin"
                                 ? "bg-[#a2ff86] text-black shadow-[3px_3px_0px_#000]"
+                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
+                        }`}
+                    >
+                        <ScanLine className="w-4 h-4 stroke-[2.5]" />
+                        <span>Live Check-In Scanner</span>
+                        <span className="px-2 py-0.5 rounded-full bg-black text-[#a2ff86] border border-black text-[10px] font-black">
+                            LIVE QR
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange("analytics")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                            activeTab === "analytics"
+                                ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
                                 : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
                         }`}
                     >
@@ -699,10 +733,10 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
                     <button
                         type="button"
-                        onClick={() => setActiveTab("pass")}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 ${
+                        onClick={() => handleTabChange("pass")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
                             activeTab === "pass"
-                                ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
+                                ? "bg-purple-300 text-black shadow-[3px_3px_0px_#000]"
                                 : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
                         }`}
                     >
@@ -1014,6 +1048,32 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             )}
                         </div>
                     </div>
+                )}
+
+                {/* TAB: LIVE CHECK-IN SCANNER TERMINAL */}
+                {activeTab === "checkin" && event && (
+                    <ClubEventCheckinTerminal
+                        eventId={event.id}
+                        eventTitle={event.title}
+                        onCheckinCompleted={(attendee) => {
+                            setAppsData((prev) => {
+                                if (!prev) return prev;
+                                const updatedList = prev.applications.map((app) =>
+                                    app.id === attendee.registrationId
+                                        ? { ...app, status: "attended" as const, checkedInAt: attendee.checkedInAt }
+                                        : app
+                                );
+                                return {
+                                    ...prev,
+                                    summary: {
+                                        ...prev.summary,
+                                        attended: updatedList.filter((a) => a.status === "attended").length,
+                                    },
+                                    applications: updatedList,
+                                };
+                            });
+                        }}
+                    />
                 )}
 
                 {/* TAB 2: ANALYTICS & ATTENDANCE */}

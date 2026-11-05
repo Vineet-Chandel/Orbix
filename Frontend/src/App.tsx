@@ -134,6 +134,7 @@ const App = () => {
           <Route path="/club/team" element={<ClubDashboardPage />} />
           <Route path="/club/events" element={<ClubDashboardPage />} />
           <Route path="/club/events/:eventId" element={<ClubDashboardPage />} />
+          <Route path="/club/events/:eventId/checkin" element={<ClubDashboardPage />} />
           <Route path="/club/analytics" element={<ClubDashboardPage />} />
           <Route path="/club/trends" element={<Navigate to="/club/analytics" replace />} />
           <Route path="/club/certificates" element={<ClubDashboardPage />} />

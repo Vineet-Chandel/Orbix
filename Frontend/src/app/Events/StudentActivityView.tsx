@@ -32,6 +32,7 @@ import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { OrbixLoader } from "../../components/ui/loader";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
+import { OrbixCardQR } from "../Profile/CardStudio/OrbixCardQR";
 
 interface StudentActivityViewProps {
     onOpenMobileSidebar?: () => void;
@@ -836,21 +837,23 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
             {activePassApp && (
                 <div
                     onClick={handlePassBackdropClick}
-                    className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+                    className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm overflow-y-auto"
                 >
                     <div
                         onClick={(e) => e.stopPropagation()}
-                        className="relative w-full max-w-sm bg-white rounded-2xl border-4 border-black shadow-[8px_8px_0px_#000] p-6 text-center space-y-4"
+                        className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl border-4 border-black shadow-[8px_8px_0px_#000] p-5 sm:p-6 text-center space-y-4 my-auto overflow-hidden"
                     >
+                        {/* Close button */}
                         <button
                             onClick={() => setActivePassApp(null)}
-                            className="absolute top-3 right-3 p-1 rounded-lg border border-black hover:bg-neutral-100"
+                            className="absolute top-3 right-3 p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 z-20 shadow-[1px_1px_0px_#000] cursor-pointer"
                         >
-                            <X className="w-4 h-4" />
+                            <X className="w-4 h-4 text-black stroke-[2.5]" />
                         </button>
 
+                        {/* Event Banner */}
                         {activePassApp.coverImageUrl && (
-                            <div className="w-full h-32 rounded-xl border-2 border-black overflow-hidden relative shadow-[2px_2px_0px_#000] -mt-1 mb-2">
+                            <div className="w-full h-32 sm:h-36 rounded-2xl border-2 border-black overflow-hidden relative shadow-[2px_2px_0px_#000] -mt-1">
                                 <img
                                     src={activePassApp.coverImageUrl}
                                     alt={activePassApp.eventTitle}
@@ -859,18 +862,16 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </div>
                         )}
 
-                        <div className="w-12 h-12 rounded-xl border-2 border-black bg-[#a2ff86] flex items-center justify-center mx-auto shadow-[2px_2px_0px_#000]">
-                            <QrCode className="w-6 h-6 text-black" />
-                        </div>
-
-                        <div>
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-[#a2ff86]">
+                        {/* Pass Header */}
+                        <div className="space-y-1">
+                            <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-[#a2ff86]">
+                                <span className="w-2 h-2 rounded-full bg-[#a2ff86] animate-pulse inline-block" />
                                 Official Entry Pass
-                            </span>
-                            <h3 className="font-black text-base text-black mt-1 leading-tight">
+                            </div>
+                            <h3 className="font-black text-lg text-black mt-1 leading-tight">
                                 {activePassApp.eventTitle}
                             </h3>
-                            <div className="flex items-center justify-center gap-1.5 mt-1.5">
+                            <div className="flex items-center justify-center gap-1.5 mt-1">
                                 {activePassApp.clubLogoUrl ? (
                                     <img
                                         src={activePassApp.clubLogoUrl}
@@ -888,29 +889,80 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </div>
                         </div>
 
+                        {/* Real Scannable High-DPI QR Code Card */}
+                        <div className="flex flex-col items-center justify-center py-1">
+                            <div className="p-3.5 bg-white rounded-2xl border-3 border-black shadow-[4px_4px_0px_#000] inline-block">
+                                <OrbixCardQR
+                                    value={activePassApp.ticketCode || ""}
+                                    size={180}
+                                    showLogo={true}
+                                    noShadow={true}
+                                />
+                            </div>
+                            <span className="text-[10px] font-mono font-bold text-neutral-500 mt-2 flex items-center gap-1.5">
+                                <QrCode className="w-3.5 h-3.5 text-black" />
+                                Scan at registration desk for admission check-in
+                            </span>
+                        </div>
+
                         {/* Ticket Code Box */}
-                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-1">
+                        <div className="p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black space-y-1">
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
                                 Your Pass Code
                             </span>
-                            <div className="font-mono text-xl font-black text-black tracking-widest">
-                                {activePassApp.ticketCode}
+                            <div className="flex items-center justify-center gap-2">
+                                <span className="font-mono text-xl sm:text-2xl font-black text-black tracking-widest">
+                                    {activePassApp.ticketCode}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => handleCopyTicket(activePassApp.ticketCode)}
+                                    className="p-1.5 rounded-lg border border-black bg-white hover:bg-neutral-100 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                    title="Copy Pass Code"
+                                >
+                                    <Copy className="w-3.5 h-3.5" />
+                                </button>
                             </div>
                         </div>
 
-                        <div className="text-[11px] font-bold text-neutral-500">
-                            Present this pass code to the registration desk upon entrance for check-in verification.
+                        {/* Attendee Info Strip */}
+                        <div className="p-2.5 rounded-xl bg-white border border-black/20 text-xs font-bold text-left flex items-center justify-between">
+                            <div className="truncate">
+                                <span className="text-[9px] uppercase font-black text-neutral-500 block">
+                                    Ticket Holder
+                                </span>
+                                <span className="text-black font-black truncate block">
+                                    {activePassApp.applicantName}
+                                </span>
+                            </div>
+                            <div className="text-right shrink-0">
+                                <span className="text-[9px] uppercase font-black text-neutral-500 block">
+                                    Student ID / Dept
+                                </span>
+                                <span className="text-neutral-700 font-mono text-[11px]">
+                                    {activePassApp.rollNumber || activePassApp.department || "Verified"}
+                                </span>
+                            </div>
                         </div>
 
-                        <button
-                            onClick={() => {
-                                handleCopyTicket(activePassApp.ticketCode);
-                                setActivePassApp(null);
-                            }}
-                            className="w-full py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] font-black text-xs shadow-[2px_2px_0px_#000]"
-                        >
-                            Copy Pass & Close
-                        </button>
+                        {/* Modal Action Controls */}
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                            <button
+                                type="button"
+                                onClick={() => handleCopyTicket(activePassApp.ticketCode)}
+                                className="py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                            >
+                                <Copy className="w-3.5 h-3.5" />
+                                Copy Code
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setActivePassApp(null)}
+                                className="py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                            >
+                                Done / Close
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
