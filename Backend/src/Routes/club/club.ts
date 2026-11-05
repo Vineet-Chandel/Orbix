@@ -3930,6 +3930,182 @@ clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, r
     }
 });
 
+/**
+ * POST /api/club/events/:eventId/checkin-verify
+ * Scans or pastes a ticketCode for live entry pass verification and check-in.
+ * Returns the full user identity profile (database personal & academic info, social links,
+ * plus check-in state).
+ */
+clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Request, res: Response) => {
+    try {
+        const { eventId } = req.params;
+        const { ticketCode, forceCheckIn } = req.body;
+        const staffUserId = req.user!.id;
+
+        if (!ticketCode || typeof ticketCode !== "string" || !ticketCode.trim()) {
+            return res.status(400).json({ success: false, message: "Valid ticketCode is required." });
+        }
+
+        const cleanCode = ticketCode.trim().toUpperCase();
+
+        const eventRes = await query(
+            `SELECT e.id, e.club_id, e.title, vc.name AS "clubName"
+             FROM club_events e
+             JOIN verified_clubs vc ON vc.id = e.club_id
+             WHERE e.id = $1::uuid LIMIT 1;`,
+            [eventId]
+        );
+        if (!eventRes.rows[0]) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
+        const event = eventRes.rows[0];
+
+        // Staff access check
+        const staffClub = await getStaffClub(staffUserId, event.club_id);
+        if (!staffClub) {
+            return res.status(403).json({ success: false, message: "Access forbidden. Club staff only." });
+        }
+
+        // Query registration with complete user profile information
+        const regRes = await query(
+            `SELECT 
+                r.id AS "registrationId",
+                r.event_id AS "eventId",
+                r.club_id AS "clubId",
+                r.user_id AS "userId",
+                r.status,
+                r.ticket_code AS "ticketCode",
+                r.registered_at AS "registeredAt",
+                r.checked_in_at AS "checkedInAt",
+                r.department,
+                r.year_of_study AS "yearOfStudy",
+                r.roll_number AS "rollNumber",
+                r.phone_number AS "phoneNumber",
+                r.notes,
+                r.reviewed_at AS "reviewedAt",
+                r.review_notes AS "reviewNotes",
+                u.username,
+                u.firstname AS "firstName",
+                u.middlename AS "middleName",
+                u.lastname AS "lastName",
+                u.email,
+                COALESCE(u.avatar_url, u.photo_url) AS "avatarUrl",
+                u.cover_image_url AS "coverImageUrl",
+                u.headline,
+                u.bio,
+                u.location,
+                COALESCE(u.college, inst.name) AS "collegeName",
+                u.website,
+                u.linkedin,
+                u.github,
+                u.custom_link AS "customLink",
+                u.links,
+                u.skills,
+                u.phone,
+                u.is_phone_verified AS "isPhoneVerified",
+                u.is_email_verified AS "isEmailVerified",
+                u.created_at AS "memberSince"
+             FROM club_event_registrations r
+             JOIN users u ON u.id = r.user_id
+             LEFT JOIN institutions inst ON inst.id = u.college_id
+             WHERE r.event_id = $1::uuid AND UPPER(TRIM(r.ticket_code)) = UPPER(TRIM($2))
+             LIMIT 1;`,
+            [eventId, cleanCode]
+        );
+
+        if (!regRes.rows[0]) {
+            return res.status(404).json({
+                success: false,
+                code: "TICKET_NOT_FOUND",
+                message: `Ticket "${cleanCode}" was not found for this event. Please check the code and try again.`,
+            });
+        }
+
+        const row = regRes.rows[0];
+
+        // Moderation block check
+        const mod = await getClubModerationState(event.club_id, row.userId);
+        if (mod.isBlocked) {
+            return res.status(403).json({
+                success: false,
+                code: "ACCESS_RESTRICTED",
+                message: "Access Restricted: This attendee has been blocked by the club.",
+                attendee: row,
+            });
+        }
+
+        let actionTaken: "checked_in" | "already_checked_in" | "pending" | "invalid_status" = "invalid_status";
+        let message = "";
+
+        if (row.status === "registered" || (row.status === "pending" && forceCheckIn === true)) {
+            // Perform check-in!
+            const checkinRes = await query(
+                `UPDATE club_event_registrations
+                 SET status = 'attended',
+                     checked_in_at = NOW(),
+                     reviewed_at = COALESCE(reviewed_at, NOW()),
+                     reviewed_by_user_id = COALESCE(reviewed_by_user_id, $2::uuid),
+                     updated_at = NOW()
+                 WHERE id = $1::uuid
+                 RETURNING checked_in_at AS "checkedInAt";`,
+                [row.registrationId, staffUserId]
+            );
+
+            row.status = "attended";
+            row.checkedInAt = checkinRes.rows[0]?.checkedInAt || new Date().toISOString();
+            actionTaken = "checked_in";
+            message = `Verified & Checked-In successfully! Welcome, ${row.firstName || row.username}.`;
+
+            // Real-time in-app notification
+            try {
+                await query(
+                    `INSERT INTO user_notifications (
+                        user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
+                    ) VALUES (
+                        $1::uuid, $1::uuid, $2,
+                        'Checked In to Event! 🎟️',
+                        $3,
+                        'club_event',
+                        'event_checkin',
+                        $4::jsonb,
+                        $5,
+                        false,
+                        NOW()
+                    ) ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
+                    [
+                        row.userId,
+                        row.username,
+                        `You have been checked in to "${event.title}" by ${event.clubName}. Welcome to the session!`,
+                        JSON.stringify({ eventId, ticketCode: row.ticketCode, clubName: event.clubName }),
+                        `app-checkin-${row.registrationId}-${Date.now()}`,
+                    ]
+                );
+            } catch (notifErr) {
+                console.warn("Check-in notification error (non-fatal):", notifErr);
+            }
+        } else if (row.status === "attended") {
+            actionTaken = "already_checked_in";
+            message = `Attendee was already checked in at ${new Date(row.checkedInAt).toLocaleTimeString()}.`;
+        } else if (row.status === "pending") {
+            actionTaken = "pending";
+            message = `Registration status is currently PENDING review. You can click 'Admit & Check-In' to verify entry.`;
+        } else {
+            actionTaken = "invalid_status";
+            message = `Ticket status is "${row.status.toUpperCase()}". Admission cannot be completed.`;
+        }
+
+        return res.json({
+            success: true,
+            actionTaken,
+            message,
+            attendee: row,
+        });
+    } catch (err: any) {
+        console.error("Check-in verify error:", err);
+        return res.status(500).json({ success: false, message: "Internal server error during verification." });
+    }
+});
+
 // =========================================================================
 // CLUB STAFF INBOX & MODERATION ENDPOINTS
 // =========================================================================
