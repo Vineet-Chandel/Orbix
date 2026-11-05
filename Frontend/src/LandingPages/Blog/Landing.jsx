@@ -253,6 +253,8 @@ const BlogLanding = () => {
         onNavigateHome={() => handleNavigate('overview')}
         hoster={displayHoster}
         blogName={displayBlogName}
+        hosterSlug={hosterSlug}
+        blogNameSlug={blogNameSlug}
       />
 
       {/* Reading Progress Indicator */}

@@ -83,6 +83,29 @@ export default function SigninForm() {
         return isValid;
     };
 
+    const resolvePostLoginRedirect = (): string => {
+        try {
+            const rawPending = sessionStorage.getItem("orbix_pending_like");
+            if (rawPending) {
+                const pending = JSON.parse(rawPending);
+                const returnUrl = pending?.returnUrl || "";
+                const isFresh = pending?.timestamp && Date.now() - pending.timestamp < 5 * 60 * 1000;
+                // Validate that returnUrl is a safe internal blog route (starts with /blog or /blogs)
+                if (isFresh && typeof returnUrl === "string" && (returnUrl.startsWith("/blog") || returnUrl.startsWith("/blogs"))) {
+                    return returnUrl;
+                }
+            }
+
+            const queryReturn = searchParams.get("returnUrl") || searchParams.get("redirect");
+            if (queryReturn && (queryReturn.startsWith("/blog") || queryReturn.startsWith("/blogs") || queryReturn.startsWith("/"))) {
+                return queryReturn;
+            }
+        } catch {
+            // Fallback safely
+        }
+        return "/dashboard";
+    };
+
     const handleLoginSuccess = (resultData: any) => {
         if (resultData?.token) {
             try {
@@ -99,9 +122,15 @@ export default function SigninForm() {
             }));
         }
 
-        toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });
-        const redirectParam = searchParams.get("redirect");
-        navigate(redirectParam || "/dashboard");
+        const destination = resolvePostLoginRedirect();
+        if (destination !== "/dashboard") {
+            const isBlog = destination.startsWith("/blog") || destination.startsWith("/blogs");
+            toast.success(isBlog ? "Welcome back! Returning to publication..." : "Welcome back! Redirecting...", { title: "Signed In" });
+            navigate(destination);
+        } else {
+            toast.success("Welcome back! Redirecting to workspace...", { title: "Signed In" });
+            navigate("/dashboard");
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {

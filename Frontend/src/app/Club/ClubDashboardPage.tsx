@@ -256,6 +256,7 @@ export default function ClubDashboardPage() {
                     return;
                 }
             }
+
         } catch (err) {
             console.error("Failed to load club dashboard:", err);
             toast.error("Could not load club dashboard. Please refresh.", { title: "Error" });

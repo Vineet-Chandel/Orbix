@@ -19,6 +19,7 @@ import {
 import { helpRouter } from './Routes/help/helpRoutes.js';
 import verificationRouter from './Routes/verification/verificationRoutes.js';
 import manageAccountsRouter from './Routes/account/manageAccountsRoutes.js';
+import blogRouter from './Routes/blog/blogRoutes.js';
 import { accountGovernanceRouter } from './Routes/account/accountGovernanceRoutes.js';
 import { privacyRouter } from './Routes/account/privacyRoutes.js';
 import { platformRouter } from './Routes/platform/platformRoutes.js';
@@ -99,6 +100,8 @@ app.use('/api/about', platformRouter);
 app.use('/relationships', relationshipRouter);
 app.use('/blocks', blockRouter);
 app.use('/profile', profileRouter);
+app.use('/api/blogs', blogRouter);
+app.use('/api/blog', blogRouter);
 app.get('/', (req: Request, res: Response) => {
     res.send('Hello World!');
 });
@@ -109,7 +112,7 @@ const PORT = process.env.PORT || 3000;
 
 const startServer = async () => {
     try {
-        app.listen(PORT, () => {
+        app.listen(Number(PORT), '0.0.0.0', () => {
             console.log(`Server running on port ${PORT}`);
         });
 
