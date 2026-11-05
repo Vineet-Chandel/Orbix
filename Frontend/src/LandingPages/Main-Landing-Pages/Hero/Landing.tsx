@@ -350,6 +350,24 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
             </svg>
         ),
     },
+    {
+        id: "awsbuildercenter",
+        name: "AWS Builder Center",
+        category: "Cloud & Developer Community",
+        brandColor: "#FF9900",
+        ring: "outer",
+        angleDeg: 244.3,
+        description: "Connect cloud builder projects, architecture benchmarks and developer community badges.",
+        renderIcon: (className = "w-8 h-8") => (
+            <img
+                src="https://play-lh.googleusercontent.com/2MTOhjyOUjrKQdwbBEuaYhTxruV3U7gL3Eu5UV-D08e2FF8seT_yhKvdJOc__9ctGv46Uql6V3XUUKLJ7ITx=w480-h960-rw"
+                alt="AWS Builder Center"
+                className={`${className} object-contain rounded-md`}
+                loading="lazy"
+                decoding="async"
+            />
+        ),
+    },
 ];
 
 export const OPPORTUNITIES: OPPORTUNITIES[] = [

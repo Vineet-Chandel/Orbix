@@ -101,6 +101,17 @@ export interface ClubEventApplicantRow {
     reviewedAt?: string | null;
     reviewNotes?: string | null;
     notes: string;
+    answers?: Record<string, any>;
+    formResponse?: Record<string, any>;
+    fileAttachments?: Array<{
+        questionId: string;
+        questionTitle?: string;
+        fileName: string;
+        fileUrl: string;
+        filePublicId: string;
+        fileSize: number;
+        mimeType: string;
+    }>;
 }
 
 export interface ClubEventApplicationsResponse {
@@ -112,6 +123,8 @@ export interface ClubEventApplicationsResponse {
         venue: string | null;
         clubName: string;
     };
+    formStructure?: any;
+    formSettings?: any;
     summary: {
         total: number;
         pending: number;

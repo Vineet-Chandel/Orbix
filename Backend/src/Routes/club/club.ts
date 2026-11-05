@@ -3480,12 +3480,21 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
                 r.checked_in_at AS "checkedInAt",
                 r.reviewed_at AS "reviewedAt",
                 r.review_notes AS "reviewNotes",
-                COALESCE(r.notes, '') AS "notes"
+                COALESCE(r.notes, '') AS "notes",
+                r.answers,
+                r.form_response AS "formResponse",
+                r.file_attachments AS "fileAttachments"
              FROM club_event_registrations r
              JOIN users u ON u.id = r.user_id
              WHERE r.event_id = $1 AND r.club_id = $2
              ORDER BY r.registered_at DESC;`,
             [eventId, event.club_id]
+        );
+
+        // Fetch form structure if exists
+        const formRes = await query(
+            `SELECT structure, title, settings FROM club_event_forms WHERE event_id = $1 LIMIT 1;`,
+            [eventId]
         );
 
         const rows = applicantsRes.rows;
@@ -3508,6 +3517,8 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
                 venue: event.venue_or_location,
                 clubName: event.clubName,
             },
+            formStructure: formRes.rows[0]?.structure || null,
+            formSettings: formRes.rows[0]?.settings || null,
             summary,
             applications: rows,
         });
@@ -3668,7 +3679,10 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
                 r.registered_at,
                 r.reviewed_at,
                 r.checked_in_at,
-                COALESCE(r.notes, '') AS notes
+                COALESCE(r.notes, '') AS notes,
+                r.answers,
+                r.form_response,
+                r.file_attachments
              FROM club_event_registrations r
              JOIN users u ON u.id = r.user_id
              WHERE r.event_id = $1 AND r.club_id = $2
@@ -3676,13 +3690,38 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
             [eventId, eventRes.rows[0].club_id]
         );
 
+        // Fetch form structure to extract custom dynamic question headers
+        const formRes = await query(
+            `SELECT structure FROM club_event_forms WHERE event_id = $1 LIMIT 1;`,
+            [eventId]
+        );
+        const formStructure = formRes.rows[0]?.structure;
+        const customQuestions: { id: string; title: string; type: string }[] = [];
+        if (formStructure && Array.isArray(formStructure.sections)) {
+            formStructure.sections.forEach((sec: any) => {
+                (sec.questions || []).forEach((q: any) => {
+                    if (q.type !== "image_card" && q.type !== "markdown_card") {
+                        customQuestions.push({
+                            id: q.id,
+                            title: q.title || "Question",
+                            type: q.type,
+                        });
+                    }
+                });
+            });
+        }
+
         const escapeCsv = (val: any) => {
             if (val === null || val === undefined) return '""';
-            const str = String(val).replace(/"/g, '""');
+            let str = String(val);
+            if (typeof val === "object") {
+                str = JSON.stringify(val);
+            }
+            str = str.replace(/"/g, '""');
             return `"${str}"`;
         };
 
-        const headers = [
+        const standardHeaders = [
             "Ticket Code",
             "Name",
             "Username",
@@ -3698,22 +3737,50 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
             "Checked In At",
             "Notes",
         ];
-        const rows = applicantsRes.rows.map((r) => [
-            escapeCsv(r.ticket_code),
-            escapeCsv(r.name),
-            escapeCsv(r.username),
-            escapeCsv(r.email),
-            escapeCsv(r.avatar_url),
-            escapeCsv(r.department),
-            escapeCsv(r.year_of_study),
-            escapeCsv(r.roll_number),
-            escapeCsv(r.phone),
-            escapeCsv(r.status === "registered" ? "accepted" : r.status),
-            escapeCsv(r.registered_at ? new Date(r.registered_at).toISOString() : ""),
-            escapeCsv(r.reviewed_at ? new Date(r.reviewed_at).toISOString() : ""),
-            escapeCsv(r.checked_in_at ? new Date(r.checked_in_at).toISOString() : ""),
-            escapeCsv(r.notes),
-        ].join(","));
+
+        // Append custom question titles
+        const headers = [
+            ...standardHeaders,
+            ...customQuestions.map((q) => q.title),
+        ];
+
+        const rows = applicantsRes.rows.map((r) => {
+            const ansObj = r.form_response || r.answers || {};
+            const attachments = r.file_attachments || [];
+
+            const standardRow = [
+                escapeCsv(r.ticket_code),
+                escapeCsv(r.name),
+                escapeCsv(r.username),
+                escapeCsv(r.email),
+                escapeCsv(r.avatar_url),
+                escapeCsv(r.department),
+                escapeCsv(r.year_of_study),
+                escapeCsv(r.roll_number),
+                escapeCsv(r.phone),
+                escapeCsv(r.status === "registered" ? "accepted" : r.status),
+                escapeCsv(r.registered_at ? new Date(r.registered_at).toISOString() : ""),
+                escapeCsv(r.reviewed_at ? new Date(r.reviewed_at).toISOString() : ""),
+                escapeCsv(r.checked_in_at ? new Date(r.checked_in_at).toISOString() : ""),
+                escapeCsv(r.notes),
+            ];
+
+            const customValues = customQuestions.map((q) => {
+                if (q.type === "file_upload") {
+                    const matchedFiles = attachments.filter((f: any) => f.questionId === q.id);
+                    if (matchedFiles.length > 0) {
+                        return escapeCsv(matchedFiles.map((f: any) => f.fileUrl).join(" ; "));
+                    }
+                }
+                const val = ansObj[q.id];
+                if (Array.isArray(val)) {
+                    return escapeCsv(val.join(", "));
+                }
+                return escapeCsv(val ?? "");
+            });
+
+            return [...standardRow, ...customValues].join(",");
+        });
 
         const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
         const safeTitle = (eventRes.rows[0].title || "event").replace(/[^a-zA-Z0-9_-]/g, "_");

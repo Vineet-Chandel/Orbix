@@ -26,6 +26,10 @@ import {
     RefreshCw,
     Award,
     ScanLine,
+    Sliders,
+    Eye,
+    Paperclip,
+    X,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -48,9 +52,10 @@ import { EventSecurityConfirmModal } from "./EventSecurityConfirmModal";
 import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
 import { EventLiveListingCard } from "../../components/EventLiveListingCard";
 import { ClubEventCheckinTerminal } from "./ClubEventCheckinTerminal";
+import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
 import { OrbixLoader } from "../../components/ui/loader";
 
-type EventTab = "roster" | "checkin" | "analytics" | "pass";
+type EventTab = "roster" | "form" | "checkin" | "analytics" | "pass";
 
 export interface ClubEventDetailWorkspaceProps {
     eventId?: string;
@@ -120,6 +125,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     >("all");
     const [updatingApplicantId, setUpdatingApplicantId] = useState<string | null>(null);
     const [copiedShareLink, setCopiedShareLink] = useState(false);
+    const [inspectingApplicant, setInspectingApplicant] = useState<ClubEventApplicantRow | null>(null);
 
     // Check authentication and load event from backend
     const loadEventDetails = async () => {
@@ -704,6 +710,22 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
                     <button
                         type="button"
+                        onClick={() => handleTabChange("form")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                            activeTab === "form"
+                                ? "bg-[#C084FC] text-black shadow-[3px_3px_0px_#000]"
+                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
+                        }`}
+                    >
+                        <Sliders className="w-4 h-4 stroke-[2.5]" />
+                        <span>Registration Form Builder</span>
+                        <span className="px-2 py-0.5 rounded-full bg-white text-black border border-black text-[10px] font-black">
+                            BUILDER
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
                         onClick={() => handleTabChange("checkin")}
                         className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
                             activeTab === "checkin"
@@ -970,6 +992,16 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                     </td>
                                                     <td className="py-3 px-4 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setInspectingApplicant(app)}
+                                                                className="px-2 py-1 rounded-lg bg-white hover:bg-neutral-100 text-black font-black text-[11px] border border-black shadow-[1px_1px_0px_#000] cursor-pointer inline-flex items-center gap-1 shrink-0"
+                                                                title="Inspect student form responses & attachments"
+                                                            >
+                                                                <Eye className="w-3 h-3" />
+                                                                <span>Answers</span>
+                                                            </button>
+
                                                             {app.status === "pending" ? (
                                                                 <>
                                                                     <button
@@ -1048,6 +1080,15 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             )}
                         </div>
                     </div>
+                )}
+
+                {/* TAB: REGISTRATION FORM BUILDER */}
+                {activeTab === "form" && event && (
+                    <EventFormBuilderWorkspace
+                        eventId={event.id}
+                        club={clubInfo || clubState.club}
+                        onBack={() => handleTabChange("roster")}
+                    />
                 )}
 
                 {/* TAB: LIVE CHECK-IN SCANNER TERMINAL */}
@@ -1405,6 +1446,193 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         </div>
                     </div>
                 </div>
+
+            {/* INSPECT APPLICANT FORM RESPONSES & ATTACHMENTS MODAL */}
+            {inspectingApplicant && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+                    <div className="w-full max-w-2xl bg-white rounded-3xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto">
+                        {/* Header */}
+                        <div className="flex items-center justify-between border-b-2 border-black/10 pb-4">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-full bg-black text-[#a2ff86] flex items-center justify-center font-black text-sm border border-black shadow-[1.5px_1.5px_0px_#000]">
+                                    {(inspectingApplicant.applicantName || "S").slice(0, 2).toUpperCase()}
+                                </div>
+                                <div>
+                                    <h3 className="text-base sm:text-lg font-black text-black">
+                                        {inspectingApplicant.applicantName}
+                                    </h3>
+                                    <div className="text-xs text-neutral-500 font-medium flex items-center gap-2">
+                                        <span>@{inspectingApplicant.username}</span>
+                                        <span>•</span>
+                                        <span>{inspectingApplicant.applicantEmail}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setInspectingApplicant(null)}
+                                className="p-1.5 rounded-xl border-2 border-black hover:bg-neutral-100 cursor-pointer shadow-[1.5px_1.5px_0px_#000]"
+                            >
+                                <X className="w-4 h-4 text-black" />
+                            </button>
+                        </div>
+
+                        {/* Status & Pass Banner */}
+                        <div className="p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex flex-wrap items-center justify-between gap-3 text-xs">
+                            <div className="flex items-center gap-2">
+                                <span className="font-black text-neutral-600 uppercase">Status:</span>
+                                <span className="px-2.5 py-0.5 rounded-full font-black uppercase text-[10px] bg-white border border-black shadow-[1px_1px_0px_#000]">
+                                    {inspectingApplicant.status}
+                                </span>
+                            </div>
+                            {inspectingApplicant.ticketCode && (
+                                <div className="flex items-center gap-2">
+                                    <span className="font-black text-neutral-600 uppercase">Pass Code:</span>
+                                    <span className="font-mono font-black text-black bg-white px-2 py-0.5 rounded-lg border border-black">
+                                        {inspectingApplicant.ticketCode}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Basic Profile Details */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
+                            <div className="p-3 rounded-xl border border-black/20 bg-neutral-50">
+                                <span className="text-[10px] font-black uppercase text-neutral-500 block mb-0.5">
+                                    Department
+                                </span>
+                                <span className="font-bold text-black">{inspectingApplicant.department || "—"}</span>
+                            </div>
+                            <div className="p-3 rounded-xl border border-black/20 bg-neutral-50">
+                                <span className="text-[10px] font-black uppercase text-neutral-500 block mb-0.5">
+                                    Year
+                                </span>
+                                <span className="font-bold text-black">{inspectingApplicant.yearOfStudy || "—"}</span>
+                            </div>
+                            <div className="p-3 rounded-xl border border-black/20 bg-neutral-50">
+                                <span className="text-[10px] font-black uppercase text-neutral-500 block mb-0.5">
+                                    Roll Number
+                                </span>
+                                <span className="font-mono font-bold text-black">{inspectingApplicant.rollNumber || "—"}</span>
+                            </div>
+                            <div className="p-3 rounded-xl border border-black/20 bg-neutral-50">
+                                <span className="text-[10px] font-black uppercase text-neutral-500 block mb-0.5">
+                                    Phone
+                                </span>
+                                <span className="font-bold text-black">{inspectingApplicant.phoneNumber || "—"}</span>
+                            </div>
+                        </div>
+
+                        {/* Dynamic Custom Form Answers */}
+                        <div className="space-y-3 pt-2">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                Dynamic Form Responses
+                            </h4>
+
+                            {inspectingApplicant.answers || inspectingApplicant.formResponse ? (
+                                <div className="space-y-2.5">
+                                    {Object.entries(
+                                        inspectingApplicant.formResponse || inspectingApplicant.answers || {}
+                                    ).map(([qKey, val]: [string, any]) => {
+                                        let displayVal = val;
+                                        if (typeof val === "object" && val !== null) {
+                                            displayVal = JSON.stringify(val);
+                                        } else if (Array.isArray(val)) {
+                                            displayVal = val.join(", ");
+                                        }
+
+                                        return (
+                                            <div
+                                                key={qKey}
+                                                className="p-3.5 rounded-xl border-2 border-black/15 bg-white space-y-1 text-xs"
+                                            >
+                                                <span className="font-black text-neutral-700 block text-[11px]">
+                                                    {qKey.replace(/^q_/, "").replace(/_/g, " ").toUpperCase()}
+                                                </span>
+                                                <div className="font-medium text-black whitespace-pre-wrap">
+                                                    {String(displayVal ?? "—")}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <span className="text-xs text-neutral-400 font-medium">
+                                    No custom form answers recorded.
+                                </span>
+                            )}
+                        </div>
+
+                        {/* File Attachments */}
+                        {inspectingApplicant.fileAttachments && inspectingApplicant.fileAttachments.length > 0 && (
+                            <div className="space-y-2 pt-2">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                    Uploaded Attachments (Cloudinary)
+                                </h4>
+                                <div className="space-y-2">
+                                    {inspectingApplicant.fileAttachments.map((f: any, fIdx: number) => (
+                                        <a
+                                            key={fIdx}
+                                            href={f.fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="p-3 rounded-xl border-2 border-black bg-emerald-50/60 hover:bg-emerald-50 flex items-center justify-between text-xs font-black text-black group"
+                                        >
+                                            <div className="flex items-center gap-2 truncate">
+                                                <Paperclip className="w-4 h-4 text-emerald-800 shrink-0" />
+                                                <span className="truncate">{f.fileName || `Attachment ${fIdx + 1}`}</span>
+                                                {f.fileSize && (
+                                                    <span className="text-[10px] text-neutral-500 font-normal">
+                                                        ({(f.fileSize / (1024 * 1024)).toFixed(2)} MB)
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <ExternalLink className="w-4 h-4 text-emerald-800" />
+                                        </a>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Modal Footer */}
+                        <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                {inspectingApplicant.status === "pending" && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                handleApplicantStatusChange(inspectingApplicant, "registered");
+                                                setInspectingApplicant(null);
+                                            }}
+                                            className="px-4 py-2 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                        >
+                                            Accept Application
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                handleApplicantStatusChange(inspectingApplicant, "rejected");
+                                                setInspectingApplicant(null);
+                                            }}
+                                            className="px-4 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-950 font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                        >
+                                            Reject
+                                        </button>
+                                    </>
+                                )}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setInspectingApplicant(null)}
+                                className="px-5 py-2 rounded-xl bg-black text-white font-black text-xs hover:bg-neutral-800 cursor-pointer shadow-[2px_2px_0px_#000]"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ATTACHED HIGH-SECURITY CONFIRMATION CHALLENGE MODAL */}
             <EventSecurityConfirmModal
