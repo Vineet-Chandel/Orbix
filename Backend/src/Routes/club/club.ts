@@ -2230,6 +2230,10 @@ clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Respo
             return res.status(401).json({ success: false, message: "Unauthorized." });
         }
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
 
         let club: any = null;
         if (userId) {
@@ -2477,6 +2481,10 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
             return res.status(401).json({ success: false, message: "Unauthorized." });
         }
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
 
         const clubRes = await query(
             `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
@@ -2669,6 +2677,10 @@ clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Re
             return res.status(401).json({ success: false, message: "Unauthorized." });
         }
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
 
         const clubRes = await query(
             `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
@@ -3117,6 +3129,10 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
 clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user?.id || null;
 
         const eventRes = await query(
@@ -3177,6 +3193,10 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
 clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
 
         const checkEvent = await query(`SELECT id FROM club_events WHERE id = $1 LIMIT 1;`, [eventId]);
@@ -3229,6 +3249,10 @@ clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res:
 clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
         const {
             applicantName,
@@ -3535,6 +3559,10 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
 clubRouter.post("/events/:eventId/cancel", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
 
         const updateRes = await query(
@@ -3622,6 +3650,10 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
 clubRouter.get("/events/:eventId/applications", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
 
         // Verify event and staff permission
@@ -3853,6 +3885,10 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
 clubRouter.get("/events/:eventId/applications/export", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
 
         const eventRes = await query(
@@ -4004,6 +4040,10 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
 clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const { ticketCode, attendeeUserId } = req.body;
         const targetUserId = attendeeUserId || req.user!.id;
 
@@ -4051,6 +4091,10 @@ clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, r
 clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const { ticketCode, forceCheckIn } = req.body;
         const staffUserId = req.user!.id;
 
@@ -4623,6 +4667,10 @@ clubRouter.get("/certificates/events", authenticate, async (req: Request, res: R
 clubRouter.get("/certificates/event/:eventId/recipients", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 

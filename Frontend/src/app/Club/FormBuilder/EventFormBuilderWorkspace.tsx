@@ -778,7 +778,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         if (pastEventsLibrary.length === 0) {
             setLoadingLibrary(true);
             try {
-                const res = await fetchClubQuestionLibrary(safeEventId);
+                const res = await fetchClubQuestionLibrary(safeEventId, club?.id);
                 setPastEventsLibrary(res.library || []);
                 if (res.library && res.library.length > 0) {
                     setExpandedLibEventId(res.library[0].eventId);
@@ -915,6 +915,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                 prompt: aiPrompt.trim(),
                 eventType: form?.title,
                 eventDescription: form?.description || undefined,
+                eventTitle: form?.title,
+                clubId: club?.id,
             });
 
             const questions = res.suggestedQuestions || [];

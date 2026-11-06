@@ -140,7 +140,8 @@ export function validateQuestionSchema(question: any): { valid: boolean; error?:
         "short_answer", "paragraph", "multiple_choice", "checkboxes", "dropdown",
         "linear_scale", "rating", "date", "time", "file_upload", "identity_prefill",
         "section_header", "rich_text", "video_embed", "code_snippet", "matrix",
-        "multiple_choice_grid", "checkbox_grid", "image_card", "markdown_card"
+        "multiple_choice_grid", "checkbox_grid", "image_card", "markdown_card",
+        "title_card", "image_block", "video_block"
     ]);
 
     if (!question.type || !VALID_TYPES.has(question.type)) {

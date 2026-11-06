@@ -1425,7 +1425,11 @@ export class ClubEventFormService {
     /**
      * Phase 6.1 Question Library: Retrieve questions from club's previous events for reuse
      */
-    static async getClubQuestionLibrary(eventId: string, userId: string): Promise<{
+    static async getClubQuestionLibrary(
+        eventId: string,
+        userId: string,
+        clubIdQuery?: string
+    ): Promise<{
         success: boolean;
         library: Array<{
             eventId: string;
@@ -1436,27 +1440,60 @@ export class ClubEventFormService {
             questions: FormQuestion[];
         }>;
     }> {
-        const evCheck = await query(`SELECT club_id AS "clubId" FROM club_events WHERE id = $1;`, [eventId]);
-        if (!evCheck.rows[0]) {
-            const error: any = new Error("Event not found.");
-            error.statusCode = 404;
-            throw error;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        let clubId: string | null = clubIdQuery?.trim() || null;
+
+        if (isUuid) {
+            const evCheck = await query(`SELECT club_id AS "clubId" FROM club_events WHERE id = $1;`, [eventId]);
+            if (evCheck.rows[0]) {
+                clubId = evCheck.rows[0].clubId;
+            }
         }
-        const clubId = evCheck.rows[0].clubId;
+
+        // If not a valid UUID (e.g. "create-draft") or not found by eventId, resolve club from user's staff/owner access
+        if (!clubId) {
+            const clubRes = await query(
+                `SELECT id FROM verified_clubs WHERE auth_user_id = $1
+                 UNION
+                 SELECT club_id AS id FROM club_team_members WHERE user_id = $1 LIMIT 1;`,
+                [userId]
+            );
+            if (clubRes.rows[0]) {
+                clubId = clubRes.rows[0].id;
+            }
+        }
+
+        if (!clubId) {
+            return { success: true, library: [] };
+        }
+
         await this.assertStaffAccess(userId, clubId);
 
-        const listRes = await query(
-            `SELECT e.id AS "eventId", e.title AS "eventTitle", e.created_at AS "createdAt",
-                    f.title AS "formTitle",
-                    COALESCE(v.structure, f.structure) AS structure
-             FROM club_events e
-             JOIN club_event_forms f ON f.event_id = e.id
-             LEFT JOIN club_event_form_versions v ON v.id = f.published_version_id
-             WHERE e.club_id = $1 AND e.id != $2
-             ORDER BY e.created_at DESC
-             LIMIT 30;`,
-            [clubId, eventId]
-        );
+        const listRes = isUuid
+            ? await query(
+                `SELECT e.id AS "eventId", e.title AS "eventTitle", e.created_at AS "createdAt",
+                        f.title AS "formTitle",
+                        COALESCE(v.structure, f.structure) AS structure
+                 FROM club_events e
+                 JOIN club_event_forms f ON f.event_id = e.id
+                 LEFT JOIN club_event_form_versions v ON v.id = f.published_version_id
+                 WHERE e.club_id = $1 AND e.id != $2
+                 ORDER BY e.created_at DESC
+                 LIMIT 30;`,
+                [clubId, eventId]
+            )
+            : await query(
+                `SELECT e.id AS "eventId", e.title AS "eventTitle", e.created_at AS "createdAt",
+                        f.title AS "formTitle",
+                        COALESCE(v.structure, f.structure) AS structure
+                 FROM club_events e
+                 JOIN club_event_forms f ON f.event_id = e.id
+                 LEFT JOIN club_event_form_versions v ON v.id = f.published_version_id
+                 WHERE e.club_id = $1
+                 ORDER BY e.created_at DESC
+                 LIMIT 30;`,
+                [clubId]
+            );
 
         const library = listRes.rows.map((row) => {
             const structure: FormStructure = row.structure || { sections: [] };
@@ -1487,24 +1524,44 @@ export class ClubEventFormService {
     static async aiSuggestQuestions(
         eventId: string,
         userId: string,
-        payload: { prompt?: string; eventType?: string; eventDescription?: string }
+        payload: { prompt?: string; eventType?: string; eventDescription?: string; eventTitle?: string; clubId?: string }
     ): Promise<{
         success: boolean;
         suggestedQuestions: FormQuestion[];
         generatedBy: "gemini" | "deterministic-engine";
         summary: string;
     }> {
-        const evCheck = await query(`SELECT club_id AS "clubId", title, summary, starts_at AS "startsAt" FROM club_events WHERE id = $1;`, [eventId]);
-        if (!evCheck.rows[0]) {
-            const error: any = new Error("Event not found.");
-            error.statusCode = 404;
-            throw error;
-        }
-        await this.assertStaffAccess(userId, evCheck.rows[0].clubId);
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        let eventTitle = payload.eventTitle || "Campus Event";
+        let eventSummary = payload.eventDescription || "";
+        let clubId: string | null = payload.clubId || null;
 
-        const event = evCheck.rows[0];
-        const eventTitle = event.title || "Campus Event";
-        const eventSummary = payload.eventDescription || event.summary || "";
+        if (isUuid) {
+            const evCheck = await query(`SELECT club_id AS "clubId", title, summary, starts_at AS "startsAt" FROM club_events WHERE id = $1;`, [eventId]);
+            if (evCheck.rows[0]) {
+                const event = evCheck.rows[0];
+                eventTitle = event.title || eventTitle;
+                eventSummary = payload.eventDescription || event.summary || "";
+                clubId = event.clubId;
+            }
+        }
+
+        if (!clubId) {
+            const clubRes = await query(
+                `SELECT id FROM verified_clubs WHERE auth_user_id = $1
+                 UNION
+                 SELECT club_id AS id FROM club_team_members WHERE user_id = $1 LIMIT 1;`,
+                [userId]
+            );
+            if (clubRes.rows[0]) {
+                clubId = clubRes.rows[0].id;
+            }
+        }
+
+        if (clubId) {
+            await this.assertStaffAccess(userId, clubId);
+        }
+
         const userPrompt = payload.prompt || `Generate questions for ${eventTitle}`;
 
         const apiKey = process.env.GEMINI_API_KEY;
