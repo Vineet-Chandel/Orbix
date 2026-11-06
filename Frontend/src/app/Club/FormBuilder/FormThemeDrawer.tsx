@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { Palette, X, UploadCloud, Check, Trash2, Sparkles, RefreshCw } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
 import type { FormThemeSettings } from "../../../api/clubEventFormApi";
@@ -102,17 +103,19 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
         toast.info("Theme reset to Orbix defaults.");
     };
 
-    return (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 select-none">
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 select-none">
             {/* Backdrop Overlay */}
             <div
-                className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-in fade-in duration-150"
+                className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-full h-full bg-black/70 backdrop-blur-sm"
                 onClick={onClose}
             />
 
             {/* Neo-brutalist Centered Theme Panel (Dead Center of Screen) */}
             <aside
-                className="relative w-full max-w-[480px] max-h-[90vh] rounded-3xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] border-3 sm:border-4 border-black shadow-[8px_8px_0px_#000] z-[71] text-black flex flex-col justify-between overflow-hidden animate-in zoom-in-95 duration-200"
+                className="relative w-full max-w-[480px] max-h-[90vh] rounded-3xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] border-3 sm:border-4 border-black shadow-[8px_8px_0px_#000] z-[101] text-black flex flex-col justify-between overflow-hidden animate-in zoom-in-95 duration-200"
             >
                 {/* Top Header */}
                 <div className="p-4 sm:p-5 border-b-2 border-black/15 bg-white/70 backdrop-blur-sm flex items-center justify-between shrink-0">
@@ -391,6 +394,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                     </button>
                 </div>
             </aside>
-        </div>
+        </div>,
+        document.body
     );
 };

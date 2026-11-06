@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     X,
@@ -87,8 +88,10 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
         setTimeout(() => setCopiedShareLink(false), 2000);
     };
 
-    return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm overflow-y-auto">
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[120] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm overflow-y-auto">
             <div className="relative w-full max-w-5xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-4 border-black shadow-[10px_10px_0px_#000] overflow-hidden my-auto flex flex-col max-h-[92vh]">
                 {/* Modal Top Bar */}
                 <div className="px-5 py-3.5 bg-white border-b-3 border-black flex items-center justify-between gap-3 shrink-0">
@@ -422,6 +425,7 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

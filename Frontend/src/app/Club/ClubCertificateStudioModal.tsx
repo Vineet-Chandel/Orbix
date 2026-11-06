@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
     Award,
     X,
@@ -250,9 +251,10 @@ export const ClubCertificateStudioModal: React.FC<ClubCertificateStudioModalProp
     };
 
     if (!isOpen) return null;
+    if (typeof document === "undefined") return null;
 
-    return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-sm overflow-y-auto">
+    return createPortal(
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[110] flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-sm overflow-y-auto">
             <div className="relative w-full max-w-5xl bg-[#FAF6EE] rounded-2xl border-4 border-black shadow-[10px_10px_0px_#000] overflow-hidden my-auto flex flex-col max-h-[92vh]">
                 {/* Header */}
                 <div className="px-6 py-4 bg-white border-b-3 border-black flex items-center justify-between gap-4">
@@ -852,6 +854,7 @@ export const ClubCertificateStudioModal: React.FC<ClubCertificateStudioModalProp
                 isOpen={!!previewCert}
                 onClose={() => setPreviewCert(null)}
             />
-        </div>
+        </div>,
+        document.body
     );
 };

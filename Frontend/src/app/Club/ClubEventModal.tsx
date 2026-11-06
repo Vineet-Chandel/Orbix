@@ -472,7 +472,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     return (
         <div
             id={modalId}
-            className="w-full flex-1 flex flex-col min-h-0 text-black animate-in fade-in duration-150 space-y-6"
+            className="w-full flex-1 flex flex-col min-h-0 text-black space-y-6"
         >
             {/* Top Workspace Header Bar */}
             <div className="pb-5 border-b-2 border-black/55 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -1001,11 +1001,18 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             >
                                                 {/* Aspect 16:9 Banner Thumbnail */}
                                                 <div className="aspect-[16/9] w-full overflow-hidden bg-neutral-950 relative">
-                                                    <img
-                                                        src={banner.dataUrl}
-                                                        alt={banner.title}
-                                                        className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
-                                                    />
+                                                    {banner.svgString ? (
+                                                        <div
+                                                            dangerouslySetInnerHTML={{ __html: banner.svgString }}
+                                                            className="w-full h-full pointer-events-none transition-transform group-hover:scale-105 duration-300 [&>svg]:w-full [&>svg]:h-full [&>svg]:object-cover"
+                                                        />
+                                                    ) : (
+                                                        <img
+                                                            src={banner.dataUrl}
+                                                            alt={banner.title}
+                                                            className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
+                                                        />
+                                                    )}
                                                     {isSelected && (
                                                         <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-[#A2FF86] text-black border-2 border-black font-black text-[10px] shadow-[1px_1px_0px_#000] flex items-center gap-1">
                                                             <Check className="w-3 h-3 stroke-[3]" />

@@ -1,4 +1,5 @@
 import React, { useRef } from "react";
+import { createPortal } from "react-dom";
 import {
     X,
     Award,
@@ -69,8 +70,10 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
 
     const badge = getCertTypeBadge(certificate.certificateType);
 
-    return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white print:static">
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[120] flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white print:static">
             <div className="relative w-full max-w-4xl bg-[#FAF6EE] rounded-2xl border-4 border-black shadow-[10px_10px_0px_#000] overflow-hidden my-auto print:border-none print:shadow-none print:max-w-none print:w-full">
                 {/* Modal Top Bar (Hidden during Print) */}
                 <div className="px-5 py-3.5 bg-white border-b-3 border-black flex items-center justify-between gap-3 print:hidden">
@@ -258,6 +261,7 @@ export const CertificateModal: React.FC<CertificateModalProps> = ({
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

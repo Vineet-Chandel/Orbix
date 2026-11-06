@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { X, Settings } from "lucide-react";
 import { NeoToggle } from "../../../components/NeoToggle";
 import type { FormSettings } from "../../../api/clubEventFormApi";
@@ -25,9 +26,11 @@ export const FormSettingsModal: React.FC<FormSettingsModalProps> = ({
         onClose();
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-            <div className="w-full max-w-xl bg-white dark:bg-[#0A0A0A] rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
+            <div className="w-full max-w-xl bg-white dark:bg-[#0A0A0A] rounded-2xl border-3 border-black shadow-[8px_8px_0px_#000] p-6 space-y-6 max-h-[90vh] overflow-y-auto">
                 {/* Modal Header */}
                 <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-4">
                     <div className="flex items-center gap-2.5">
@@ -177,6 +180,7 @@ export const FormSettingsModal: React.FC<FormSettingsModalProps> = ({
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

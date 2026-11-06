@@ -111,7 +111,7 @@ export const EventPosterFront: React.FC<EventPosterFrontProps> = ({
                             src={coverImageUrl}
                             alt={title || "Event Banner"}
                             className="w-full h-full object-contain"
-                            crossOrigin="anonymous"
+                            crossOrigin={coverImageUrl.startsWith("data:") ? undefined : "anonymous"}
                         />
                     ) : (
                         <div className="w-full h-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.5px,transparent_1.5px)] [background-size:14px_14px] flex flex-col items-center justify-center p-3 text-center">
@@ -251,7 +251,7 @@ export const EventPosterFront: React.FC<EventPosterFrontProps> = ({
                         src={coverImageUrl}
                         alt={title || "Event Banner"}
                         className="w-full h-full object-contain"
-                        crossOrigin="anonymous"
+                        crossOrigin={coverImageUrl.startsWith("data:") ? undefined : "anonymous"}
                     />
                 ) : (
                     <div className="w-full h-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.5px,transparent_1.5px)] [background-size:16px_16px] flex flex-col items-center justify-center p-4 text-center">

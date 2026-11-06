@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
+import { createPortal } from "react-dom";
 import {
     Plus,
     Split,
@@ -677,8 +678,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             id: `block_vid_${Date.now()}`,
             type: "video_block",
             title: "Video Guide",
-            videoUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-            videoTitle: "Watch this walkthrough before applying",
+            videoUrl: "",
+            videoTitle: "",
             required: false,
         };
         updateSections((sections) => {
@@ -1658,12 +1659,12 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             type="button"
                             onClick={handleSaveForm}
                             disabled={saving || isPublishing}
-                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none"
+                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none h-9"
                             title="Save working draft"
                         >
                             {saving ? (
                                 <>
-                                    <OrbixLoader size="xs" />
+                                    <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" />
                                     <span>Saving...</span>
                                 </>
                             ) : (
@@ -1676,12 +1677,12 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             type="button"
                             onClick={handlePublishForm}
                             disabled={saving || isPublishing}
-                            className="px-4 sm:px-6 py-2 rounded-xl sm:rounded-2xl bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none"
+                            className="px-4 sm:px-6 py-2 rounded-xl sm:rounded-2xl bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none h-9"
                             title="Publish"
                         >
                             {isPublishing ? (
                                 <>
-                                    <OrbixLoader size="xs" />
+                                    <span className="w-3.5 h-3.5 rounded-full border-2 border-current border-t-transparent animate-spin shrink-0" />
                                     <span>Publishing...</span>
                                 </>
                             ) : (
@@ -1708,24 +1709,24 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             </React.Suspense>
 
             {/* Import Questions Modal */}
-            {isImportModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div className="w-full max-w-xl bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-                        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
+            {isImportModalOpen && typeof document !== "undefined" && createPortal(
+                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
+                    <div className="w-full max-w-xl bg-white dark:bg-neutral-900 rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 space-y-4 max-h-[85vh] overflow-y-auto">
+                        <div className="flex items-center justify-between border-b-2 border-black/10 dark:border-white/10 pb-3">
                             <div className="flex items-center gap-2">
-                                <ClipboardList className="w-4 h-4 text-neutral-800 dark:text-neutral-200" />
-                                <h3 className="text-sm font-bold text-neutral-900 dark:text-white">Import Questions</h3>
+                                <ClipboardList className="w-5 h-5 text-black dark:text-white stroke-[2.5]" />
+                                <h3 className="text-base font-black text-black dark:text-white">Import Questions</h3>
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setIsImportModalOpen(false)}
-                                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                                className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer transition-colors"
                             >
-                                <X className="w-4 h-4" />
+                                <X className="w-4 h-4 stroke-[2.5]" />
                             </button>
                         </div>
 
-                        <p className="text-xs text-neutral-500 font-normal">
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400 font-bold">
                             Select questions from the template bank to append directly to the active section.
                         </p>
 
@@ -1733,13 +1734,13 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             {QUICK_TEMPLATES.map((tmpl) => (
                                 <div
                                     key={tmpl.key}
-                                    className="p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-950 hover:bg-neutral-100 dark:hover:bg-neutral-900 flex items-center justify-between gap-3 transition-colors"
+                                    className="p-3.5 rounded-xl border-2 border-black bg-neutral-50/70 dark:bg-neutral-950 hover:bg-neutral-100 dark:hover:bg-neutral-900 flex items-center justify-between gap-3 shadow-[2px_2px_0px_#000] transition-colors"
                                 >
                                     <div className="min-w-0">
-                                        <h5 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                                        <h5 className="text-xs sm:text-sm font-black text-neutral-900 dark:text-white truncate">
                                             {tmpl.label}
                                         </h5>
-                                        <p className="text-[11px] text-neutral-500 font-normal truncate">
+                                        <p className="text-[11px] text-neutral-500 font-bold truncate">
                                             Preconfigured question with validation
                                         </p>
                                     </div>
@@ -1756,7 +1757,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                             toast.success(`Imported: "${tmpl.label}"`);
                                             setIsImportModalOpen(false);
                                         }}
-                                        className="px-3 py-1.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 text-xs font-semibold shadow-sm cursor-pointer shrink-0 transition-colors"
+                                        className="px-3.5 py-1.5 rounded-xl bg-black dark:bg-white text-white dark:text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer shrink-0 transition-transform"
                                     >
                                         + Import
                                     </button>
@@ -1764,46 +1765,48 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             ))}
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* Clear Form Confirmation Modal */}
-            {isClearConfirmOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div className="w-full max-w-sm bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl p-6 space-y-4 text-center">
-                        <div className="w-10 h-10 rounded-xl bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 mx-auto flex items-center justify-center">
-                            <Trash2 className="w-5 h-5" />
+            {isClearConfirmOpen && typeof document !== "undefined" && createPortal(
+                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
+                    <div className="w-full max-w-sm bg-white dark:bg-neutral-900 rounded-2xl border-3 border-black shadow-[6px_6px_0px_#000] p-6 space-y-4 text-center">
+                        <div className="w-12 h-12 rounded-2xl border-2 border-black bg-rose-200 text-rose-800 shadow-[2px_2px_0px_#000] mx-auto flex items-center justify-center">
+                            <Trash2 className="w-6 h-6 stroke-[2.5]" />
                         </div>
-                        <h4 className="text-sm font-bold text-neutral-900 dark:text-white">Clear All Questions?</h4>
-                        <p className="text-xs text-neutral-500 font-normal">
+                        <h4 className="text-base font-black text-black dark:text-white">Clear All Questions?</h4>
+                        <p className="text-xs text-neutral-600 dark:text-neutral-400 font-bold">
                             This will remove all current questions from the draft. You can undo this action with Ctrl+Z.
                         </p>
                         <div className="flex items-center justify-center gap-3 pt-2">
                             <button
                                 type="button"
                                 onClick={() => setIsClearConfirmOpen(false)}
-                                className="px-4 py-2 rounded-lg border border-neutral-200 dark:border-neutral-800 text-xs font-semibold hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                                className="px-4 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="button"
                                 onClick={handleClearForm}
-                                className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold shadow-sm cursor-pointer transition-colors"
+                                className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-white border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform"
                             >
                                 Yes, Clear Form
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ---------------------------------------------------------------- */}
             {/* PHASE 6.1: QUESTION LIBRARY MODAL */}
             {/* ---------------------------------------------------------------- */}
-            {isQuestionLibraryOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div className="w-full max-w-3xl bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl p-6 space-y-5 max-h-[85vh] flex flex-col">
+            {isQuestionLibraryOpen && typeof document !== "undefined" && createPortal(
+                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
+                    <div className="w-full max-w-3xl bg-white dark:bg-neutral-900 rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 space-y-5 max-h-[85vh] flex flex-col">
                         <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
                             <div className="flex items-center gap-2.5">
                                 <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
@@ -1981,15 +1984,16 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             </div>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ---------------------------------------------------------------- */}
             {/* PHASE 6.2: FORM TEMPLATES CATALOG MODAL */}
             {/* ---------------------------------------------------------------- */}
-            {isTemplatesModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div className="w-full max-w-4xl bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl p-6 space-y-5 max-h-[85vh] flex flex-col">
+            {isTemplatesModalOpen && typeof document !== "undefined" && createPortal(
+                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
+                    <div className="w-full max-w-4xl bg-white dark:bg-neutral-900 rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 space-y-5 max-h-[85vh] flex flex-col">
                         <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
                             <div className="flex items-center gap-2.5">
                                 <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
@@ -2197,15 +2201,16 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             </>
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ---------------------------------------------------------------- */}
             {/* PHASE 6.3: AI-ASSISTED FORM CREATION MODAL */}
             {/* ---------------------------------------------------------------- */}
-            {isAiModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl p-6 space-y-4 max-h-[85vh] flex flex-col">
+            {isAiModalOpen && typeof document !== "undefined" && createPortal(
+                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
+                    <div className="w-full max-w-2xl bg-white dark:bg-neutral-900 rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 space-y-4 max-h-[85vh] flex flex-col">
                         <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
                             <div className="flex items-center gap-2.5">
                                 <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
@@ -2415,7 +2420,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             </div>
                         )}
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

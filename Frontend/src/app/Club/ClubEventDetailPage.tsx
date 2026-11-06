@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import {
     ArrowLeft,
@@ -1438,8 +1439,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                 </div>
 
             {/* INSPECT APPLICANT FORM RESPONSES & ATTACHMENTS MODAL */}
-            {inspectingApplicant && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
+            {inspectingApplicant && typeof document !== "undefined" && createPortal(
+                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
                     <div className="w-full max-w-2xl bg-white rounded-3xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto">
                         {/* Header */}
                         <div className="flex items-center justify-between border-b-2 border-black/10 pb-4">
@@ -1621,7 +1622,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
 
             {/* ATTACHED HIGH-SECURITY CONFIRMATION CHALLENGE MODAL */}

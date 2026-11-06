@@ -427,15 +427,7 @@ const CODE_COFFEE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12
 
 const toDataUrl = (svg: string): string => {
     const cleanSvg = svg.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, "&amp;");
-    try {
-        if (typeof window !== "undefined" && typeof window.btoa === "function") {
-            const base64 = window.btoa(unescape(encodeURIComponent(cleanSvg)));
-            return `data:image/svg+xml;base64,${base64}`;
-        }
-    } catch {
-        // Fallback to encoded UTF-8 URI
-    }
-    return `data:image/svg+xml;utf8,${encodeURIComponent(cleanSvg)}`;
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(cleanSvg)}`;
 };
 
 export const PRESET_EVENT_BANNERS: PresetBanner[] = [

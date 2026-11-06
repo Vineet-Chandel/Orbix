@@ -4091,8 +4091,8 @@ clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, r
 clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
-        if (!isUuid) {
+        const isEventUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isEventUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
         const { ticketCode, forceCheckIn } = req.body;
