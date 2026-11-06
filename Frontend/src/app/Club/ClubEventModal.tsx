@@ -8,7 +8,10 @@ import {
     CheckCheck,
     Sparkles,
     ArrowLeft,
+    ArrowRight,
     Info,
+    Plus,
+    Check,
 } from "lucide-react";
 import { NeoSelect } from "../../components/NeoSelect";
 import { NeoImageDropzone } from "../../components/NeoImageDropzone";
@@ -21,7 +24,21 @@ import {
     uploadClubImageToCloudinary,
 } from "../../utils/clubProfileApi";
 import { ClubMarkdownEditor } from "./Profile/ClubMarkdownEditor";
-import type { ClubEvent, CreateClubEventPayload, ClubEventStatus } from "../../store/clubEventsSlice";
+import {
+    PRESET_EVENT_BANNERS,
+    getRandomPresetBanner,
+} from "../../components/EventBanners/presetEventBanners";
+import { QuestionCard } from "./FormBuilder/QuestionCard";
+import { ORBIX_FORM_TEMPLATES } from "./FormBuilder/formTemplates";
+import type {
+    FormStructure,
+    FormQuestion,
+} from "../../api/clubEventFormApi";
+import type {
+    ClubEvent,
+    CreateClubEventPayload,
+    ClubEventStatus,
+} from "../../store/clubEventsSlice";
 
 export interface ClubEventModalProps {
     isOpen: boolean;
@@ -61,6 +78,51 @@ interface FormErrors {
 
 const URL_REGEX = /^(https?:\/\/)([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?(\?.*)?$/i;
 
+const DEFAULT_QUESTIONS: FormQuestion[] = [
+    {
+        id: "q_solo_team",
+        type: "multiple_choice",
+        title: "Are you registering as an individual or team?",
+        description: "Select whether you are hacking solo or with an established team.",
+        required: true,
+        options: [
+            { id: "opt_indiv", text: "Individual (Looking for a team)" },
+            { id: "opt_solo", text: "Solo Participant" },
+            { id: "opt_team", text: "Team (I am the Team Leader)" },
+            { id: "opt_member", text: "Team Member" },
+        ],
+    },
+    {
+        id: "q_track",
+        type: "multiple_choice",
+        title: "Preferred Track / Domain",
+        description: "Which domain will you focus on during this event?",
+        required: true,
+        options: [
+            { id: "opt_fullstack", text: "Full-Stack Web Development" },
+            { id: "opt_ai", text: "AI / Machine Learning" },
+            { id: "opt_mobile", text: "Mobile App Development" },
+            { id: "opt_cloud", text: "Cloud & DevOps" },
+            { id: "opt_design", text: "UI/UX & Product Design" },
+        ],
+    },
+    {
+        id: "q_tech_stack",
+        type: "checkboxes",
+        title: "Primary Tech Stack & Tools",
+        description: "Select technologies you have experience with or plan to use.",
+        required: false,
+        options: [
+            { id: "opt_react", text: "React / Next.js" },
+            { id: "opt_node", text: "Node.js / Express" },
+            { id: "opt_python", text: "Python / FastAPI / Django" },
+            { id: "opt_ts", text: "TypeScript" },
+            { id: "opt_postgres", text: "PostgreSQL / Prisma" },
+            { id: "opt_docker", text: "Docker / Kubernetes" },
+        ],
+    },
+];
+
 export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     isOpen,
     onClose,
@@ -75,6 +137,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
 }) => {
     const toast = useToast();
     const modalId = useId();
+
+    const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
 
     const formatForInput = (isoStr: string | null | undefined): string => {
         if (!isoStr) return "";
@@ -109,9 +173,24 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     const [isUploadingBanner, setIsUploadingBanner] = useState(false);
     const [uploadProgress, setUploadProgress] = useState<number | null>(null);
 
+    // Form builder state for Step 3
+    const [formStructure, setFormStructure] = useState<FormStructure>({
+        sections: [
+            {
+                id: "sec_default_1",
+                title: "Participant Information & Preferences",
+                description: "Tell the organizers about your background and interests.",
+                afterSectionAction: "submit_form",
+                questions: DEFAULT_QUESTIONS,
+            },
+        ],
+    });
+    const [activeQuestionId, setActiveQuestionId] = useState<string>(DEFAULT_QUESTIONS[0].id);
+
     // Initialize or reset form when modal opens or editingEvent changes
     useEffect(() => {
         if (isOpen) {
+            setCurrentStep(1);
             if (editingEvent) {
                 setForm({
                     title: editingEvent.title || "",
@@ -127,6 +206,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     status: editingEvent.status || "published",
                 });
             } else {
+                const defaultBanner = getRandomPresetBanner().dataUrl;
                 setForm({
                     title: "",
                     summary: "",
@@ -137,9 +217,21 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     locationType: "in_person",
                     venueOrLocation: "",
                     registrationUrl: "",
-                    coverImageUrl: "",
+                    coverImageUrl: defaultBanner,
                     status: initialStatus,
                 });
+                setFormStructure({
+                    sections: [
+                        {
+                            id: "sec_default_1",
+                            title: "Participant Information & Preferences",
+                            description: "Tell the organizers about your background and interests.",
+                            afterSectionAction: "submit_form",
+                            questions: JSON.parse(JSON.stringify(DEFAULT_QUESTIONS)),
+                        },
+                    ],
+                });
+                setActiveQuestionId(DEFAULT_QUESTIONS[0].id);
             }
             setErrors({});
             setTouched({});
@@ -227,7 +319,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             // Fetch signed upload params for banner
             const uploadConfig = await requestClubUploadSignature("banner", clubId);
 
-            // Upload directly to Cloudinary with real-time progress
+            // Upload directly with real-time progress
             const result = await uploadClubImageToCloudinary(uploadConfig, file, (percent) => {
                 setUploadProgress(percent);
             });
@@ -245,10 +337,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         }
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        // Mark all fields as touched
+    // Step 1 -> Step 2 Navigation
+    const handleGoToStep2 = () => {
         setTouched({
             title: true,
             startsAt: true,
@@ -260,7 +350,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         const validationErrors = validate(form);
         setErrors(validationErrors);
 
-        // Check for fatal errors
         if (
             validationErrors.title ||
             validationErrors.startsAt ||
@@ -272,11 +361,211 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                 validationErrors.startsAt ||
                 validationErrors.endsAt ||
                 validationErrors.registrationUrl;
-            toast.error(firstError || "Please correct the highlighted fields before submitting.", {
+            toast.error(firstError || "Please correct the highlighted fields before proceeding.", {
                 title: "Validation Error",
             });
             return;
         }
+
+        // Ensure banner is selected; if empty, pick a random preset
+        if (!form.coverImageUrl) {
+            setForm((prev) => ({ ...prev, coverImageUrl: getRandomPresetBanner().dataUrl }));
+        }
+
+        setCurrentStep(2);
+    };
+
+    // Step 2 -> Step 3 Navigation
+    const handleGoToStep3 = () => {
+        if (!form.coverImageUrl) {
+            setForm((prev) => ({ ...prev, coverImageUrl: getRandomPresetBanner().dataUrl }));
+        }
+        setCurrentStep(3);
+    };
+
+    // Form builder helper methods for Step 3
+    const totalQuestions = formStructure.sections.reduce((acc, s) => acc + s.questions.length, 0);
+
+    const handleAddQuestion = () => {
+        const newQuestionId = `q_${Date.now()}`;
+        const newQuestion: FormQuestion = {
+            id: newQuestionId,
+            type: "short_answer",
+            title: "Untitled Question",
+            required: false,
+        };
+
+        setFormStructure((prev) => {
+            const copy = JSON.parse(JSON.stringify(prev));
+            if (!copy.sections || copy.sections.length === 0) {
+                copy.sections = [
+                    {
+                        id: `sec_${Date.now()}`,
+                        title: "Section 1",
+                        afterSectionAction: "submit_form",
+                        questions: [newQuestion],
+                    },
+                ];
+            } else {
+                copy.sections[copy.sections.length - 1].questions.push(newQuestion);
+            }
+            return copy;
+        });
+
+        setActiveQuestionId(newQuestionId);
+        toast.info("Added new question to form.");
+    };
+
+    const handleQuickAddQuestion = (preset: Partial<FormQuestion>) => {
+        const newQuestionId = `q_${Date.now()}`;
+        const newQuestion: FormQuestion = {
+            id: newQuestionId,
+            type: preset.type || "short_answer",
+            title: preset.title || "Untitled Question",
+            description: preset.description,
+            required: Boolean(preset.required),
+            options: preset.options ? JSON.parse(JSON.stringify(preset.options)) : undefined,
+        };
+
+        setFormStructure((prev) => {
+            const copy = JSON.parse(JSON.stringify(prev));
+            if (!copy.sections || copy.sections.length === 0) {
+                copy.sections = [
+                    {
+                        id: `sec_${Date.now()}`,
+                        title: "Section 1",
+                        afterSectionAction: "submit_form",
+                        questions: [newQuestion],
+                    },
+                ];
+            } else {
+                copy.sections[copy.sections.length - 1].questions.push(newQuestion);
+            }
+            return copy;
+        });
+
+        setActiveQuestionId(newQuestionId);
+        toast.success(`Added question: "${newQuestion.title}"`);
+    };
+
+    const handleApplyTemplate = (templateId: string) => {
+        const found = ORBIX_FORM_TEMPLATES.find((t) => t.id === templateId);
+        if (!found) return;
+
+        setFormStructure(JSON.parse(JSON.stringify(found.structure)));
+        const firstQ = found.structure.sections[0]?.questions[0];
+        if (firstQ) setActiveQuestionId(firstQ.id);
+
+        toast.success(`Applied template: "${found.title}" with ${found.structure.sections[0]?.questions.length || 0} questions.`);
+    };
+
+    const handleUpdateQuestion = (updatedQ: FormQuestion) => {
+        setFormStructure((prev) => {
+            const copy = JSON.parse(JSON.stringify(prev));
+            for (const sec of copy.sections) {
+                const idx = sec.questions.findIndex((q: FormQuestion) => q.id === updatedQ.id);
+                if (idx !== -1) {
+                    sec.questions[idx] = updatedQ;
+                    break;
+                }
+            }
+            return copy;
+        });
+    };
+
+    const handleDeleteQuestion = (questionId: string) => {
+        setFormStructure((prev) => {
+            const copy = JSON.parse(JSON.stringify(prev));
+            for (const sec of copy.sections) {
+                sec.questions = sec.questions.filter((q: FormQuestion) => q.id !== questionId);
+            }
+            return copy;
+        });
+        toast.info("Question removed.");
+    };
+
+    const handleDuplicateQuestion = (questionId: string) => {
+        setFormStructure((prev) => {
+            const copy = JSON.parse(JSON.stringify(prev));
+            for (const sec of copy.sections) {
+                const idx = sec.questions.findIndex((q: FormQuestion) => q.id === questionId);
+                if (idx !== -1) {
+                    const original = sec.questions[idx];
+                    const dup: FormQuestion = {
+                        ...JSON.parse(JSON.stringify(original)),
+                        id: `q_dup_${Date.now()}`,
+                        title: `${original.title} (Copy)`,
+                    };
+                    sec.questions.splice(idx + 1, 0, dup);
+                    setActiveQuestionId(dup.id);
+                    break;
+                }
+            }
+            return copy;
+        });
+        toast.info("Question duplicated.");
+    };
+
+    const handleMoveQuestion = (questionId: string, direction: "up" | "down") => {
+        setFormStructure((prev) => {
+            const copy = JSON.parse(JSON.stringify(prev));
+            for (const sec of copy.sections) {
+                const idx = sec.questions.findIndex((q: FormQuestion) => q.id === questionId);
+                if (idx !== -1) {
+                    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
+                    if (targetIdx >= 0 && targetIdx < sec.questions.length) {
+                        const [removed] = sec.questions.splice(idx, 1);
+                        sec.questions.splice(targetIdx, 0, removed);
+                    }
+                    break;
+                }
+            }
+            return copy;
+        });
+    };
+
+    // Final Submission Handler (Atomic Launch)
+    const handleSubmitFinal = (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+
+        // Validate Step 1
+        const validationErrors = validate(form);
+        if (
+            validationErrors.title ||
+            validationErrors.startsAt ||
+            validationErrors.endsAt ||
+            validationErrors.registrationUrl
+        ) {
+            setCurrentStep(1);
+            setTouched({
+                title: true,
+                startsAt: true,
+                endsAt: true,
+                registrationUrl: true,
+                venueOrLocation: true,
+            });
+            setErrors(validationErrors);
+            const firstError =
+                validationErrors.title ||
+                validationErrors.startsAt ||
+                validationErrors.endsAt ||
+                validationErrors.registrationUrl;
+            toast.error(firstError || "Please fix validation errors in Step 1.", {
+                title: "Validation Error",
+            });
+            return;
+        }
+
+        // Validate Step 3 Form Questions
+        if (totalQuestions === 0) {
+            setCurrentStep(3);
+            toast.error("The registration form cannot be empty. Please include at least 1 question for participants.", {
+                title: "Registration Form Required",
+            });
+            return;
+        }
+
+        const effectiveBanner = form.coverImageUrl.trim() || getRandomPresetBanner().dataUrl;
 
         // Construct clean payload with valid details only
         const payload: CreateClubEventPayload = {
@@ -289,8 +578,19 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             locationType: form.locationType,
             venueOrLocation: form.venueOrLocation.trim() || null,
             registrationUrl: form.registrationUrl.trim() || null,
-            coverImageUrl: form.coverImageUrl.trim() || null,
+            coverImageUrl: effectiveBanner,
             status: form.status,
+            initialFormStructure: formStructure,
+            initialFormSettings: {
+                allowMultipleResponses: false,
+                limitOneResponsePerUser: true,
+                showProgressBar: true,
+                shuffleQuestions: false,
+            },
+            initialFormTheme: {
+                accentColor: "#38BDF8",
+                themePreset: "neo_brutalist",
+            },
         };
 
         // Fire callback immediately for optimistic update
@@ -304,8 +604,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             id={modalId}
             className="w-full flex-1 flex flex-col min-h-0 text-black animate-in fade-in duration-150 space-y-6"
         >
-            {/* Top Workspace Header Bar matching Event Details */}
-            <div className="pb-5 border-b-2 border-black/55 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            {/* Top Workspace Header Bar */}
+            <div className="pb-5 border-b-2 border-black/55 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                 <div className="flex items-center gap-3 sm:gap-4 min-w-0">
                     {onOpenMobileSidebar && (
                         <button
@@ -361,471 +661,801 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             </span>
                         </div>
                         <p className="text-[11px] sm:text-xs text-neutral-600 font-medium truncate">
-                            Organize workshops, hackathons, and chapter meetups with strictly verified details.
+                            Step {currentStep} of 3: {currentStep === 1 ? "Event Information" : currentStep === 2 ? "Banner Selection" : "Registration Form"}
                         </p>
                     </div>
                 </div>
 
-                {/* Right Header Actions */}
-                <div className="flex items-center gap-2.5 shrink-0">
-                    <OrbixButton
-                        type="button"
-                        onClick={handleSubmit}
-                        variant="lime"
-                        disabled={isUploadingBanner}
-                        className="px-4 sm:px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000]"
-                    >
-                        {editingEvent ? "Save Changes" : "Create Event"}
-                    </OrbixButton>
+                {/* Center / Right: 3-Step Wizard Navigation */}
+                <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                    {/* Stepper Pills */}
+                    <div className="flex items-center bg-[#FAF6EE] p-1 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] gap-1">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentStep(1)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                                currentStep === 1
+                                    ? "bg-[#FFE566] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black hover:bg-white/60"
+                            }`}
+                        >
+                            <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">1</span>
+                            <span>Event Info</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => handleGoToStep2()}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                                currentStep === 2
+                                    ? "bg-[#38BDF8] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black hover:bg-white/60"
+                            }`}
+                        >
+                            <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">2</span>
+                            <span>Banner</span>
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => handleGoToStep3()}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                                currentStep === 3
+                                    ? "bg-[#A2FF86] text-black border-2 border-black shadow-[2px_2px_0px_#000]"
+                                    : "text-neutral-700 hover:text-black hover:bg-white/60"
+                            }`}
+                        >
+                            <span className="w-4 h-4 rounded-full bg-black text-white flex items-center justify-center text-[10px]">3</span>
+                            <span>Form ({totalQuestions})</span>
+                        </button>
+                    </div>
+
+                    {/* Action Button */}
+                    {currentStep === 1 && (
+                        <OrbixButton
+                            type="button"
+                            onClick={handleGoToStep2}
+                            variant="primary"
+                            disabled={isUploadingBanner}
+                            className="px-4 sm:px-5 py-2 text-xs font-black shadow-[3px_3px_0px_#000]"
+                        >
+                            <span>Next: Banner</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                        </OrbixButton>
+                    )}
+
+                    {currentStep === 2 && (
+                        <OrbixButton
+                            type="button"
+                            onClick={handleGoToStep3}
+                            variant="lime"
+                            disabled={isUploadingBanner}
+                            className="px-4 sm:px-5 py-2 text-xs font-black shadow-[3px_3px_0px_#000]"
+                        >
+                            <span>Next: Form Builder</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                        </OrbixButton>
+                    )}
+
+                    {currentStep === 3 && (
+                        <OrbixButton
+                            type="button"
+                            onClick={() => handleSubmitFinal()}
+                            variant="lime"
+                            disabled={isUploadingBanner || totalQuestions === 0}
+                            className="px-4 sm:px-6 py-2 text-xs font-black shadow-[3px_3px_0px_#000]"
+                        >
+                            <span>{editingEvent ? "Save Changes" : "🚀 Publish & Create Event"}</span>
+                        </OrbixButton>
+                    )}
                 </div>
             </div>
 
-            {/* Workspace Body: 50% Left Form / 50% Right Banner & Live Preview */}
-            <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden flex flex-col lg:flex-row">
-                {/* 50% LEFT COLUMN: Input Form with Valid Details Validation */}
-                <div className="w-full lg:w-1/2 p-4 sm:p-6 lg:p-8 space-y-6 border-b-3 lg:border-b-0 lg:border-r-3 border-black bg-[#FAF6EE]/30">
+            {/* ---------------------------------------------------------------- */}
+            {/* STEP 1: EVENT INFORMATION & SCHEDULE */}
+            {/* ---------------------------------------------------------------- */}
+            {currentStep === 1 && (
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
-                                Step 1 of 2
+                                Step 1 of 3
                             </span>
-                            <h3 className="text-base font-black text-black">Event Information</h3>
+                            <h3 className="text-base sm:text-lg font-black text-black">Event Information & Schedule</h3>
                         </div>
                         <span className="text-[11px] font-bold text-neutral-500 bg-white px-2.5 py-1 rounded-lg border border-black/30 shadow-[1px_1px_0px_#000]">
                             * Required Fields
                         </span>
                     </div>
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        {/* 1. Title */}
-                        <div>
-                            <div className="flex items-center justify-between mb-1">
-                                <label className="block text-xs font-black uppercase tracking-wider text-black">
-                                    Event Title *
-                                </label>
-                                <span
-                                    className={`text-[10px] font-mono font-bold ${
-                                        form.title.length > 120
-                                            ? "text-rose-600"
-                                            : form.title.length >= 3
-                                            ? "text-emerald-700"
-                                            : "text-neutral-500"
-                                    }`}
-                                >
-                                    {form.title.length}/120
-                                </span>
-                            </div>
-                            <input
-                                type="text"
-                                required
-                                value={form.title}
-                                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                                onBlur={() => handleBlur("title")}
-                                maxLength={120}
-                                placeholder="e.g. Masterclass: System Design & Microservices Architecture"
-                                className={`w-full px-3.5 py-2.5 rounded-xl bg-white border-2 text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-hidden transition-all ${
-                                    touched.title && errors.title
-                                        ? "border-rose-500 bg-rose-50/50"
-                                        : "border-black focus:ring-2 focus:ring-[#a2ff86]"
-                                }`}
-                            />
-                            {touched.title && errors.title && (
-                                <p className="text-[11px] font-bold text-rose-600 mt-1.5 flex items-center gap-1">
-                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                    <span>{errors.title}</span>
-                                </p>
-                            )}
-                        </div>
-
-                        {/* 2. Schedule Row: Starts At & Ends At */}
-                        <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3.5">
-                            <div className="flex items-center gap-2 pb-2 border-b border-black/10">
-                                <Calendar className="w-4 h-4 text-neutral-700" />
-                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                    Schedule & Timings
-                                </h4>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                                <div>
-                                    <NeoDateTimePicker
-                                        label="Starts At"
-                                        required
-                                        value={form.startsAt}
-                                        onChange={(val) => {
-                                            setForm({ ...form, startsAt: val });
-                                            if (errors.startsAt) {
-                                                setErrors({ ...errors, startsAt: undefined });
-                                            }
-                                        }}
-                                        onBlur={() => handleBlur("startsAt")}
-                                        error={touched.startsAt ? errors.startsAt : undefined}
-                                        placeholder="Pick event start date & time"
-                                        mode="datetime"
-                                    />
-                                    {touched.startsAt && errors.startsAt && (
-                                        <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                                            <AlertCircle className="w-3 h-3 shrink-0" />
-                                            <span>{errors.startsAt}</span>
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <NeoDateTimePicker
-                                        label="Ends At (Optional)"
-                                        value={form.endsAt}
-                                        onChange={(val) => {
-                                            setForm({ ...form, endsAt: val });
-                                            if (errors.endsAt) {
-                                                setErrors({ ...errors, endsAt: undefined });
-                                            }
-                                        }}
-                                        onBlur={() => handleBlur("endsAt")}
-                                        error={touched.endsAt ? errors.endsAt : undefined}
-                                        placeholder="Pick event end date & time"
-                                        mode="datetime"
-                                    />
-                                    {touched.endsAt && errors.endsAt && (
-                                        <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                                            <AlertCircle className="w-3 h-3 shrink-0" />
-                                            <span>{errors.endsAt}</span>
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-
-                            <p className="text-[10px] text-neutral-500 font-medium">
-                                * Times are formatted according to Indian Standard Time (Asia/Kolkata).
-                            </p>
-                        </div>
-
-                        {/* 3. Location Row */}
-                        <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3.5">
-                            <div className="flex items-center gap-2 pb-2 border-b border-black/10">
-                                <MapPin className="w-4 h-4 text-neutral-700" />
-                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                    Location & Venue
-                                </h4>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                        Location Type *
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Left Sub-column: Title, Schedule, Location */}
+                        <div className="space-y-5">
+                            {/* 1. Title */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                        Event Title *
                                     </label>
-                                    <NeoSelect
-                                        value={form.locationType}
-                                        onChange={(val) =>
-                                            setForm({ ...form, locationType: val as any })
-                                        }
-                                        options={[
-                                            { value: "in_person", label: "In-Person (Campus)" },
-                                            { value: "virtual", label: "Virtual (Online / Zoom / Meet)" },
-                                            { value: "hybrid", label: "Hybrid (Campus + Stream)" },
-                                        ]}
-                                        size="sm"
-                                        className="w-full"
-                                        triggerClassName="h-9 font-bold bg-[#FAF6EE] text-xs border-2 border-black"
-                                    />
+                                    <span
+                                        className={`text-[10px] font-mono font-bold ${
+                                            form.title.length > 120
+                                                ? "text-rose-600"
+                                                : form.title.length >= 3
+                                                ? "text-emerald-700"
+                                                : "text-neutral-500"
+                                        }`}
+                                    >
+                                        {form.title.length}/120
+                                    </span>
+                                </div>
+                                <input
+                                    type="text"
+                                    required
+                                    value={form.title}
+                                    onChange={(e) => setForm({ ...form, title: e.target.value })}
+                                    onBlur={() => handleBlur("title")}
+                                    maxLength={120}
+                                    placeholder="e.g. Masterclass: System Design & Microservices Architecture"
+                                    className={`w-full px-3.5 py-2.5 rounded-xl bg-white border-2 text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-hidden transition-all ${
+                                        touched.title && errors.title
+                                            ? "border-rose-500 bg-rose-50/50"
+                                            : "border-black focus:ring-2 focus:ring-[#a2ff86]"
+                                    }`}
+                                />
+                                {touched.title && errors.title && (
+                                    <p className="text-[11px] font-bold text-rose-600 mt-1.5 flex items-center gap-1">
+                                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                        <span>{errors.title}</span>
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* 2. Schedule Row: Starts At & Ends At */}
+                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3.5">
+                                <div className="flex items-center gap-2 pb-2 border-b border-black/10">
+                                    <Calendar className="w-4 h-4 text-neutral-700" />
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                        Schedule & Timings
+                                    </h4>
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                        Venue or Location Details
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                    <div>
+                                        <NeoDateTimePicker
+                                            label="Starts At"
+                                            required
+                                            value={form.startsAt}
+                                            onChange={(val) => {
+                                                setForm({ ...form, startsAt: val });
+                                                if (errors.startsAt) {
+                                                    setErrors({ ...errors, startsAt: undefined });
+                                                }
+                                            }}
+                                            onBlur={() => handleBlur("startsAt")}
+                                            error={touched.startsAt ? errors.startsAt : undefined}
+                                            placeholder="Pick event start date & time"
+                                            mode="datetime"
+                                        />
+                                        {touched.startsAt && errors.startsAt && (
+                                            <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                                                <AlertCircle className="w-3 h-3 shrink-0" />
+                                                <span>{errors.startsAt}</span>
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <NeoDateTimePicker
+                                            label="Ends At (Optional)"
+                                            value={form.endsAt}
+                                            onChange={(val) => {
+                                                setForm({ ...form, endsAt: val });
+                                                if (errors.endsAt) {
+                                                    setErrors({ ...errors, endsAt: undefined });
+                                                }
+                                            }}
+                                            onBlur={() => handleBlur("endsAt")}
+                                            error={touched.endsAt ? errors.endsAt : undefined}
+                                            placeholder="Pick event end date & time"
+                                            mode="datetime"
+                                        />
+                                        {touched.endsAt && errors.endsAt && (
+                                            <p className="text-[10px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                                                <AlertCircle className="w-3 h-3 shrink-0" />
+                                                <span>{errors.endsAt}</span>
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <p className="text-[10px] text-neutral-500 font-medium">
+                                    * Times are formatted according to Indian Standard Time (Asia/Kolkata).
+                                </p>
+                            </div>
+
+                            {/* 3. Location Row */}
+                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3.5">
+                                <div className="flex items-center gap-2 pb-2 border-b border-black/10">
+                                    <MapPin className="w-4 h-4 text-neutral-700" />
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                        Location & Venue
+                                    </h4>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                            Location Type *
+                                        </label>
+                                        <NeoSelect
+                                            value={form.locationType}
+                                            onChange={(val) =>
+                                                setForm({ ...form, locationType: val as any })
+                                            }
+                                            options={[
+                                                { value: "in_person", label: "In-Person (Campus)" },
+                                                { value: "virtual", label: "Virtual (Online / Zoom / Meet)" },
+                                                { value: "hybrid", label: "Hybrid (Campus + Stream)" },
+                                            ]}
+                                            size="sm"
+                                            className="w-full"
+                                            triggerClassName="h-9 font-bold bg-[#FAF6EE] text-xs border-2 border-black"
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                            Venue or Location Details
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={form.venueOrLocation}
+                                            onChange={(e) =>
+                                                setForm({ ...form, venueOrLocation: e.target.value })
+                                            }
+                                            onBlur={() => handleBlur("venueOrLocation")}
+                                            placeholder={
+                                                form.locationType === "virtual"
+                                                    ? "e.g. Google Meet link / Zoom room"
+                                                    : "e.g. Main Auditorium, Block C"
+                                            }
+                                            className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Right Sub-column: URL, Summary, Description, Stage */}
+                        <div className="space-y-5">
+                            {/* 4. Registration / RSVP URL */}
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
+                                    Registration / RSVP URL (Optional)
+                                </label>
+                                <input
+                                    type="url"
+                                    value={form.registrationUrl}
+                                    onChange={(e) =>
+                                        setForm({ ...form, registrationUrl: e.target.value })
+                                    }
+                                    onBlur={() => handleBlur("registrationUrl")}
+                                    placeholder="https://forms.gle/... or https://unstop.com/..."
+                                    className={`w-full px-3.5 py-2.5 rounded-xl bg-white border-2 text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-hidden transition-all ${
+                                        touched.registrationUrl && errors.registrationUrl
+                                            ? "border-rose-500 bg-rose-50/50"
+                                            : "border-black focus:ring-2 focus:ring-[#a2ff86]"
+                                    }`}
+                                />
+                                {touched.registrationUrl && errors.registrationUrl ? (
+                                    <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
+                                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                                        <span>{errors.registrationUrl}</span>
+                                    </p>
+                                ) : (
+                                    <p className="text-[10px] text-neutral-500 font-medium mt-1">
+                                        Provide an external link if ticketing or registration is hosted externally.
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* 5. Brief Summary */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1">
+                                    <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                        Brief Summary (1-2 Sentences)
                                     </label>
-                                    <input
-                                        type="text"
-                                        value={form.venueOrLocation}
-                                        onChange={(e) =>
-                                            setForm({ ...form, venueOrLocation: e.target.value })
-                                        }
-                                        onBlur={() => handleBlur("venueOrLocation")}
-                                        placeholder={
-                                            form.locationType === "virtual"
-                                                ? "e.g. Google Meet link / Zoom room"
-                                                : "e.g. Main Auditorium, Block C"
-                                        }
-                                        className="w-full px-3 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:bg-white focus:outline-hidden"
-                                    />
+                                    <span className="text-[10px] font-mono font-bold text-neutral-500">
+                                        {form.summary.length}/200
+                                    </span>
+                                </div>
+                                <input
+                                    type="text"
+                                    maxLength={200}
+                                    value={form.summary}
+                                    onChange={(e) => setForm({ ...form, summary: e.target.value })}
+                                    placeholder="A hands-on session exploring smart contracts, decentralized apps, and tooling..."
+                                    className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-hidden focus:ring-2 focus:ring-[#a2ff86]"
+                                />
+                            </div>
+
+                            {/* 6. Full Description & Agenda */}
+                            <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                        Full Description & Agenda
+                                    </label>
+                                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-[#FAF6EE] border border-black/40 text-neutral-700">
+                                        Markdown Supported
+                                    </span>
+                                </div>
+                                <ClubMarkdownEditor
+                                    value={form.description}
+                                    onChange={(val) => setForm({ ...form, description: val })}
+                                    placeholder="Prerequisites, schedule, speaker profiles, certifications, guidelines, and competition prizes..."
+                                    minHeight="min-h-[140px]"
+                                />
+                            </div>
+
+                            {/* 7. Publish Status Selector */}
+                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                                <label className="block text-xs font-black uppercase tracking-wider text-black">
+                                    Publication Stage
+                                </label>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm({ ...form, status: "published" })}
+                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${
+                                            form.status === "published"
+                                                ? "bg-emerald-300 border-black shadow-[2px_2px_0px_#000] font-black"
+                                                : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-black">Published</span>
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-800" />
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm({ ...form, status: "draft" })}
+                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${
+                                            form.status === "draft"
+                                                ? "bg-amber-300 border-black shadow-[2px_2px_0px_#000] font-black"
+                                                : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-black">Draft</span>
+                                            <Info className="w-3.5 h-3.5 text-amber-800" />
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm({ ...form, status: "completed" })}
+                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${
+                                            form.status === "completed"
+                                                ? "bg-sky-300 border-black shadow-[2px_2px_0px_#000] font-black"
+                                                : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-black">Completed</span>
+                                            <CheckCheck className="w-3.5 h-3.5 text-sky-900" />
+                                        </div>
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        onClick={() => setForm({ ...form, status: "cancelled" })}
+                                        className={`p-2.5 rounded-xl border-2 text-left cursor-pointer transition-all ${
+                                            form.status === "cancelled"
+                                                ? "bg-rose-300 border-black shadow-[2px_2px_0px_#000] font-black"
+                                                : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-black">Cancelled</span>
+                                            <X className="w-3.5 h-3.5 text-rose-800" />
+                                        </div>
+                                    </button>
                                 </div>
                             </div>
                         </div>
+                    </div>
 
-                        {/* 4. Registration / RSVP URL */}
-                        <div>
-                            <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
-                                Registration / RSVP URL (Optional)
-                            </label>
-                            <input
-                                type="url"
-                                value={form.registrationUrl}
-                                onChange={(e) =>
-                                    setForm({ ...form, registrationUrl: e.target.value })
-                                }
-                                onBlur={() => handleBlur("registrationUrl")}
-                                placeholder="https://forms.gle/... or https://unstop.com/..."
-                                className={`w-full px-3.5 py-2.5 rounded-xl bg-white border-2 text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-hidden transition-all ${
-                                    touched.registrationUrl && errors.registrationUrl
-                                        ? "border-rose-500 bg-rose-50/50"
-                                        : "border-black focus:ring-2 focus:ring-[#a2ff86]"
-                                }`}
-                            />
-                            {touched.registrationUrl && errors.registrationUrl ? (
-                                <p className="text-[11px] font-bold text-rose-600 mt-1 flex items-center gap-1">
-                                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                                    <span>{errors.registrationUrl}</span>
-                                </p>
-                            ) : (
-                                <p className="text-[10px] text-neutral-500 font-medium mt-1">
-                                    Provide an external Google Form, Unstop, Luma, or ticketing link for participants.
-                                </p>
-                            )}
-                        </div>
-
-                        {/* 5. Brief Summary */}
-                        <div>
-                            <div className="flex items-center justify-between mb-1">
-                                <label className="block text-xs font-black uppercase tracking-wider text-black">
-                                    Brief Summary (1-2 Sentences)
-                                </label>
-                                <span className="text-[10px] font-mono font-bold text-neutral-500">
-                                    {form.summary.length}/200
-                                </span>
-                            </div>
-                            <input
-                                type="text"
-                                maxLength={200}
-                                value={form.summary}
-                                onChange={(e) => setForm({ ...form, summary: e.target.value })}
-                                placeholder="A hands-on session exploring smart contracts, decentralized apps, and tooling..."
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-white border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:outline-hidden focus:ring-2 focus:ring-[#a2ff86]"
-                            />
-                        </div>
-
-                        {/* 6. Full Description & Agenda */}
-                        <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                                <label className="block text-xs font-black uppercase tracking-wider text-black">
-                                    Full Description & Agenda
-                                </label>
-                                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-[#FAF6EE] border border-black/40 text-neutral-700">
-                                    Markdown Supported
-                                </span>
-                            </div>
-                            <ClubMarkdownEditor
-                                value={form.description}
-                                onChange={(val) => setForm({ ...form, description: val })}
-                                placeholder="Prerequisites, schedule, speaker profiles, certifications, guidelines, and competition prizes..."
-                                minHeight="min-h-[220px]"
-                            />
-                        </div>
-
-                        {/* 7. Publish Status Selector */}
-                        <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                            <label className="block text-xs font-black uppercase tracking-wider text-black">
-                                Publication Stage
-                            </label>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
-                                <button
-                                    type="button"
-                                    onClick={() => setForm({ ...form, status: "published" })}
-                                    className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all ${
-                                        form.status === "published"
-                                            ? "bg-emerald-300 border-black shadow-[2px_2px_0px_#000] font-black"
-                                            : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-black">Published</span>
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-800" />
-                                    </div>
-                                    <p className="text-[10px] text-neutral-700 mt-1 leading-snug">
-                                        Live in directory & open for RSVPs
-                                    </p>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setForm({ ...form, status: "completed" })}
-                                    className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all ${
-                                        form.status === "completed"
-                                            ? "bg-sky-300 border-black shadow-[2px_2px_0px_#000] font-black"
-                                            : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-black">Completed</span>
-                                        <CheckCheck className="w-3.5 h-3.5 text-sky-900" />
-                                    </div>
-                                    <p className="text-[10px] text-neutral-700 mt-1 leading-snug">
-                                        Finished session with historical roster
-                                    </p>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setForm({ ...form, status: "draft" })}
-                                    className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all ${
-                                        form.status === "draft"
-                                            ? "bg-amber-300 border-black shadow-[2px_2px_0px_#000] font-black"
-                                            : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-black">Draft</span>
-                                        <Info className="w-3.5 h-3.5 text-amber-800" />
-                                    </div>
-                                    <p className="text-[10px] text-neutral-700 mt-1 leading-snug">
-                                        Saved internally for club team review
-                                    </p>
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() => setForm({ ...form, status: "cancelled" })}
-                                    className={`p-3 rounded-xl border-2 text-left cursor-pointer transition-all ${
-                                        form.status === "cancelled"
-                                            ? "bg-rose-300 border-black shadow-[2px_2px_0px_#000] font-black"
-                                            : "bg-[#FAF6EE] hover:bg-neutral-100 border-black/40 text-neutral-700"
-                                    }`}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-black">Cancelled</span>
-                                        <X className="w-3.5 h-3.5 text-rose-800" />
-                                    </div>
-                                    <p className="text-[10px] text-neutral-700 mt-1 leading-snug">
-                                        Marked as cancelled for records
-                                    </p>
-                                </button>
-                            </div>
-
-                            {/* Warning when transitioning from Published to Cancelled stage */}
-                            {editingEvent?.status === "published" && form.status === "cancelled" && (
-                                <div className="p-3.5 rounded-2xl bg-rose-100 border-2 border-rose-900 shadow-[2px_2px_0px_#000] space-y-1.5 animate-in fade-in duration-200">
-                                    <div className="flex items-center gap-2">
-                                        <AlertCircle className="w-4 h-4 text-rose-700 stroke-[2.5]" />
-                                        <span className="text-xs font-black uppercase tracking-wider text-rose-950">
-                                            Warning: Moving from Published to Cancelled Stage
-                                        </span>
-                                    </div>
-                                    <p className="text-xs font-bold text-rose-950 leading-relaxed">
-                                        Orbix enforces a minimum 4-hour advance cancellation limit. Setting this event to Cancelled will immediately dispatch cancellation notifications to all registered students and campus members of your college.
-                                    </p>
-                                </div>
-                            )}
-                        </div>
-                    </form>
+                    {/* Step 1 Footer */}
+                    <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                        <OrbixButton
+                            type="button"
+                            onClick={handleGoToStep2}
+                            variant="primary"
+                            className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000]"
+                        >
+                            <span>Next: Select Banner</span>
+                            <ArrowRight className="w-4 h-4 ml-1" />
+                        </OrbixButton>
+                    </div>
                 </div>
+            )}
 
-                {/* 50% RIGHT COLUMN: Banner Upload & Live Catalog Card Preview */}
-                <div className="w-full lg:w-1/2 h-full overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6 bg-white">
+            {/* ---------------------------------------------------------------- */}
+            {/* STEP 2: BANNER SELECTION STUDIO */}
+            {/* ---------------------------------------------------------------- */}
+            {currentStep === 2 && (
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
                     <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
-                                Step 2 of 2
+                                Step 2 of 3
                             </span>
-                            <h3 className="text-base font-black text-black">Event Banner & Live Preview</h3>
-                        </div>
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-600">
-                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                            <span>Real-Time Catalog Rendering</span>
-                        </div>
-                    </div>
-
-                    {/* Banner Upload Section */}
-                    <div className="space-y-3">
-                        <div>
-                            <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                Event Cover Banner
-                            </h4>
+                            <h3 className="text-base sm:text-lg font-black text-black">Event Banner Studio & Live Preview</h3>
                             <p className="text-xs text-neutral-600 font-medium mt-0.5">
-                                Import a cover image for your event, identical to coordinator and profile media.
+                                Select from 5 high-vibe developer SVG banners, or upload a custom flyer for this event.
                             </p>
                         </div>
-
-                        {/* NeoImageDropzone with banner aspect ratio */}
-                        <NeoImageDropzone
-                            headline="Drag and drop your event banner here"
-                            subtext="or click anywhere in this block to browse your device"
-                            value={form.coverImageUrl}
-                            onChange={handleBannerFileSelect}
-                            onRemove={() => setForm({ ...form, coverImageUrl: "" })}
-                            isUploading={isUploadingBanner}
-                            uploadProgress={uploadProgress}
-                            aspectRatio="banner"
-                            maxSizeMB={5}
-                            recommendedNote="Recommended 16:9 ratio (e.g. 1200x675px). PNG, JPG, or WEBP up to 5MB."
-                        />
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-neutral-600 bg-white px-3 py-1.5 rounded-xl border border-black shadow-[1px_1px_0px_#000]">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                            <span>Auto-Selected If Omitted</span>
+                        </div>
                     </div>
 
-                    {/* Live Event Card Preview */}
-                    <div className="space-y-3 pt-2">
-                        <div className="flex items-center justify-between">
-                            <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                Live Listing Card Preview
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        {/* 7 Columns: Preset Banner Grid & Custom Dropzone */}
+                        <div className="lg:col-span-7 space-y-5">
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                        Choose from 5 Curated Developer Banners
+                                    </h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const randomBanner = getRandomPresetBanner();
+                                            setForm((prev) => ({ ...prev, coverImageUrl: randomBanner.dataUrl }));
+                                            toast.info(`Swapped to "${randomBanner.title}" banner!`);
+                                        }}
+                                        className="text-[11px] font-black text-sky-700 hover:text-sky-900 underline cursor-pointer"
+                                    >
+                                        🎲 Surprise Me
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    {PRESET_EVENT_BANNERS.map((banner) => {
+                                        const isSelected = form.coverImageUrl === banner.dataUrl;
+                                        return (
+                                            <div
+                                                key={banner.id}
+                                                onClick={() => {
+                                                    setForm((prev) => ({ ...prev, coverImageUrl: banner.dataUrl }));
+                                                    toast.success(`Selected banner: "${banner.title}"`);
+                                                }}
+                                                className={`group relative rounded-2xl border-2 cursor-pointer transition-all overflow-hidden ${
+                                                    isSelected
+                                                        ? "border-black shadow-[4px_4px_0px_#000] ring-4 ring-[#A2FF86] bg-neutral-900"
+                                                        : "border-black/50 hover:border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] bg-white hover:translate-y-[-1px]"
+                                                }`}
+                                            >
+                                                {/* Aspect 16:9 Banner Thumbnail */}
+                                                <div className="aspect-[16/9] w-full overflow-hidden bg-neutral-950 relative">
+                                                    <img
+                                                        src={banner.dataUrl}
+                                                        alt={banner.title}
+                                                        className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
+                                                    />
+                                                    {isSelected && (
+                                                        <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-[#A2FF86] text-black border-2 border-black font-black text-[10px] shadow-[1px_1px_0px_#000] flex items-center gap-1">
+                                                            <Check className="w-3 h-3 stroke-[3]" />
+                                                            <span>Active</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <div className="p-2.5 bg-white border-t-2 border-black flex items-center justify-between">
+                                                    <div className="truncate">
+                                                        <h5 className="text-xs font-black text-black truncate">{banner.title}</h5>
+                                                        <span className="text-[10px] font-bold text-neutral-500 truncate block">
+                                                            {banner.category}
+                                                        </span>
+                                                    </div>
+                                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border border-black/40 bg-[#FAF6EE] text-black shrink-0">
+                                                        {banner.badgeText.split(" ")[0]}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* Or Custom Upload */}
+                            <div className="pt-2 border-t-2 border-black/10 space-y-2">
+                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                    Or Upload Custom Event Flyer
+                                </h4>
+                                <NeoImageDropzone
+                                    headline="Drag and drop your event banner here"
+                                    subtext="or click anywhere in this block to browse your device"
+                                    value={form.coverImageUrl.startsWith("data:image/svg+xml") ? "" : form.coverImageUrl}
+                                    onChange={handleBannerFileSelect}
+                                    onRemove={() => {
+                                        setForm((prev) => ({ ...prev, coverImageUrl: getRandomPresetBanner().dataUrl }));
+                                    }}
+                                    isUploading={isUploadingBanner}
+                                    uploadProgress={uploadProgress}
+                                    aspectRatio="banner"
+                                    maxSizeMB={5}
+                                    recommendedNote="Recommended 16:9 ratio (e.g. 1200x675px). PNG, JPG, or WEBP up to 5MB."
+                                />
+                            </div>
+                        </div>
+
+                        {/* 5 Columns: Live Catalog Card Preview */}
+                        <div className="lg:col-span-5 space-y-3">
+                            <h4 className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
+                                <Sparkles className="w-4 h-4 text-amber-500" />
+                                <span>Real-Time Catalog Preview</span>
                             </h4>
-                        </div>
 
-                        <EventLiveListingCard
-                            title={form.title}
-                            summary={form.summary}
-                            description={form.description}
-                            startsAt={form.startsAt}
-                            endsAt={form.endsAt}
-                            timezone={form.timezone}
-                            venueOrLocation={form.venueOrLocation}
-                            locationType={form.locationType}
-                            registrationUrl={form.registrationUrl}
-                            coverImageUrl={form.coverImageUrl}
-                            status={form.status}
-                            clubName={clubName || "Your Club Chapter"}
-                            clubLogoUrl={clubLogoUrl}
-                            collegeName={collegeName || "Your College Campus"}
-                            eventId={editingEvent?.id}
-                            slug={editingEvent?.slug}
-                        />
+                            <div className="sticky top-4">
+                                <EventLiveListingCard
+                                    title={form.title || "Untitled Campus Event"}
+                                    summary={form.summary}
+                                    description={form.description}
+                                    startsAt={form.startsAt}
+                                    endsAt={form.endsAt}
+                                    timezone={form.timezone}
+                                    venueOrLocation={form.venueOrLocation}
+                                    locationType={form.locationType}
+                                    registrationUrl={form.registrationUrl}
+                                    coverImageUrl={form.coverImageUrl}
+                                    status={form.status}
+                                    clubName={clubName || "Your Club Chapter"}
+                                    clubLogoUrl={clubLogoUrl}
+                                    collegeName={collegeName || "Your College Campus"}
+                                    eventId={editingEvent?.id}
+                                    slug={editingEvent?.slug}
+                                />
+                            </div>
+                        </div>
                     </div>
 
-                    {/* Banner Guidelines Callout Card */}
-                    <div className="p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
-                        <div className="flex items-center gap-2">
-                            <Info className="w-4 h-4 text-neutral-800" />
-                            <h5 className="text-xs font-black uppercase tracking-wider text-black">
-                                Banner Specifications
-                            </h5>
-                        </div>
-                        <ul className="text-xs text-neutral-700 space-y-1 pl-5 list-disc font-medium">
-                            <li>Supported formats: PNG, JPG, or WEBP</li>
-                            <li>Maximum file size: 5 MB</li>
-                            <li>Ideal dimensions: 1200 x 675 pixels (16:9 landscape aspect ratio)</li>
-                            <li>High contrast and legible text work best for thumbnail cards</li>
-                        </ul>
+                    {/* Step 2 Footer */}
+                    <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentStep(1)}
+                            className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Back: Event Info</span>
+                        </button>
+                        <OrbixButton
+                            type="button"
+                            onClick={handleGoToStep3}
+                            variant="lime"
+                            className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000]"
+                        >
+                            <span>Next: Build Registration Form</span>
+                            <ArrowRight className="w-4 h-4 ml-1" />
+                        </OrbixButton>
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Bottom Floating Bar on Mobile */}
-            <div className="p-3 bg-[#FAF6EE] border-t-2 border-black flex sm:hidden items-center justify-end gap-2 shrink-0">
-                <button
-                    type="button"
-                    onClick={onClose}
-                    disabled={isUploadingBanner}
-                    className="px-4 py-2 rounded-xl bg-white border-2 border-black text-xs font-bold"
-                >
-                    Cancel
-                </button>
-                <OrbixButton
-                    type="button"
-                    onClick={handleSubmit}
-                    variant="lime"
-                    disabled={isUploadingBanner}
-                    className="px-5 py-2 text-xs font-black"
-                >
-                    {editingEvent ? "Update Event" : "Create Event"}
-                </OrbixButton>
-            </div>
+            {/* ---------------------------------------------------------------- */}
+            {/* STEP 3: REGISTRATION FORM BUILDER */}
+            {/* ---------------------------------------------------------------- */}
+            {currentStep === 3 && (
+                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b-2 border-black/10 gap-3">
+                        <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                Step 3 of 3
+                            </span>
+                            <h3 className="text-base sm:text-lg font-black text-black">
+                                Registration Form Builder ({totalQuestions} Questions)
+                            </h3>
+                            <p className="text-xs text-neutral-600 font-medium mt-0.5">
+                                Configure participant questionnaire. Verified student identity (Name, Email, Roll No., College) is automatically captured by Orbix upon submission.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                            <OrbixButton
+                                type="button"
+                                onClick={handleAddQuestion}
+                                variant="primary"
+                                className="px-3.5 py-1.5 text-xs font-black shadow-[2px_2px_0px_#000]"
+                            >
+                                <Plus className="w-3.5 h-3.5 mr-1 stroke-[3]" />
+                                <span>Add Question</span>
+                            </OrbixButton>
+                        </div>
+                    </div>
+
+                    {/* Quick Add Accelerators */}
+                    <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                        <div className="flex items-center justify-between flex-wrap gap-2">
+                            <span className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
+                                <Sparkles className="w-4 h-4 text-amber-500" />
+                                <span>Quick Add Common Event Questions:</span>
+                            </span>
+
+                            {/* Templates Quick Apply */}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                    type="button"
+                                    onClick={() => handleApplyTemplate("hackathon_registration")}
+                                    className="px-2.5 py-1 rounded-lg border border-black bg-sky-100 hover:bg-sky-200 text-sky-950 text-[11px] font-black cursor-pointer shadow-[1px_1px_0px_#000]"
+                                >
+                                    ⚡ Hackathon Preset
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleApplyTemplate("tech_workshop_rsvp")}
+                                    className="px-2.5 py-1 rounded-lg border border-black bg-amber-100 hover:bg-amber-200 text-amber-950 text-[11px] font-black cursor-pointer shadow-[1px_1px_0px_#000]"
+                                >
+                                    ⚡ Workshop Preset
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    handleQuickAddQuestion({
+                                        title: "Hackathon Experience Level",
+                                        type: "multiple_choice",
+                                        required: true,
+                                        options: [
+                                            { id: "e1", text: "First-time Hacker" },
+                                            { id: "e2", text: "Participated in 1-3 Hackathons" },
+                                            { id: "e3", text: "Veteran / Hackathon Winner" },
+                                        ],
+                                    })
+                                }
+                                className="px-3 py-1.5 rounded-xl border-2 border-black bg-[#FAF6EE] hover:bg-white text-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
+                            >
+                                + Hackathon Experience
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    handleQuickAddQuestion({
+                                        title: "Project Idea & Pitch",
+                                        description: "Briefly outline what you plan to build or explore.",
+                                        type: "paragraph",
+                                        required: false,
+                                    })
+                                }
+                                className="px-3 py-1.5 rounded-xl border-2 border-black bg-[#FAF6EE] hover:bg-white text-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
+                            >
+                                + Project Idea Pitch
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    handleQuickAddQuestion({
+                                        title: "GitHub / Portfolio Profile",
+                                        description: "Link to your code repositories or personal portfolio.",
+                                        type: "short_answer",
+                                        required: false,
+                                    })
+                                }
+                                className="px-3 py-1.5 rounded-xl border-2 border-black bg-[#FAF6EE] hover:bg-white text-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
+                            >
+                                + GitHub Profile
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    handleQuickAddQuestion({
+                                        title: "Resume / CV Upload",
+                                        description: "Upload PDF format resume (max 10MB).",
+                                        type: "file_upload",
+                                        required: false,
+                                    })
+                                }
+                                className="px-3 py-1.5 rounded-xl border-2 border-black bg-[#FAF6EE] hover:bg-white text-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
+                            >
+                                + Resume Upload
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Question Cards Render */}
+                    {totalQuestions === 0 ? (
+                        <div className="p-8 rounded-3xl bg-rose-50 border-3 border-rose-600 text-center space-y-3">
+                            <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
+                            <h4 className="text-sm font-black text-rose-950">Registration Form Cannot Be Empty</h4>
+                            <p className="text-xs text-rose-800 max-w-md mx-auto">
+                                Orbix events require at least 1 question for participant registration. Click &ldquo;Add Question&rdquo; or pick one of the presets above.
+                            </p>
+                            <OrbixButton
+                                type="button"
+                                onClick={handleAddQuestion}
+                                variant="rose"
+                                className="px-5 py-2 text-xs font-black shadow-[2px_2px_0px_#000]"
+                            >
+                                + Add First Question
+                            </OrbixButton>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {formStructure.sections.map((section) => (
+                                <div key={section.id} className="space-y-4">
+                                    {section.questions.map((question, qIdx) => (
+                                        <QuestionCard
+                                            key={question.id}
+                                            question={question}
+                                            index={qIdx}
+                                            totalQuestions={section.questions.length}
+                                            sections={formStructure.sections}
+                                            currentSectionId={section.id}
+                                            accentColor="#38BDF8"
+                                            eventId={editingEvent?.id || "create-draft"}
+                                            isActive={activeQuestionId === question.id}
+                                            onSelect={() => setActiveQuestionId(question.id)}
+                                            onChange={handleUpdateQuestion}
+                                            onDelete={() => handleDeleteQuestion(question.id)}
+                                            onDuplicate={() => handleDuplicateQuestion(question.id)}
+                                            onMoveUp={() => handleMoveQuestion(question.id, "up")}
+                                            onMoveDown={() => handleMoveQuestion(question.id, "down")}
+                                        />
+                                    ))}
+                                </div>
+                            ))}
+
+                            <button
+                                type="button"
+                                onClick={handleAddQuestion}
+                                className="w-full py-3.5 rounded-2xl border-2 border-dashed border-black hover:border-black/80 bg-white/60 hover:bg-white text-black font-black text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-[2px_2px_0px_#000]"
+                            >
+                                <Plus className="w-4 h-4 stroke-[3]" />
+                                <span>Add Another Question</span>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Step 3 Footer */}
+                    <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentStep(2)}
+                            className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
+                        >
+                            <ArrowLeft className="w-3.5 h-3.5" />
+                            <span>Back: Banner Studio</span>
+                        </button>
+                        <OrbixButton
+                            type="button"
+                            onClick={() => handleSubmitFinal()}
+                            variant="lime"
+                            disabled={totalQuestions === 0}
+                            className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000]"
+                        >
+                            <span>{editingEvent ? "Save Changes" : "🚀 Publish & Create Event"}</span>
+                        </OrbixButton>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

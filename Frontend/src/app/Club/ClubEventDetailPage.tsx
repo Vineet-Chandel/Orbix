@@ -1557,7 +1557,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         {inspectingApplicant.fileAttachments && inspectingApplicant.fileAttachments.length > 0 && (
                             <div className="space-y-2 pt-2">
                                 <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                    Uploaded Attachments (Cloudinary)
+                                    Uploaded Attachments & Files
                                 </h4>
                                 <div className="space-y-2">
                                     {inspectingApplicant.fileAttachments.map((f: any, fIdx: number) => (

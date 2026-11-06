@@ -33,6 +33,7 @@ import clubProfileRouter from "./clubProfileRoutes.js";
 import clubSettingsRouter from "./clubSettingsRoutes.js";
 import { ClubProfileService } from "../../services/club/clubProfileService.js";
 import { notifyClubAndCollegeUsers } from "../../services/club/clubEventNotificationService.js";
+import { ClubEventFormService } from "../../services/club/clubEventFormService.js";
 import { sendGuardianConsentEmail } from "../../services/email/resendService.js";
 
 const clubRouter = express.Router();
@@ -50,6 +51,9 @@ clubRouter.use("/settings", clubSettingsRouter);
 clubRouter.get("/college-clubs", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const collegeId = (req.query.collegeId as string) || undefined;
         const collegeName = (req.query.collegeName as string) || undefined;
         const clubId = (req.query.clubId as string) || undefined;
@@ -1455,6 +1459,9 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
 clubRouter.get("/application-status", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const userEmail = req.user?.gmail || req.user?.email;
 
         if (!userId && !userEmail) {
@@ -2071,6 +2078,9 @@ clubRouter.get("/session-state", authenticate, async (req: Request, res: Respons
     try {
         const userId = req.user?.id;
         if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
+        if (!userId) {
             return res.status(401).json({ success: false, message: "Authentication required" });
         }
 
@@ -2140,6 +2150,9 @@ const normalizeLocationTypeForDb = (type?: string): string => {
 clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const requestedClubId = (req.query.clubId as string) || undefined;
         let clubId: string | null = null;
 
@@ -2213,6 +2226,9 @@ clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
 clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const { eventId } = req.params;
 
         let club: any = null;
@@ -2292,6 +2308,9 @@ clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Respo
 clubRouter.post("/events", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const clubRes = await query(
             `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
             [userId]
@@ -2313,6 +2332,9 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
             registrationUrl,
             coverImageUrl,
             status = "draft",
+            initialFormStructure,
+            initialFormSettings,
+            initialFormTheme,
         } = req.body;
 
         if (!title || typeof title !== "string" || title.trim().length < 3) {
@@ -2403,7 +2425,24 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
 
         const newEvent = insertRes.rows[0];
 
-        // Notify club staff and college students if event is published live
+        // Save and publish initial registration form configured during 3-step event creation
+        if (initialFormStructure && Array.isArray(initialFormStructure?.sections)) {
+            try {
+                await ClubEventFormService.saveFormDraft(newEvent.id, userId, {
+                    structure: initialFormStructure,
+                    title: `${title.trim()} Registration`,
+                    settings: initialFormSettings || {},
+                    themeSettings: initialFormTheme || {},
+                });
+                if (finalStatus === "published") {
+                    await ClubEventFormService.publishForm(newEvent.id, userId, "Initial event publication");
+                }
+            } catch (formSaveErr) {
+                console.error("[POST /events] Error saving initial form structure:", formSaveErr);
+            }
+        }
+
+        // Notify club staff and college students ONLY AFTER event and registration form are ready
         if (finalStatus === "published") {
             notifyClubAndCollegeUsers(newEvent.id, clubId, "published", userId).catch((err) =>
                 console.error("[POST /events] Notification dispatch error:", err)
@@ -2434,6 +2473,9 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
 clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const { eventId } = req.params;
 
         const clubRes = await query(
@@ -2623,6 +2665,9 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
 clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const { eventId } = req.params;
 
         const clubRes = await query(

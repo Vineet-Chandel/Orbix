@@ -936,11 +936,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 setActiveTab("questions");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all ${
-                                activeTab === "questions" && !isPreviewOpen
-                                    ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
-                                    : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                            }`}
+                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all ${activeTab === "questions" && !isPreviewOpen
+                                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                                }`}
                         >
                             Questions
                         </button>
@@ -951,11 +950,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 setActiveTab("responses");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
-                                activeTab === "responses" && !isPreviewOpen
-                                    ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
-                                    : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                            }`}
+                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${activeTab === "responses" && !isPreviewOpen
+                                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                                }`}
                         >
                             <BarChart3 className="w-4 h-4" />
                             <span>Responses</span>
@@ -972,11 +970,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 setActiveTab("settings");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
-                                activeTab === "settings" && !isPreviewOpen
-                                    ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
-                                    : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                            }`}
+                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${activeTab === "settings" && !isPreviewOpen
+                                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                                }`}
                         >
                             <Settings className="w-4 h-4" />
                             <span>Settings</span>
@@ -1453,11 +1450,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     {registeredCount} {registeredCount === 1 ? "Response" : "Responses"} Received
                                 </h3>
                                 <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                                        form.settings.isOpen
-                                            ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
-                                            : "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
-                                    }`}
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${form.settings.isOpen
+                                        ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                                        : "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
+                                        }`}
                                 >
                                     {form.settings.isOpen ? "Accepting Responses" : "Not Accepting Responses"}
                                 </span>
@@ -1563,14 +1559,20 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-                            className={`px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0 ${
-                                isPreviewOpen
-                                    ? "bg-black text-white dark:bg-white dark:text-black"
-                                    : "bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white"
-                            }`}
+                            className={`px-3 sm:px-4 py-1 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0 ${isPreviewOpen
+                                ? "bg-black text-white dark:bg-white dark:text-black"
+                                : "bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white"
+                                }`}
                             title="Preview form as student"
                         >
-                            <span>{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
+                            <span>{isPreviewOpen ? <svg xmlns="http://www.w3.org/2000/svg" width="1.8em" height="1.8em" viewBox="0 0 48 48">
+                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M9.858 18C6.238 21 4 24 4 24s8.954 12 20 12c1.37 0 2.708-.185 4-.508M20.032 12.5c1.282-.318 2.61-.5 3.968-.5c11.046 0 20 12 20 12s-2.239 3-5.858 6m-17.828-9.379a5 5 0 0 0 7.186 6.95M42 42L6 6"></path>
+                            </svg> : <svg xmlns="http://www.w3.org/2000/svg" width="1.8em" height="1.8em" viewBox="0 0 48 48">
+                                <g fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth={4}>
+                                    <path d="M24 36c11.046 0 20-12 20-12s-8.954-12-20-12S4 24 4 24s8.954 12 20 12Z"></path>
+                                    <path d="M24 29a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z"></path>
+                                </g>
+                            </svg>}</span>
                         </button>
 
                         {/* Divider */}
@@ -1581,16 +1583,24 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             type="button"
                             onClick={handleSaveForm}
                             disabled={saving || isPublishing}
-                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
+                            className="px-3 sm:px-4 py-1 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
                             title="Save working draft"
                         >
                             {saving ? (
                                 <>
                                     <OrbixLoader size="xs" />
-                                    <span>Saving...</span>
+
                                 </>
                             ) : (
-                                <span>Save Draft</span>
+                                <span>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="1.8em" height="1.8em" viewBox="0 0 24 24">
+                                        <g fill="none">
+                                            <path fill="currentColor" d="M4.71 20.95c-.93 0-1.4 0-1.69-.28l-.01-.02c-.29-.29-.29-.75-.29-1.69V4.9c0-.94 0-1.4.3-1.7c.29-.3.77-.3 1.72-.3c.77 0 1.15 0 1.42.22c.28.22.36.59.54 1.33l.23.98c.17.74.26 1.11.53 1.33s.65.21 1.41.21h2.45c.84 0 1.26 0 1.54-.25c.28-.24.34-.66.44-1.5l.3-2.4l4.05 2.82l2.95 2.6c.33.29.5.44.59.63c.09.2.09.42.09.87V19c0 .89 0 1.33-.26 1.62l-.07.06c-.29.26-.73.26-1.61.26c-.78 0-1.17 0-1.44-.22l-.07-.05c-.25-.24-.3-.63-.42-1.4l-.5-3.55c-.11-.77-.16-1.15-.42-1.4c-.26-.23-.65-.26-1.43-.31l-3.06-.2l-3.06.2c-.79.05-1.18.08-1.45.33c-.26.25-.3.64-.4 1.43l-.4 3.42c-.1.83-.15 1.24-.43 1.5h-.01c-.28.25-.7.25-1.54.25" opacity={0.2}></path>
+                                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.77 21.38c-2.83 0-4.24 0-5.12-.88s-.88-2.3-.88-5.12V8.6c0-2.83 0-4.24.88-5.12s2.3-.88 5.12-.88h3.58c1.05 0 1.58 0 2.07.18s.9.5 1.72 1.17l1.72 1.4l1.1.88c1.11.89 1.67 1.33 1.97 1.95s.3 1.33.3 2.75v4.45c0 2.83 0 4.24-.88 5.12s-2.3.88-5.12.88z"></path>
+                                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.64 2.82v.65c0 1.55 0 2.32.4 2.86a2 2 0 0 0 .4.39c.53.4 1.3.4 2.84.4c1.55 0 2.32 0 2.86-.4a2 2 0 0 0 .39-.4c.4-.53.4-1.3.4-2.85v-.65m3.43 18.44v-3.29c0-1.89 0-2.83-.58-3.41c-.59-.59-1.53-.59-3.42-.59h-2.72c-1.89 0-2.83 0-3.42.59c-.58.58-.58 1.52-.58 3.41v3.29"></path>
+                                        </g>
+                                    </svg>
+                                </span>
                             )}
                         </button>
 
@@ -1837,9 +1847,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                                             <div
                                                                 key={q.id}
                                                                 onClick={() => handleToggleSelectLibQuestion(q.id)}
-                                                                className={`pt-2 pb-2 px-2 rounded-lg flex items-start gap-3 cursor-pointer transition-colors ${
-                                                                    isSelected ? "bg-neutral-50 dark:bg-neutral-800/60" : "hover:bg-neutral-50 dark:hover:bg-neutral-800/30"
-                                                                }`}
+                                                                className={`pt-2 pb-2 px-2 rounded-lg flex items-start gap-3 cursor-pointer transition-colors ${isSelected ? "bg-neutral-50 dark:bg-neutral-800/60" : "hover:bg-neutral-50 dark:hover:bg-neutral-800/30"
+                                                                    }`}
                                                             >
                                                                 <div className="pt-0.5 shrink-0">
                                                                     {isSelected ? (
@@ -2043,11 +2052,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                                 key={cat}
                                                 type="button"
                                                 onClick={() => setTemplateCategoryFilter(cat)}
-                                                className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                                                    templateCategoryFilter === cat
-                                                        ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900"
-                                                        : "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                                                }`}
+                                                className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${templateCategoryFilter === cat
+                                                    ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900"
+                                                    : "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                                    }`}
                                             >
                                                 {cat}
                                             </button>
@@ -2275,9 +2283,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                             <div
                                                 key={idx}
                                                 onClick={() => handleToggleSelectAiIndex(idx)}
-                                                className={`p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 flex items-start gap-3 cursor-pointer transition-colors ${
-                                                    isSelected ? "bg-neutral-50 dark:bg-neutral-800/60" : "bg-white dark:bg-neutral-900 hover:bg-neutral-50"
-                                                }`}
+                                                className={`p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 flex items-start gap-3 cursor-pointer transition-colors ${isSelected ? "bg-neutral-50 dark:bg-neutral-800/60" : "bg-white dark:bg-neutral-900 hover:bg-neutral-50"
+                                                    }`}
                                             >
                                                 <div className="pt-0.5 shrink-0">
                                                     {isSelected ? (
