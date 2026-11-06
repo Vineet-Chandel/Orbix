@@ -89,10 +89,10 @@ export const EventInvitationStudio: React.FC<EventInvitationStudioProps> = (prop
         const maxStageWidth = Math.max(Math.min(containerWidth - 32, 540), 280);
 
         if (format === "landscape") {
-            // ~1.91:1 ratio
-            const width = maxStageWidth;
-            const height = Math.round(width / 1.91);
-            return { width, height, exportWidth: 600, exportHeight: 314 };
+            // Stacked layout: Full-width banner stacked on top of editorial details (~1.14:1 ratio)
+            const width = Math.min(maxStageWidth, 500);
+            const height = Math.round(width * 0.88);
+            return { width, height, exportWidth: 600, exportHeight: 528 };
         } else if (format === "story") {
             // 9:16 ratio
             const height = Math.min(620, Math.max(window.innerHeight * 0.65, 480));

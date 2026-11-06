@@ -64,7 +64,7 @@ export const EventPosterFront: React.FC<EventPosterFrontProps> = ({
         : "Campus In-Person";
 
     // -------------------------------------------------------------------------
-    // LANDSCAPE LAYOUT (Split 2-Column Art-Directed Composition)
+    // LANDSCAPE / BANNER LAYOUT (Sequential Stacked Composition: Banner -> Details)
     // -------------------------------------------------------------------------
     if (format === "landscape") {
         return (
@@ -104,83 +104,80 @@ export const EventPosterFront: React.FC<EventPosterFrontProps> = ({
                     </span>
                 </div>
 
-                {/* Split Body */}
-                <div className="grid grid-cols-12 flex-1 min-h-0 bg-[#FAF6EE]">
-                    {/* Left 5 Cols: Visual Artwork */}
-                    <div className="col-span-5 relative border-r-4 border-black bg-neutral-900 overflow-hidden flex items-center justify-center">
-                        {coverImageUrl ? (
-                            <img
-                                src={coverImageUrl}
-                                alt={title}
-                                className="w-full h-full object-cover"
-                                crossOrigin="anonymous"
-                            />
-                        ) : (
-                            <div className="w-full h-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.5px,transparent_1.5px)] [background-size:14px_14px] flex flex-col items-center justify-center p-3 text-center">
-                                <div className="p-3 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] mb-2">
-                                    <Sparkles className="w-6 h-6 text-black stroke-[2.5]" />
-                                </div>
-                                <span className="text-xs font-black uppercase tracking-wider text-black">
-                                    Campus Session
-                                </span>
-                                <span className="text-[10px] font-bold text-neutral-500 mt-0.5">
-                                    {modeLabel}
-                                </span>
+                {/* Banner Container: Full width, aspect 2.4/1, object-contain so NO clipping */}
+                <div className="w-full aspect-[2.4/1] bg-neutral-950 border-b-4 border-black relative overflow-hidden flex items-center justify-center shrink-0">
+                    {coverImageUrl ? (
+                        <img
+                            src={coverImageUrl}
+                            alt={title || "Event Banner"}
+                            className="w-full h-full object-contain"
+                            crossOrigin="anonymous"
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.5px,transparent_1.5px)] [background-size:14px_14px] flex flex-col items-center justify-center p-3 text-center">
+                            <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] mb-1">
+                                <Sparkles className="w-5 h-5 text-black stroke-[2.5]" />
                             </div>
-                        )}
-
-                        <div className="absolute top-2.5 left-2.5">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#FFE566] text-black border-2 border-black text-[9px] font-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                {isVirtual ? (
-                                    <Video className="w-3 h-3 stroke-[2.5]" />
-                                ) : (
-                                    <MapPin className="w-3 h-3 stroke-[2.5]" />
-                                )}
-                                <span>{modeLabel}</span>
+                            <span className="text-xs font-black uppercase tracking-wider text-black">
+                                Orbix Campus Session
+                            </span>
+                            <span className="text-[10px] font-bold text-neutral-500">
+                                {collegeName || "Official Student Event"}
                             </span>
                         </div>
+                    )}
+
+                    <div className="absolute top-2.5 left-2.5">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#FFE566] text-black border-2 border-black text-[9px] font-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                            {isVirtual ? (
+                                <Video className="w-3 h-3 stroke-[2.5]" />
+                            ) : (
+                                <MapPin className="w-3 h-3 stroke-[2.5]" />
+                            )}
+                            <span>{modeLabel}</span>
+                        </span>
+                    </div>
+                </div>
+
+                {/* Details Section Stacked Below Banner */}
+                <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between overflow-hidden bg-[#FAF6EE]">
+                    <div className="space-y-1.5">
+                        {/* Schedule Pill */}
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white text-black border-2 border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
+                            <Calendar className="w-3 h-3 stroke-[2.5] text-neutral-800" />
+                            <span className="truncate">{schedule.dateBadgeText}</span>
+                        </div>
+
+                        {/* Headline */}
+                        <h2
+                            className="font-black text-black tracking-tight line-clamp-1 text-base sm:text-lg"
+                        >
+                            {title?.trim() || "Untitled Campus Event"}
+                        </h2>
+
+                        {/* Summary Excerpt */}
+                        {cleanSummary && (
+                            <p className="text-[11px] text-neutral-700 font-medium leading-snug line-clamp-2">
+                                {cleanSummary}
+                            </p>
+                        )}
                     </div>
 
-                    {/* Right 7 Cols: Typography & Editorial Details */}
-                    <div className="col-span-7 p-4 flex flex-col justify-between overflow-hidden">
-                        <div className="space-y-2">
-                            {/* Schedule Pill */}
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white text-black border-2 border-black text-[10px] font-black shadow-[1px_1px_0px_#000]">
-                                <Calendar className="w-3 h-3 stroke-[2.5] text-neutral-800" />
-                                <span className="truncate">{schedule.dateBadgeText}</span>
-                            </div>
-
-                            {/* Headline */}
-                            <h2
-                                className={`font-black text-black tracking-tight line-clamp-2 ${titleSizeClass}`}
-                            >
-                                {title?.trim() || "Untitled Campus Event"}
-                            </h2>
-
-                            {/* Summary Excerpt */}
-                            {cleanSummary && (
-                                <p className="text-[11px] text-neutral-700 font-medium leading-snug line-clamp-2">
-                                    {cleanSummary}
-                                </p>
-                            )}
+                    {/* Venue & Callout */}
+                    <div className="pt-2 border-t-2 border-black/10 flex items-center justify-between gap-2 text-[10px] font-bold text-neutral-800">
+                        <div className="flex items-center gap-1 truncate min-w-0">
+                            <MapPin className="w-3 h-3 text-neutral-700 shrink-0 stroke-[2.5]" />
+                            <span className="truncate font-black text-[11px]">
+                                {venueOrLocation?.trim() || (isVirtual ? "Online Session Link" : "Campus Hall / Auditorium")}
+                            </span>
                         </div>
 
-                        {/* Venue & Callout */}
-                        <div className="pt-2 border-t-2 border-black/10 flex items-center justify-between gap-2 text-[10px] font-bold text-neutral-800">
-                            <div className="flex items-center gap-1 truncate min-w-0">
-                                <MapPin className="w-3 h-3 text-neutral-700 shrink-0 stroke-[2.5]" />
-                                <span className="truncate font-black">
-                                    {venueOrLocation?.trim() || (isVirtual ? "Online Session Link" : "Campus Hall / Auditorium")}
-                                </span>
+                        {showFlipHint && (
+                            <div className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#A2FF86] text-black border-2 border-black text-[9px] font-black uppercase tracking-wider shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                                <span>Scan Pass</span>
+                                <ArrowRight className="w-3 h-3 stroke-[2.5]" />
                             </div>
-
-                            {showFlipHint && (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-black text-[#FFE566] text-[9px] font-black uppercase tracking-wider shrink-0">
-                                    <span>Scan Pass</span>
-                                    <ArrowRight className="w-2.5 h-2.5" />
-                                </span>
-                            )}
-                        </div>
+                        )}
                     </div>
                 </div>
 
@@ -245,15 +242,15 @@ export const EventPosterFront: React.FC<EventPosterFrontProps> = ({
 
             {/* Event Artwork / Banner Container */}
             <div
-                className={`w-full bg-neutral-900 border-b-4 border-black relative overflow-hidden flex items-center justify-center shrink-0 ${
-                    isStory ? "aspect-[4/3] max-h-72" : "aspect-[16/9] max-h-56"
+                className={`w-full bg-neutral-950 border-b-4 border-black relative overflow-hidden flex items-center justify-center shrink-0 ${
+                    isStory ? "aspect-[2/1] max-h-64" : "aspect-[2.4/1] max-h-56"
                 }`}
             >
                 {coverImageUrl ? (
                     <img
                         src={coverImageUrl}
-                        alt="Event Banner"
-                        className="w-full h-full object-cover"
+                        alt={title || "Event Banner"}
+                        className="w-full h-full object-contain"
                         crossOrigin="anonymous"
                     />
                 ) : (
