@@ -611,6 +611,7 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
                                 onChange={handleToggleTwoFactor}
                                 onStatusText="2FA: Enabled"
                                 offStatusText="2FA: Disabled"
+                                showStatusText={true}
                                 ariaLabel="Toggle two-factor authentication"
                             />
                         </div>

@@ -119,7 +119,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                 <div className="space-y-2.5">
                     <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
                         <span>Form Banner Header</span>
-                        <span className="text-[10px] text-neutral-400 font-medium lowercase">Cloudinary</span>
+                        <span className="text-[10px] text-neutral-400 font-medium lowercase">Max 10 MB</span>
                     </label>
 
                     {headerImageUrl ? (
@@ -154,7 +154,7 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
                         <label className="border border-dashed border-neutral-300 dark:border-neutral-700 hover:border-neutral-900 dark:hover:border-neutral-400 rounded-2xl p-5 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-neutral-50/70 dark:bg-neutral-900/60 hover:bg-neutral-100/70 dark:hover:bg-neutral-900 transition-colors">
                             <UploadCloud className="w-6 h-6 text-neutral-500" />
                             <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                                {isUploading ? "Uploading to Cloudinary..." : "Upload Header Banner"}
+                                {isUploading ? "Uploading Banner..." : "Upload Header Banner"}
                             </span>
                             <span className="text-[10px] text-neutral-400 font-normal">
                                 Recommended 1200 x 320 px (JPG, PNG, WebP)

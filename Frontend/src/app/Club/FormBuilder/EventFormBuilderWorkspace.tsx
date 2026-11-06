@@ -58,9 +58,9 @@ import {
 import { QuestionCard } from "./QuestionCard";
 import { SectionCard } from "./SectionCard";
 import { NeoToggle } from "../../../components/NeoToggle";
+import { NeoSelect } from "../../../components/NeoSelect";
 import { OrbixLoader } from "../../../components/ui/loader";
 import { useToast } from "../../../context/ToastContext";
-import { getCloudinaryBannerUrl } from "../../../utils/cloudinaryDelivery";
 
 // Lazy-loaded heavy views for performance (Phase 4.1)
 const FormThemeDrawer = React.lazy(() =>
@@ -219,7 +219,7 @@ const QUICK_TEMPLATES = [
             id: `q_${Date.now()}_proposal`,
             type: "file_upload",
             title: "Upload your project proposal / pitch deck",
-            description: "Accepts PDF or presentation slide decks up to 25 MB stored in Cloudinary.",
+            description: "Accepts PDF or presentation slide decks up to 25 MB.",
             required: false,
             validation: {
                 allowedFileTypes: ["pdf"],
@@ -874,7 +874,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             setAiSuggestedQuestions(questions);
             setSelectedAiIndices(new Set(questions.map((_, idx) => idx)));
             setAiEngineLabel(
-                res.generatedBy === "gemini" ? "Gemini 2.0 Flash AI" : "Orbix Domain Knowledge Fallback"
+                res.generatedBy === "gemini" ? "Orbix AI Engine" : "Orbix Domain Knowledge"
             );
             toast.success(`Generated ${questions.length} customized questions!`);
         } catch (err: any) {
@@ -1341,47 +1341,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 <span>Templates</span>
                             </button>
                         </div>
-                    </div>
-
-                    {/* Header Image Banner */}
-                    {form.headerImageUrl && (
-                        <div className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm group">
-                            <img
-                                src={getCloudinaryBannerUrl(form.headerImageUrl)}
-                                alt="Form Header Banner"
-                                loading="lazy"
-                                className="w-full h-44 sm:h-64 lg:h-72 object-cover"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setIsThemeDrawerOpen(true)}
-                                className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs border border-neutral-200 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-neutral-50"
-                            >
-                                Change Banner
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Master Form Title & Description Card */}
-                    <div
-                        className="rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm p-6 sm:p-7 space-y-3 relative overflow-hidden"
-                    >
-                        <div className="flex items-center justify-between">
-                            <input
-                                type="text"
-                                value={form.title}
-                                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                                placeholder="Form Title..."
-                                className="w-full text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white border-b border-transparent hover:border-neutral-200 dark:hover:border-neutral-800 focus:border-neutral-900 dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 transition-colors"
-                            />
-                        </div>
-                        <textarea
-                            value={form.description || ""}
-                            onChange={(e) => setForm({ ...form, description: e.target.value })}
-                            placeholder="Form Description (guidelines, rules, prerequisites, prizes)..."
-                            rows={2}
-                            className="w-full text-xs sm:text-sm font-normal text-neutral-600 dark:text-neutral-400 border-b border-transparent hover:border-neutral-200 dark:hover:border-neutral-800 focus:border-neutral-900 dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 resize-none transition-colors"
-                        />
                     </div>
 
                     {/* Verified Identity Notice Card */}
@@ -1930,17 +1889,16 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         {sections.length > 0 && (
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs font-medium">
                                 <span className="text-neutral-600 dark:text-neutral-400 shrink-0">Insert Selected Into:</span>
-                                <select
+                                <NeoSelect
                                     value={libTargetSectionId}
-                                    onChange={(e) => setLibTargetSectionId(e.target.value)}
-                                    className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 font-semibold text-xs text-neutral-900 dark:text-white focus:outline-none cursor-pointer flex-1"
-                                >
-                                    {sections.map((sec, idx) => (
-                                        <option key={sec.id} value={sec.id}>
-                                            Section {idx + 1}: {sec.title || "Untitled Section"} ({sec.questions.length} questions)
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={(val) => setLibTargetSectionId(val)}
+                                    size="sm"
+                                    className="flex-1"
+                                    options={sections.map((sec, idx) => ({
+                                        value: sec.id,
+                                        label: `Section ${idx + 1}: ${sec.title || "Untitled Section"} (${sec.questions.length} questions)`
+                                    }))}
+                                />
                             </div>
                         )}
 
@@ -2433,17 +2391,16 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 {sections.length > 0 && (
                                     <div className="flex items-center gap-2 p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs font-medium">
                                         <span className="text-neutral-600 dark:text-neutral-400 shrink-0">Insert Into:</span>
-                                        <select
+                                        <NeoSelect
                                             value={aiTargetSectionId}
-                                            onChange={(e) => setAiTargetSectionId(e.target.value)}
-                                            className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 font-semibold text-xs text-neutral-900 dark:text-white focus:outline-none cursor-pointer flex-1"
-                                        >
-                                            {sections.map((sec, idx) => (
-                                                <option key={sec.id} value={sec.id}>
-                                                    Section {idx + 1}: {sec.title || "Untitled Section"}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            onChange={(val) => setAiTargetSectionId(val)}
+                                            size="sm"
+                                            className="flex-1"
+                                            options={sections.map((sec, idx) => ({
+                                                value: sec.id,
+                                                label: `Section ${idx + 1}: ${sec.title || "Untitled Section"}`
+                                            }))}
+                                        />
                                     </div>
                                 )}
 

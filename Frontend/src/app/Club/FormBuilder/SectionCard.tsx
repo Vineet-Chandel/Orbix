@@ -6,6 +6,7 @@ import {
     ArrowDown,
 } from "lucide-react";
 import type { FormSection } from "../../../api/clubEventFormApi";
+import { NeoSelect } from "../../../components/NeoSelect";
 
 export interface SectionCardProps {
     section: FormSection;
@@ -107,10 +108,11 @@ export const SectionCard: React.FC<SectionCardProps> = React.memo(({
             {/* After Section Navigation Flow */}
             <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                 <span className="font-medium text-neutral-500">After section {index + 1}:</span>
-                <select
-                    value={section.afterSectionAction}
-                    onChange={(e) => onChange({ ...section, afterSectionAction: e.target.value })}
-                    className="font-medium bg-neutral-50 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 border border-neutral-200 dark:border-neutral-800 rounded-lg px-3 py-1.5 focus:outline-none focus:border-neutral-400 cursor-pointer transition-colors"
+                <NeoSelect
+                    value={section.afterSectionAction || "next_section"}
+                    onChange={(val) => onChange({ ...section, afterSectionAction: val })}
+                    size="sm"
+                    triggerClassName="font-medium min-w-[200px]"
                 >
                     <option value="next_section">Continue to next section</option>
                     {allSections.map((s, sIdx) => {
@@ -122,7 +124,7 @@ export const SectionCard: React.FC<SectionCardProps> = React.memo(({
                         );
                     })}
                     <option value="submit_form">Submit form</option>
-                </select>
+                </NeoSelect>
             </div>
         </div>
     );
