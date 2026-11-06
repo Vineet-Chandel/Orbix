@@ -1617,37 +1617,37 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             </span>
                         </button>
 
-                        {/* Templates Button */}
+                        {/* Templates Button (Borderless) */}
                         <button
                             type="button"
                             onClick={() => {
                                 if (activeTab !== "questions") setActiveTab("questions");
                                 setIsTemplatesModalOpen(true);
                             }}
-                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-sm shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-0 shadow-none"
                             title="Form Templates"
                         >
-                            <LayoutTemplate className="w-5 h-5 stroke-[2.5]" />
+                            <LayoutTemplate className="w-4 h-4 stroke-[2.5]" />
                             <span>Templates</span>
                         </button>
 
-                        {/* Theme Button (Icon only) */}
+                        {/* Theme Button (Icon only, Borderless) */}
                         <button
                             type="button"
                             onClick={() => setIsThemeDrawerOpen(true)}
-                            className="p-2 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0"
+                            className="p-2 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center shrink-0 border-0 shadow-none"
                             title="Theme & Colors"
                         >
-                            <Palette className="w-5 h-5 stroke-[2.5]" />
+                            <Palette className="w-4 h-4 stroke-[2.5]" />
                         </button>
 
-                        {/* Preview Simulator Action (Text only, no logo) */}
+                        {/* Preview Simulator Action (Text only, Borderless) */}
                         <button
                             type="button"
                             onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-                            className={`px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0 ${isPreviewOpen
+                            className={`px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl font-black text-xs transition-all cursor-pointer flex items-center justify-center shrink-0 border-0 shadow-none ${isPreviewOpen
                                 ? "bg-black text-white dark:bg-white dark:text-black"
-                                : "bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white"
+                                : "bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white"
                                 }`}
                             title="Preview form as student"
                         >
@@ -1655,14 +1655,14 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         </button>
 
                         {/* Divider */}
-                        <div className="h-6 w-[2px] bg-black/20 dark:bg-white/20 mx-0.5 shrink-0" />
+                        <div className="h-5 w-[1px] bg-neutral-300 dark:bg-neutral-700 mx-0.5 shrink-0" />
 
-                        {/* Save Draft (Text only, no logo) */}
+                        {/* Save Draft (Text only, Borderless) */}
                         <button
                             type="button"
                             onClick={handleSaveForm}
                             disabled={saving || isPublishing}
-                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
+                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none"
                             title="Save working draft"
                         >
                             {saving ? (
@@ -1675,12 +1675,12 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             )}
                         </button>
 
-                        {/* Publish (Text only "Publish", or "Publish & Create Event" in Wizard) */}
+                        {/* Publish (Text only "Publish", or "Publish & Create Event" in Wizard, Borderless) */}
                         <button
                             type="button"
                             onClick={handlePublishForm}
                             disabled={saving || isPublishing}
-                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
+                            className="px-4 sm:px-6 py-2 rounded-xl sm:rounded-2xl bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none"
                             title={isWizardMode ? "Publish & Create Event" : "Publish form snapshot for students"}
                         >
                             {isPublishing ? (

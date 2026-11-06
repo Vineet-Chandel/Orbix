@@ -492,19 +492,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         </button>
                     )}
 
-                    <button
-                        type="button"
-                        onClick={onClose}
-                        disabled={isUploadingBanner}
-                        className="p-2 sm:px-3 sm:py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
-                        title="Back to Events"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span className="hidden sm:inline">Back to Events</span>
-                    </button>
-
-                    <div className="h-6 w-[2px] bg-black/20 hidden sm:block shrink-0" />
-
                     <div className="truncate">
                         <div className="flex items-center gap-2">
                             <h2 className="text-base sm:text-lg lg:text-xl font-black text-black tracking-tight truncate">
@@ -536,7 +523,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     </div>
                 </div>
 
-                {/* Center / Right: 3-Step Wizard Navigation */}
+                {/* Center / Right: 3-Step Wizard Navigation Stepper */}
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                     {/* Stepper Pills */}
                     <div className="flex items-center bg-[#FAF6EE] p-1 rounded-2xl border-2 border-black shadow-[2px_2px_0px_#000] gap-1">
@@ -579,45 +566,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             <span>Form ({totalQuestions})</span>
                         </button>
                     </div>
-
-                    {/* Action Button */}
-                    {currentStep === 1 && (
-                        <OrbixButton
-                            type="button"
-                            onClick={handleGoToStep2}
-                            variant="primary"
-                            disabled={isUploadingBanner}
-                            className="px-4 sm:px-5 py-2 text-xs font-black shadow-[3px_3px_0px_#000]"
-                        >
-                            <span>Next: Banner</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                        </OrbixButton>
-                    )}
-
-                    {currentStep === 2 && (
-                        <OrbixButton
-                            type="button"
-                            onClick={handleGoToStep3}
-                            variant="lime"
-                            disabled={isUploadingBanner}
-                            className="px-4 sm:px-5 py-2 text-xs font-black shadow-[3px_3px_0px_#000]"
-                        >
-                            <span>Next: Form Builder</span>
-                            <ArrowRight className="w-3.5 h-3.5" />
-                        </OrbixButton>
-                    )}
-
-                    {currentStep === 3 && (
-                        <OrbixButton
-                            type="button"
-                            onClick={() => handleSubmitFinal()}
-                            variant="lime"
-                            disabled={isUploadingBanner || totalQuestions === 0}
-                            className="px-4 sm:px-6 py-2 text-xs font-black shadow-[3px_3px_0px_#000]"
-                        >
-                            <span>{editingEvent ? "Save Changes" : "🚀 Publish & Create Event"}</span>
-                        </OrbixButton>
-                    )}
                 </div>
             </div>
 
@@ -952,10 +900,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             type="button"
                             onClick={handleGoToStep2}
                             variant="primary"
-                            className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000]"
+                            iconRight={<ArrowRight className="w-4 h-4" />}
+                            className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000] whitespace-nowrap shrink-0"
                         >
-                            <span>Next: Select Banner</span>
-                            <ArrowRight className="w-4 h-4 ml-1" />
+                            Next: Select Banner
                         </OrbixButton>
                     </div>
                 </div>
@@ -1128,10 +1076,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             type="button"
                             onClick={handleGoToStep3}
                             variant="lime"
-                            className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000]"
+                            iconRight={<ArrowRight className="w-4 h-4" />}
+                            className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000] whitespace-nowrap shrink-0"
                         >
-                            <span>Next: Build Registration Form</span>
-                            <ArrowRight className="w-4 h-4 ml-1" />
+                            Next: Build Registration Form
                         </OrbixButton>
                     </div>
                 </div>

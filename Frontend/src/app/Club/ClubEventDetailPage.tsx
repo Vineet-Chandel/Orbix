@@ -612,13 +612,13 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
             {/* Hero Event Card */}
             <div className="p-6 sm:p-7 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-6">
-                    {/* Cover Banner if present */}
+                    {/* Cover Banner if present (100% full view, never cropped) */}
                     {event.coverImageUrl ? (
-                        <div className="w-full h-44 sm:h-64 rounded-2xl border-2 border-black overflow-hidden relative shadow-[3px_3px_0px_#000] bg-neutral-100">
+                        <div className="w-full aspect-[2.4/1] max-h-[420px] rounded-2xl border-2 sm:border-3 border-black overflow-hidden relative shadow-[3px_3px_0px_#000] bg-neutral-950 flex items-center justify-center">
                             <img
                                 src={event.coverImageUrl}
                                 alt={event.title}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                             />
                         </div>
                     ) : (

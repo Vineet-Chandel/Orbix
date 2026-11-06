@@ -576,13 +576,13 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                                     className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer group"
                                 >
                                     <div>
-                                        {/* Cover Banner */}
-                                        <div className="relative w-full h-40 rounded-xl border-2 border-black overflow-hidden mb-3.5 bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                        {/* Cover Banner (100% full view, never cropped) */}
+                                        <div className="relative w-full aspect-[2.4/1] rounded-xl border-2 border-black overflow-hidden mb-3.5 bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                             {ev.coverImageUrl ? (
                                                 <img
                                                     src={ev.coverImageUrl}
                                                     alt={ev.title}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full bg-[#FAF6EE] flex items-center justify-center font-black text-neutral-400 text-sm">
