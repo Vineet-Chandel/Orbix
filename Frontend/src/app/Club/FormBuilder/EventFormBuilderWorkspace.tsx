@@ -1050,33 +1050,33 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         </button>
                     </div>
 
-                    {/* Dynamic Save Status Badge */}
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 shrink-0">
+                    {/* Dynamic Save Status Badge (Fixed height to prevent any layout jumping) */}
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 shrink-0 h-8">
                         {saveStatus === "saving" && (
-                            <>
-                                <OrbixLoader size="xs" />
+                            <span className="inline-flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
+                                <span className="w-2.5 h-2.5 rounded-full border-2 border-neutral-400 border-t-neutral-800 dark:border-neutral-600 dark:border-t-neutral-200 animate-spin shrink-0" />
                                 <span>Saving...</span>
-                            </>
+                            </span>
                         )}
                         {saveStatus === "saved" && (
-                            <>
-                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                <span className="text-emerald-700 dark:text-emerald-400">Saved</span>
-                            </>
+                            <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                <span>Saved</span>
+                            </span>
                         )}
                         {saveStatus === "unsaved" && (
-                            <>
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                <span className="text-amber-700 dark:text-amber-400">Unsaved</span>
-                            </>
+                            <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                                <span>Unsaved</span>
+                            </span>
                         )}
                         {saveStatus === "error" && (
                             <button
                                 type="button"
                                 onClick={handleSaveForm}
-                                className="text-rose-600 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
+                                className="text-rose-600 hover:underline inline-flex items-center gap-1 cursor-pointer font-semibold"
                             >
-                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                                 <span>Save failed · Retry</span>
                             </button>
                         )}
