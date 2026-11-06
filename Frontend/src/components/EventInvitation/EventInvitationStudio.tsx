@@ -359,50 +359,56 @@ export const EventInvitationStudio: React.FC<EventInvitationStudioProps> = (prop
                 </div>
             </div>
 
-            {/* Action Bar: Download Front, Download Back, Copy Link, Native Share */}
+            {/* Action Bar: Front/Back Toggle, Download Button with Logo, Copy Link, Native Share */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
-                {/* 1. Download Front Card */}
-                <button
-                    type="button"
-                    onClick={() => handleDownload("front")}
-                    disabled={isExporting}
-                    className="h-11 flex items-center justify-center gap-2 px-3 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer disabled:opacity-50"
-                >
-                    {isExporting && exportingSide === "front" ? (
-                        <>
-                            <svg className="w-4 h-4 animate-spin text-black" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                            </svg>
-                            <span>Rendering Front...</span>
-                        </>
-                    ) : (
-                        <>
-                            <Download className="w-4 h-4 stroke-[2.5]" />
-                            <span>Download Front Poster</span>
-                        </>
-                    )}
-                </button>
+                {/* 1. Front / Back (QR) Switcher Toggle */}
+                <div className="h-11 flex items-center p-1 bg-white rounded-xl border-2 border-black shadow-[3px_3px_0px_#000]">
+                    <button
+                        type="button"
+                        onClick={() => setFace("front")}
+                        className={`flex-1 h-full px-3 rounded-lg text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            face === "front"
+                                ? "bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]"
+                                : "text-neutral-600 hover:text-black"
+                        }`}
+                        title="Show Front Poster"
+                    >
+                        <span>Front</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setFace("back")}
+                        className={`flex-1 h-full px-3 rounded-lg text-xs font-black uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                            face === "back"
+                                ? "bg-[#A2FF86] text-black border border-black shadow-[1px_1px_0px_#000]"
+                                : "text-neutral-600 hover:text-black"
+                        }`}
+                        title="Show Back QR Pass"
+                    >
+                        <span>Back (QR)</span>
+                    </button>
+                </div>
 
-                {/* 2. Download Back (QR) */}
+                {/* 2. Download Button with Logo */}
                 <button
                     type="button"
-                    onClick={() => handleDownload("back")}
+                    onClick={() => handleDownload(face)}
                     disabled={isExporting}
-                    className="h-11 flex items-center justify-center gap-2 px-3 rounded-xl bg-[#A2FF86] hover:bg-[#8EE673] text-black text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer disabled:opacity-50"
+                    className="h-11 flex items-center justify-center gap-2 px-4 rounded-xl bg-black hover:bg-neutral-800 text-white text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer disabled:opacity-50"
+                    title={`Download ${face === "front" ? "Front Poster" : "Back QR Pass"}`}
                 >
-                    {isExporting && exportingSide === "back" ? (
+                    {isExporting ? (
                         <>
-                            <svg className="w-4 h-4 animate-spin text-black" fill="none" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 animate-spin text-white" fill="none" viewBox="0 0 24 24">
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                             </svg>
-                            <span>Rendering Back...</span>
+                            <span>Rendering {exportingSide || face}...</span>
                         </>
                     ) : (
                         <>
                             <Download className="w-4 h-4 stroke-[2.5]" />
-                            <span>Download Back (QR)</span>
+                            <span>Download {face === "front" ? "Front" : "Back"}</span>
                         </>
                     )}
                 </button>

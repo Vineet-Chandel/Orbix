@@ -10,7 +10,6 @@ import {
     ArrowLeft,
     ArrowRight,
     Info,
-    Plus,
     Check,
 } from "lucide-react";
 import { NeoSelect } from "../../components/NeoSelect";
@@ -28,8 +27,7 @@ import {
     PRESET_EVENT_BANNERS,
     getRandomPresetBanner,
 } from "../../components/EventBanners/presetEventBanners";
-import { QuestionCard } from "./FormBuilder/QuestionCard";
-import { ORBIX_FORM_TEMPLATES } from "./FormBuilder/formTemplates";
+import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
 import type {
     FormStructure,
     FormQuestion,
@@ -185,7 +183,16 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             },
         ],
     });
-    const [activeQuestionId, setActiveQuestionId] = useState<string>(DEFAULT_QUESTIONS[0].id);
+    const [formSettings, setFormSettings] = useState<any>({
+        allowMultipleResponses: false,
+        limitOneResponsePerUser: true,
+        showProgressBar: true,
+        shuffleQuestions: false,
+    });
+    const [formTheme, setFormTheme] = useState<any>({
+        accentColor: "#38BDF8",
+        themePreset: "neo_brutalist",
+    });
 
     // Initialize or reset form when modal opens or editingEvent changes
     useEffect(() => {
@@ -231,7 +238,16 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         },
                     ],
                 });
-                setActiveQuestionId(DEFAULT_QUESTIONS[0].id);
+                setFormSettings({
+                    allowMultipleResponses: false,
+                    limitOneResponsePerUser: true,
+                    showProgressBar: true,
+                    shuffleQuestions: false,
+                });
+                setFormTheme({
+                    accentColor: "#38BDF8",
+                    themePreset: "neo_brutalist",
+                });
             }
             setErrors({});
             setTouched({});
@@ -386,144 +402,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     // Form builder helper methods for Step 3
     const totalQuestions = formStructure.sections.reduce((acc, s) => acc + s.questions.length, 0);
 
-    const handleAddQuestion = () => {
-        const newQuestionId = `q_${Date.now()}`;
-        const newQuestion: FormQuestion = {
-            id: newQuestionId,
-            type: "short_answer",
-            title: "Untitled Question",
-            required: false,
-        };
-
-        setFormStructure((prev) => {
-            const copy = JSON.parse(JSON.stringify(prev));
-            if (!copy.sections || copy.sections.length === 0) {
-                copy.sections = [
-                    {
-                        id: `sec_${Date.now()}`,
-                        title: "Section 1",
-                        afterSectionAction: "submit_form",
-                        questions: [newQuestion],
-                    },
-                ];
-            } else {
-                copy.sections[copy.sections.length - 1].questions.push(newQuestion);
-            }
-            return copy;
-        });
-
-        setActiveQuestionId(newQuestionId);
-        toast.info("Added new question to form.");
-    };
-
-    const handleQuickAddQuestion = (preset: Partial<FormQuestion>) => {
-        const newQuestionId = `q_${Date.now()}`;
-        const newQuestion: FormQuestion = {
-            id: newQuestionId,
-            type: preset.type || "short_answer",
-            title: preset.title || "Untitled Question",
-            description: preset.description,
-            required: Boolean(preset.required),
-            options: preset.options ? JSON.parse(JSON.stringify(preset.options)) : undefined,
-        };
-
-        setFormStructure((prev) => {
-            const copy = JSON.parse(JSON.stringify(prev));
-            if (!copy.sections || copy.sections.length === 0) {
-                copy.sections = [
-                    {
-                        id: `sec_${Date.now()}`,
-                        title: "Section 1",
-                        afterSectionAction: "submit_form",
-                        questions: [newQuestion],
-                    },
-                ];
-            } else {
-                copy.sections[copy.sections.length - 1].questions.push(newQuestion);
-            }
-            return copy;
-        });
-
-        setActiveQuestionId(newQuestionId);
-        toast.success(`Added question: "${newQuestion.title}"`);
-    };
-
-    const handleApplyTemplate = (templateId: string) => {
-        const found = ORBIX_FORM_TEMPLATES.find((t) => t.id === templateId);
-        if (!found) return;
-
-        setFormStructure(JSON.parse(JSON.stringify(found.structure)));
-        const firstQ = found.structure.sections[0]?.questions[0];
-        if (firstQ) setActiveQuestionId(firstQ.id);
-
-        toast.success(`Applied template: "${found.title}" with ${found.structure.sections[0]?.questions.length || 0} questions.`);
-    };
-
-    const handleUpdateQuestion = (updatedQ: FormQuestion) => {
-        setFormStructure((prev) => {
-            const copy = JSON.parse(JSON.stringify(prev));
-            for (const sec of copy.sections) {
-                const idx = sec.questions.findIndex((q: FormQuestion) => q.id === updatedQ.id);
-                if (idx !== -1) {
-                    sec.questions[idx] = updatedQ;
-                    break;
-                }
-            }
-            return copy;
-        });
-    };
-
-    const handleDeleteQuestion = (questionId: string) => {
-        setFormStructure((prev) => {
-            const copy = JSON.parse(JSON.stringify(prev));
-            for (const sec of copy.sections) {
-                sec.questions = sec.questions.filter((q: FormQuestion) => q.id !== questionId);
-            }
-            return copy;
-        });
-        toast.info("Question removed.");
-    };
-
-    const handleDuplicateQuestion = (questionId: string) => {
-        setFormStructure((prev) => {
-            const copy = JSON.parse(JSON.stringify(prev));
-            for (const sec of copy.sections) {
-                const idx = sec.questions.findIndex((q: FormQuestion) => q.id === questionId);
-                if (idx !== -1) {
-                    const original = sec.questions[idx];
-                    const dup: FormQuestion = {
-                        ...JSON.parse(JSON.stringify(original)),
-                        id: `q_dup_${Date.now()}`,
-                        title: `${original.title} (Copy)`,
-                    };
-                    sec.questions.splice(idx + 1, 0, dup);
-                    setActiveQuestionId(dup.id);
-                    break;
-                }
-            }
-            return copy;
-        });
-        toast.info("Question duplicated.");
-    };
-
-    const handleMoveQuestion = (questionId: string, direction: "up" | "down") => {
-        setFormStructure((prev) => {
-            const copy = JSON.parse(JSON.stringify(prev));
-            for (const sec of copy.sections) {
-                const idx = sec.questions.findIndex((q: FormQuestion) => q.id === questionId);
-                if (idx !== -1) {
-                    const targetIdx = direction === "up" ? idx - 1 : idx + 1;
-                    if (targetIdx >= 0 && targetIdx < sec.questions.length) {
-                        const [removed] = sec.questions.splice(idx, 1);
-                        sec.questions.splice(targetIdx, 0, removed);
-                    }
-                    break;
-                }
-            }
-            return copy;
-        });
-    };
-
     // Final Submission Handler (Atomic Launch)
     const handleSubmitFinal = (e?: React.FormEvent) => {
         if (e) e.preventDefault();
@@ -581,16 +459,8 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             coverImageUrl: effectiveBanner,
             status: form.status,
             initialFormStructure: formStructure,
-            initialFormSettings: {
-                allowMultipleResponses: false,
-                limitOneResponsePerUser: true,
-                showProgressBar: true,
-                shuffleQuestions: false,
-            },
-            initialFormTheme: {
-                accentColor: "#38BDF8",
-                themePreset: "neo_brutalist",
-            },
+            initialFormSettings: formSettings,
+            initialFormTheme: formTheme,
         };
 
         // Fire callback immediately for optimistic update
@@ -1113,13 +983,45 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        {/* 7 Columns: Preset Banner Grid & Custom Dropzone */}
-                        <div className="lg:col-span-7 space-y-5">
-                            <div>
-                                <div className="flex items-center justify-between mb-2">
+                        {/* 7 Columns: Custom Dropzone (Top) & Preset Banners (Below) */}
+                        <div className="lg:col-span-7 space-y-6">
+                            {/* 1. Custom Flyer Dropzone Space (At the upper side) */}
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
                                     <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                        Choose from 5 Curated Developer Banners
+                                        Upload Custom Event Flyer
                                     </h4>
+                                    <span className="text-[10px] font-bold text-neutral-500">
+                                        Drag & drop or browse device
+                                    </span>
+                                </div>
+                                <NeoImageDropzone
+                                    headline="Drag and drop your event banner here"
+                                    subtext="or click anywhere in this block to browse your device"
+                                    value={form.coverImageUrl.startsWith("data:image/svg+xml") ? "" : form.coverImageUrl}
+                                    onChange={handleBannerFileSelect}
+                                    onRemove={() => {
+                                        setForm((prev) => ({ ...prev, coverImageUrl: getRandomPresetBanner().dataUrl }));
+                                    }}
+                                    isUploading={isUploadingBanner}
+                                    uploadProgress={uploadProgress}
+                                    aspectRatio="banner"
+                                    maxSizeMB={5}
+                                    recommendedNote="Recommended 16:9 ratio (e.g. 1200x675px). PNG, JPG, or WEBP up to 5MB."
+                                />
+                            </div>
+
+                            {/* 2. Curated Developer Banners (At the bottom side of custom upload) */}
+                            <div className="pt-4 border-t-2 border-black/10 space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                            Or Choose from 5 Curated Developer Banners
+                                        </h4>
+                                        <p className="text-[11px] text-neutral-600 font-medium">
+                                            Instant high-vibe SVGs styled for developer clubs & hackathons
+                                        </p>
+                                    </div>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -1127,7 +1029,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             setForm((prev) => ({ ...prev, coverImageUrl: randomBanner.dataUrl }));
                                             toast.info(`Swapped to "${randomBanner.title}" banner!`);
                                         }}
-                                        className="text-[11px] font-black text-sky-700 hover:text-sky-900 underline cursor-pointer"
+                                        className="text-[11px] font-black text-sky-700 hover:text-sky-900 underline cursor-pointer shrink-0"
                                     >
                                         🎲 Surprise Me
                                     </button>
@@ -1179,27 +1081,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                         );
                                     })}
                                 </div>
-                            </div>
-
-                            {/* Or Custom Upload */}
-                            <div className="pt-2 border-t-2 border-black/10 space-y-2">
-                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                    Or Upload Custom Event Flyer
-                                </h4>
-                                <NeoImageDropzone
-                                    headline="Drag and drop your event banner here"
-                                    subtext="or click anywhere in this block to browse your device"
-                                    value={form.coverImageUrl.startsWith("data:image/svg+xml") ? "" : form.coverImageUrl}
-                                    onChange={handleBannerFileSelect}
-                                    onRemove={() => {
-                                        setForm((prev) => ({ ...prev, coverImageUrl: getRandomPresetBanner().dataUrl }));
-                                    }}
-                                    isUploading={isUploadingBanner}
-                                    uploadProgress={uploadProgress}
-                                    aspectRatio="banner"
-                                    maxSizeMB={5}
-                                    recommendedNote="Recommended 16:9 ratio (e.g. 1200x675px). PNG, JPG, or WEBP up to 5MB."
-                                />
                             </div>
                         </div>
 
@@ -1257,203 +1138,51 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             )}
 
             {/* ---------------------------------------------------------------- */}
-            {/* STEP 3: REGISTRATION FORM BUILDER */}
+            {/* STEP 3: REGISTRATION FORM BUILDER WORKSPACE */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 3 && (
-                <div className="w-full rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] overflow-hidden p-4 sm:p-6 lg:p-8 space-y-6 bg-[#FAF6EE]/20">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b-2 border-black/10 gap-3">
+                <div className="w-full rounded-3xl bg-white dark:bg-[#0A0A0A] border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6">
+                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
                         <div>
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
                                 Step 3 of 3
                             </span>
-                            <h3 className="text-base sm:text-lg font-black text-black">
-                                Registration Form Builder ({totalQuestions} Questions)
+                            <h3 className="text-base sm:text-lg font-black text-black dark:text-white">
+                                Dynamic Registration Form Builder
                             </h3>
-                            <p className="text-xs text-neutral-600 font-medium mt-0.5">
-                                Configure participant questionnaire. Verified student identity (Name, Email, Roll No., College) is automatically captured by Orbix upon submission.
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400 font-medium mt-0.5">
+                                Full Studio: Configure questionnaire with AI Assistant, Question Bank, Templates, Theme, and Branching Logic.
                             </p>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                            <OrbixButton
-                                type="button"
-                                onClick={handleAddQuestion}
-                                variant="primary"
-                                className="px-3.5 py-1.5 text-xs font-black shadow-[2px_2px_0px_#000]"
-                            >
-                                <Plus className="w-3.5 h-3.5 mr-1 stroke-[3]" />
-                                <span>Add Question</span>
-                            </OrbixButton>
-                        </div>
                     </div>
 
-                    {/* Quick Add Accelerators */}
-                    <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                            <span className="text-xs font-black uppercase tracking-wider text-black flex items-center gap-1.5">
-                                <Sparkles className="w-4 h-4 text-amber-500" />
-                                <span>Quick Add Common Event Questions:</span>
-                            </span>
-
-                            {/* Templates Quick Apply */}
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                                <button
-                                    type="button"
-                                    onClick={() => handleApplyTemplate("hackathon_registration")}
-                                    className="px-2.5 py-1 rounded-lg border border-black bg-sky-100 hover:bg-sky-200 text-sky-950 text-[11px] font-black cursor-pointer shadow-[1px_1px_0px_#000]"
-                                >
-                                    ⚡ Hackathon Preset
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => handleApplyTemplate("tech_workshop_rsvp")}
-                                    className="px-2.5 py-1 rounded-lg border border-black bg-amber-100 hover:bg-amber-200 text-amber-950 text-[11px] font-black cursor-pointer shadow-[1px_1px_0px_#000]"
-                                >
-                                    ⚡ Workshop Preset
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    handleQuickAddQuestion({
-                                        title: "Hackathon Experience Level",
-                                        type: "multiple_choice",
-                                        required: true,
-                                        options: [
-                                            { id: "e1", text: "First-time Hacker" },
-                                            { id: "e2", text: "Participated in 1-3 Hackathons" },
-                                            { id: "e3", text: "Veteran / Hackathon Winner" },
-                                        ],
-                                    })
-                                }
-                                className="px-3 py-1.5 rounded-xl border-2 border-black bg-[#FAF6EE] hover:bg-white text-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
-                            >
-                                + Hackathon Experience
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    handleQuickAddQuestion({
-                                        title: "Project Idea & Pitch",
-                                        description: "Briefly outline what you plan to build or explore.",
-                                        type: "paragraph",
-                                        required: false,
-                                    })
-                                }
-                                className="px-3 py-1.5 rounded-xl border-2 border-black bg-[#FAF6EE] hover:bg-white text-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
-                            >
-                                + Project Idea Pitch
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    handleQuickAddQuestion({
-                                        title: "GitHub / Portfolio Profile",
-                                        description: "Link to your code repositories or personal portfolio.",
-                                        type: "short_answer",
-                                        required: false,
-                                    })
-                                }
-                                className="px-3 py-1.5 rounded-xl border-2 border-black bg-[#FAF6EE] hover:bg-white text-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
-                            >
-                                + GitHub Profile
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() =>
-                                    handleQuickAddQuestion({
-                                        title: "Resume / CV Upload",
-                                        description: "Upload PDF format resume (max 10MB).",
-                                        type: "file_upload",
-                                        required: false,
-                                    })
-                                }
-                                className="px-3 py-1.5 rounded-xl border-2 border-black bg-[#FAF6EE] hover:bg-white text-black text-xs font-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
-                            >
-                                + Resume Upload
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Question Cards Render */}
-                    {totalQuestions === 0 ? (
-                        <div className="p-8 rounded-3xl bg-rose-50 border-3 border-rose-600 text-center space-y-3">
-                            <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
-                            <h4 className="text-sm font-black text-rose-950">Registration Form Cannot Be Empty</h4>
-                            <p className="text-xs text-rose-800 max-w-md mx-auto">
-                                Orbix events require at least 1 question for participant registration. Click &ldquo;Add Question&rdquo; or pick one of the presets above.
-                            </p>
-                            <OrbixButton
-                                type="button"
-                                onClick={handleAddQuestion}
-                                variant="rose"
-                                className="px-5 py-2 text-xs font-black shadow-[2px_2px_0px_#000]"
-                            >
-                                + Add First Question
-                            </OrbixButton>
-                        </div>
-                    ) : (
-                        <div className="space-y-4">
-                            {formStructure.sections.map((section) => (
-                                <div key={section.id} className="space-y-4">
-                                    {section.questions.map((question, qIdx) => (
-                                        <QuestionCard
-                                            key={question.id}
-                                            question={question}
-                                            index={qIdx}
-                                            totalQuestions={section.questions.length}
-                                            sections={formStructure.sections}
-                                            currentSectionId={section.id}
-                                            accentColor="#38BDF8"
-                                            eventId={editingEvent?.id || "create-draft"}
-                                            isActive={activeQuestionId === question.id}
-                                            onSelect={() => setActiveQuestionId(question.id)}
-                                            onChange={handleUpdateQuestion}
-                                            onDelete={() => handleDeleteQuestion(question.id)}
-                                            onDuplicate={() => handleDuplicateQuestion(question.id)}
-                                            onMoveUp={() => handleMoveQuestion(question.id, "up")}
-                                            onMoveDown={() => handleMoveQuestion(question.id, "down")}
-                                        />
-                                    ))}
-                                </div>
-                            ))}
-
-                            <button
-                                type="button"
-                                onClick={handleAddQuestion}
-                                className="w-full py-3.5 rounded-2xl border-2 border-dashed border-black hover:border-black/80 bg-white/60 hover:bg-white text-black font-black text-xs flex items-center justify-center gap-2 cursor-pointer transition-all shadow-[2px_2px_0px_#000]"
-                            >
-                                <Plus className="w-4 h-4 stroke-[3]" />
-                                <span>Add Another Question</span>
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Step 3 Footer */}
-                    <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
-                        <button
-                            type="button"
-                            onClick={() => setCurrentStep(2)}
-                            className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-bold shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer"
-                        >
-                            <ArrowLeft className="w-3.5 h-3.5" />
-                            <span>Back: Banner Studio</span>
-                        </button>
-                        <OrbixButton
-                            type="button"
-                            onClick={() => handleSubmitFinal()}
-                            variant="lime"
-                            disabled={totalQuestions === 0}
-                            className="px-6 py-2.5 text-xs font-black shadow-[3px_3px_0px_#000]"
-                        >
-                            <span>{editingEvent ? "Save Changes" : "🚀 Publish & Create Event"}</span>
-                        </OrbixButton>
-                    </div>
+                    <EventFormBuilderWorkspace
+                        eventId={editingEvent?.id || "create-draft"}
+                        club={{ id: clubId, name: clubName, logoUrl: clubLogoUrl }}
+                        isWizardMode={true}
+                        initialFormRecord={{
+                            id: "wizard-draft-form",
+                            eventId: editingEvent?.id || "create-draft",
+                            title: `${form.title.trim() || "Event"} Registration`,
+                            description: form.summary.trim() || "Complete registration to secure your verified student pass.",
+                            structure: formStructure,
+                            settings: formSettings,
+                            themeSettings: formTheme,
+                            isPublished: false,
+                            version: 1,
+                        } as any}
+                        initialEventData={{
+                            ...form,
+                            title: form.title.trim() || "Event",
+                        }}
+                        onWizardChange={(updatedForm) => {
+                            if (updatedForm.structure) setFormStructure(updatedForm.structure);
+                            if (updatedForm.settings) setFormSettings(updatedForm.settings);
+                            if (updatedForm.themeSettings) setFormTheme(updatedForm.themeSettings);
+                        }}
+                        onWizardBack={() => setCurrentStep(2)}
+                        onWizardSubmit={() => handleSubmitFinal()}
+                    />
                 </div>
             )}
         </div>

@@ -64,7 +64,7 @@ const CYBER_HACKATHON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
     <text x="50" y="293" fill="#000000" font-family="sans-serif" font-size="12" font-weight="900">RUN HACKATHON</text>
   </g>
 
-  <!-- Left Content Info & Badges -->
+  <!-- Left Content Info and Badges -->
   <g transform="translate(80, 140)">
     <!-- Category Pill -->
     <g>
@@ -118,7 +118,7 @@ const DEV_WORKSHOP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1
   <rect width="1200" height="675" fill="#1E3A8A"/>
   <rect width="1200" height="675" fill="url(#blueprint-grid)"/>
 
-  <!-- Blueprint Ticks & Crosshairs -->
+  <!-- Blueprint Ticks and Crosshairs -->
   <circle cx="100" cy="100" r="28" fill="none" stroke="#60A5FA" stroke-width="2" stroke-dasharray="4 4"/>
   <line x1="100" y1="60" x2="100" y2="140" stroke="#60A5FA" stroke-width="1.5"/>
   <line x1="60" y1="100" x2="140" y2="100" stroke="#60A5FA" stroke-width="1.5"/>
@@ -143,14 +143,14 @@ const DEV_WORKSHOP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1
     <g transform="translate(35, 90)">
       <rect x="0" y="0" width="310" height="75" rx="12" fill="#FFFFFF" stroke="#000000" stroke-width="2.5"/>
       <text x="20" y="32" fill="#000000" font-family="monospace" font-size="13" font-weight="bold">MODULE 01</text>
-      <text x="20" y="55" fill="#2563EB" font-family="sans-serif" font-size="16" font-weight="900">Architecture & Patterns</text>
+      <text x="20" y="55" fill="#2563EB" font-family="sans-serif" font-size="16" font-weight="900">Architecture &amp; Patterns</text>
 
       <rect x="0" y="90" width="310" height="75" rx="12" fill="#FFFFFF" stroke="#000000" stroke-width="2.5"/>
       <text x="20" y="122" fill="#000000" font-family="monospace" font-size="13" font-weight="bold">MODULE 02</text>
       <text x="20" y="145" fill="#10B981" font-family="sans-serif" font-size="16" font-weight="900">Hands-on Live Coding</text>
 
       <rect x="0" y="180" width="310" height="50" rx="12" fill="#000000"/>
-      <text x="75" y="211" fill="#FFE566" font-family="sans-serif" font-size="14" font-weight="900">BUILD & DEPLOY NOW</text>
+      <text x="75" y="211" fill="#FFE566" font-family="sans-serif" font-size="14" font-weight="900">BUILD &amp; DEPLOY NOW</text>
     </g>
   </g>
 
@@ -217,8 +217,8 @@ const CAMPUS_KEYNOTE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
     <!-- Keynote Banner Card Content -->
     <rect x="24" y="24" width="372" height="130" rx="16" fill="#8B5CF6" stroke="#000000" stroke-width="3"/>
     <text x="44" y="65" fill="#FFE566" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1.5">SPECIAL GUEST KEYNOTE</text>
-    <text x="44" y="105" fill="#FFFFFF" font-family="sans-serif" font-size="28" font-weight="900">LEADERSHIP & TECH</text>
-    <text x="44" y="132" fill="#E9D5FF" font-family="sans-serif" font-size="13" font-weight="bold">Auditorium Main Stage • Live & Interactive</text>
+    <text x="44" y="105" fill="#FFFFFF" font-family="sans-serif" font-size="28" font-weight="900">LEADERSHIP &amp; TECH</text>
+    <text x="44" y="132" fill="#E9D5FF" font-family="sans-serif" font-size="13" font-weight="bold">Auditorium Main Stage • Live &amp; Interactive</text>
 
     <!-- Details Box -->
     <rect x="24" y="174" width="372" height="85" rx="16" fill="#FAF6EE" stroke="#000000" stroke-width="2.5"/>
@@ -236,7 +236,7 @@ const CAMPUS_KEYNOTE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
     <g>
       <rect x="4" y="4" width="220" height="44" rx="12" fill="#000000"/>
       <rect x="0" y="0" width="220" height="44" rx="12" fill="#FFFFFF" stroke="#000000" stroke-width="3"/>
-      <text x="20" y="28" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">🎙️ KEYNOTE & SUMMIT</text>
+      <text x="20" y="28" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">🎙️ KEYNOTE &amp; SUMMIT</text>
     </g>
 
     <text x="0" y="135" fill="#000000" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="900" letter-spacing="-1.5">
@@ -279,7 +279,7 @@ const AI_NEURAL_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200
   <rect width="1200" height="675" fill="#150226"/>
   <rect width="1200" height="675" fill="url(#ai-glow)"/>
 
-  <!-- Neural Constellation Lines & Nodes -->
+  <!-- Neural Constellation Lines and Nodes -->
   <g stroke="#F43F5E" stroke-width="1.5" opacity="0.45">
     <line x1="750" y1="180" x2="880" y2="120"/>
     <line x1="880" y1="120" x2="1040" y2="190"/>
@@ -322,7 +322,7 @@ const AI_NEURAL_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200
     <g>
       <rect x="4" y="4" width="230" height="44" rx="12" fill="#000000"/>
       <rect x="0" y="0" width="230" height="44" rx="12" fill="#F43F5E" stroke="#000000" stroke-width="2.5"/>
-      <text x="20" y="28" fill="#FFFFFF" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">🧠 AI & DATA LAB</text>
+      <text x="20" y="28" fill="#FFFFFF" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">🧠 AI &amp; DATA LAB</text>
     </g>
 
     <text x="0" y="130" fill="#FFFFFF" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="900" letter-spacing="-1.5">
@@ -347,7 +347,7 @@ const AI_NEURAL_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200
 
   <rect x="0" y="625" width="1200" height="50" fill="#0A0114"/>
   <line x1="0" y1="625" x2="1200" y2="625" stroke="#F43F5E" stroke-width="3"/>
-  <text x="80" y="656" fill="#F43F5E" font-family="monospace" font-size="13" font-weight="bold">ORBIX APPLIED ARTIFICIAL INTELLIGENCE // RESEARCH & DEPLOY</text>
+  <text x="80" y="656" fill="#F43F5E" font-family="monospace" font-size="13" font-weight="bold">ORBIX APPLIED ARTIFICIAL INTELLIGENCE // RESEARCH &amp; DEPLOY</text>
 </svg>`;
 
 // 5. CODE & COFFEE / CREATIVE JAM
@@ -369,7 +369,7 @@ const CODE_COFFEE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12
     <!-- Coffee Header -->
     <rect x="0" y="0" width="380" height="55" rx="24" fill="#FB923C" stroke="#000000" stroke-width="4"/>
     <rect x="0" y="35" width="380" height="20" fill="#FB923C"/>
-    <text x="30" y="35" fill="#000000" font-family="sans-serif" font-size="15" font-weight="900" letter-spacing="1">☕ BUILD & CONNECT</text>
+    <text x="30" y="35" fill="#000000" font-family="sans-serif" font-size="15" font-weight="900" letter-spacing="1">☕ BUILD &amp; CONNECT</text>
 
     <!-- Coffee Cup Vector Art -->
     <g transform="translate(130, 95)">
@@ -387,7 +387,7 @@ const CODE_COFFEE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12
 
     <!-- Community Details -->
     <rect x="25" y="235" width="330" height="70" rx="14" fill="#FFF7ED" stroke="#000000" stroke-width="2.5"/>
-    <text x="45" y="262" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900">CASUAL HACKING & NETWORKING</text>
+    <text x="45" y="262" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900">CASUAL HACKING &amp; NETWORKING</text>
     <text x="45" y="285" fill="#EA580C" font-family="sans-serif" font-size="12" font-weight="bold">Bring your laptop • Good vibes provided</text>
   </g>
 
@@ -426,7 +426,16 @@ const CODE_COFFEE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12
 </svg>`;
 
 const toDataUrl = (svg: string): string => {
-    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    const cleanSvg = svg.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, "&amp;");
+    try {
+        if (typeof window !== "undefined" && typeof window.btoa === "function") {
+            const base64 = window.btoa(unescape(encodeURIComponent(cleanSvg)));
+            return `data:image/svg+xml;base64,${base64}`;
+        }
+    } catch {
+        // Fallback to encoded UTF-8 URI
+    }
+    return `data:image/svg+xml;utf8,${encodeURIComponent(cleanSvg)}`;
 };
 
 export const PRESET_EVENT_BANNERS: PresetBanner[] = [

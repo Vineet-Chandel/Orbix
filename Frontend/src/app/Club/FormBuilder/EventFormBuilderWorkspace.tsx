@@ -224,9 +224,15 @@ const QUICK_TEMPLATES = [
 ];
 
 export interface EventFormBuilderWorkspaceProps {
-    eventId: string;
+    eventId?: string;
     club?: any;
     onBack?: () => void;
+    isWizardMode?: boolean;
+    initialFormRecord?: ClubEventFormRecord | null;
+    initialEventData?: any;
+    onWizardChange?: (form: ClubEventFormRecord) => void;
+    onWizardBack?: () => void;
+    onWizardSubmit?: () => void;
 }
 
 type MainTab = "questions" | "responses" | "settings";
@@ -236,8 +242,15 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     eventId,
     club,
     onBack: _onBack,
+    isWizardMode = false,
+    initialFormRecord,
+    initialEventData,
+    onWizardChange,
+    onWizardBack,
+    onWizardSubmit,
 }) => {
     const toast = useToast();
+    const safeEventId = eventId || "create-draft";
 
     // 1. Core States
     const [loading, setLoading] = useState(true);
@@ -329,6 +342,31 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     const loadForm = async () => {
         setLoading(true);
         try {
+            if (isWizardMode && initialFormRecord) {
+                setForm(initialFormRecord);
+                setEvent(initialEventData || { title: initialFormRecord.title || "New Event" });
+                setRegisteredCount(0);
+
+                if (initialFormRecord.structure) {
+                    setHistory([JSON.parse(JSON.stringify(initialFormRecord.structure))]);
+                    setHistoryIndex(0);
+                }
+
+                if (initialFormRecord.structure?.sections?.[0]?.questions?.[0]) {
+                    setActiveQuestionId(initialFormRecord.structure.sections[0].questions[0].id);
+                }
+                setSaveStatus("saved");
+                setLoading(false);
+                isInitialLoad.current = false;
+                return;
+            }
+
+            if (!eventId || eventId === "create-draft") {
+                setLoading(false);
+                isInitialLoad.current = false;
+                return;
+            }
+
             const res = await fetchClubEventForm(eventId);
             setForm(res.form);
             setEvent(res.event);
@@ -353,7 +391,14 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
     useEffect(() => {
         loadForm();
-    }, [eventId]);
+    }, [eventId, isWizardMode]);
+
+    // Bubble form modifications up in wizard mode
+    useEffect(() => {
+        if (isWizardMode && form && onWizardChange) {
+            onWizardChange(form);
+        }
+    }, [form, isWizardMode, onWizardChange]);
 
     // Push new snapshot to undo/redo stack
     const pushHistory = (newStructure: FormStructure) => {
@@ -424,6 +469,17 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         }
 
         autosaveTimer.current = setTimeout(async () => {
+            if (isWizardMode) {
+                if (form && onWizardChange) onWizardChange(form);
+                setSaveStatus("saved");
+                return;
+            }
+
+            if (!eventId || eventId === "create-draft") {
+                setSaveStatus("saved");
+                return;
+            }
+
             try {
                 setSaveStatus("saving");
                 await saveClubEventForm(eventId, {
@@ -445,11 +501,19 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         return () => {
             if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
         };
-    }, [form?.structure, form?.title, form?.description, form?.settings, form?.themeSettings]);
+    }, [form?.structure, form?.title, form?.description, form?.settings, form?.themeSettings, isWizardMode]);
 
     // Explicit Save Draft Button Click
     const handleSaveForm = async () => {
         if (!form) return;
+        if (isWizardMode) {
+            if (onWizardChange) onWizardChange(form);
+            setSaveStatus("saved");
+            toast.success("Draft saved to wizard draft!", { title: "Draft Saved" });
+            return;
+        }
+
+        if (!eventId || eventId === "create-draft") return;
         setSaving(true);
         setSaveStatus("saving");
         try {
@@ -477,6 +541,12 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     // Publish form into an immutable version snapshot
     const handlePublishForm = async () => {
         if (!form) return;
+        if (isWizardMode) {
+            if (onWizardSubmit) onWizardSubmit();
+            return;
+        }
+
+        if (!eventId || eventId === "create-draft") return;
         setIsPublishing(true);
         setSaveStatus("saving");
         try {
@@ -708,7 +778,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         if (pastEventsLibrary.length === 0) {
             setLoadingLibrary(true);
             try {
-                const res = await fetchClubQuestionLibrary(eventId);
+                const res = await fetchClubQuestionLibrary(safeEventId);
                 setPastEventsLibrary(res.library || []);
                 if (res.library && res.library.length > 0) {
                     setExpandedLibEventId(res.library[0].eventId);
@@ -841,7 +911,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
         setIsAiGenerating(true);
         try {
-            const res = await requestAiQuestionSuggestions(eventId, {
+            const res = await requestAiQuestionSuggestions(safeEventId, {
                 prompt: aiPrompt.trim(),
                 eventType: form?.title,
                 eventDescription: form?.description || undefined,
@@ -1248,7 +1318,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                         sections={sections}
                                         currentSectionId={section.id}
                                         accentColor={accentColor}
-                                        eventId={eventId}
+                                        eventId={safeEventId}
                                         isActive={activeQuestionId === question.id}
                                         isQuiz={Boolean(form.settings.quiz?.isQuiz)}
                                         defaultPoints={
@@ -1484,7 +1554,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
                     <React.Suspense fallback={<div className="p-8 flex justify-center"><OrbixLoader size="md" /></div>}>
                         <FormResponsesAnalyticsView
-                            eventId={eventId}
+                            eventId={safeEventId}
                             eventTitle={form.title}
                         />
                     </React.Suspense>
@@ -1514,6 +1584,19 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {activeTab !== "responses" && (
                 <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 max-w-[95vw]">
                     <div className="bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto">
+                        {/* Wizard Back Button */}
+                        {isWizardMode && onWizardBack && (
+                            <button
+                                type="button"
+                                onClick={onWizardBack}
+                                className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                                title="Back to Banner Studio"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                <span className="hidden sm:inline">Back: Banner</span>
+                            </button>
+                        )}
+
                         {/* AI Assistant Button */}
                         <button
                             type="button"
@@ -1524,11 +1607,14 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 }
                                 setIsAiModalOpen(true);
                             }}
-                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                            className="px-3.5 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
                             style={{ backgroundColor: accentColor, color: "#000" }}
                             title="AI Assistant: Generate questions with AI"
                         >
-                            <span className="font-black text-xs tracking-wider px-1">AI AI</span>
+                            <span className="inline-flex items-center gap-1 font-black text-xs tracking-wider">
+                                <Sparkles className="w-3.5 h-3.5 fill-black text-black stroke-[2.5]" />
+                                <span>AI AI</span>
+                            </span>
                         </button>
 
                         {/* Templates Button */}
@@ -1538,10 +1624,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 if (activeTab !== "questions") setActiveTab("questions");
                                 setIsTemplatesModalOpen(true);
                             }}
-                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-sm shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                             title="Form Templates"
                         >
-                            <LayoutTemplate className="w-4 h-4 stroke-[2.5]" />
+                            <LayoutTemplate className="w-5 h-5 stroke-[2.5]" />
                             <span>Templates</span>
                         </button>
 
@@ -1552,27 +1638,20 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             className="p-2 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0"
                             title="Theme & Colors"
                         >
-                            <Palette className="w-4 h-4 stroke-[2.5]" />
+                            <Palette className="w-5 h-5 stroke-[2.5]" />
                         </button>
 
                         {/* Preview Simulator Action (Text only, no logo) */}
                         <button
                             type="button"
                             onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-                            className={`px-3 sm:px-4 py-1 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0 ${isPreviewOpen
+                            className={`px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0 ${isPreviewOpen
                                 ? "bg-black text-white dark:bg-white dark:text-black"
                                 : "bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white"
                                 }`}
                             title="Preview form as student"
                         >
-                            <span>{isPreviewOpen ? <svg xmlns="http://www.w3.org/2000/svg" width="1.8em" height="1.8em" viewBox="0 0 48 48">
-                                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={4} d="M9.858 18C6.238 21 4 24 4 24s8.954 12 20 12c1.37 0 2.708-.185 4-.508M20.032 12.5c1.282-.318 2.61-.5 3.968-.5c11.046 0 20 12 20 12s-2.239 3-5.858 6m-17.828-9.379a5 5 0 0 0 7.186 6.95M42 42L6 6"></path>
-                            </svg> : <svg xmlns="http://www.w3.org/2000/svg" width="1.8em" height="1.8em" viewBox="0 0 48 48">
-                                <g fill="none" stroke="currentColor" strokeLinejoin="round" strokeWidth={4}>
-                                    <path d="M24 36c11.046 0 20-12 20-12s-8.954-12-20-12S4 24 4 24s8.954 12 20 12Z"></path>
-                                    <path d="M24 29a5 5 0 1 0 0-10a5 5 0 0 0 0 10Z"></path>
-                                </g>
-                            </svg>}</span>
+                            <span>{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
                         </button>
 
                         {/* Divider */}
@@ -1583,34 +1662,26 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             type="button"
                             onClick={handleSaveForm}
                             disabled={saving || isPublishing}
-                            className="px-3 sm:px-4 py-1 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
+                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
                             title="Save working draft"
                         >
                             {saving ? (
                                 <>
                                     <OrbixLoader size="xs" />
-
+                                    <span>Saving...</span>
                                 </>
                             ) : (
-                                <span>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="1.8em" height="1.8em" viewBox="0 0 24 24">
-                                        <g fill="none">
-                                            <path fill="currentColor" d="M4.71 20.95c-.93 0-1.4 0-1.69-.28l-.01-.02c-.29-.29-.29-.75-.29-1.69V4.9c0-.94 0-1.4.3-1.7c.29-.3.77-.3 1.72-.3c.77 0 1.15 0 1.42.22c.28.22.36.59.54 1.33l.23.98c.17.74.26 1.11.53 1.33s.65.21 1.41.21h2.45c.84 0 1.26 0 1.54-.25c.28-.24.34-.66.44-1.5l.3-2.4l4.05 2.82l2.95 2.6c.33.29.5.44.59.63c.09.2.09.42.09.87V19c0 .89 0 1.33-.26 1.62l-.07.06c-.29.26-.73.26-1.61.26c-.78 0-1.17 0-1.44-.22l-.07-.05c-.25-.24-.3-.63-.42-1.4l-.5-3.55c-.11-.77-.16-1.15-.42-1.4c-.26-.23-.65-.26-1.43-.31l-3.06-.2l-3.06.2c-.79.05-1.18.08-1.45.33c-.26.25-.3.64-.4 1.43l-.4 3.42c-.1.83-.15 1.24-.43 1.5h-.01c-.28.25-.7.25-1.54.25" opacity={0.2}></path>
-                                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8.77 21.38c-2.83 0-4.24 0-5.12-.88s-.88-2.3-.88-5.12V8.6c0-2.83 0-4.24.88-5.12s2.3-.88 5.12-.88h3.58c1.05 0 1.58 0 2.07.18s.9.5 1.72 1.17l1.72 1.4l1.1.88c1.11.89 1.67 1.33 1.97 1.95s.3 1.33.3 2.75v4.45c0 2.83 0 4.24-.88 5.12s-2.3.88-5.12.88z"></path>
-                                            <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6.64 2.82v.65c0 1.55 0 2.32.4 2.86a2 2 0 0 0 .4.39c.53.4 1.3.4 2.84.4c1.55 0 2.32 0 2.86-.4a2 2 0 0 0 .39-.4c.4-.53.4-1.3.4-2.85v-.65m3.43 18.44v-3.29c0-1.89 0-2.83-.58-3.41c-.59-.59-1.53-.59-3.42-.59h-2.72c-1.89 0-2.83 0-3.42.59c-.58.58-.58 1.52-.58 3.41v3.29"></path>
-                                        </g>
-                                    </svg>
-                                </span>
+                                <span>Save Draft</span>
                             )}
                         </button>
 
-                        {/* Publish (Text only "Publish", no logo, no "Live") */}
+                        {/* Publish (Text only "Publish", or "Publish & Create Event" in Wizard) */}
                         <button
                             type="button"
                             onClick={handlePublishForm}
                             disabled={saving || isPublishing}
                             className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
-                            title="Publish form snapshot for students"
+                            title={isWizardMode ? "Publish & Create Event" : "Publish form snapshot for students"}
                         >
                             {isPublishing ? (
                                 <>
@@ -1618,7 +1689,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     <span>Publishing...</span>
                                 </>
                             ) : (
-                                <span>Publish</span>
+                                <span>{isWizardMode ? "🚀 Publish & Create Event" : "Publish"}</span>
                             )}
                         </button>
                     </div>
@@ -1632,7 +1703,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                     onClose={() => setIsThemeDrawerOpen(false)}
                     theme={form.themeSettings}
                     headerImageUrl={form.headerImageUrl}
-                    eventId={eventId}
+                    eventId={safeEventId}
                     onChangeTheme={(themeSettings) => setForm({ ...form, themeSettings })}
                     onChangeHeaderImage={(url, publicId) =>
                         setForm({ ...form, headerImageUrl: url, headerImagePublicId: publicId })
