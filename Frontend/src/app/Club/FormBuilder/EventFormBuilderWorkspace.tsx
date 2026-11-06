@@ -1181,7 +1181,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {activeTab === "questions" && !isPreviewOpen && (
                 <div className="relative w-full lg:pr-20 space-y-6 pb-36">
                     {/* Verified Identity Notice Card */}
-                    <div className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4">
+                    <div
+                        className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4"
+                        style={{ borderColor: accentColor }}
+                    >
                         <div className="flex items-start sm:items-center gap-3.5">
                             <div
                                 className="w-11 h-11 rounded-2xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0"
@@ -1267,6 +1270,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 totalSections={sections.length}
                                 allSections={sections}
                                 accentColor={accentColor}
+                                cardSurfaceColor={form.themeSettings?.cardSurfaceColor}
+                                cardShadowStyle={form.themeSettings?.cardShadowStyle}
                                 onChange={(updatedSec) => {
                                     updateSections((secs) => {
                                         secs[sIdx] = updatedSec;
@@ -1320,6 +1325,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                         sections={sections}
                                         currentSectionId={section.id}
                                         accentColor={accentColor}
+                                        cardSurfaceColor={form.themeSettings?.cardSurfaceColor}
+                                        cardShadowStyle={form.themeSettings?.cardShadowStyle}
                                         eventId={safeEventId}
                                         isActive={activeQuestionId === question.id}
                                         isQuiz={Boolean(form.settings.quiz?.isQuiz)}

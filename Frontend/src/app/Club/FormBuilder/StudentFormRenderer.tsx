@@ -118,6 +118,9 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         return userResponse?.answers || userResponse?.formResponse || {};
     });
 
+    const accentColor = form.themeSettings?.accentColor || "#38BDF8";
+    const cardSurfaceColor = form.themeSettings?.cardSurfaceColor || "#FFFFFF";
+
     // File attachments state: array of FileAttachmentMeta
     const [fileAttachments, setFileAttachments] = useState<FileAttachmentMeta[]>(() => {
         return userResponse?.fileAttachments || [];
@@ -1152,7 +1155,10 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
         <div className={`w-full ${isPreview ? "max-w-full" : "max-w-5xl xl:max-w-6xl"} mx-auto space-y-6 text-neutral-900 dark:text-neutral-100`}>
             {/* Header Banner if present */}
             {form.headerImageUrl && (
-                <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm bg-neutral-100 dark:bg-neutral-900">
+                <div
+                    className="rounded-2xl sm:rounded-3xl border-2 sm:border-[3px] overflow-hidden shadow-[4px_4px_0px_#000] bg-neutral-100 dark:bg-neutral-900"
+                    style={{ borderColor: accentColor }}
+                >
                     <img
                         src={getCloudinaryBannerUrl(form.headerImageUrl)}
                         alt="Form Banner"
@@ -1164,7 +1170,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
             {/* Form Title & Context Card */}
             <div
-                className="rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm p-6 sm:p-7 space-y-3 relative overflow-hidden"
+                className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] shadow-[4px_4px_0px_#000] p-6 sm:p-7 space-y-3 relative overflow-hidden"
+                style={{
+                    borderColor: accentColor,
+                    backgroundColor: cardSurfaceColor || undefined,
+                }}
             >
                 <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-neutral-100 dark:bg-neutral-800 text-neutral-800 dark:text-neutral-200">
@@ -1488,10 +1498,16 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
             {/* Active Section Header Card (Section Title & Description) */}
             {activeSection && (activeSection.title || activeSection.description) && (
-                <div className="p-5 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-1">
-                    <h3 className="text-base font-bold text-neutral-900 dark:text-white">{activeSection.title}</h3>
+                <div
+                    className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] shadow-[4px_4px_0px_#000] space-y-1"
+                    style={{
+                        borderColor: accentColor,
+                        backgroundColor: cardSurfaceColor || undefined,
+                    }}
+                >
+                    <h3 className="text-base sm:text-lg font-black text-neutral-900 dark:text-white">{activeSection.title}</h3>
                     {activeSection.description && (
-                        <p className="text-xs text-neutral-500 font-normal">{activeSection.description}</p>
+                        <p className="text-xs sm:text-sm text-neutral-600 dark:text-neutral-400 font-medium leading-relaxed">{activeSection.description}</p>
                     )}
                 </div>
             )}
@@ -1509,7 +1525,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                 <div
                                     key={question.id}
                                     id={`q_wrapper_${question.id}`}
-                                    className="p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-2"
+                                    className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] shadow-[3px_3px_0px_#000] space-y-2"
+                                    style={{
+                                        borderColor: accentColor,
+                                        backgroundColor: cardSurfaceColor || undefined,
+                                    }}
                                 >
                                     {question.title && (
                                         <h3 className="text-base sm:text-lg font-bold text-neutral-900 dark:text-neutral-100">{question.title}</h3>
@@ -1536,7 +1556,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                 <div
                                     key={question.id}
                                     id={`q_wrapper_${question.id}`}
-                                    className="p-5 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-2.5"
+                                    className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] shadow-[3px_3px_0px_#000] space-y-2.5"
+                                    style={{
+                                        borderColor: accentColor,
+                                        backgroundColor: cardSurfaceColor || undefined,
+                                    }}
                                 >
                                     {question.title && (
                                         <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{question.title}</h4>
@@ -1568,7 +1592,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                 <div
                                     key={question.id}
                                     id={`q_wrapper_${question.id}`}
-                                    className="p-5 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-3"
+                                    className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] shadow-[3px_3px_0px_#000] space-y-3"
+                                    style={{
+                                        borderColor: accentColor,
+                                        backgroundColor: cardSurfaceColor || undefined,
+                                    }}
                                 >
                                     {question.title && (
                                         <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{question.title}</h4>
@@ -1603,7 +1631,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                 <div
                                     key={question.id}
                                     id={`q_wrapper_${question.id}`}
-                                    className="p-5 rounded-2xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 shadow-sm space-y-2"
+                                    className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-neutral-50 dark:bg-neutral-900 border-2 sm:border-[3px] shadow-[3px_3px_0px_#000] space-y-2"
+                                    style={{
+                                        borderColor: accentColor,
+                                        backgroundColor: cardSurfaceColor || undefined,
+                                    }}
                                 >
                                     {question.title && (
                                         <h4 className="text-sm font-bold text-neutral-900 dark:text-neutral-100">{question.title}</h4>
@@ -1619,11 +1651,15 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                             <div
                                 key={question.id}
                                 id={`q_wrapper_${question.id}`}
-                                className={`p-5 sm:p-6 rounded-2xl bg-white dark:bg-[#0A0A0A] border transition-all space-y-3 shadow-sm ${
+                                className={`p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] transition-all space-y-3 shadow-[3px_3px_0px_#000] ${
                                     qError
-                                        ? "border-rose-500 ring-1 ring-rose-500/20"
-                                        : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700"
+                                        ? "ring-2 ring-rose-500/50"
+                                        : ""
                                 }`}
+                                style={{
+                                    borderColor: qError ? "#F43F5E" : accentColor,
+                                    backgroundColor: cardSurfaceColor || undefined,
+                                }}
                             >
                                 {/* Question Title & Description */}
                                 <div className="space-y-1">
@@ -2186,9 +2222,9 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                         type="button"
                         onClick={handleBack}
                         disabled={isSubmitting}
-                        className="px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer transition-colors"
+                        className="px-4 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 font-bold text-xs text-neutral-800 dark:text-neutral-200 shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                     >
-                        <ArrowLeft className="w-4 h-4" />
+                        <ArrowLeft className="w-4 h-4 stroke-[2.5]" />
                         <span>Previous Section</span>
                     </button>
                 ) : onCancel ? (
@@ -2196,7 +2232,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                         type="button"
                         onClick={onCancel}
                         disabled={isSubmitting}
-                        className="px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-700 dark:text-neutral-300 cursor-pointer transition-colors"
+                        className="px-4 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 font-bold text-xs text-neutral-800 dark:text-neutral-200 shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                     >
                         Cancel
                     </button>
@@ -2208,7 +2244,8 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                     type="button"
                     onClick={handleNext}
                     disabled={isSubmitting}
-                    className="px-6 py-2.5 rounded-xl bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 font-semibold text-xs text-white dark:text-black shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
+                    className="px-6 py-2.5 rounded-xl border-2 border-black font-black text-xs shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                    style={{ backgroundColor: accentColor, color: "#000" }}
                 >
                     {isSubmitting ? (
                         <>
