@@ -4,8 +4,6 @@ import {
     QrCode,
     Download,
     Share2,
-    Copy,
-    Check,
     Smartphone,
     Monitor,
     RectangleVertical,
@@ -36,7 +34,6 @@ export const EventInvitationStudio: React.FC<EventInvitationStudioProps> = (prop
     const [isExporting, setIsExporting] = useState(false);
     const [exportingSide, setExportingSide] = useState<InvitationFace | null>(null);
     const [isSharing, setIsSharing] = useState(false);
-    const [hasCopiedLink, setHasCopiedLink] = useState(false);
 
     // Responsive scaling measurement
     const stageContainerRef = useRef<HTMLDivElement>(null);
@@ -166,15 +163,13 @@ export const EventInvitationStudio: React.FC<EventInvitationStudioProps> = (prop
         }
     };
 
-    // Copy link handler
+    // Copy link handler (fallback for share)
     const handleCopyLink = async () => {
         try {
             await navigator.clipboard.writeText(canonicalRegistrationUrl);
-            setHasCopiedLink(true);
             toast.success("Event registration link copied to clipboard!", {
                 title: "Link Copied",
             });
-            setTimeout(() => setHasCopiedLink(false), 2400);
         } catch {
             toast.error("Could not copy link to clipboard.");
         }
@@ -359,8 +354,8 @@ export const EventInvitationStudio: React.FC<EventInvitationStudioProps> = (prop
                 </div>
             </div>
 
-            {/* Action Bar: Front/Back Toggle, Download Button with Logo, Copy Link, Native Share */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+            {/* Action Bar: Front/Back Toggle, Download Button with Logo, Native Share */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                 {/* 1. Front / Back (QR) Switcher Toggle */}
                 <div className="h-11 flex items-center p-1 bg-white rounded-xl border-2 border-black shadow-[3px_3px_0px_#000]">
                     <button
@@ -413,26 +408,7 @@ export const EventInvitationStudio: React.FC<EventInvitationStudioProps> = (prop
                     )}
                 </button>
 
-                {/* 3. Copy Direct Link */}
-                <button
-                    type="button"
-                    onClick={handleCopyLink}
-                    className="h-11 flex items-center justify-center gap-2 px-3 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider transition-all border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer"
-                >
-                    {hasCopiedLink ? (
-                        <>
-                            <Check className="w-4 h-4 stroke-[3] text-emerald-600" />
-                            <span className="text-emerald-700">Link Copied!</span>
-                        </>
-                    ) : (
-                        <>
-                            <Copy className="w-4 h-4 stroke-[2.5]" />
-                            <span>Copy RSVP Link</span>
-                        </>
-                    )}
-                </button>
-
-                {/* 4. Native Share */}
+                {/* 3. Native Share */}
                 <button
                     type="button"
                     onClick={handleShare}
