@@ -345,6 +345,7 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                         offIcon={<Lock className="w-3.5 h-3.5 text-neutral-700 stroke-[3]" />}
                                         onStatusText="Status: Public"
                                         offStatusText="Status: Private"
+                                        showStatusText={true}
                                         ariaLabel="Toggle resume visibility on profile"
                                     />
                                 </div>

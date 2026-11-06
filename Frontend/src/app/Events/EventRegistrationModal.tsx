@@ -37,6 +37,11 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
     const [phoneNumber, setPhoneNumber] = useState("");
     const [notes, setNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isAttendeeUnder18, setIsAttendeeUnder18] = useState(false);
+    const [guardianName, setGuardianName] = useState("");
+    const [guardianEmail, setGuardianEmail] = useState("");
+    const [guardianPhone, setGuardianPhone] = useState("");
+    const [guardianRelationship, setGuardianRelationship] = useState("Parent");
 
     // Submission Status
     const [submittedSuccess, setSubmittedSuccess] = useState(false);
@@ -53,6 +58,11 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
             setRollNumber("");
             setPhoneNumber("");
             setNotes("");
+            setIsAttendeeUnder18(false);
+            setGuardianName("");
+            setGuardianEmail("");
+            setGuardianPhone("");
+            setGuardianRelationship("Parent");
             setSubmittedSuccess(false);
         }
     }, [isOpen, event, user]);
@@ -72,6 +82,25 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
 
         try {
             setIsSubmitting(true);
+            if (isAttendeeUnder18) {
+                if (!guardianName.trim() || guardianName.trim().length < 2) {
+                    toast.error("Please provide your parent or legal guardian's full name.");
+                    return;
+                }
+                if (!guardianEmail.trim() || !guardianEmail.includes("@")) {
+                    toast.error("Please provide a valid email address for your parent or legal guardian.");
+                    return;
+                }
+                if (guardianEmail.trim().toLowerCase() === applicantEmail.trim().toLowerCase()) {
+                    toast.error("Guardian email address must be different from your personal email address.");
+                    return;
+                }
+                if (!guardianPhone.trim() || guardianPhone.trim().length < 7) {
+                    toast.error("Please provide your parent or legal guardian's phone number.");
+                    return;
+                }
+            }
+
             await applyForEvent(event.id, {
                 applicantName: applicantName.trim(),
                 applicantEmail: applicantEmail.trim(),
@@ -80,6 +109,11 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                 rollNumber: rollNumber.trim() || undefined,
                 phoneNumber: phoneNumber.trim() || undefined,
                 notes: notes.trim() || undefined,
+                isAttendeeUnder18,
+                guardianName: isAttendeeUnder18 ? guardianName.trim() : undefined,
+                guardianEmail: isAttendeeUnder18 ? guardianEmail.trim().toLowerCase() : undefined,
+                guardianPhone: isAttendeeUnder18 ? guardianPhone.trim() : undefined,
+                guardianRelationship: isAttendeeUnder18 ? guardianRelationship.trim() : undefined,
             });
 
             setSubmittedSuccess(true);
@@ -364,6 +398,96 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                                 placeholder="Any specific topics you want covered or questions for the speakers..."
                                 className="w-full p-2.5 rounded-xl bg-white border-2 border-black text-xs font-medium text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
                             />
+                        </div>
+
+                        {/* Minor Attendee & Guardian Verification Section */}
+                        <div className="p-3.5 rounded-2xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] space-y-3">
+                            <label className="flex items-start gap-2.5 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={isAttendeeUnder18}
+                                    onChange={(e) => setIsAttendeeUnder18(e.target.checked)}
+                                    className="mt-0.5 h-4 w-4 rounded border-2 border-black accent-black cursor-pointer"
+                                />
+                                <div>
+                                    <span className="text-xs font-black uppercase tracking-wider text-black block">
+                                        I am under 18 years of age (e.g. 17-year-old first-year student)
+                                    </span>
+                                    <span className="text-[11px] text-neutral-600 block leading-tight mt-0.5">
+                                        In compliance with minor protection laws, verifiable parental/guardian consent is required before registration can be finalized.
+                                    </span>
+                                </div>
+                            </label>
+
+                            {isAttendeeUnder18 && (
+                                <div className="pt-2 border-t-2 border-black/10 space-y-3 animate-in fade-in duration-200">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[11px] font-black uppercase tracking-wider text-black mb-1">
+                                                Parent / Guardian Name *
+                                            </label>
+                                            <input
+                                                type="text"
+                                                required={isAttendeeUnder18}
+                                                value={guardianName}
+                                                onChange={(e) => setGuardianName(e.target.value)}
+                                                placeholder="Parent's full name"
+                                                className="w-full px-2.5 py-1.5 rounded-lg bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[11px] font-black uppercase tracking-wider text-black mb-1">
+                                                Relationship *
+                                            </label>
+                                            <select
+                                                value={guardianRelationship}
+                                                onChange={(e) => setGuardianRelationship(e.target.value)}
+                                                className="w-full px-2.5 py-1.5 rounded-lg bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
+                                            >
+                                                <option value="Mother">Mother</option>
+                                                <option value="Father">Father</option>
+                                                <option value="Legal Guardian">Legal Guardian</option>
+                                                <option value="Parent">Parent</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="block text-[11px] font-black uppercase tracking-wider text-black mb-1">
+                                                Guardian Email *
+                                            </label>
+                                            <input
+                                                type="email"
+                                                required={isAttendeeUnder18}
+                                                value={guardianEmail}
+                                                onChange={(e) => setGuardianEmail(e.target.value)}
+                                                placeholder="parent@example.com"
+                                                className="w-full px-2.5 py-1.5 rounded-lg bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[11px] font-black uppercase tracking-wider text-black mb-1">
+                                                Guardian Phone *
+                                            </label>
+                                            <input
+                                                type="tel"
+                                                required={isAttendeeUnder18}
+                                                value={guardianPhone}
+                                                onChange={(e) => setGuardianPhone(e.target.value)}
+                                                placeholder="+91 98765 43210"
+                                                className="w-full px-2.5 py-1.5 rounded-lg bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <p className="text-[10px] text-zinc-500 font-medium">
+                                        An electronic verification link will be emailed to your guardian. Your registration will remain pending until guardian confirmation is received.
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="pt-2 border-t-2 border-black/10 flex items-center justify-end gap-2.5">

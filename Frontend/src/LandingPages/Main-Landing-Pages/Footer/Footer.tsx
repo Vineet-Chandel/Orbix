@@ -247,12 +247,12 @@ export const Footer: React.FC = () => {
                                 <span>Zero Password Sync</span>
                             </li>
                             <li>
-                                <Link to="/support" className="hover:text-black hover:underline transition-colors">
+                                <Link to="/privacy" className="hover:text-black hover:underline transition-colors">
                                     Privacy Policy
                                 </Link>
                             </li>
                             <li>
-                                <Link to="/support" className="hover:text-black hover:underline transition-colors">
+                                <Link to="/terms" className="hover:text-black hover:underline transition-colors">
                                     Terms of Service
                                 </Link>
                             </li>

@@ -9,7 +9,6 @@ import {
     Edit3,
     Trash2,
     Users,
-    BarChart3,
     QrCode,
     FileSpreadsheet,
     CheckCircle2,
@@ -98,6 +97,9 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
     const handleTabChange = (tab: EventTab) => {
         setActiveTab(tab);
+        if (tab === "roster") {
+            loadApplications();
+        }
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             if (tab === "roster") {
@@ -610,13 +612,13 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
             {/* Hero Event Card */}
             <div className="p-6 sm:p-7 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-6">
-                    {/* Cover Banner if present */}
+                    {/* Cover Banner if present (100% full view, never cropped) */}
                     {event.coverImageUrl ? (
-                        <div className="w-full h-44 sm:h-64 rounded-2xl border-2 border-black overflow-hidden relative shadow-[3px_3px_0px_#000] bg-neutral-100">
+                        <div className="w-full aspect-[2.4/1] max-h-[420px] rounded-2xl border-2 sm:border-3 border-black overflow-hidden relative shadow-[3px_3px_0px_#000] bg-neutral-950 flex items-center justify-center">
                             <img
                                 src={event.coverImageUrl}
                                 alt={event.title}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                             />
                         </div>
                     ) : (
@@ -738,19 +740,6 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         <span className="px-2 py-0.5 rounded-full bg-black text-[#a2ff86] border border-black text-[10px] font-black">
                             LIVE QR
                         </span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => handleTabChange("analytics")}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-                            activeTab === "analytics"
-                                ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
-                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
-                        }`}
-                    >
-                        <BarChart3 className="w-4 h-4 stroke-[2.5]" />
-                        <span>Analytics & Attendance</span>
                     </button>
 
                     <button
@@ -1208,6 +1197,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     description={event.description || undefined}
                                     startsAt={event.startsAt}
                                     endsAt={event.endsAt || undefined}
+                                    timezone={event.timezone}
                                     venueOrLocation={event.venueOrLocation || undefined}
                                     locationType={event.locationType}
                                     registrationUrl={event.registrationUrl || undefined}
@@ -1567,7 +1557,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         {inspectingApplicant.fileAttachments && inspectingApplicant.fileAttachments.length > 0 && (
                             <div className="space-y-2 pt-2">
                                 <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                    Uploaded Attachments (Cloudinary)
+                                    Uploaded Attachments & Files
                                 </h4>
                                 <div className="space-y-2">
                                     {inspectingApplicant.fileAttachments.map((f: any, fIdx: number) => (

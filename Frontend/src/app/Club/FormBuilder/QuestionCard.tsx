@@ -27,6 +27,8 @@ import {
     SlidersHorizontal,
 } from "lucide-react";
 import { NeoToggle } from "../../../components/NeoToggle";
+import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import {
     type FormQuestion,
     type FormQuestionType,
@@ -100,6 +102,8 @@ const QUESTION_TYPE_CATEGORIES: {
         ],
     },
 ];
+
+const QUESTION_TYPES = QUESTION_TYPE_CATEGORIES.flatMap((c) => c.types);
 
 export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
     question,
@@ -226,7 +230,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                 imageUrl: result.secureUrl,
                 imagePublicId: result.publicId,
             });
-            toast.success("Image uploaded to Cloudinary!");
+            toast.success("Image uploaded successfully!");
         } catch (err: any) {
             toast.error(err.message || "Failed to upload image.");
         } finally {
@@ -369,7 +373,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                         {/* Image attach icon button */}
                         <label
                             className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer text-neutral-600 dark:text-neutral-400 shadow-sm transition-colors"
-                            title="Attach Image from Cloudinary"
+                            title="Attach Image"
                         >
                             <Image className="w-4 h-4" />
                             <input
@@ -381,21 +385,17 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                             />
                         </label>
 
-                        <select
+                        <NeoSelect
                             value={question.type}
-                            onChange={(e) => handleTypeChange(e.target.value as FormQuestionType)}
-                            className="text-xs font-semibold border border-neutral-200 dark:border-neutral-800 rounded-xl px-3 py-2 bg-white dark:bg-neutral-900 text-neutral-800 dark:text-neutral-200 focus:outline-none focus:border-neutral-400 shadow-sm cursor-pointer transition-colors"
-                        >
-                            {QUESTION_TYPE_CATEGORIES.map((cat) => (
-                                <optgroup key={cat.category} label={cat.category}>
-                                    {cat.types.map((t) => (
-                                        <option key={t.value} value={t.value}>
-                                            {t.label}
-                                        </option>
-                                    ))}
-                                </optgroup>
-                            ))}
-                        </select>
+                            onChange={(val) => handleTypeChange(val as FormQuestionType)}
+                            size="sm"
+                            options={QUESTION_TYPES.map((t) => ({
+                                value: t.value,
+                                label: t.label,
+                                icon: <t.icon className="w-3.5 h-3.5" />,
+                            }))}
+                            triggerClassName="text-xs font-semibold min-w-[150px]"
+                        />
                     </div>
                 </div>
 
@@ -780,10 +780,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
 
                                 {/* Conditional Section Routing dropdown */}
                                 {showRouting && (
-                                    <select
+                                    <NeoSelect
                                         value={opt.goToSectionId || "next_section"}
-                                        onChange={(e) => handleOptionBranching(optIdx, e.target.value)}
-                                        className="text-[11px] font-bold border border-black/30 rounded-lg px-2 py-1 bg-white focus:outline-none max-w-[150px]"
+                                        onChange={(val) => handleOptionBranching(optIdx, val)}
+                                        size="sm"
+                                        triggerClassName="text-[11px] font-bold max-w-[170px]"
                                     >
                                         <option value="next_section">Continue to next section</option>
                                         <option value="submit_form">Submit form directly</option>
@@ -792,7 +793,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                                                 Go to section {sIdx + 1} ({sec.title || "Untitled"})
                                             </option>
                                         ))}
-                                    </select>
+                                    </NeoSelect>
                                 )}
 
                                 {(question.options || []).length > 1 && (
@@ -939,10 +940,11 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                                 />
 
                                 {showRouting && (
-                                    <select
+                                    <NeoSelect
                                         value={opt.goToSectionId || "next_section"}
-                                        onChange={(e) => handleOptionBranching(optIdx, e.target.value)}
-                                        className="text-[11px] font-bold border border-black/30 rounded-lg px-2 py-1 bg-white focus:outline-none max-w-[150px]"
+                                        onChange={(val) => handleOptionBranching(optIdx, val)}
+                                        size="sm"
+                                        triggerClassName="text-[11px] font-bold max-w-[170px]"
                                     >
                                         <option value="next_section">Continue to next section</option>
                                         <option value="submit_form">Submit form directly</option>
@@ -951,7 +953,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                                                 Go to section {sIdx + 1} ({sec.title || "Untitled"})
                                             </option>
                                         ))}
-                                    </select>
+                                    </NeoSelect>
                                 )}
 
                                 {(question.options || []).length > 1 && (
@@ -984,13 +986,13 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                     <div className="p-4 rounded-2xl bg-neutral-50 border border-black/20 space-y-4">
                         <div className="flex items-center gap-2 text-xs font-black text-neutral-800">
                             <UploadCloud className="w-4 h-4 text-sky-600" />
-                            <span>Direct Cloudinary Upload Configuration</span>
+                            <span>File Upload Configuration</span>
                         </div>
 
                         {/* Allowed File Types */}
                         <div className="space-y-2">
-                            <span className="text-xs font-bold text-neutral-600">Allowed File Formats:</span>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400">Allowed File Formats:</span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                                 {[
                                     { id: "pdf", label: "PDF Document" },
                                     { id: "image", label: "Images (JPG, PNG)" },
@@ -1002,47 +1004,45 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                                     const isChecked = currentAllowed.includes(type.id as any);
 
                                     return (
-                                        <label key={type.id} className="flex items-center gap-2 text-xs font-bold cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={isChecked}
-                                                onChange={(e) => {
-                                                    const updatedTypes = e.target.checked
-                                                        ? [...currentAllowed, type.id as any]
-                                                        : currentAllowed.filter((t) => t !== type.id);
-                                                    onChange({
-                                                        ...question,
-                                                        validation: {
-                                                            ...question.validation,
-                                                            allowedFileTypes: updatedTypes,
-                                                        },
-                                                    });
-                                                }}
-                                                className="w-3.5 h-3.5 accent-black rounded"
-                                            />
-                                            <span>{type.label}</span>
-                                        </label>
+                                        <NeoCheckbox
+                                            key={type.id}
+                                            checked={isChecked}
+                                            onCheckedChange={(checked) => {
+                                                const updatedTypes = checked
+                                                    ? [...currentAllowed, type.id as any]
+                                                    : currentAllowed.filter((t) => t !== type.id);
+                                                onChange({
+                                                    ...question,
+                                                    validation: {
+                                                        ...question.validation,
+                                                        allowedFileTypes: updatedTypes,
+                                                    },
+                                                });
+                                            }}
+                                            size="sm"
+                                            label={type.label}
+                                        />
                                     );
                                 })}
                             </div>
                         </div>
 
                         {/* File Size & Max Files Restrictions */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-1">
                             <div>
-                                <label className="font-bold text-neutral-600 block mb-1">Max File Size Limit:</label>
-                                <select
+                                <label className="font-bold text-neutral-700 dark:text-neutral-300 block mb-1.5">Max File Size Limit:</label>
+                                <NeoSelect
                                     value={question.validation?.maxFileSizeMb ?? 10}
-                                    onChange={(e) =>
+                                    onChange={(val) =>
                                         onChange({
                                             ...question,
                                             validation: {
                                                 ...question.validation,
-                                                maxFileSizeMb: Number(e.target.value),
+                                                maxFileSizeMb: Number(val),
                                             },
                                         })
                                     }
-                                    className="w-full text-xs font-black border border-black/30 rounded-xl p-2 bg-white"
+                                    size="sm"
                                 >
                                     <option value="1">1 MB</option>
                                     <option value="5">5 MB</option>
@@ -1050,29 +1050,29 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                                     <option value="25">25 MB</option>
                                     <option value="50">50 MB</option>
                                     <option value="100">100 MB</option>
-                                </select>
+                                </NeoSelect>
                             </div>
 
                             <div>
-                                <label className="font-bold text-neutral-600 block mb-1">Max Number of Files:</label>
-                                <select
+                                <label className="font-bold text-neutral-700 dark:text-neutral-300 block mb-1.5">Max Number of Files:</label>
+                                <NeoSelect
                                     value={question.validation?.maxFiles ?? 1}
-                                    onChange={(e) =>
+                                    onChange={(val) =>
                                         onChange({
                                             ...question,
                                             validation: {
                                                 ...question.validation,
-                                                maxFiles: Number(e.target.value),
+                                                maxFiles: Number(val),
                                             },
                                         })
                                     }
-                                    className="w-full text-xs font-black border border-black/30 rounded-xl p-2 bg-white"
+                                    size="sm"
                                 >
                                     <option value="1">1 file</option>
                                     <option value="2">2 files</option>
                                     <option value="3">3 files</option>
                                     <option value="5">5 files</option>
-                                </select>
+                                </NeoSelect>
                             </div>
                         </div>
                     </div>
@@ -1081,47 +1081,49 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                 {/* 7. Linear Scale */}
                 {question.type === "linear_scale" && (
                     <div className="space-y-4 pt-2">
-                        <div className="flex items-center gap-3 text-xs font-black">
-                            <select
+                        <div className="flex items-center gap-3 text-xs font-semibold">
+                            <NeoSelect
                                 value={question.scaleConfig?.min ?? 1}
-                                onChange={(e) =>
+                                onChange={(val) =>
                                     onChange({
                                         ...question,
                                         scaleConfig: {
-                                            min: Number(e.target.value),
+                                            min: Number(val),
                                             max: question.scaleConfig?.max ?? 5,
                                             minLabel: question.scaleConfig?.minLabel,
                                             maxLabel: question.scaleConfig?.maxLabel,
                                         },
                                     })
                                 }
-                                className="border border-black rounded-xl p-1.5 bg-white font-black"
+                                size="sm"
+                                triggerClassName="w-20"
                             >
                                 <option value="0">0</option>
                                 <option value="1">1</option>
-                            </select>
-                            <span>to</span>
-                            <select
+                            </NeoSelect>
+                            <span className="text-neutral-500">to</span>
+                            <NeoSelect
                                 value={question.scaleConfig?.max ?? 5}
-                                onChange={(e) =>
+                                onChange={(val) =>
                                     onChange({
                                         ...question,
                                         scaleConfig: {
                                             min: question.scaleConfig?.min ?? 1,
-                                            max: Number(e.target.value),
+                                            max: Number(val),
                                             minLabel: question.scaleConfig?.minLabel,
                                             maxLabel: question.scaleConfig?.maxLabel,
                                         },
                                     })
                                 }
-                                className="border border-black rounded-xl p-1.5 bg-white font-black"
+                                size="sm"
+                                triggerClassName="w-20"
                             >
                                 {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                                     <option key={num} value={num}>
                                         {num}
                                     </option>
                                 ))}
-                            </select>
+                            </NeoSelect>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -1217,25 +1219,26 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
 
                             <div className="flex items-center gap-2">
                                 <span className="text-neutral-600 dark:text-neutral-400">Scale Levels:</span>
-                                <select
+                                <NeoSelect
                                     value={question.ratingConfig?.levels || 5}
-                                    onChange={(e) =>
+                                    onChange={(val) =>
                                         onChange({
                                             ...question,
                                             ratingConfig: {
                                                 icon: question.ratingConfig?.icon || "star",
-                                                levels: Number(e.target.value),
+                                                levels: Number(val),
                                             },
                                         })
                                     }
-                                    className="border border-neutral-200 dark:border-neutral-700 rounded-xl p-1.5 bg-white dark:bg-neutral-900 font-semibold text-xs text-neutral-900 dark:text-neutral-100"
+                                    size="sm"
+                                    triggerClassName="w-28 text-xs font-semibold"
                                 >
                                     {[3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                                         <option key={num} value={num}>
                                             {num} Levels
                                         </option>
                                     ))}
-                                </select>
+                                </NeoSelect>
                             </div>
                         </div>
 
@@ -1399,41 +1402,35 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                             <Calendar className="w-4 h-4 text-emerald-600" />
                             <span>Date Selection Configuration</span>
                         </div>
-                        <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-neutral-700">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={question.dateConfig?.includeYear ?? true}
-                                    onChange={(e) =>
-                                        onChange({
-                                            ...question,
-                                            dateConfig: {
-                                                includeYear: e.target.checked,
-                                                includeTime: question.dateConfig?.includeTime ?? false,
-                                            },
-                                        })
-                                    }
-                                    className="w-3.5 h-3.5 accent-black rounded"
-                                />
-                                <span>Include Year (YYYY-MM-DD)</span>
-                            </label>
-                            <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={question.dateConfig?.includeTime ?? false}
-                                    onChange={(e) =>
-                                        onChange({
-                                            ...question,
-                                            dateConfig: {
-                                                includeYear: question.dateConfig?.includeYear ?? true,
-                                                includeTime: e.target.checked,
-                                            },
-                                        })
-                                    }
-                                    className="w-3.5 h-3.5 accent-black rounded"
-                                />
-                                <span>Include Time (hh:mm)</span>
-                            </label>
+                        <div className="flex flex-wrap items-center gap-5 text-xs font-bold text-neutral-700">
+                            <NeoCheckbox
+                                checked={question.dateConfig?.includeYear ?? true}
+                                onCheckedChange={(checked) =>
+                                    onChange({
+                                        ...question,
+                                        dateConfig: {
+                                            includeYear: checked,
+                                            includeTime: question.dateConfig?.includeTime ?? false,
+                                        },
+                                    })
+                                }
+                                label="Include Year (YYYY-MM-DD)"
+                                size="sm"
+                            />
+                            <NeoCheckbox
+                                checked={question.dateConfig?.includeTime ?? false}
+                                onCheckedChange={(checked) =>
+                                    onChange({
+                                        ...question,
+                                        dateConfig: {
+                                            includeYear: question.dateConfig?.includeYear ?? true,
+                                            includeTime: checked,
+                                        },
+                                    })
+                                }
+                                label="Include Time (hh:mm)"
+                                size="sm"
+                            />
                         </div>
                     </div>
                 )}
@@ -1568,18 +1565,18 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                         {/* Number Validation for Short Answer */}
                         {question.type === "short_answer" && (
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
-                                <select
+                                <NeoSelect
                                     value={question.validation?.numberType || "greater_than"}
-                                    onChange={(e) =>
+                                    onChange={(val) =>
                                         onChange({
                                             ...question,
                                             validation: {
                                                 ...question.validation,
-                                                numberType: e.target.value as any,
+                                                numberType: val as any,
                                             },
                                         })
                                     }
-                                    className="border border-black rounded-xl p-2 bg-white font-bold"
+                                    size="sm"
                                 >
                                     <option value="greater_than">Greater than</option>
                                     <option value="greater_or_equal">Greater than or equal to</option>
@@ -1589,7 +1586,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                                     <option value="between">Between</option>
                                     <option value="is_number">Is number</option>
                                     <option value="whole_number">Whole number</option>
-                                </select>
+                                </NeoSelect>
                                 <input
                                     type="number"
                                     value={question.validation?.numberValue ?? ""}

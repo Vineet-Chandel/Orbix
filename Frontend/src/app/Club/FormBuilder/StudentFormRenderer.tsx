@@ -39,6 +39,9 @@ import type {
     FileAttachmentMeta,
     StudentIdentityProfile,
 } from "../../../api/clubEventFormApi";
+import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
+import { NeoDateTimePicker } from "../../../components/NeoDateTimePicker";
 import {
     requestAttachmentUploadSignature,
     uploadFileToCloudinary,
@@ -1146,7 +1149,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     const progressPercent = totalSections > 1 ? Math.round(((currentSecIdx + 1) / totalSections) * 100) : 100;
 
     return (
-        <div className="max-w-2xl mx-auto space-y-6 text-neutral-900 dark:text-neutral-100">
+        <div className={`w-full ${isPreview ? "max-w-full" : "max-w-5xl xl:max-w-6xl"} mx-auto space-y-6 text-neutral-900 dark:text-neutral-100`}>
             {/* Header Banner if present */}
             {form.headerImageUrl && (
                 <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm bg-neutral-100 dark:bg-neutral-900">
@@ -1154,7 +1157,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                         src={getCloudinaryBannerUrl(form.headerImageUrl)}
                         alt="Form Banner"
                         loading="lazy"
-                        className="w-full h-36 sm:h-48 object-cover"
+                        className="w-full h-44 sm:h-64 lg:h-72 object-cover"
                     />
                 </div>
             )}
@@ -1764,18 +1767,18 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
                                             return (
                                                 <div key={opt.id} className="space-y-2">
-                                                    <label
+                                                    <div
+                                                        onClick={toggleCheck}
                                                         className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
                                                             isChecked
                                                                 ? "border-neutral-900 dark:border-white bg-neutral-50 dark:bg-neutral-900 shadow-sm"
                                                                 : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 bg-white dark:bg-[#0A0A0A]"
                                                         }`}
                                                     >
-                                                        <input
-                                                            type="checkbox"
+                                                        <NeoCheckbox
                                                             checked={isChecked}
-                                                            onChange={toggleCheck}
-                                                            className="w-4 h-4 accent-neutral-900 dark:accent-white rounded cursor-pointer"
+                                                            onCheckedChange={toggleCheck}
+                                                            size="sm"
                                                         />
                                                         <span className="text-xs sm:text-sm font-medium text-neutral-900 dark:text-neutral-100 flex-1">
                                                             {opt.text}
@@ -1788,7 +1791,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                                 className="w-8 h-8 rounded-lg border border-neutral-200 dark:border-neutral-800 object-cover shrink-0"
                                                             />
                                                         )}
-                                                    </label>
+                                                    </div>
                                                     {isOtherOpt && isChecked && (
                                                         <input
                                                             type="text"
@@ -1810,10 +1813,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
                                 {/* Input Type: Dropdown */}
                                 {question.type === "dropdown" && (
-                                    <select
+                                    <NeoSelect
                                         value={val ?? ""}
-                                        onChange={(e) => setAnswer(question.id, e.target.value)}
-                                        className="w-full text-xs sm:text-sm font-medium border border-neutral-200 dark:border-neutral-800 rounded-xl p-2.5 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-white cursor-pointer"
+                                        onChange={(selectedVal) => setAnswer(question.id, selectedVal)}
+                                        placeholder="Select an option..."
+                                        size="md"
                                     >
                                         <option value="">Select an option...</option>
                                         {(question.options || []).map((opt) => (
@@ -1821,7 +1825,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                 {opt.text}
                                             </option>
                                         ))}
-                                    </select>
+                                    </NeoSelect>
                                 )}
 
                                 {/* Input Type: Linear Scale */}
@@ -2072,15 +2076,25 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                                 return (
                                                                     <td
                                                                         key={cIdx}
-                                                                        className="p-2 text-center border-b border-black/10"
+                                                                        className="p-2 text-center border-b border-neutral-100 dark:border-neutral-800"
                                                                     >
-                                                                        <input
-                                                                            type={question.type === "checkbox_grid" ? "checkbox" : "radio"}
-                                                                            name={`${question.id}_row_${rIdx}`}
-                                                                            checked={isChecked}
-                                                                            onChange={handleGridCheck}
-                                                                            className="w-4 h-4 accent-black cursor-pointer"
-                                                                        />
+                                                                        {question.type === "checkbox_grid" ? (
+                                                                            <div className="flex justify-center">
+                                                                                <NeoCheckbox
+                                                                                    checked={isChecked}
+                                                                                    onCheckedChange={() => handleGridCheck()}
+                                                                                    size="sm"
+                                                                                />
+                                                                            </div>
+                                                                        ) : (
+                                                                            <input
+                                                                                type="radio"
+                                                                                name={`${question.id}_row_${rIdx}`}
+                                                                                checked={isChecked}
+                                                                                onChange={handleGridCheck}
+                                                                                className="w-4 h-4 accent-neutral-900 dark:accent-white cursor-pointer"
+                                                                            />
+                                                                        )}
                                                                     </td>
                                                                 );
                                                             })}
@@ -2094,11 +2108,11 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
 
                                 {/* Input Type: Date */}
                                 {question.type === "date" && (
-                                    <input
-                                        type={question.dateConfig?.includeTime ? "datetime-local" : "date"}
+                                    <NeoDateTimePicker
                                         value={val ?? ""}
-                                        onChange={(e) => setAnswer(question.id, e.target.value)}
-                                        className="w-full text-xs sm:text-sm font-medium border border-neutral-200 dark:border-neutral-800 rounded-xl p-2.5 bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 dark:focus:border-white"
+                                        onChange={(nextVal) => setAnswer(question.id, nextVal)}
+                                        mode={question.dateConfig?.includeTime ? "datetime" : "date"}
+                                        placeholder={question.dateConfig?.includeTime ? "Select date & time..." : "Select date..."}
                                     />
                                 )}
 

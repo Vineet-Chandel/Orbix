@@ -985,8 +985,8 @@ export default function ClubDashboardPage() {
                                                 >
                                                     <div>
                                                         {ev.coverImageUrl && (
-                                                            <div className="w-full h-24 rounded-lg border border-black overflow-hidden mb-2 bg-neutral-100 shadow-[1px_1px_0px_#000]">
-                                                                <img src={ev.coverImageUrl} alt={ev.title} className="w-full h-full object-cover" />
+                                                            <div className="w-full aspect-[2.4/1] rounded-lg border border-black overflow-hidden mb-2 bg-neutral-950 shadow-[1px_1px_0px_#000] flex items-center justify-center">
+                                                                <img src={ev.coverImageUrl} alt={ev.title} className="w-full h-full object-contain" />
                                                             </div>
                                                         )}
                                                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
@@ -1179,13 +1179,13 @@ export default function ClubDashboardPage() {
                                                 className="p-5 sm:p-6 rounded-3xl bg-white border-4 border-black shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] hover:-translate-y-1 hover:-translate-x-1 transition-all cursor-pointer flex flex-col justify-between group"
                                             >
                                                 <div>
-                                                    {/* Cover Banner if attached */}
+                                                    {/* Cover Banner if attached (100% full view, never cropped) */}
                                                     {ev.coverImageUrl && (
-                                                        <div className="w-full h-40 sm:h-48 rounded-2xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                                        <div className="w-full aspect-[2.4/1] rounded-2xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                                             <img
                                                                 src={ev.coverImageUrl}
                                                                 alt={ev.title}
-                                                                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                                                                className="w-full h-full object-contain group-hover:scale-102 transition-transform duration-300"
                                                             />
                                                             {ev.isOptimistic && (
                                                                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">

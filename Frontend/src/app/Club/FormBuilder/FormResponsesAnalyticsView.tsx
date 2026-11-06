@@ -18,7 +18,6 @@ import {
     CheckCircle2,
     Clock,
     Filter,
-    Calendar,
     ArrowUpDown,
     Check,
     Copy,
@@ -38,6 +37,9 @@ import {
     type FormVersionRecord,
     type FetchResponsesParams,
 } from "../../../api/clubEventFormApi";
+import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
+import { NeoDateTimePicker } from "../../../components/NeoDateTimePicker";
 import { OrbixLoader } from "../../../components/ui/loader";
 import { useToast } from "../../../context/ToastContext";
 
@@ -876,7 +878,7 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
                                         {q.type === "file_upload" && (
                                             <div className="space-y-2">
                                                 <div className="flex items-center justify-between text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-                                                    <span>{q.fileCount || 0} Files Uploaded via Cloudinary</span>
+                                                    <span>{q.fileCount || 0} Files Uploaded</span>
                                                     <span>{((q.totalBytes || 0) / (1024 * 1024)).toFixed(2)} MB total</span>
                                                 </div>
                                             </div>
@@ -949,15 +951,12 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
                         {/* Multi-select for export (Phase 5.5) */}
                         {activeResponse && (
                             <div className="flex items-center gap-3">
-                                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-neutral-700 dark:text-neutral-300 select-none">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedIds.has(activeResponse.id)}
-                                        onChange={() => toggleSelect(activeResponse.id)}
-                                        className="w-4 h-4 rounded border border-neutral-300 dark:border-neutral-700 accent-neutral-900 dark:accent-white cursor-pointer"
-                                    />
-                                    <span>Select for Export</span>
-                                </label>
+                                <NeoCheckbox
+                                    checked={selectedIds.has(activeResponse.id)}
+                                    onCheckedChange={() => toggleSelect(activeResponse.id)}
+                                    size="sm"
+                                    label="Select for Export"
+                                />
 
                                 <button
                                     type="button"
@@ -974,17 +973,16 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
                         {/* Dropdown to jump directly to any question */}
                         <div className="flex items-center gap-2">
                             <span className="text-xs font-medium text-neutral-500">Jump to:</span>
-                            <select
-                                value={activeQuestionIdx}
-                                onChange={(e) => setActiveQuestionIdx(Number(e.target.value))}
-                                className="px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 text-xs font-medium bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none focus:border-neutral-900 max-w-[280px] truncate"
-                            >
-                                {questionsList.map((q: any, qIdx: number) => (
-                                    <option key={q.id || qIdx} value={qIdx}>
-                                        {qIdx + 1}. {q.title}
-                                    </option>
-                                ))}
-                            </select>
+                            <NeoSelect
+                                value={String(activeQuestionIdx)}
+                                onChange={(val) => setActiveQuestionIdx(Number(val))}
+                                size="sm"
+                                className="w-56"
+                                options={questionsList.map((q: any, qIdx: number) => ({
+                                    value: String(qIdx),
+                                    label: `${qIdx + 1}. ${q.title || "Untitled Question"}`
+                                }))}
+                            />
                         </div>
                     </div>
 
@@ -1260,10 +1258,11 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
 
                             {/* Status Filter */}
                             <div>
-                                <select
+                                <NeoSelect
                                     value={statusFilter}
-                                    onChange={(e) => setStatusFilter(e.target.value)}
-                                    className="w-full px-3 py-1.5 text-xs font-medium border border-neutral-200 dark:border-neutral-800 rounded-xl bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+                                    onChange={(val) => setStatusFilter(val)}
+                                    size="sm"
+                                    triggerClassName="w-full"
                                 >
                                     <option value="all">All Statuses ({statusCounts.totalCount})</option>
                                     <option value="registered">Registered ({statusCounts.successfulCount})</option>
@@ -1271,30 +1270,26 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
                                     <option value="attended">Attended ({statusCounts.attendedCount})</option>
                                     <option value="rejected">Rejected ({statusCounts.rejectedCount})</option>
                                     <option value="cancelled">Cancelled ({statusCounts.cancelledCount})</option>
-                                </select>
+                                </NeoSelect>
                             </div>
 
                             {/* Date Range: From Date */}
-                            <div className="relative">
-                                <Calendar className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                                <input
-                                    type="date"
+                            <div>
+                                <NeoDateTimePicker
                                     value={startDateFilter}
-                                    onChange={(e) => setStartDateFilter(e.target.value)}
-                                    title="From submission date"
-                                    className="w-full pl-8 pr-2 py-1.5 text-xs font-medium border border-neutral-200 dark:border-neutral-800 rounded-xl bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+                                    onChange={(val) => setStartDateFilter(val)}
+                                    mode="date"
+                                    placeholder="From date..."
                                 />
                             </div>
 
                             {/* Date Range: To Date */}
-                            <div className="relative">
-                                <Calendar className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                                <input
-                                    type="date"
+                            <div>
+                                <NeoDateTimePicker
                                     value={endDateFilter}
-                                    onChange={(e) => setEndDateFilter(e.target.value)}
-                                    title="To submission date"
-                                    className="w-full pl-8 pr-2 py-1.5 text-xs font-medium border border-neutral-200 dark:border-neutral-800 rounded-xl bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 focus:outline-none cursor-pointer"
+                                    onChange={(val) => setEndDateFilter(val)}
+                                    mode="date"
+                                    placeholder="To date..."
                                 />
                             </div>
                         </div>
@@ -1303,16 +1298,17 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-neutral-100 dark:border-neutral-800">
                             <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs font-medium text-neutral-500">Sort by:</span>
-                                <select
+                                <NeoSelect
                                     value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value)}
-                                    className="px-2.5 py-1 text-xs font-medium border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
+                                    onChange={(val) => setSortBy(val)}
+                                    size="sm"
+                                    triggerClassName="min-w-[140px]"
                                 >
                                     <option value="registered_at">Submission Date</option>
                                     <option value="applicant_name">Applicant Name</option>
                                     <option value="quiz_score">Quiz Score</option>
                                     <option value="status">Status</option>
-                                </select>
+                                </NeoSelect>
 
                                 <button
                                     type="button"
@@ -1328,16 +1324,17 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
                             {/* Page size selector */}
                             <div className="flex items-center gap-2">
                                 <span className="text-xs font-medium text-neutral-500">Page Size:</span>
-                                <select
+                                <NeoSelect
                                     value={pageSize}
-                                    onChange={(e) => setPageSize(Number(e.target.value))}
-                                    className="px-2 py-1 text-xs font-medium border border-neutral-200 dark:border-neutral-700 rounded-lg bg-white dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100"
+                                    onChange={(val) => setPageSize(Number(val))}
+                                    size="sm"
+                                    triggerClassName="w-20"
                                 >
                                     <option value={10}>10</option>
                                     <option value={25}>25</option>
                                     <option value={50}>50</option>
                                     <option value={100}>100</option>
-                                </select>
+                                </NeoSelect>
                             </div>
                         </div>
                     </div>
@@ -1373,15 +1370,12 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
                         {/* Multi-select for export (Phase 5.5) */}
                         {activeResponse && (
                             <div className="flex items-center gap-3">
-                                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-medium text-neutral-700 dark:text-neutral-300 select-none">
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedIds.has(activeResponse.id)}
-                                        onChange={() => toggleSelect(activeResponse.id)}
-                                        className="w-4 h-4 rounded border border-neutral-300 dark:border-neutral-700 accent-neutral-900 dark:accent-white cursor-pointer"
-                                    />
-                                    <span>Select for Export</span>
-                                </label>
+                                <NeoCheckbox
+                                    checked={selectedIds.has(activeResponse.id)}
+                                    onCheckedChange={() => toggleSelect(activeResponse.id)}
+                                    size="sm"
+                                    label="Select for Export"
+                                />
 
                                 <button
                                     type="button"
@@ -1483,26 +1477,20 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
                                             <span className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
                                                 Status:
                                             </span>
-                                            <select
+                                            <NeoSelect
                                                 value={activeResponse.status}
                                                 disabled={updatingStatusId === activeResponse.id}
-                                                onChange={(e) => handleStatusChange(activeResponse.id, e.target.value)}
-                                                className={`px-3 py-1 rounded-xl text-xs font-semibold border border-neutral-200 dark:border-neutral-700 cursor-pointer ${
-                                                    activeResponse.status === "registered"
-                                                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
-                                                        : activeResponse.status === "pending"
-                                                        ? "bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
-                                                        : activeResponse.status === "attended"
-                                                        ? "bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-300"
-                                                        : "bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
-                                                }`}
-                                            >
-                                                <option value="registered">Registered</option>
-                                                <option value="pending">Pending</option>
-                                                <option value="attended">Attended</option>
-                                                <option value="rejected">Rejected</option>
-                                                <option value="cancelled">Cancelled</option>
-                                            </select>
+                                                onChange={(val) => handleStatusChange(activeResponse.id, val)}
+                                                size="sm"
+                                                className="w-36"
+                                                options={[
+                                                    { value: "registered", label: "Registered" },
+                                                    { value: "pending", label: "Pending" },
+                                                    { value: "attended", label: "Attended" },
+                                                    { value: "rejected", label: "Rejected" },
+                                                    { value: "cancelled", label: "Cancelled" },
+                                                ]}
+                                            />
                                         </div>
 
                                         {/* Quiz Score Badge */}

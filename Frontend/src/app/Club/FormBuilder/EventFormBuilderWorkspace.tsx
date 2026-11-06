@@ -6,9 +6,6 @@ import {
     Settings,
     Eye,
     BarChart3,
-    Save,
-    Share2,
-    Check,
     ArrowLeft,
     FileText,
     ShieldCheck,
@@ -18,7 +15,6 @@ import {
     Layers,
     UploadCloud,
     Sparkles,
-    Send,
     Undo2,
     Redo2,
     AlertTriangle,
@@ -27,11 +23,9 @@ import {
     Heading,
     ClipboardList,
     Trash2,
-    CheckCircle2,
     X,
     LayoutTemplate,
     Wand2,
-    QrCode,
     CheckSquare,
     Square,
     ChevronDown,
@@ -48,7 +42,6 @@ import {
     publishClubEventForm,
     fetchClubQuestionLibrary,
     requestAiQuestionSuggestions,
-    verifyRegistrationQrCheckIn,
 } from "../../../api/clubEventFormApi";
 import {
     ORBIX_FORM_TEMPLATES,
@@ -58,9 +51,9 @@ import {
 import { QuestionCard } from "./QuestionCard";
 import { SectionCard } from "./SectionCard";
 import { NeoToggle } from "../../../components/NeoToggle";
+import { NeoSelect } from "../../../components/NeoSelect";
 import { OrbixLoader } from "../../../components/ui/loader";
 import { useToast } from "../../../context/ToastContext";
-import { getCloudinaryBannerUrl } from "../../../utils/cloudinaryDelivery";
 
 // Lazy-loaded heavy views for performance (Phase 4.1)
 const FormThemeDrawer = React.lazy(() =>
@@ -219,7 +212,7 @@ const QUICK_TEMPLATES = [
             id: `q_${Date.now()}_proposal`,
             type: "file_upload",
             title: "Upload your project proposal / pitch deck",
-            description: "Accepts PDF or presentation slide decks up to 25 MB stored in Cloudinary.",
+            description: "Accepts PDF or presentation slide decks up to 25 MB.",
             required: false,
             validation: {
                 allowedFileTypes: ["pdf"],
@@ -231,9 +224,15 @@ const QUICK_TEMPLATES = [
 ];
 
 export interface EventFormBuilderWorkspaceProps {
-    eventId: string;
+    eventId?: string;
     club?: any;
     onBack?: () => void;
+    isWizardMode?: boolean;
+    initialFormRecord?: ClubEventFormRecord | null;
+    initialEventData?: any;
+    onWizardChange?: (form: ClubEventFormRecord) => void;
+    onWizardBack?: () => void;
+    onWizardSubmit?: () => void;
 }
 
 type MainTab = "questions" | "responses" | "settings";
@@ -242,9 +241,16 @@ type SaveBadgeStatus = "saved" | "saving" | "unsaved" | "error";
 export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps> = ({
     eventId,
     club,
-    onBack,
+    onBack: _onBack,
+    isWizardMode = false,
+    initialFormRecord,
+    initialEventData,
+    onWizardChange,
+    onWizardBack,
+    onWizardSubmit,
 }) => {
     const toast = useToast();
+    const safeEventId = eventId || "create-draft";
 
     // 1. Core States
     const [loading, setLoading] = useState(true);
@@ -270,7 +276,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
-    const [copiedShareLink, setCopiedShareLink] = useState(false);
 
     // Phase 6.1 Question Library State
     const [isQuestionLibraryOpen, setIsQuestionLibraryOpen] = useState(false);
@@ -293,12 +298,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     const [selectedAiIndices, setSelectedAiIndices] = useState<Set<number>>(new Set());
     const [aiTargetSectionId, setAiTargetSectionId] = useState<string>("");
     const [aiEngineLabel, setAiEngineLabel] = useState<string | null>(null);
-
-    // Phase 6.4 QR Check-In Scanner State
-    const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-    const [qrInputCode, setQrInputCode] = useState("");
-    const [isVerifyingQr, setIsVerifyingQr] = useState(false);
-    const [qrResult, setQrResult] = useState<any | null>(null);
 
     // Section Deletion with Undo Behaviour
     const [deletedSectionNotice, setDeletedSectionNotice] = useState<{
@@ -343,6 +342,31 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     const loadForm = async () => {
         setLoading(true);
         try {
+            if (isWizardMode && initialFormRecord) {
+                setForm(initialFormRecord);
+                setEvent(initialEventData || { title: initialFormRecord.title || "New Event" });
+                setRegisteredCount(0);
+
+                if (initialFormRecord.structure) {
+                    setHistory([JSON.parse(JSON.stringify(initialFormRecord.structure))]);
+                    setHistoryIndex(0);
+                }
+
+                if (initialFormRecord.structure?.sections?.[0]?.questions?.[0]) {
+                    setActiveQuestionId(initialFormRecord.structure.sections[0].questions[0].id);
+                }
+                setSaveStatus("saved");
+                setLoading(false);
+                isInitialLoad.current = false;
+                return;
+            }
+
+            if (!eventId || eventId === "create-draft") {
+                setLoading(false);
+                isInitialLoad.current = false;
+                return;
+            }
+
             const res = await fetchClubEventForm(eventId);
             setForm(res.form);
             setEvent(res.event);
@@ -367,7 +391,14 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
     useEffect(() => {
         loadForm();
-    }, [eventId]);
+    }, [eventId, isWizardMode]);
+
+    // Bubble form modifications up in wizard mode
+    useEffect(() => {
+        if (isWizardMode && form && onWizardChange) {
+            onWizardChange(form);
+        }
+    }, [form, isWizardMode, onWizardChange]);
 
     // Push new snapshot to undo/redo stack
     const pushHistory = (newStructure: FormStructure) => {
@@ -438,6 +469,17 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         }
 
         autosaveTimer.current = setTimeout(async () => {
+            if (isWizardMode) {
+                if (form && onWizardChange) onWizardChange(form);
+                setSaveStatus("saved");
+                return;
+            }
+
+            if (!eventId || eventId === "create-draft") {
+                setSaveStatus("saved");
+                return;
+            }
+
             try {
                 setSaveStatus("saving");
                 await saveClubEventForm(eventId, {
@@ -459,11 +501,19 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         return () => {
             if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
         };
-    }, [form?.structure, form?.title, form?.description, form?.settings, form?.themeSettings]);
+    }, [form?.structure, form?.title, form?.description, form?.settings, form?.themeSettings, isWizardMode]);
 
     // Explicit Save Draft Button Click
     const handleSaveForm = async () => {
         if (!form) return;
+        if (isWizardMode) {
+            if (onWizardChange) onWizardChange(form);
+            setSaveStatus("saved");
+            toast.success("Draft saved to wizard draft!", { title: "Draft Saved" });
+            return;
+        }
+
+        if (!eventId || eventId === "create-draft") return;
         setSaving(true);
         setSaveStatus("saving");
         try {
@@ -491,6 +541,12 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     // Publish form into an immutable version snapshot
     const handlePublishForm = async () => {
         if (!form) return;
+        if (isWizardMode) {
+            if (onWizardSubmit) onWizardSubmit();
+            return;
+        }
+
+        if (!eventId || eventId === "create-draft") return;
         setIsPublishing(true);
         setSaveStatus("saving");
         try {
@@ -517,15 +573,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         } finally {
             setIsPublishing(false);
         }
-    };
-
-    // Copy direct registration link for students
-    const handleCopyShareLink = () => {
-        const link = `${window.location.origin}/events/${eventId}/register`;
-        navigator.clipboard.writeText(link);
-        setCopiedShareLink(true);
-        toast.success("Registration link copied to clipboard!");
-        setTimeout(() => setCopiedShareLink(false), 2500);
     };
 
     // -------------------------------------------------------------------------
@@ -731,7 +778,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         if (pastEventsLibrary.length === 0) {
             setLoadingLibrary(true);
             try {
-                const res = await fetchClubQuestionLibrary(eventId);
+                const res = await fetchClubQuestionLibrary(safeEventId);
                 setPastEventsLibrary(res.library || []);
                 if (res.library && res.library.length > 0) {
                     setExpandedLibEventId(res.library[0].eventId);
@@ -864,7 +911,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
         setIsAiGenerating(true);
         try {
-            const res = await requestAiQuestionSuggestions(eventId, {
+            const res = await requestAiQuestionSuggestions(safeEventId, {
                 prompt: aiPrompt.trim(),
                 eventType: form?.title,
                 eventDescription: form?.description || undefined,
@@ -874,7 +921,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             setAiSuggestedQuestions(questions);
             setSelectedAiIndices(new Set(questions.map((_, idx) => idx)));
             setAiEngineLabel(
-                res.generatedBy === "gemini" ? "Gemini 2.0 Flash AI" : "Orbix Domain Knowledge Fallback"
+                res.generatedBy === "gemini" ? "Orbix AI Engine" : "Orbix Domain Knowledge"
             );
             toast.success(`Generated ${questions.length} customized questions!`);
         } catch (err: any) {
@@ -931,33 +978,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         setSelectedAiIndices(new Set());
     };
 
-    // -------------------------------------------------------------------------
-    // PHASE 6.4: QR CHECK-IN SCANNER HANDLERS
-    // -------------------------------------------------------------------------
-    const handleVerifyTicketQr = async () => {
-        if (!qrInputCode.trim()) {
-            toast.error("Please enter a valid ticket code (e.g. TKT-...)");
-            return;
-        }
-
-        setIsVerifyingQr(true);
-        setQrResult(null);
-        try {
-            const res = await verifyRegistrationQrCheckIn(eventId, qrInputCode.trim());
-            setQrResult(res);
-            if (res.valid) {
-                toast.success(res.message || "Attendee successfully checked in!");
-            } else {
-                toast.error(res.message || "Ticket verification failed.");
-            }
-        } catch (err: any) {
-            toast.error(err.message || "Failed to verify ticket.");
-            setQrResult({ valid: false, message: err.message });
-        } finally {
-            setIsVerifyingQr(false);
-        }
-    };
-
     if (loading) {
         return (
             <div className="p-16 flex flex-col items-center justify-center space-y-3">
@@ -975,212 +995,21 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     return (
         <div className="space-y-6 text-neutral-900 dark:text-neutral-100">
             {/* Top Workspace Navigation Bar */}
-            <div className="pb-4 border-b border-neutral-200 dark:border-neutral-800 flex flex-col gap-4">
-                {/* Upper bar: Title, Save Status, Undo/Redo, Actions */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                        {onBack && (
-                            <button
-                                type="button"
-                                onClick={onBack}
-                                className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors"
-                                title="Back to event"
-                            >
-                                <ArrowLeft className="w-4 h-4" />
-                                <span className="hidden sm:inline">Event Details</span>
-                            </button>
-                        )}
-
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2.5 flex-wrap">
-                                <input
-                                    type="text"
-                                    value={form.title || ""}
-                                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                                    placeholder="Form Title..."
-                                    className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-neutral-900 dark:focus:border-white focus:outline-none transition-colors px-1 py-0.5 truncate max-w-xs sm:max-w-md"
-                                />
-
-                                {/* Dynamic Save Status Badge */}
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-500">
-                                    {saveStatus === "saving" && (
-                                        <>
-                                            <OrbixLoader size="xs" />
-                                            <span>Saving...</span>
-                                        </>
-                                    )}
-                                    {saveStatus === "saved" && (
-                                        <>
-                                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                            <span>Saved</span>
-                                        </>
-                                    )}
-                                    {saveStatus === "unsaved" && (
-                                        <>
-                                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                            <span>Unsaved</span>
-                                        </>
-                                    )}
-                                    {saveStatus === "error" && (
-                                        <button
-                                            type="button"
-                                            onClick={handleSaveForm}
-                                            className="text-rose-600 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
-                                        >
-                                            <AlertTriangle className="w-3.5 h-3.5" />
-                                            <span>Save failed · Retry</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Upper Toolbar: Undo, Redo, Theme, Preview, Share, Save, Publish */}
-                    <div className="flex items-center gap-2 flex-wrap shrink-0">
-                        {/* Undo / Redo */}
-                        <div className="flex items-center bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg shadow-sm divide-x divide-neutral-200 dark:divide-neutral-800">
-                            <button
-                                type="button"
-                                onClick={handleUndo}
-                                disabled={historyIndex <= 0}
-                                className="p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-neutral-700 dark:text-neutral-300 transition-colors"
-                                title="Undo (Ctrl+Z)"
-                            >
-                                <Undo2 className="w-4 h-4" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleRedo}
-                                disabled={historyIndex >= history.length - 1}
-                                className="p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-neutral-700 dark:text-neutral-300 transition-colors"
-                                title="Redo (Ctrl+Shift+Z)"
-                            >
-                                <Redo2 className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        {/* Templates Button */}
-                        <button
-                            type="button"
-                            onClick={() => setIsTemplatesModalOpen(true)}
-                            className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Form Templates"
-                        >
-                            <LayoutTemplate className="w-4 h-4" />
-                            <span className="hidden sm:inline">Templates</span>
-                        </button>
-
-                        {/* QR Check-In Scanner */}
-                        <button
-                            type="button"
-                            onClick={() => setIsQrModalOpen(true)}
-                            className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Ticket & QR Check-In"
-                        >
-                            <QrCode className="w-4 h-4" />
-                            <span className="hidden sm:inline">Check-In</span>
-                        </button>
-
-                        {/* Theme Button */}
-                        <button
-                            type="button"
-                            onClick={() => setIsThemeDrawerOpen(true)}
-                            className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Theme & Colors"
-                        >
-                            <Palette className="w-4 h-4" />
-                            <span className="hidden sm:inline">Theme</span>
-                        </button>
-
-                        {/* Preview Simulator Action */}
-                        <button
-                            type="button"
-                            onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-                            className={`p-2 sm:px-3 sm:py-2 rounded-lg text-xs font-medium shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
-                                isPreviewOpen
-                                    ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                                    : "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
-                            }`}
-                            title="Preview form as student"
-                        >
-                            <Eye className="w-4 h-4" />
-                            <span className="hidden sm:inline">{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
-                        </button>
-
-                        {/* Share Student Link */}
-                        <button
-                            type="button"
-                            onClick={handleCopyShareLink}
-                            className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Copy link"
-                        >
-                            {copiedShareLink ? (
-                                <Check className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
-                            ) : (
-                                <Share2 className="w-4 h-4" />
-                            )}
-                            <span className="hidden sm:inline">Share</span>
-                        </button>
-
-                        {/* Save Draft */}
-                        <button
-                            type="button"
-                            onClick={handleSaveForm}
-                            disabled={saving || isPublishing}
-                            className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Save working draft"
-                        >
-                            {saving ? (
-                                <>
-                                    <OrbixLoader size="xs" />
-                                    <span className="hidden sm:inline">Saving...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Save Draft</span>
-                                </>
-                            )}
-                        </button>
-
-                        {/* Publish Live */}
-                        <button
-                            type="button"
-                            onClick={handlePublishForm}
-                            disabled={saving || isPublishing}
-                            className="px-3.5 py-2 rounded-lg bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-black text-xs font-semibold shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Publish live snapshot for students"
-                        >
-                            {isPublishing ? (
-                                <>
-                                    <OrbixLoader size="xs" />
-                                    <span>Publishing...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Send className="w-3.5 h-3.5" />
-                                    <span>Publish Live</span>
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
-
-                {/* 3 Main Navigation Tabs: Questions | Responses | Settings */}
-                <div className="flex items-center justify-center pt-2">
-                    <div className="flex items-center p-1 bg-neutral-100 dark:bg-neutral-900 rounded-xl border border-neutral-200/80 dark:border-neutral-800 gap-1">
+            <div className="pb-4 border-b border-neutral-200 dark:border-neutral-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                {/* Left: 3 Main Navigation Tabs + Saved/Unsaved Status Indicator */}
+                <div className="flex items-center gap-3.5 flex-wrap">
+                    {/* 3 Main Navigation Tabs: Questions | Responses | Settings */}
+                    <div className="flex items-center p-1 bg-neutral-100 dark:bg-neutral-900 rounded-xl border border-neutral-200/80 dark:border-neutral-800 gap-1 shrink-0">
                         <button
                             type="button"
                             onClick={() => {
                                 setActiveTab("questions");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all ${
-                                activeTab === "questions" && !isPreviewOpen
-                                    ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
-                                    : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                            }`}
+                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all ${activeTab === "questions" && !isPreviewOpen
+                                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                                }`}
                         >
                             Questions
                         </button>
@@ -1191,11 +1020,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 setActiveTab("responses");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
-                                activeTab === "responses" && !isPreviewOpen
-                                    ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
-                                    : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                            }`}
+                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${activeTab === "responses" && !isPreviewOpen
+                                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                                }`}
                         >
                             <BarChart3 className="w-4 h-4" />
                             <span>Responses</span>
@@ -1212,14 +1040,70 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 setActiveTab("settings");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
-                                activeTab === "settings" && !isPreviewOpen
-                                    ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
-                                    : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                            }`}
+                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${activeTab === "settings" && !isPreviewOpen
+                                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
+                                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
+                                }`}
                         >
                             <Settings className="w-4 h-4" />
                             <span>Settings</span>
+                        </button>
+                    </div>
+
+                    {/* Dynamic Save Status Badge */}
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 shrink-0">
+                        {saveStatus === "saving" && (
+                            <>
+                                <OrbixLoader size="xs" />
+                                <span>Saving...</span>
+                            </>
+                        )}
+                        {saveStatus === "saved" && (
+                            <>
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span className="text-emerald-700 dark:text-emerald-400">Saved</span>
+                            </>
+                        )}
+                        {saveStatus === "unsaved" && (
+                            <>
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                <span className="text-amber-700 dark:text-amber-400">Unsaved</span>
+                            </>
+                        )}
+                        {saveStatus === "error" && (
+                            <button
+                                type="button"
+                                onClick={handleSaveForm}
+                                className="text-rose-600 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>Save failed · Retry</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Right Upper Toolbar: Undo, Redo */}
+                <div className="flex items-center gap-2 shrink-0">
+                    {/* Undo / Redo */}
+                    <div className="flex items-center bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg shadow-sm divide-x divide-neutral-200 dark:divide-neutral-800">
+                        <button
+                            type="button"
+                            onClick={handleUndo}
+                            disabled={historyIndex <= 0}
+                            className="p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-neutral-700 dark:text-neutral-300 transition-colors"
+                            title="Undo (Ctrl+Z)"
+                        >
+                            <Undo2 className="w-4 h-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleRedo}
+                            disabled={historyIndex >= history.length - 1}
+                            className="p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-neutral-700 dark:text-neutral-300 transition-colors"
+                            title="Redo (Ctrl+Shift+Z)"
+                        >
+                            <Redo2 className="w-4 h-4" />
                         </button>
                     </div>
                 </div>
@@ -1227,7 +1111,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
             {/* Branching Warning Banner if broken links exist */}
             {branchingWarnings.length > 0 && activeTab === "questions" && (
-                <div className="max-w-3xl mx-auto p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 shadow-sm">
+                <div className="w-full p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 shadow-sm">
                     <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                     <div className="text-xs text-amber-900 dark:text-amber-200 space-y-1">
                         <span className="font-semibold block">Branching Logic Alert:</span>
@@ -1242,7 +1126,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* PREVIEW SIMULATOR OVERLAY */}
             {/* ---------------------------------------------------------------- */}
             {isPreviewOpen && (
-                <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="w-full space-y-4 animate-in fade-in duration-200">
                     <div className="p-3.5 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border border-neutral-800 dark:border-neutral-200 shadow-sm flex items-center justify-between gap-3 text-xs font-medium">
                         <div className="flex items-center gap-2">
                             <Eye className="w-4 h-4 text-neutral-300 dark:text-neutral-700" />
@@ -1293,132 +1177,61 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* TAB 1: QUESTIONS (GOOGLE FORMS BUILDER CANVAS) */}
             {/* ---------------------------------------------------------------- */}
             {activeTab === "questions" && !isPreviewOpen && (
-                <div className="relative max-w-3xl mx-auto space-y-6 pb-24">
-                    {/* Phase 6 Accelerators Banner: AI, Question Library & Templates */}
-                    <div className="rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center shrink-0">
-                                <Sparkles className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
-                            </div>
-                            <div>
-                                <span className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white">Form Accelerators</span>
-                                <span className="text-[11px] text-neutral-500 hidden sm:inline ml-2 font-normal">
-                                    Build questionnaires in seconds with AI, reusable questions & templates
-                                </span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (form?.structure?.sections?.length) {
-                                        setAiTargetSectionId(form.structure.sections[form.structure.sections.length - 1].id);
-                                    }
-                                    setIsAiModalOpen(true);
-                                }}
-                                className="px-3 py-1.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 font-medium text-xs shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                                title="AI Assistant (Phase 6.3)"
-                            >
-                                <Sparkles className="w-3.5 h-3.5" />
-                                <span>AI Assistant</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleOpenQuestionLibrary}
-                                className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-medium text-xs border border-neutral-200 dark:border-neutral-800 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                                title="Question Library (Phase 6.1)"
-                            >
-                                <ClipboardList className="w-3.5 h-3.5" />
-                                <span>Question Library</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setIsTemplatesModalOpen(true)}
-                                className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-medium text-xs border border-neutral-200 dark:border-neutral-800 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                                title="Templates Catalog (Phase 6.2)"
-                            >
-                                <LayoutTemplate className="w-3.5 h-3.5" />
-                                <span>Templates</span>
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Header Image Banner */}
-                    {form.headerImageUrl && (
-                        <div className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm group">
-                            <img
-                                src={getCloudinaryBannerUrl(form.headerImageUrl)}
-                                alt="Form Header Banner"
-                                loading="lazy"
-                                className="w-full h-36 sm:h-48 object-cover"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setIsThemeDrawerOpen(true)}
-                                className="absolute bottom-3 right-3 px-3 py-1.5 rounded-lg bg-white text-black font-semibold text-xs border border-neutral-200 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-neutral-50"
-                            >
-                                Change Banner
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Master Form Title & Description Card */}
-                    <div
-                        className="rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm p-6 sm:p-7 space-y-3 relative overflow-hidden"
-                    >
-                        <div className="flex items-center justify-between">
-                            <input
-                                type="text"
-                                value={form.title}
-                                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                                placeholder="Form Title..."
-                                className="w-full text-xl sm:text-2xl font-bold text-neutral-900 dark:text-white border-b border-transparent hover:border-neutral-200 dark:hover:border-neutral-800 focus:border-neutral-900 dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 transition-colors"
-                            />
-                        </div>
-                        <textarea
-                            value={form.description || ""}
-                            onChange={(e) => setForm({ ...form, description: e.target.value })}
-                            placeholder="Form Description (guidelines, rules, prerequisites, prizes)..."
-                            rows={2}
-                            className="w-full text-xs sm:text-sm font-normal text-neutral-600 dark:text-neutral-400 border-b border-transparent hover:border-neutral-200 dark:hover:border-neutral-800 focus:border-neutral-900 dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 resize-none transition-colors"
-                        />
-                    </div>
-
+                <div className="relative w-full lg:pr-20 space-y-6 pb-36">
                     {/* Verified Identity Notice Card */}
-                    <div className="rounded-xl bg-neutral-50/70 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 p-4 sm:p-5 space-y-3">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex items-center justify-center shrink-0">
-                                <ShieldCheck className="w-4 h-4 text-emerald-800 dark:text-emerald-300" />
+                    <div className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4">
+                        <div className="flex items-start sm:items-center gap-3.5">
+                            <div
+                                className="w-11 h-11 rounded-2xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0"
+                                style={{ backgroundColor: accentColor }}
+                            >
+                                <ShieldCheck className="w-6 h-6 text-black stroke-[2.5]" />
                             </div>
-                            <div className="min-w-0">
-                                <h4 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5">
-                                    Orbix Verified Identity Integration
-                                    <span className="px-2 py-0.2 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                            <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="text-sm sm:text-base font-black text-black dark:text-white tracking-tight">
+                                        Orbix Verified Identity Integration
+                                    </h4>
+                                    <span
+                                        className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1.5px_1.5px_0px_#000] text-black"
+                                        style={{ backgroundColor: accentColor }}
+                                    >
                                         Active
                                     </span>
-                                </h4>
-                                <p className="text-[11px] text-neutral-500 font-normal">
+                                </div>
+                                <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 leading-relaxed">
                                     Orbix pre-fills and binds student name, campus email, college, roll number, and verified profile credentials automatically upon submission.
                                 </p>
                             </div>
                         </div>
 
                         {/* Quick-Add Event Question Templates */}
-                        <div className="pt-2 border-t border-neutral-200/80 dark:border-neutral-800">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                        <div className="pt-3.5 border-t-2 border-black/10 dark:border-white/10 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <span className="text-xs font-black uppercase tracking-wider text-black dark:text-white">
                                     + Quick Add Common Event Questions:
                                 </span>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsImportModalOpen(true)}
-                                    className="text-[11px] font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                                >
-                                    <ClipboardList className="w-3.5 h-3.5" />
-                                    <span>Browse Question Bank</span>
-                                </button>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenQuestionLibrary}
+                                        className="px-3 py-1 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] flex items-center gap-1.5 cursor-pointer transition-all self-start sm:self-auto"
+                                        title="Past Events Question Library"
+                                    >
+                                        <FileText className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Past Questions</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsImportModalOpen(true)}
+                                        className="px-3 py-1 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] flex items-center gap-1.5 cursor-pointer transition-all self-start sm:self-auto"
+                                    >
+                                        <ClipboardList className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Browse Question Bank</span>
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="flex flex-wrap gap-2">
                                 {QUICK_TEMPLATES.map((tmpl) => (
                                     <button
                                         key={tmpl.key}
@@ -1433,7 +1246,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                             setActiveQuestionId(newQ.id);
                                             toast.success(`Added question: "${tmpl.label}"`);
                                         }}
-                                        className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-medium shadow-sm cursor-pointer transition-colors"
+                                        className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer transition-all"
                                     >
                                         + {tmpl.label}
                                     </button>
@@ -1505,7 +1318,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                         sections={sections}
                                         currentSectionId={section.id}
                                         accentColor={accentColor}
-                                        eventId={eventId}
+                                        eventId={safeEventId}
                                         isActive={activeQuestionId === question.id}
                                         isQuiz={Boolean(form.settings.quiz?.isQuiz)}
                                         defaultPoints={
@@ -1565,36 +1378,37 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     <button
                                         type="button"
                                         onClick={() => handleAddQuestion(sIdx)}
-                                        className="px-3.5 py-1.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 font-semibold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                                        className="px-3.5 py-2 rounded-xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
+                                        style={{ backgroundColor: accentColor, color: "#000" }}
                                     >
-                                        <Plus className="w-3.5 h-3.5" />
+                                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
                                         <span>Add Question</span>
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => handleAddTitleBlock(sIdx)}
-                                        className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 font-medium text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                                        className="px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
                                         title="Add Title & Description block"
                                     >
-                                        <Heading className="w-3.5 h-3.5" />
+                                        <Heading className="w-3.5 h-3.5 stroke-[2.5]" />
                                         <span>Title Block</span>
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => handleAddImageBlock(sIdx)}
-                                        className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 font-medium text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                                        className="px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
                                         title="Add Image block"
                                     >
-                                        <ImageIcon className="w-3.5 h-3.5" />
+                                        <ImageIcon className="w-3.5 h-3.5 stroke-[2.5]" />
                                         <span>Image</span>
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => handleAddVideoBlock(sIdx)}
-                                        className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 font-medium text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                                        className="px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
                                         title="Add Video block"
                                     >
-                                        <Video className="w-3.5 h-3.5" />
+                                        <Video className="w-3.5 h-3.5 stroke-[2.5]" />
                                         <span>Video</span>
                                     </button>
                                 </div>
@@ -1607,98 +1421,69 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={handleAddSection}
-                            className="px-5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 font-semibold text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
+                            className="px-5 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs sm:text-sm shadow-[3px_3px_0px_#000] hover:shadow-[1.5px_1.5px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] cursor-pointer flex items-center gap-2 transition-all"
                         >
-                            <Split className="w-4 h-4" />
+                            <Split className="w-4 h-4 stroke-[2.5]" />
                             <span>Add Section Break</span>
                         </button>
 
                         <button
                             type="button"
                             onClick={() => setIsClearConfirmOpen(true)}
-                            className="px-4 py-2 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-medium text-xs text-neutral-500 hover:text-rose-600 cursor-pointer flex items-center gap-1.5 transition-colors"
+                            className="px-4 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-rose-100 text-rose-700 font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
                         >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
                             <span>Clear Form</span>
                         </button>
                     </div>
 
-                    {/* Floating Quick-Add Toolbar (Desktop docked right, Mobile bottom bar) */}
-                    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 lg:translate-x-0 lg:bottom-auto lg:top-44 lg:right-6 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-md p-1.5 flex lg:flex-col items-center gap-1 z-40">
+                    {/* Floating Vertical Canvas Tools Palette (Desktop docked right) */}
+                    <div className="hidden sm:flex flex-col fixed top-44 right-3 sm:right-4 xl:right-6 w-fit bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 border-black shadow-[3px_3px_0px_#000] rounded-2xl p-1.5 items-center gap-1.5 z-30">
                         <button
                             type="button"
                             onClick={() => handleAddQuestion()}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-transparent hover:border-black cursor-pointer transition-colors"
                             title="Add Question (+)"
                         >
-                            <Plus className="w-4 h-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (form?.structure?.sections?.length) {
-                                    setAiTargetSectionId(form.structure.sections[form.structure.sections.length - 1].id);
-                                }
-                                setIsAiModalOpen(true);
-                            }}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
-                            title="AI Assistant"
-                        >
-                            <Sparkles className="w-4 h-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleOpenQuestionLibrary}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
-                            title="Past Events Question Library"
-                        >
-                            <ClipboardList className="w-4 h-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setIsTemplatesModalOpen(true)}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
-                            title="Form Templates"
-                        >
-                            <LayoutTemplate className="w-4 h-4" />
+                            <Plus className="w-4 h-4 stroke-[2.5]" />
                         </button>
                         <button
                             type="button"
                             onClick={() => handleAddTitleBlock()}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-transparent hover:border-black cursor-pointer transition-colors"
                             title="Add Title and description (Tt)"
                         >
-                            <Heading className="w-4 h-4" />
+                            <Heading className="w-4 h-4 stroke-[2.5]" />
                         </button>
                         <button
                             type="button"
                             onClick={() => handleAddImageBlock()}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-transparent hover:border-black cursor-pointer transition-colors"
                             title="Add Image block"
                         >
-                            <ImageIcon className="w-4 h-4" />
+                            <ImageIcon className="w-4 h-4 stroke-[2.5]" />
                         </button>
                         <button
                             type="button"
                             onClick={() => handleAddVideoBlock()}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-transparent hover:border-black cursor-pointer transition-colors"
                             title="Add Video block"
                         >
-                            <Video className="w-4 h-4" />
+                            <Video className="w-4 h-4 stroke-[2.5]" />
                         </button>
                         <button
                             type="button"
                             onClick={handleAddSection}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-transparent hover:border-black cursor-pointer transition-colors"
                             title="Add Section Break (=)"
                         >
-                            <Split className="w-4 h-4" />
+                            <Split className="w-4 h-4 stroke-[2.5]" />
                         </button>
                     </div>
 
                     {/* Section Deletion with Instant Undo Banner */}
                     {deletedSectionNotice && (
-                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-neutral-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-neutral-800 animate-in fade-in slide-in-from-bottom-2">
+                        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-neutral-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-neutral-800 animate-in fade-in slide-in-from-bottom-2">
                             <span className="text-xs font-medium">
                                 Section &ldquo;{deletedSectionNotice.section.title}&rdquo; deleted.
                             </span>
@@ -1726,7 +1511,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* TAB 2: RESPONSES (LIVE ANALYTICS & INSPECTOR) */}
             {/* ---------------------------------------------------------------- */}
             {activeTab === "responses" && !isPreviewOpen && (
-                <div className="max-w-4xl mx-auto space-y-6">
+                <div className="w-full space-y-6 pb-24">
                     {/* Accepting Responses Bar */}
                     <div className="p-5 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
@@ -1735,11 +1520,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     {registeredCount} {registeredCount === 1 ? "Response" : "Responses"} Received
                                 </h3>
                                 <span
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${
-                                        form.settings.isOpen
-                                            ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
-                                            : "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
-                                    }`}
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${form.settings.isOpen
+                                        ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800"
+                                        : "bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-300 dark:border-rose-800"
+                                        }`}
                                 >
                                     {form.settings.isOpen ? "Accepting Responses" : "Not Accepting Responses"}
                                 </span>
@@ -1770,7 +1554,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
                     <React.Suspense fallback={<div className="p-8 flex justify-center"><OrbixLoader size="md" /></div>}>
                         <FormResponsesAnalyticsView
-                            eventId={eventId}
+                            eventId={safeEventId}
                             eventTitle={form.title}
                         />
                     </React.Suspense>
@@ -1793,6 +1577,125 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                 </React.Suspense>
             )}
 
+            {/* ---------------------------------------------------------------- */}
+            {/* FLOATING BOTTOM ACTION BAR */}
+            {/* Unified & Non-duplicated: AI Assistant, Templates, Theme, Preview, Save Draft, Publish Live */}
+            {/* ---------------------------------------------------------------- */}
+            {activeTab !== "responses" && (
+                <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 max-w-[95vw]">
+                    <div className="bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto">
+                        {/* Wizard Back Button */}
+                        {isWizardMode && onWizardBack && (
+                            <button
+                                type="button"
+                                onClick={onWizardBack}
+                                className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                                title="Back to Banner Studio"
+                            >
+                                <ArrowLeft className="w-4 h-4" />
+                                <span className="hidden sm:inline">Back: Banner</span>
+                            </button>
+                        )}
+
+                        {/* AI Assistant Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (activeTab !== "questions") setActiveTab("questions");
+                                if (form?.structure?.sections?.length) {
+                                    setAiTargetSectionId(form.structure.sections[form.structure.sections.length - 1].id);
+                                }
+                                setIsAiModalOpen(true);
+                            }}
+                            className="px-3.5 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                            style={{ backgroundColor: accentColor, color: "#000" }}
+                            title="AI Assistant: Generate questions with AI"
+                        >
+                            <span className="inline-flex items-center gap-1 font-black text-xs tracking-wider">
+                                <Sparkles className="w-3.5 h-3.5 fill-black text-black stroke-[2.5]" />
+                                <span>AI AI</span>
+                            </span>
+                        </button>
+
+                        {/* Templates Button (Borderless) */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (activeTab !== "questions") setActiveTab("questions");
+                                setIsTemplatesModalOpen(true);
+                            }}
+                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-0 shadow-none"
+                            title="Form Templates"
+                        >
+                            <LayoutTemplate className="w-4 h-4 stroke-[2.5]" />
+                            <span>Templates</span>
+                        </button>
+
+                        {/* Theme Button (Icon only, Borderless) */}
+                        <button
+                            type="button"
+                            onClick={() => setIsThemeDrawerOpen(true)}
+                            className="p-2 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center shrink-0 border-0 shadow-none"
+                            title="Theme & Colors"
+                        >
+                            <Palette className="w-4 h-4 stroke-[2.5]" />
+                        </button>
+
+                        {/* Preview Simulator Action (Text only, Borderless) */}
+                        <button
+                            type="button"
+                            onClick={() => setIsPreviewOpen(!isPreviewOpen)}
+                            className={`px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl font-black text-xs transition-all cursor-pointer flex items-center justify-center shrink-0 border-0 shadow-none ${isPreviewOpen
+                                ? "bg-black text-white dark:bg-white dark:text-black"
+                                : "bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white"
+                                }`}
+                            title="Preview form as student"
+                        >
+                            <span>{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
+                        </button>
+
+                        {/* Divider */}
+                        <div className="h-5 w-[1px] bg-neutral-300 dark:bg-neutral-700 mx-0.5 shrink-0" />
+
+                        {/* Save Draft (Text only, Borderless) */}
+                        <button
+                            type="button"
+                            onClick={handleSaveForm}
+                            disabled={saving || isPublishing}
+                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none"
+                            title="Save working draft"
+                        >
+                            {saving ? (
+                                <>
+                                    <OrbixLoader size="xs" />
+                                    <span>Saving...</span>
+                                </>
+                            ) : (
+                                <span>Save Draft</span>
+                            )}
+                        </button>
+
+                        {/* Publish (Text only "Publish", or "Publish & Create Event" in Wizard, Borderless) */}
+                        <button
+                            type="button"
+                            onClick={handlePublishForm}
+                            disabled={saving || isPublishing}
+                            className="px-4 sm:px-6 py-2 rounded-xl sm:rounded-2xl bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none"
+                            title={isWizardMode ? "Publish & Create Event" : "Publish form snapshot for students"}
+                        >
+                            {isPublishing ? (
+                                <>
+                                    <OrbixLoader size="xs" />
+                                    <span>Publishing...</span>
+                                </>
+                            ) : (
+                                <span>{isWizardMode ? "🚀 Publish & Create Event" : "Publish"}</span>
+                            )}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Theme Drawer */}
             <React.Suspense fallback={null}>
                 <FormThemeDrawer
@@ -1800,7 +1703,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                     onClose={() => setIsThemeDrawerOpen(false)}
                     theme={form.themeSettings}
                     headerImageUrl={form.headerImageUrl}
-                    eventId={eventId}
+                    eventId={safeEventId}
                     onChangeTheme={(themeSettings) => setForm({ ...form, themeSettings })}
                     onChangeHeaderImage={(url, publicId) =>
                         setForm({ ...form, headerImageUrl: url, headerImagePublicId: publicId })
@@ -1930,17 +1833,16 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         {sections.length > 0 && (
                             <div className="flex items-center gap-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs font-medium">
                                 <span className="text-neutral-600 dark:text-neutral-400 shrink-0">Insert Selected Into:</span>
-                                <select
+                                <NeoSelect
                                     value={libTargetSectionId}
-                                    onChange={(e) => setLibTargetSectionId(e.target.value)}
-                                    className="px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 font-semibold text-xs text-neutral-900 dark:text-white focus:outline-none cursor-pointer flex-1"
-                                >
-                                    {sections.map((sec, idx) => (
-                                        <option key={sec.id} value={sec.id}>
-                                            Section {idx + 1}: {sec.title || "Untitled Section"} ({sec.questions.length} questions)
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={(val) => setLibTargetSectionId(val)}
+                                    size="sm"
+                                    className="flex-1"
+                                    options={sections.map((sec, idx) => ({
+                                        value: sec.id,
+                                        label: `Section ${idx + 1}: ${sec.title || "Untitled Section"} (${sec.questions.length} questions)`
+                                    }))}
+                                />
                             </div>
                         )}
 
@@ -2016,9 +1918,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                                             <div
                                                                 key={q.id}
                                                                 onClick={() => handleToggleSelectLibQuestion(q.id)}
-                                                                className={`pt-2 pb-2 px-2 rounded-lg flex items-start gap-3 cursor-pointer transition-colors ${
-                                                                    isSelected ? "bg-neutral-50 dark:bg-neutral-800/60" : "hover:bg-neutral-50 dark:hover:bg-neutral-800/30"
-                                                                }`}
+                                                                className={`pt-2 pb-2 px-2 rounded-lg flex items-start gap-3 cursor-pointer transition-colors ${isSelected ? "bg-neutral-50 dark:bg-neutral-800/60" : "hover:bg-neutral-50 dark:hover:bg-neutral-800/30"
+                                                                    }`}
                                                             >
                                                                 <div className="pt-0.5 shrink-0">
                                                                     {isSelected ? (
@@ -2222,11 +2123,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                                 key={cat}
                                                 type="button"
                                                 onClick={() => setTemplateCategoryFilter(cat)}
-                                                className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                                                    templateCategoryFilter === cat
-                                                        ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900"
-                                                        : "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                                                }`}
+                                                className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${templateCategoryFilter === cat
+                                                    ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900"
+                                                    : "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                                    }`}
                                             >
                                                 {cat}
                                             </button>
@@ -2433,17 +2333,16 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 {sections.length > 0 && (
                                     <div className="flex items-center gap-2 p-2.5 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs font-medium">
                                         <span className="text-neutral-600 dark:text-neutral-400 shrink-0">Insert Into:</span>
-                                        <select
+                                        <NeoSelect
                                             value={aiTargetSectionId}
-                                            onChange={(e) => setAiTargetSectionId(e.target.value)}
-                                            className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 font-semibold text-xs text-neutral-900 dark:text-white focus:outline-none cursor-pointer flex-1"
-                                        >
-                                            {sections.map((sec, idx) => (
-                                                <option key={sec.id} value={sec.id}>
-                                                    Section {idx + 1}: {sec.title || "Untitled Section"}
-                                                </option>
-                                            ))}
-                                        </select>
+                                            onChange={(val) => setAiTargetSectionId(val)}
+                                            size="sm"
+                                            className="flex-1"
+                                            options={sections.map((sec, idx) => ({
+                                                value: sec.id,
+                                                label: `Section ${idx + 1}: ${sec.title || "Untitled Section"}`
+                                            }))}
+                                        />
                                     </div>
                                 )}
 
@@ -2455,9 +2354,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                             <div
                                                 key={idx}
                                                 onClick={() => handleToggleSelectAiIndex(idx)}
-                                                className={`p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 flex items-start gap-3 cursor-pointer transition-colors ${
-                                                    isSelected ? "bg-neutral-50 dark:bg-neutral-800/60" : "bg-white dark:bg-neutral-900 hover:bg-neutral-50"
-                                                }`}
+                                                className={`p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 flex items-start gap-3 cursor-pointer transition-colors ${isSelected ? "bg-neutral-50 dark:bg-neutral-800/60" : "bg-white dark:bg-neutral-900 hover:bg-neutral-50"
+                                                    }`}
                                             >
                                                 <div className="pt-0.5 shrink-0">
                                                     {isSelected ? (
@@ -2520,131 +2418,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 </button>
                             </div>
                         )}
-                    </div>
-                </div>
-            )}
-
-            {/* ---------------------------------------------------------------- */}
-            {/* PHASE 6.4: QR CHECK-IN SCANNER MODAL */}
-            {/* ---------------------------------------------------------------- */}
-            {isQrModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div className="w-full max-w-md bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl p-6 space-y-4">
-                        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                                    <QrCode className="w-4 h-4 text-neutral-800 dark:text-neutral-200" />
-                                </div>
-                                <div>
-                                    <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">Event Ticket Check-In</h3>
-                                    <p className="text-[11px] text-neutral-500 font-normal">
-                                        Scan or enter attendee ticket pass code.
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsQrModalOpen(false);
-                                    setQrResult(null);
-                                    setQrInputCode("");
-                                }}
-                                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        {/* Input Form */}
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                                    Ticket Pass Code / QR Code:
-                                </label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="text"
-                                        value={qrInputCode}
-                                        onChange={(e) => setQrInputCode(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
-                                                e.preventDefault();
-                                                handleVerifyTicketQr();
-                                            }
-                                        }}
-                                        placeholder="e.g. TKT-B1F34E89"
-                                        className="flex-1 p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800 text-xs font-mono font-bold text-neutral-900 dark:text-white bg-white dark:bg-neutral-950 focus:outline-none focus:border-neutral-400 uppercase"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleVerifyTicketQr}
-                                        disabled={isVerifyingQr || !qrInputCode.trim()}
-                                        className="px-4 py-2.5 rounded-lg bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-100 disabled:opacity-40 text-white dark:text-neutral-900 text-xs font-semibold shadow-sm cursor-pointer transition-colors"
-                                    >
-                                        {isVerifyingQr ? <OrbixLoader size="xs" /> : "Verify"}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Verification Result Card */}
-                        {qrResult && (
-                            <div
-                                className={`p-4 rounded-xl border space-y-2 animate-in fade-in duration-200 ${
-                                    qrResult.valid
-                                        ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800"
-                                        : "bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800"
-                                }`}
-                            >
-                                <div className="flex items-center gap-2">
-                                    {qrResult.valid ? (
-                                        <CheckCircle2 className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
-                                    ) : (
-                                        <AlertTriangle className="w-4 h-4 text-rose-600 stroke-[2.5]" />
-                                    )}
-                                    <h4
-                                        className={`text-xs font-semibold ${
-                                            qrResult.valid ? "text-emerald-900 dark:text-emerald-200" : "text-rose-900 dark:text-rose-200"
-                                        }`}
-                                    >
-                                        {qrResult.message}
-                                    </h4>
-                                </div>
-
-                                {qrResult.registration && (
-                                    <div className="pt-2 border-t border-neutral-200/60 dark:border-neutral-800 space-y-1 text-xs text-neutral-700 dark:text-neutral-300 font-normal">
-                                        <p>
-                                            <span className="font-semibold text-neutral-900 dark:text-white">Student:</span>{" "}
-                                            {qrResult.registration.studentName || "Verified Student"}
-                                        </p>
-                                        <p>
-                                            <span className="font-semibold text-neutral-900 dark:text-white">Email:</span>{" "}
-                                            {qrResult.registration.studentEmail}
-                                        </p>
-                                        {qrResult.registration.studentRollNo && (
-                                            <p>
-                                                <span className="font-semibold text-neutral-900 dark:text-white">Roll No:</span>{" "}
-                                                {qrResult.registration.studentRollNo}
-                                            </p>
-                                        )}
-                                        <p>
-                                            <span className="font-semibold text-neutral-900 dark:text-white">Ticket:</span>{" "}
-                                            <code className="bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded font-mono font-semibold">
-                                                {qrResult.registration.ticketCode}
-                                            </code>
-                                        </p>
-                                        <p className="text-[10px] text-neutral-500 pt-1">
-                                            Status: <span className="font-semibold uppercase text-emerald-600">Attended & Verified</span>
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="p-3 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-500 font-normal">
-                            <span className="font-semibold text-neutral-900 dark:text-white block mb-0.5">Contactless Check-In Ready</span>
-                            Ticket QR barcodes on student registration receipts can be scanned with any smartphone camera or USB barcode scanner directly into this field.
-                        </div>
                     </div>
                 </div>
             )}

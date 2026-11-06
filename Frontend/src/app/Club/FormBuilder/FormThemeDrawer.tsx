@@ -1,48 +1,48 @@
 import React, { useState } from "react";
-import { X, UploadCloud, Trash2, Check, Palette, Sparkles } from "lucide-react";
+import { Palette, X, UploadCloud, Check, Trash2, Sparkles, RefreshCw } from "lucide-react";
+import { useToast } from "../../../context/ToastContext";
 import type { FormThemeSettings } from "../../../api/clubEventFormApi";
 import { requestFormMediaSignature, uploadFileToCloudinary } from "../../../api/clubEventFormApi";
-import { useToast } from "../../../context/ToastContext";
 
 export interface FormThemeDrawerProps {
     isOpen: boolean;
     onClose: () => void;
     theme: FormThemeSettings;
-    headerImageUrl: string | null;
+    headerImageUrl?: string | null;
     eventId: string;
-    onChangeTheme: (updatedTheme: FormThemeSettings) => void;
+    onChangeTheme: (theme: FormThemeSettings) => void;
     onChangeHeaderImage: (url: string | null, publicId: string | null) => void;
 }
 
-const ORBIX_ACCENT_PALETTES = [
-    { label: "Vibrant Cyan", value: "#38BDF8", bgClass: "bg-[#38BDF8]" },
-    { label: "Electric Yellow", value: "#FFE566", bgClass: "bg-[#FFE566]" },
-    { label: "Neon Lime", value: "#a2ff86", bgClass: "bg-[#a2ff86]" },
-    { label: "Royal Purple", value: "#C084FC", bgClass: "bg-[#C084FC]" },
-    { label: "Coral Rose", value: "#FB7185", bgClass: "bg-[#FB7185]" },
-    { label: "Tangerine", value: "#FB923C", bgClass: "bg-[#FB923C]" },
-    { label: "Neo Black", value: "#18181b", bgClass: "bg-[#18181b]" },
+const ORBIX_ACCENT_PALETTES: { label: string; value: string; bgClass: string }[] = [
+    { label: "Orbix Sky", value: "#38BDF8", bgClass: "bg-[#38BDF8]" },
+    { label: "Campus Yellow", value: "#FFE566", bgClass: "bg-[#FFE566]" },
+    { label: "Neon Lime", value: "#A2FF86", bgClass: "bg-[#A2FF86]" },
+    { label: "Cyber Purple", value: "#C084FC", bgClass: "bg-[#C084FC]" },
+    { label: "Vibrant Coral", value: "#FB7185", bgClass: "bg-[#FB7185]" },
+    { label: "Bright Amber", value: "#FB923C", bgClass: "bg-[#FB923C]" },
+    { label: "Solid Pitch", value: "#18181B", bgClass: "bg-[#18181B]" },
     { label: "Emerald Teal", value: "#2DD4BF", bgClass: "bg-[#2DD4BF]" },
 ];
 
-const BACKGROUND_PALETTES = [
-    { label: "Neo Cream", value: "#FAF6EE", preview: "bg-[#FAF6EE]" },
-    { label: "Pure White", value: "#FFFFFF", preview: "bg-white" },
-    { label: "Soft Gray", value: "#F3F4F6", preview: "bg-gray-100" },
-    { label: "Warm Amber", value: "#FFFBEB", preview: "bg-amber-50" },
-    { label: "Cool Sky", value: "#EFF6FF", preview: "bg-blue-50" },
+const BACKGROUND_PALETTES: { label: string; value: string; preview: string }[] = [
+    { label: "Orbix Canvas", value: "#FAF6EE", preview: "bg-[#FAF6EE]" },
+    { label: "Clean White", value: "#FFFFFF", preview: "bg-white" },
+    { label: "Cool Mist", value: "#F1F5F9", preview: "bg-[#F1F5F9]" },
+    { label: "Soft Cream", value: "#FEFCE8", preview: "bg-[#FEFCE8]" },
+    { label: "Sky Ice", value: "#F0F9FF", preview: "bg-[#F0F9FF]" },
 ];
 
-const SURFACE_PALETTES = [
+const SURFACE_PALETTES: { label: string; value: string }[] = [
     { label: "Pure White", value: "#FFFFFF" },
-    { label: "Warm Ivory", value: "#FAF6EE" },
+    { label: "Warm Ivory", value: "#FCFBF7" },
     { label: "Cool Slate", value: "#F8FAFC" },
 ];
 
-const SHADOW_STYLES: { label: string; value: "soft" | "crisp" | "bold"; desc: string }[] = [
-    { label: "Crisp 2px", value: "crisp", desc: "Classic Neo-Brutalist 2px border shadow" },
-    { label: "Bold 4px", value: "bold", desc: "High-contrast 4px solid drop shadow" },
-    { label: "Soft Glow", value: "soft", desc: "Subtle diffused border shadow" },
+const SHADOW_STYLES: { label: string; value: "crisp" | "bold" | "soft"; desc: string }[] = [
+    { label: "Crisp 2px", value: "crisp", desc: "Classic Neo 2px sharp offset" },
+    { label: "Bold 4px", value: "bold", desc: "Orbix Signature 4px high-contrast" },
+    { label: "Soft Glow", value: "soft", desc: "Subtle diffused box elevation" },
 ];
 
 const BUTTON_STYLES: { label: string; value: "rounded" | "pill" | "sharp" }[] = [
@@ -90,263 +90,307 @@ export const FormThemeDrawer: React.FC<FormThemeDrawerProps> = ({
         }
     };
 
+    const handleResetTheme = () => {
+        onChangeTheme({
+            accentColor: "#38BDF8",
+            backgroundColor: "#FAF6EE",
+            cardSurfaceColor: "#FFFFFF",
+            fontFamily: "sans",
+            buttonStyle: "rounded",
+            cardShadowStyle: "crisp",
+        });
+        toast.info("Theme reset to Orbix defaults.");
+    };
+
     return (
-        <div className="fixed inset-y-0 right-0 w-full sm:w-96 bg-white dark:bg-[#0A0A0A] border-l border-neutral-200 dark:border-neutral-800 shadow-2xl z-50 p-6 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-right duration-200">
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between border-b border-neutral-200 dark:border-neutral-800 pb-4">
-                    <div className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700">
-                            <Palette className="w-5 h-5 text-neutral-900 dark:text-neutral-100" />
+        <>
+            {/* Backdrop Overlay */}
+            <div
+                className="fixed inset-0 bg-black/40 backdrop-blur-xs z-[65] animate-in fade-in duration-150"
+                onClick={onClose}
+            />
+
+            {/* Neo-brutalist Floating Sidebar on the Right (Inspired by App's Left Sidebar) */}
+            <aside
+                className="fixed top-2 sm:top-3 bottom-2 sm:bottom-3 right-2 sm:right-3 w-[calc(100vw-1rem)] sm:w-[380px] max-w-full rounded-2xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] border-3 border-black shadow-[6px_6px_0px_#000] z-[70] text-black flex flex-col justify-between overflow-hidden animate-in slide-in-from-right duration-200 select-none"
+            >
+                {/* Top Header */}
+                <div className="p-4 sm:p-5 border-b-2 border-black/15 bg-white/70 backdrop-blur-sm flex items-center justify-between shrink-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-10 h-10 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center shrink-0">
+                            <Palette className="w-5 h-5 text-black stroke-[2.5]" />
                         </div>
-                        <div>
-                            <h3 className="text-base font-bold text-neutral-900 dark:text-neutral-100">Theme & Aesthetics</h3>
-                            <p className="text-[11px] text-neutral-500 font-normal">
-                                Customize fonts, surfaces, and colors
+                        <div className="truncate">
+                            <h3 className="text-base font-black text-black tracking-tight truncate">
+                                Theme & Aesthetics
+                            </h3>
+                            <p className="text-[11px] text-neutral-600 font-bold truncate">
+                                Customize fonts, surfaces & colors
                             </p>
                         </div>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+                        className="w-8 h-8 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                        title="Close theme panel"
                     >
-                        <X className="w-4 h-4" />
+                        <X className="w-4 h-4 text-black stroke-[2.5]" />
                     </button>
                 </div>
 
-                {/* 1. Header Banner Image */}
-                <div className="space-y-2.5">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300 flex items-center justify-between">
-                        <span>Form Banner Header</span>
-                        <span className="text-[10px] text-neutral-400 font-medium lowercase">Cloudinary</span>
-                    </label>
-
-                    {headerImageUrl ? (
-                        <div className="relative rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm group">
-                            <img
-                                src={headerImageUrl}
-                                alt="Form Header"
-                                className="w-full h-28 object-cover"
-                            />
-                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
-                                <label className="px-3 py-1.5 rounded-xl bg-white/95 backdrop-blur-sm text-neutral-900 font-semibold text-xs border border-neutral-200 shadow-sm cursor-pointer hover:bg-white">
-                                    Change
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleUploadHeaderImage}
-                                        disabled={isUploading}
-                                        className="hidden"
-                                    />
-                                </label>
-                                <button
-                                    type="button"
-                                    onClick={() => onChangeHeaderImage(null, null)}
-                                    className="p-1.5 rounded-xl bg-rose-500 text-white border border-rose-600 shadow-sm cursor-pointer hover:bg-rose-600"
-                                    title="Remove header image"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
-                        </div>
-                    ) : (
-                        <label className="border border-dashed border-neutral-300 dark:border-neutral-700 hover:border-neutral-900 dark:hover:border-neutral-400 rounded-2xl p-5 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-neutral-50/70 dark:bg-neutral-900/60 hover:bg-neutral-100/70 dark:hover:bg-neutral-900 transition-colors">
-                            <UploadCloud className="w-6 h-6 text-neutral-500" />
-                            <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                                {isUploading ? "Uploading to Cloudinary..." : "Upload Header Banner"}
-                            </span>
-                            <span className="text-[10px] text-neutral-400 font-normal">
-                                Recommended 1200 x 320 px (JPG, PNG, WebP)
-                            </span>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleUploadHeaderImage}
-                                disabled={isUploading}
-                                className="hidden"
-                            />
+                {/* Scrollable Customization Body */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-6 no-scrollbar">
+                    {/* 1. Header Banner Image */}
+                    <div className="space-y-2">
+                        <label className="text-xs font-black uppercase tracking-wider text-black flex items-center justify-between">
+                            <span>Form Banner Header</span>
+                            <span className="text-[10px] text-neutral-500 font-bold lowercase">Max 10 MB</span>
                         </label>
-                    )}
-                </div>
 
-                {/* 2. Primary Accent Color */}
-                <div className="space-y-2.5">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
-                        Accent Theme Color
-                    </label>
-                    <div className="grid grid-cols-4 gap-2">
-                        {ORBIX_ACCENT_PALETTES.map((palette) => {
-                            const isSelected = theme.accentColor?.toLowerCase() === palette.value.toLowerCase();
-                            return (
-                                <button
-                                    key={palette.value}
-                                    type="button"
-                                    onClick={() => onChangeTheme({ ...theme, accentColor: palette.value })}
-                                    className={`h-10 rounded-xl border border-neutral-200 dark:border-neutral-700 flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
-                                        palette.bgClass
-                                    } ${isSelected ? "ring-2 ring-neutral-900 dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-[#0A0A0A]" : "hover:border-neutral-400"}`}
-                                    title={palette.label}
-                                >
-                                    {isSelected && (
-                                        <Check
-                                            className={`w-4 h-4 stroke-[2.5] ${
-                                                palette.value === "#18181b" ? "text-white" : "text-black"
-                                            }`}
+                        {headerImageUrl ? (
+                            <div className="relative rounded-2xl border-2 border-black overflow-hidden shadow-[2.5px_2.5px_0px_#000] group bg-black">
+                                <img
+                                    src={headerImageUrl}
+                                    alt="Form Header"
+                                    className="w-full h-28 object-contain"
+                                />
+                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition-opacity">
+                                    <label className="px-3 py-1.5 rounded-xl bg-white text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-neutral-100 transition-transform active:scale-95">
+                                        Change
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleUploadHeaderImage}
+                                            disabled={isUploading}
+                                            className="hidden"
                                         />
+                                    </label>
+                                    <button
+                                        type="button"
+                                        onClick={() => onChangeHeaderImage(null, null)}
+                                        className="p-1.5 rounded-xl bg-rose-400 text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer hover:bg-rose-500 transition-transform active:scale-95"
+                                        title="Remove header image"
+                                    >
+                                        <Trash2 className="w-4 h-4 stroke-[2.5]" />
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <label className="border-2 border-dashed border-black hover:bg-amber-100/50 rounded-2xl p-4 flex flex-col items-center justify-center gap-1.5 cursor-pointer bg-white transition-all shadow-[2px_2px_0px_#000]">
+                                <UploadCloud className="w-6 h-6 text-black stroke-[2.5]" />
+                                <span className="text-xs font-black text-black">
+                                    {isUploading ? "Uploading Banner..." : "Upload Header Banner"}
+                                </span>
+                                <span className="text-[10px] text-neutral-600 font-bold">
+                                    Recommended 1200 x 320 px (JPG, PNG, WebP)
+                                </span>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleUploadHeaderImage}
+                                    disabled={isUploading}
+                                    className="hidden"
+                                />
+                            </label>
+                        )}
+                    </div>
+
+                    {/* 2. Primary Accent Color */}
+                    <div className="space-y-2">
+                        <label className="block text-xs font-black uppercase tracking-wider text-black">
+                            Accent Theme Color
+                        </label>
+                        <div className="grid grid-cols-4 gap-2.5">
+                            {ORBIX_ACCENT_PALETTES.map((palette) => {
+                                const isSelected = theme.accentColor?.toLowerCase() === palette.value.toLowerCase();
+                                return (
+                                    <button
+                                        key={palette.value}
+                                        type="button"
+                                        onClick={() => onChangeTheme({ ...theme, accentColor: palette.value })}
+                                        className={`h-10 rounded-xl border-2 border-black flex items-center justify-center transition-all cursor-pointer ${
+                                            palette.bgClass
+                                        } ${
+                                            isSelected
+                                                ? "shadow-[3px_3px_0px_#000] translate-x-[-1px] translate-y-[-1px] ring-2 ring-black"
+                                                : "shadow-[1.5px_1.5px_0px_#000] hover:shadow-[2.5px_2.5px_0px_#000]"
+                                        }`}
+                                        title={palette.label}
+                                    >
+                                        {isSelected && (
+                                            <Check
+                                                className={`w-4 h-4 stroke-[3] ${
+                                                    palette.value === "#18181B" ? "text-white" : "text-black"
+                                                }`}
+                                            />
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* 3. Canvas Background Color */}
+                    <div className="space-y-2">
+                        <label className="block text-xs font-black uppercase tracking-wider text-black">
+                            Canvas Background Tone
+                        </label>
+                        <div className="grid grid-cols-5 gap-2">
+                            {BACKGROUND_PALETTES.map((bg) => {
+                                const isSelected = (theme.backgroundColor || "#FAF6EE").toLowerCase() === bg.value.toLowerCase();
+                                return (
+                                    <button
+                                        key={bg.value}
+                                        type="button"
+                                        onClick={() => onChangeTheme({ ...theme, backgroundColor: bg.value })}
+                                        className={`h-9 rounded-xl border-2 border-black flex items-center justify-center cursor-pointer transition-all ${
+                                            bg.preview
+                                        } ${
+                                            isSelected
+                                                ? "shadow-[2.5px_2.5px_0px_#000] ring-2 ring-black"
+                                                : "shadow-[1px_1px_0px_#000] hover:shadow-[2px_2px_0px_#000]"
+                                        }`}
+                                        title={bg.label}
+                                    >
+                                        {isSelected && <Check className="w-3.5 h-3.5 text-black stroke-[3]" />}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* 4. Card Surface Tone */}
+                    <div className="space-y-2">
+                        <label className="block text-xs font-black uppercase tracking-wider text-black">
+                            Card Surface Color
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {SURFACE_PALETTES.map((sf) => {
+                                const isSelected = (theme.cardSurfaceColor || "#FFFFFF").toLowerCase() === sf.value.toLowerCase();
+                                return (
+                                    <button
+                                        key={sf.value}
+                                        type="button"
+                                        onClick={() => onChangeTheme({ ...theme, cardSurfaceColor: sf.value })}
+                                        className={`p-2.5 rounded-xl border-2 border-black text-xs font-black cursor-pointer text-center transition-all ${
+                                            isSelected
+                                                ? "bg-[#FFE566] text-black shadow-[2.5px_2.5px_0px_#000]"
+                                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1px_1px_0px_#000]"
+                                        }`}
+                                    >
+                                        {sf.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* 5. Card Elevation */}
+                    <div className="space-y-2">
+                        <label className="block text-xs font-black uppercase tracking-wider text-black">
+                            Card Elevation
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {SHADOW_STYLES.map((sh) => {
+                                const isSelected = (theme.cardShadowStyle || "crisp") === sh.value;
+                                return (
+                                    <button
+                                        key={sh.value}
+                                        type="button"
+                                        onClick={() => onChangeTheme({ ...theme, cardShadowStyle: sh.value })}
+                                        className={`p-2.5 rounded-xl border-2 border-black text-xs font-black cursor-pointer text-center transition-all ${
+                                            isSelected
+                                                ? "bg-[#A2FF86] text-black shadow-[2.5px_2.5px_0px_#000]"
+                                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1px_1px_0px_#000]"
+                                        }`}
+                                        title={sh.desc}
+                                    >
+                                        {sh.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* 6. Button Geometry */}
+                    <div className="space-y-2">
+                        <label className="block text-xs font-black uppercase tracking-wider text-black">
+                            Button Geometry
+                        </label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {BUTTON_STYLES.map((b) => {
+                                const isSelected = (theme.buttonStyle || "rounded") === b.value;
+                                return (
+                                    <button
+                                        key={b.value}
+                                        type="button"
+                                        onClick={() => onChangeTheme({ ...theme, buttonStyle: b.value })}
+                                        className={`p-2.5 rounded-xl border-2 border-black text-xs font-black cursor-pointer text-center transition-all ${
+                                            isSelected
+                                                ? "bg-[#C084FC] text-black shadow-[2.5px_2.5px_0px_#000]"
+                                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1px_1px_0px_#000]"
+                                        }`}
+                                    >
+                                        {b.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* 7. Font Family */}
+                    <div className="space-y-2">
+                        <label className="block text-xs font-black uppercase tracking-wider text-black">
+                            Typography Style
+                        </label>
+                        <div className="space-y-2">
+                            {FONT_OPTIONS.map((font) => (
+                                <button
+                                    key={font.value}
+                                    type="button"
+                                    onClick={() => onChangeTheme({ ...theme, fontFamily: font.value })}
+                                    className={`w-full text-left p-3 rounded-xl border-2 border-black font-black text-xs flex items-center justify-between cursor-pointer transition-all ${
+                                        (theme.fontFamily || "sans") === font.value
+                                            ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
+                                            : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
+                                    }`}
+                                >
+                                    <div>
+                                        <span className="block font-black">{font.label}</span>
+                                        <span className="text-[10px] text-neutral-600 font-bold block">
+                                            {font.sub}
+                                        </span>
+                                    </div>
+                                    {(theme.fontFamily || "sans") === font.value && (
+                                        <Check className="w-4 h-4 text-black stroke-[3]" />
                                     )}
                                 </button>
-                            );
-                        })}
+                            ))}
+                        </div>
                     </div>
                 </div>
 
-                {/* 3. Canvas Background Color */}
-                <div className="space-y-2.5">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
-                        Canvas Background Tone
-                    </label>
-                    <div className="grid grid-cols-5 gap-2">
-                        {BACKGROUND_PALETTES.map((bg) => {
-                            const isSelected = (theme.backgroundColor || "#FAF6EE").toLowerCase() === bg.value.toLowerCase();
-                            return (
-                                <button
-                                    key={bg.value}
-                                    type="button"
-                                    onClick={() => onChangeTheme({ ...theme, backgroundColor: bg.value })}
-                                    className={`h-9 rounded-xl border border-neutral-200 dark:border-neutral-700 flex items-center justify-center cursor-pointer transition-all active:scale-95 ${
-                                        bg.preview
-                                    } ${isSelected ? "ring-2 ring-neutral-900 dark:ring-white ring-offset-2" : "hover:border-neutral-400"}`}
-                                    title={bg.label}
-                                >
-                                    {isSelected && <Check className="w-3.5 h-3.5 text-neutral-900 stroke-[2.5]" />}
-                                </button>
-                            );
-                        })}
-                    </div>
+                {/* Bottom Actions */}
+                <div className="p-4 sm:p-5 border-t-2 border-black/15 bg-white/70 backdrop-blur-sm flex items-center gap-2 shrink-0">
+                    <button
+                        type="button"
+                        onClick={handleResetTheme}
+                        className="p-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px] shrink-0"
+                        title="Reset theme defaults"
+                    >
+                        <RefreshCw className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 py-2.5 rounded-xl bg-[#A2FF86] hover:bg-[#8ee673] text-black font-black text-xs border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1.5px_1.5px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 uppercase tracking-wider"
+                    >
+                        <Sparkles className="w-4 h-4 stroke-[2.5]" />
+                        <span>Apply & Close</span>
+                    </button>
                 </div>
-
-                {/* 4. Card Surface Tone */}
-                <div className="space-y-2">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
-                        Card Surface Color
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                        {SURFACE_PALETTES.map((sf) => {
-                            const isSelected = (theme.cardSurfaceColor || "#FFFFFF").toLowerCase() === sf.value.toLowerCase();
-                            return (
-                                <button
-                                    key={sf.value}
-                                    type="button"
-                                    onClick={() => onChangeTheme({ ...theme, cardSurfaceColor: sf.value })}
-                                    className={`p-2 rounded-xl border text-[11px] font-semibold cursor-pointer text-center transition-colors ${
-                                        isSelected
-                                            ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-sm"
-                                            : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                                    }`}
-                                >
-                                    {sf.label}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* 5. Card Shadow Style */}
-                <div className="space-y-2">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
-                        Card Elevation
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                        {SHADOW_STYLES.map((sh) => {
-                            const isSelected = (theme.cardShadowStyle || "crisp") === sh.value;
-                            return (
-                                <button
-                                    key={sh.value}
-                                    type="button"
-                                    onClick={() => onChangeTheme({ ...theme, cardShadowStyle: sh.value })}
-                                    className={`p-2 rounded-xl border text-[11px] font-semibold cursor-pointer text-center transition-colors ${
-                                        isSelected
-                                            ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-sm"
-                                            : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                                    }`}
-                                    title={sh.desc}
-                                >
-                                    {sh.label}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* 6. Button Style */}
-                <div className="space-y-2">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
-                        Button Geometry
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                        {BUTTON_STYLES.map((b) => {
-                            const isSelected = (theme.buttonStyle || "rounded") === b.value;
-                            return (
-                                <button
-                                    key={b.value}
-                                    type="button"
-                                    onClick={() => onChangeTheme({ ...theme, buttonStyle: b.value })}
-                                    className={`p-2 rounded-xl border text-[11px] font-semibold cursor-pointer text-center transition-colors ${
-                                        isSelected
-                                            ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 border-neutral-900 dark:border-white shadow-sm"
-                                            : "bg-white dark:bg-neutral-900 text-neutral-700 dark:text-neutral-300 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800"
-                                    }`}
-                                >
-                                    {b.label}
-                                </button>
-                            );
-                        })}
-                    </div>
-                </div>
-
-                {/* 7. Font Family */}
-                <div className="space-y-2.5">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-700 dark:text-neutral-300">
-                        Typography Style
-                    </label>
-                    <div className="space-y-2">
-                        {FONT_OPTIONS.map((font) => (
-                            <button
-                                key={font.value}
-                                type="button"
-                                onClick={() => onChangeTheme({ ...theme, fontFamily: font.value })}
-                                className={`w-full text-left p-3 rounded-xl border font-medium text-xs flex items-center justify-between cursor-pointer transition-colors ${
-                                    (theme.fontFamily || "sans") === font.value
-                                        ? "bg-neutral-100 dark:bg-neutral-800 border-neutral-300 dark:border-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
-                                        : "bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800/60 text-neutral-700 dark:text-neutral-300"
-                                }`}
-                            >
-                                <div>
-                                    <span className="block font-semibold">{font.label}</span>
-                                    <span className="text-[10px] text-neutral-500 font-normal block">
-                                        {font.sub}
-                                    </span>
-                                </div>
-                                {(theme.fontFamily || "sans") === font.value && (
-                                    <Check className="w-4 h-4 text-neutral-900 dark:text-neutral-100 stroke-[2.5]" />
-                                )}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            <div className="pt-6 border-t border-neutral-200 dark:border-neutral-800 mt-6">
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="w-full py-2.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 font-semibold text-xs hover:bg-neutral-800 dark:hover:bg-neutral-200 transition-colors shadow-sm cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                    <Sparkles className="w-4 h-4 text-amber-300" />
-                    <span>Apply Theme</span>
-                </button>
-            </div>
-        </div>
+            </aside>
+        </>
     );
 };

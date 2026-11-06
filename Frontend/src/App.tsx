@@ -32,6 +32,9 @@ const ClubStatusPage = lazy(() => import("./app/Club/ClubStatusPage"));
 const ClubReviewerQueuePage = lazy(() => import("./app/Club/ClubReviewerQueuePage"));
 const ClubDashboardPage = lazy(() => import("./app/Club/ClubDashboardPage"));
 const PublicClubProfilePage = lazy(() => import("./app/Club/PublicClubProfilePage"));
+const PrivacyPolicyPage = lazy(() => import("./LandingPages/Legal/PrivacyPolicyPage"));
+const TermsConditionsPage = lazy(() => import("./LandingPages/Legal/TermsConditionsPage"));
+const GuardianConsentPage = lazy(() => import("./LandingPages/Legal/GuardianConsentPage"));
 const PublicEventRegistrationPage = lazy(() => import("./app/Events/PublicEventRegistrationPage"));
 
 const WorkspaceRedirect = () => {
@@ -87,6 +90,14 @@ const App = () => {
           <Route path="/customers" element={<CustomersPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/support" element={<SupportPage />} />
+
+          {/* Legal & Minor Attendee Consent Routes */}
+          <Route path="/privacy" element={<PrivacyPolicyPage />} />
+          <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
+          <Route path="/terms" element={<TermsConditionsPage />} />
+          <Route path="/terms-and-conditions" element={<Navigate to="/terms" replace />} />
+          <Route path="/terms-of-service" element={<Navigate to="/terms" replace />} />
+          <Route path="/events/guardian-consent" element={<GuardianConsentPage />} />
           <Route path="/platform" element={<PlatformPage />} />
           <Route path="/demo" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
           <Route path="/demo-profile" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />

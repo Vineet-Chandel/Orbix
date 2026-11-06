@@ -322,13 +322,13 @@ export default function PublicClubProfilePage() {
             <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
                 {/* Header Banner & Hero Card */}
                 <div className="rounded-2xl bg-white border-2 border-black shadow-[6px_6px_0px_#000] overflow-hidden">
-                    {/* Header Banner Image */}
-                    <div className="w-full h-44 sm:h-64 bg-neutral-900 border-b-2 border-black relative overflow-hidden">
+                    {/* Header Banner Image (100% full view, never cropped) */}
+                    <div className="w-full aspect-[2.4/1] sm:aspect-[2.8/1] max-h-80 bg-neutral-950 border-b-2 border-black relative overflow-hidden flex items-center justify-center">
                         {club.coverImageUrl ? (
                             <img
                                 src={club.coverImageUrl}
                                 alt={club.name}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                             />
                         ) : (
                             <div className="w-full h-full bg-[#FFE566] bg-[radial-gradient(#000_1.5px,transparent_1.5px)] [background-size:16px_16px] flex items-center justify-center">

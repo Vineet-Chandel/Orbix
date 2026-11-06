@@ -128,13 +128,13 @@ export const ClubDetailModal: React.FC<ClubDetailModalProps> = ({
 
                 {/* SCROLLABLE INNER CONTAINER */}
                 <div className="overflow-y-auto flex-1 overscroll-contain">
-                    {/* Cover Showcase Banner */}
-                    <div className="relative h-44 sm:h-56 md:h-64 w-full bg-neutral-900 border-b-3 border-black overflow-hidden flex-shrink-0">
+                    {/* Cover Showcase Banner (100% full view, never cropped) */}
+                    <div className="relative aspect-[2.4/1] max-h-72 w-full bg-neutral-950 border-b-3 border-black overflow-hidden flex-shrink-0 flex items-center justify-center">
                         {club.coverImageUrl ? (
                             <img
                                 src={club.coverImageUrl}
                                 alt={`${club.name} banner`}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                             />
                         ) : (
                             <div className="w-full h-full bg-gradient-to-br from-neutral-950 via-neutral-900 to-black relative flex items-center justify-center">

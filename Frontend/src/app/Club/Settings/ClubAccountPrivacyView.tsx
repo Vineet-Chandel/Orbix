@@ -140,6 +140,7 @@ export const ClubAccountPrivacyView: React.FC<ClubAccountPrivacyViewProps> = ({
                         offIcon={<Lock className="w-3.5 h-3.5 text-neutral-700 stroke-[3]" />}
                         onStatusText="Status: Public"
                         offStatusText="Status: Private"
+                        showStatusText={true}
                         ariaLabel="Toggle club public or private visibility"
                     />
                 </div>

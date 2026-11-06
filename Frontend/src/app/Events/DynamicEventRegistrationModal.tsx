@@ -51,7 +51,7 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
 
     return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-md animate-in fade-in duration-150">
-            <div className="relative w-full max-w-3xl bg-white dark:bg-[#0A0A0A] rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-2xl p-5 sm:p-8 max-h-[92vh] overflow-y-auto text-neutral-900 dark:text-neutral-100">
+            <div className="relative w-full max-w-4xl xl:max-w-5xl bg-white dark:bg-[#0A0A0A] rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-2xl p-5 sm:p-8 max-h-[92vh] overflow-y-auto text-neutral-900 dark:text-neutral-100">
                 {/* Close Button */}
                 <button
                     type="button"
