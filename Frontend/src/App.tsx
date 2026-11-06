@@ -35,6 +35,7 @@ const PublicClubProfilePage = lazy(() => import("./app/Club/PublicClubProfilePag
 const PrivacyPolicyPage = lazy(() => import("./LandingPages/Legal/PrivacyPolicyPage"));
 const TermsConditionsPage = lazy(() => import("./LandingPages/Legal/TermsConditionsPage"));
 const GuardianConsentPage = lazy(() => import("./LandingPages/Legal/GuardianConsentPage"));
+const PublicEventRegistrationPage = lazy(() => import("./app/Events/PublicEventRegistrationPage"));
 
 const WorkspaceRedirect = () => {
   const { user } = useAppSelector((state) => state.user);
@@ -102,6 +103,7 @@ const App = () => {
           <Route path="/demo-profile" element={<Navigate to="/profile/u/Vineet-Chandel" replace />} />
           <Route path="/leaderboard" element={<LeaderboardPage />} />
           <Route path="/events" element={<EventTrackerPage />} />
+          <Route path="/events/:eventId/register" element={<PublicEventRegistrationPage />} />
           <Route path="/card" element={<Card />} />
           <Route path="/platforms" element={<Platform />} />
           <Route path="/orbit" element={<Platform />} />

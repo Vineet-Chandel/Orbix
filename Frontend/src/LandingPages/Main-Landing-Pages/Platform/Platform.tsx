@@ -15,7 +15,7 @@ export interface PlatformItem {
     renderIcon: (className?: string) => React.ReactNode;
 }
 
-// Complete set of all 19 platforms connectable to Orbix
+// Complete set of all 20 platforms connectable to Orbix
 export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
     // -------------------------------------------------------------
     // INNER ORBIT RING (6 Core Portals - 60° apart, alternating AI & Competitive)
@@ -113,7 +113,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
     },
 
     // -------------------------------------------------------------
-    // OUTER ORBIT RING (13 Platforms - Evenly Spaced around 360°)
+    // OUTER ORBIT RING (14 Platforms - Evenly Spaced around 360°)
     // -------------------------------------------------------------
     {
         id: "github",
@@ -135,7 +135,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Advanced Algorithms",
         brandColor: "#0284C7",
         ring: "outer",
-        angleDeg: 297.7, // Upper right
+        angleDeg: 295.7, // Upper right
         description: "Connect acceleration benchmarks and high-throughput algorithmic scores.",
         renderIcon: (className = "w-8 h-8") => (
             <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 128 128">
@@ -152,7 +152,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Engineering Publications",
         brandColor: "#12100E",
         ring: "outer",
-        angleDeg: 325.4,
+        angleDeg: 321.4,
         description: "Link engineering architecture articles, deep-dives and technical stories.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -170,7 +170,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Tech Newsletters",
         brandColor: "#FF6719",
         ring: "outer",
-        angleDeg: 353.1, // Middle right
+        angleDeg: 347.1, // Middle right
         description: "Publish your developer newsletters and systems engineering insights.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -187,7 +187,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "DSA & Core CS",
         brandColor: "#2F8D46",
         ring: "outer",
-        angleDeg: 20.8,
+        angleDeg: 12.9,
         description: "Aggregate practice score, solved questions and institution rank.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="#2F8D46">
@@ -201,7 +201,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Skill Badges & Certifications",
         brandColor: "#00EA64",
         ring: "outer",
-        angleDeg: 48.5,
+        angleDeg: 38.6,
         description: "Showcase verified badges, gold certificates and domain proficiencies.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="#00EA64">
@@ -215,7 +215,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Japanese CP Contests",
         brandColor: "#222222",
         ring: "outer",
-        angleDeg: 76.2, // Near bottom right
+        angleDeg: 64.3, // Near bottom right
         description: "Sync Dan/Kyu ratings, ABC/ARC contest performance and colors.",
         renderIcon: (className = "w-8 h-8") => (
 
@@ -231,7 +231,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Coding Ninjas Studio",
         brandColor: "#FF5722",
         ring: "outer",
-        angleDeg: 103.8, // Near bottom left
+        angleDeg: 90.0, // Near bottom left
         description: "Sync interview tracks, ninja points and practice challenges.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="#DD6620">
@@ -245,7 +245,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "SRM & Single Round Matches",
         brandColor: "#29A7DF",
         ring: "outer",
-        angleDeg: 131.5,
+        angleDeg: 115.7,
         description: "Display vintage SRM ratings, algorithm division stats and achievements.",
         renderIcon: (className = "w-8 h-8") => (
 
@@ -261,7 +261,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Tech Interview Prep",
         brandColor: "#0D8BD9",
         ring: "outer",
-        angleDeg: 159.2, // Mid left
+        angleDeg: 141.4, // Mid left
         description: "Sync interview streak, topic strengths and company-tagged questions.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} xmlns="http://www.w3.org/2000/svg" width="58" height="35" viewBox="0 0 58 35" fill="none">
@@ -304,7 +304,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Hackathons & Challenges",
         brandColor: "#2C3454",
         ring: "outer",
-        angleDeg: 186.9,
+        angleDeg: 167.1,
         description: "Connect competitive hackathons, company hiring challenges and ratings.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24">
@@ -318,7 +318,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Problem Set Archive",
         brandColor: "#214478",
         ring: "outer",
-        angleDeg: 214.6, // Upper left
+        angleDeg: 192.9, // Upper left
         description: "Track classical algorithm problem sets and pure competitive tasks.",
         renderIcon: () => (
             <span className="font-black text-[#214478] tracking-wider text-sm sm:text-base font-mono select-none">
@@ -332,7 +332,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         category: "Sphere Online Judge",
         brandColor: "#1B6AC9",
         ring: "outer",
-        angleDeg: 242.3, // Top left
+        angleDeg: 218.6, // Top left
         description: "Benchmark classical problem sets across 60+ programming languages.",
         renderIcon: (className = "w-8 h-8") => (
             <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -345,6 +345,24 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
                     strokeLinejoin="round"
                 />
             </svg>
+        ),
+    },
+    {
+        id: "awsbuildercenter",
+        name: "AWS Builder Center",
+        category: "Cloud & Developer Community",
+        brandColor: "#FF9900",
+        ring: "outer",
+        angleDeg: 244.3,
+        description: "Connect cloud builder projects, architecture benchmarks and developer community badges.",
+        renderIcon: (className = "w-8 h-8") => (
+            <img
+                src="https://play-lh.googleusercontent.com/2MTOhjyOUjrKQdwbBEuaYhTxruV3U7gL3Eu5UV-D08e2FF8seT_yhKvdJOc__9ctGv46Uql6V3XUUKLJ7ITx=w480-h960-rw"
+                alt="AWS Builder Center"
+                className={`${className} object-contain rounded-md`}
+                loading="lazy"
+                decoding="async"
+            />
         ),
     },
 ];
@@ -639,7 +657,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                             )}
                         </svg>
 
-                        {/* 13 Outer Orbit Platforms */}
+                        {/* 14 Outer Orbit Platforms */}
                         {outerPlatforms.map((platform) => {
                             const rad = (platform.angleDeg * Math.PI) / 180;
                             const x = Math.round(Math.cos(rad) * OUTER_RADIUS);

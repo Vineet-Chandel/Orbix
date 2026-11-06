@@ -24,6 +24,7 @@ import { accountGovernanceRouter } from './Routes/account/accountGovernanceRoute
 import { privacyRouter } from './Routes/account/privacyRoutes.js';
 import { platformRouter } from './Routes/platform/platformRoutes.js';
 import { sessionRouter } from './Routes/session/sessionRoutes.js';
+import { eventFormRouter } from './Routes/events/eventFormRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import { startAccountPurgeWorker } from './services/account/accountPurgeService.js';
 import redis from './redis/client.js';
@@ -77,6 +78,8 @@ app.use('/api/leaderboard', leaderboardRouter);
 app.use('/api/events', eventsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/institutions', institutionsRouter);
+app.use('/api', eventFormRouter);
+app.use('/', eventFormRouter);
 app.use('/api/club', clubRouter);
 app.use('/api/clubs', clubRouter);
 app.use('/clubs', clubRouter);

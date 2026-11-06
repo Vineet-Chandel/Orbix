@@ -186,6 +186,18 @@ export const getPortalIcon = (portalId: string, className = "w-5 h-5"): ReactNod
                 </svg>
             );
 
+        case "awsbuildercenter":
+        case "aws":
+            return (
+                <img
+                    src="https://play-lh.googleusercontent.com/2MTOhjyOUjrKQdwbBEuaYhTxruV3U7gL3Eu5UV-D08e2FF8seT_yhKvdJOc__9ctGv46Uql6V3XUUKLJ7ITx=w480-h960-rw"
+                    alt="AWS Builder Center"
+                    className={`${className} object-contain rounded-md`}
+                    loading="lazy"
+                    decoding="async"
+                />
+            );
+
         default:
             return (
                 <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

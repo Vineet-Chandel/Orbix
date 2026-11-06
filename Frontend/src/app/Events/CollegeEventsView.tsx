@@ -23,7 +23,7 @@ import {
     toggleEventLike,
     type CollegeEventItem,
 } from "../../api/collegeEventsApi";
-import { EventRegistrationModal } from "./EventRegistrationModal";
+import { DynamicEventRegistrationModal } from "./DynamicEventRegistrationModal";
 import { CollegeEventDetailModal } from "./CollegeEventDetailModal";
 import { CollegeRestrictionModal } from "../../components/CollegeRestrictionModal";
 import { NeoSelect } from "../../components/NeoSelect";
@@ -803,8 +803,8 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                 onToggleHeart={(ev) => handleToggleHeart(ev)}
             />
 
-            {/* Registration Modal */}
-            <EventRegistrationModal
+            {/* Dynamic Registration Modal */}
+            <DynamicEventRegistrationModal
                 isOpen={Boolean(selectedEventForModal)}
                 onClose={() => setSelectedEventForModal(null)}
                 event={selectedEventForModal}

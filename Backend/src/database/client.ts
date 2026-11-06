@@ -122,6 +122,9 @@ export const testDatabaseConnection = async () => {
             ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_email_operation_id UUID NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS username_updated_at TIMESTAMPTZ NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS roll_number VARCHAR(100) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS department VARCHAR(100) NULL;
+            ALTER TABLE users ADD COLUMN IF NOT EXISTS year_of_study VARCHAR(50) NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_confirmed_at TIMESTAMPTZ NULL;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS is_phone_verified BOOLEAN DEFAULT false;
             ALTER TABLE users ADD COLUMN IF NOT EXISTS phone_verified_at TIMESTAMPTZ NULL;
@@ -716,6 +719,160 @@ export const testDatabaseConnection = async () => {
                     ALTER TABLE public.account_deletion_requests ADD COLUMN IF NOT EXISTS user_email_hash VARCHAR(64);
                     ALTER TABLE public.account_deletion_requests ADD COLUMN IF NOT EXISTS purge_log JSONB DEFAULT '{}'::jsonb;
                 END IF;
+
+                -- Ensure Dynamic Event Registration Form Builder schema exists
+                CREATE TABLE IF NOT EXISTS public.club_event_forms (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    header_image_url TEXT,
+                    header_image_public_id TEXT,
+                    theme_settings JSONB NOT NULL DEFAULT '{
+                        "accentColor": "#38BDF8",
+                        "fontFamily": "sans",
+                        "headerPosition": "center"
+                    }'::jsonb,
+                    settings JSONB NOT NULL DEFAULT '{
+                        "isOpen": true,
+                        "closedMessage": "Registrations are currently closed for this event.",
+                        "maxResponses": null,
+                        "limitOneResponse": true,
+                        "allowEditResponse": false,
+                        "requireLogin": true,
+                        "showProgressBar": true,
+                        "confirmationMessage": "Your registration has been submitted successfully!",
+                        "notifyOnRegistration": true
+                    }'::jsonb,
+                    structure JSONB NOT NULL DEFAULT '{"sections": []}'::jsonb,
+                    is_published BOOLEAN NOT NULL DEFAULT true,
+                    schema_version INT NOT NULL DEFAULT 1,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT unique_event_form UNIQUE (event_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_forms_event
+                    ON public.club_event_forms(event_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_forms_club
+                    ON public.club_event_forms(club_id);
+
+                ALTER TABLE public.club_event_forms
+                    ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'draft',
+                    ADD COLUMN IF NOT EXISTS created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS current_draft_version_id UUID,
+                    ADD COLUMN IF NOT EXISTS published_version_id UUID,
+                    ADD COLUMN IF NOT EXISTS default_settings JSONB NOT NULL DEFAULT '{
+                        "isOpen": true,
+                        "closedMessage": "Registrations are currently closed for this event.",
+                        "maxResponses": null,
+                        "limitOneResponse": true,
+                        "allowEditResponse": false,
+                        "requireLogin": true,
+                        "showProgressBar": true,
+                        "confirmationMessage": "Your registration has been submitted successfully!",
+                        "notifyOnRegistration": true
+                    }'::jsonb,
+                    ADD COLUMN IF NOT EXISTS version_count INT NOT NULL DEFAULT 1,
+                    ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ;
+
+                CREATE TABLE IF NOT EXISTS public.club_event_form_versions (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    form_id UUID NOT NULL REFERENCES public.club_event_forms(id) ON DELETE CASCADE,
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    version_number INT NOT NULL,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    header_image_url TEXT,
+                    header_image_public_id TEXT,
+                    structure JSONB NOT NULL DEFAULT '{"sections": []}'::jsonb,
+                    settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    theme_settings JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    change_summary TEXT,
+                    is_published BOOLEAN NOT NULL DEFAULT false,
+                    published_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    published_at TIMESTAMPTZ,
+                    CONSTRAINT unique_form_version UNIQUE (form_id, version_number)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_form_versions_form
+                    ON public.club_event_form_versions(form_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_form_versions_event
+                    ON public.club_event_form_versions(event_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_form_versions_published
+                    ON public.club_event_form_versions(form_id, is_published);
+
+                ALTER TABLE public.club_event_registrations
+                    ADD COLUMN IF NOT EXISTS form_id UUID REFERENCES public.club_event_forms(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS form_version_id UUID REFERENCES public.club_event_form_versions(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS form_response JSONB DEFAULT '{}'::jsonb,
+                    ADD COLUMN IF NOT EXISTS answers JSONB DEFAULT '{}'::jsonb,
+                    ADD COLUMN IF NOT EXISTS file_attachments JSONB DEFAULT '[]'::jsonb,
+                    ADD COLUMN IF NOT EXISTS idempotency_key TEXT,
+                    ADD COLUMN IF NOT EXISTS quiz_score NUMERIC(7,2) DEFAULT NULL,
+                    ADD COLUMN IF NOT EXISTS quiz_max_score NUMERIC(7,2) DEFAULT NULL,
+                    ADD COLUMN IF NOT EXISTS quiz_graded_answers JSONB DEFAULT NULL,
+                    ADD COLUMN IF NOT EXISTS quiz_grades_released BOOLEAN DEFAULT FALSE,
+                    ADD COLUMN IF NOT EXISTS last_updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_registrations_form
+                    ON public.club_event_registrations(form_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_registrations_version
+                    ON public.club_event_registrations(form_version_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_registrations_idempotency
+                    ON public.club_event_registrations(idempotency_key) WHERE idempotency_key IS NOT NULL;
+                CREATE INDEX IF NOT EXISTS idx_club_event_registrations_event_user
+                    ON public.club_event_registrations(event_id, user_id);
+
+                CREATE TABLE IF NOT EXISTS public.club_form_media_assets (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    form_id UUID REFERENCES public.club_event_forms(id) ON DELETE CASCADE,
+                    event_id UUID REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    uploader_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    public_id TEXT NOT NULL UNIQUE,
+                    secure_url TEXT NOT NULL,
+                    resource_type TEXT NOT NULL DEFAULT 'image',
+                    format TEXT,
+                    bytes INT,
+                    width INT,
+                    height INT,
+                    asset_purpose TEXT NOT NULL DEFAULT 'question_image',
+                    question_id TEXT,
+                    response_id UUID REFERENCES public.club_event_registrations(id) ON DELETE SET NULL,
+                    metadata JSONB DEFAULT '{}'::jsonb,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_form_media_assets_form
+                    ON public.club_form_media_assets(form_id);
+                CREATE INDEX IF NOT EXISTS idx_club_form_media_assets_event
+                    ON public.club_form_media_assets(event_id);
+                CREATE INDEX IF NOT EXISTS idx_club_form_media_assets_response
+                    ON public.club_form_media_assets(response_id);
+
+                -- Student Response Drafts and Autosave Table
+                CREATE TABLE IF NOT EXISTS public.club_event_response_drafts (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    event_id UUID NOT NULL REFERENCES public.club_events(id) ON DELETE CASCADE,
+                    form_id UUID REFERENCES public.club_event_forms(id) ON DELETE CASCADE,
+                    form_version_id UUID REFERENCES public.club_event_form_versions(id) ON DELETE SET NULL,
+                    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    answers JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    file_attachments JSONB NOT NULL DEFAULT '[]'::jsonb,
+                    current_section_index INT NOT NULL DEFAULT 0,
+                    section_history JSONB NOT NULL DEFAULT '[0]'::jsonb,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    CONSTRAINT unique_user_event_draft UNIQUE (event_id, user_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_response_drafts_user_event
+                    ON public.club_event_response_drafts(user_id, event_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_response_drafts_event_version
+                    ON public.club_event_response_drafts(event_id, form_version_id);
             END $$;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");

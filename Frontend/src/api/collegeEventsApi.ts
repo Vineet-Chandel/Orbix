@@ -113,6 +113,17 @@ export interface ClubEventApplicantRow {
     guardianRelationship?: string | null;
     guardianConsentStatus?: "not_required" | "pending_verification" | "verified" | "rejected" | "withdrawn";
     guardianConsentVerifiedAt?: string | null;
+    answers?: Record<string, any>;
+    formResponse?: Record<string, any>;
+    fileAttachments?: Array<{
+        questionId: string;
+        questionTitle?: string;
+        fileName: string;
+        fileUrl: string;
+        filePublicId: string;
+        fileSize: number;
+        mimeType: string;
+    }>;
 }
 
 export interface ClubEventApplicationsResponse {
@@ -124,6 +135,8 @@ export interface ClubEventApplicationsResponse {
         venue: string | null;
         clubName: string;
     };
+    formStructure?: any;
+    formSettings?: any;
     summary: {
         total: number;
         pending: number;
