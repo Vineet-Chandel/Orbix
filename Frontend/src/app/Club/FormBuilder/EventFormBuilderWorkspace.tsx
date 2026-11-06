@@ -1018,8 +1018,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                     </div>
                 </div>
 
-                {/* Right Upper Toolbar: Undo, Redo, Theme, Preview, Save, Publish */}
-                <div className="flex items-center gap-2 flex-wrap shrink-0">
+                {/* Right Upper Toolbar: Undo, Redo */}
+                <div className="flex items-center gap-2 shrink-0">
                     {/* Undo / Redo */}
                     <div className="flex items-center bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg shadow-sm divide-x divide-neutral-200 dark:divide-neutral-800">
                         <button
@@ -1041,85 +1041,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             <Redo2 className="w-4 h-4" />
                         </button>
                     </div>
-
-                    {/* Templates Button */}
-                    <button
-                        type="button"
-                        onClick={() => setIsTemplatesModalOpen(true)}
-                        className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                        title="Form Templates"
-                    >
-                        <LayoutTemplate className="w-4 h-4" />
-                        <span className="hidden sm:inline">Templates</span>
-                    </button>
-
-                    {/* Theme Button */}
-                    <button
-                        type="button"
-                        onClick={() => setIsThemeDrawerOpen(true)}
-                        className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                        title="Theme & Colors"
-                    >
-                        <Palette className="w-4 h-4" />
-                        <span className="hidden sm:inline">Theme</span>
-                    </button>
-
-                    {/* Preview Simulator Action */}
-                    <button
-                        type="button"
-                        onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-                        className={`p-2 sm:px-3 sm:py-2 rounded-lg text-xs font-medium shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
-                            isPreviewOpen
-                                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                                : "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
-                        }`}
-                        title="Preview form as student"
-                    >
-                        <Eye className="w-4 h-4" />
-                        <span className="hidden sm:inline">{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
-                    </button>
-
-                    {/* Save Draft */}
-                    <button
-                        type="button"
-                        onClick={handleSaveForm}
-                        disabled={saving || isPublishing}
-                        className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                        title="Save working draft"
-                    >
-                        {saving ? (
-                            <>
-                                <OrbixLoader size="xs" />
-                                <span className="hidden sm:inline">Saving...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Save className="w-4 h-4" />
-                                <span className="hidden sm:inline">Save Draft</span>
-                            </>
-                        )}
-                    </button>
-
-                    {/* Publish Live */}
-                    <button
-                        type="button"
-                        onClick={handlePublishForm}
-                        disabled={saving || isPublishing}
-                        className="px-3.5 py-2 rounded-lg bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-black text-xs font-semibold shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                        title="Publish live snapshot for students"
-                    >
-                        {isPublishing ? (
-                            <>
-                                <OrbixLoader size="xs" />
-                                <span>Publishing...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Send className="w-3.5 h-3.5" />
-                                <span>Publish Live</span>
-                            </>
-                        )}
-                    </button>
                 </div>
             </div>
 
@@ -1191,60 +1112,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* TAB 1: QUESTIONS (GOOGLE FORMS BUILDER CANVAS) */}
             {/* ---------------------------------------------------------------- */}
             {activeTab === "questions" && !isPreviewOpen && (
-                <div className="relative w-full lg:pr-20 space-y-6 pb-24">
-                    {/* Phase 6 Accelerators Banner: AI, Question Library & Templates */}
-                    <div className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <div
-                                className="w-10 h-10 rounded-2xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0"
-                                style={{ backgroundColor: accentColor }}
-                            >
-                                <Sparkles className="w-5 h-5 text-black stroke-[2.5]" />
-                            </div>
-                            <div>
-                                <span className="text-sm font-black text-black dark:text-white">Form Accelerators</span>
-                                <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400 hidden sm:inline ml-2">
-                                    Build questionnaires in seconds with AI, reusable questions & templates
-                                </span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    if (form?.structure?.sections?.length) {
-                                        setAiTargetSectionId(form.structure.sections[form.structure.sections.length - 1].id);
-                                    }
-                                    setIsAiModalOpen(true);
-                                }}
-                                className="px-4 py-2 rounded-xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center gap-1.5 active:translate-x-[1.5px] active:translate-y-[1.5px]"
-                                style={{ backgroundColor: accentColor, color: "#000" }}
-                                title="AI Assistant (Phase 6.3)"
-                            >
-                                <Sparkles className="w-4 h-4 stroke-[2.5]" />
-                                <span>AI Assistant</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleOpenQuestionLibrary}
-                                className="px-4 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center gap-1.5 active:translate-x-[1.5px] active:translate-y-[1.5px]"
-                                title="Question Library (Phase 6.1)"
-                            >
-                                <ClipboardList className="w-4 h-4 stroke-[2.5]" />
-                                <span>Question Library</span>
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setIsTemplatesModalOpen(true)}
-                                className="px-4 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center gap-1.5 active:translate-x-[1.5px] active:translate-y-[1.5px]"
-                                title="Templates Catalog (Phase 6.2)"
-                            >
-                                <LayoutTemplate className="w-4 h-4 stroke-[2.5]" />
-                                <span>Templates</span>
-                            </button>
-                        </div>
-                    </div>
-
+                <div className="relative w-full lg:pr-20 space-y-6 pb-36">
                     {/* Verified Identity Notice Card */}
                     <div className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4">
                         <div className="flex items-start sm:items-center gap-3.5">
@@ -1278,14 +1146,25 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 <span className="text-xs font-black uppercase tracking-wider text-black dark:text-white">
                                     + Quick Add Common Event Questions:
                                 </span>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsImportModalOpen(true)}
-                                    className="px-3 py-1 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] flex items-center gap-1.5 cursor-pointer transition-all self-start sm:self-auto"
-                                >
-                                    <ClipboardList className="w-3.5 h-3.5 stroke-[2.5]" />
-                                    <span>Browse Question Bank</span>
-                                </button>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <button
+                                        type="button"
+                                        onClick={handleOpenQuestionLibrary}
+                                        className="px-3 py-1 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] flex items-center gap-1.5 cursor-pointer transition-all self-start sm:self-auto"
+                                        title="Past Events Question Library"
+                                    >
+                                        <FileText className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Past Questions</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsImportModalOpen(true)}
+                                        className="px-3 py-1 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] flex items-center gap-1.5 cursor-pointer transition-all self-start sm:self-auto"
+                                    >
+                                        <ClipboardList className="w-3.5 h-3.5 stroke-[2.5]" />
+                                        <span>Browse Question Bank</span>
+                                    </button>
+                                </div>
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 {QUICK_TEMPLATES.map((tmpl) => (
@@ -1493,82 +1372,53 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         </button>
                     </div>
 
-                    {/* Floating Quick-Add Toolbar (Desktop docked right, Mobile bottom bar) */}
-                    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 lg:left-auto lg:translate-x-0 lg:bottom-auto lg:top-44 lg:right-4 xl:right-6 w-fit bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl p-1.5 flex lg:flex-col items-center gap-1 z-40">
+                    {/* Floating Vertical Canvas Tools Palette (Desktop docked right) */}
+                    <div className="hidden sm:flex flex-col fixed top-44 right-3 sm:right-4 xl:right-6 w-fit bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 border-black shadow-[3px_3px_0px_#000] rounded-2xl p-1.5 items-center gap-1.5 z-30">
                         <button
                             type="button"
                             onClick={() => handleAddQuestion()}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-transparent hover:border-black cursor-pointer transition-colors"
                             title="Add Question (+)"
                         >
-                            <Plus className="w-4 h-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                if (form?.structure?.sections?.length) {
-                                    setAiTargetSectionId(form.structure.sections[form.structure.sections.length - 1].id);
-                                }
-                                setIsAiModalOpen(true);
-                            }}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
-                            title="AI Assistant"
-                        >
-                            <Sparkles className="w-4 h-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleOpenQuestionLibrary}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
-                            title="Past Events Question Library"
-                        >
-                            <ClipboardList className="w-4 h-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setIsTemplatesModalOpen(true)}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
-                            title="Form Templates"
-                        >
-                            <LayoutTemplate className="w-4 h-4" />
+                            <Plus className="w-4 h-4 stroke-[2.5]" />
                         </button>
                         <button
                             type="button"
                             onClick={() => handleAddTitleBlock()}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-transparent hover:border-black cursor-pointer transition-colors"
                             title="Add Title and description (Tt)"
                         >
-                            <Heading className="w-4 h-4" />
+                            <Heading className="w-4 h-4 stroke-[2.5]" />
                         </button>
                         <button
                             type="button"
                             onClick={() => handleAddImageBlock()}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-transparent hover:border-black cursor-pointer transition-colors"
                             title="Add Image block"
                         >
-                            <ImageIcon className="w-4 h-4" />
+                            <ImageIcon className="w-4 h-4 stroke-[2.5]" />
                         </button>
                         <button
                             type="button"
                             onClick={() => handleAddVideoBlock()}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-transparent hover:border-black cursor-pointer transition-colors"
                             title="Add Video block"
                         >
-                            <Video className="w-4 h-4" />
+                            <Video className="w-4 h-4 stroke-[2.5]" />
                         </button>
                         <button
                             type="button"
                             onClick={handleAddSection}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-transparent hover:border-black cursor-pointer transition-colors"
                             title="Add Section Break (=)"
                         >
-                            <Split className="w-4 h-4" />
+                            <Split className="w-4 h-4 stroke-[2.5]" />
                         </button>
                     </div>
 
                     {/* Section Deletion with Instant Undo Banner */}
                     {deletedSectionNotice && (
-                        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-neutral-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-neutral-800 animate-in fade-in slide-in-from-bottom-2">
+                        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-neutral-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-neutral-800 animate-in fade-in slide-in-from-bottom-2">
                             <span className="text-xs font-medium">
                                 Section &ldquo;{deletedSectionNotice.section.title}&rdquo; deleted.
                             </span>
@@ -1661,6 +1511,119 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         }}
                     />
                 </React.Suspense>
+            )}
+
+            {/* ---------------------------------------------------------------- */}
+            {/* FLOATING BOTTOM ACTION BAR */}
+            {/* Unified & Non-duplicated: AI Assistant, Templates, Theme, Preview, Save Draft, Publish Live */}
+            {/* ---------------------------------------------------------------- */}
+            {activeTab !== "responses" && (
+                <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 max-w-[95vw]">
+                    <div className="bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto">
+                        {/* AI Assistant Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (activeTab !== "questions") setActiveTab("questions");
+                                if (form?.structure?.sections?.length) {
+                                    setAiTargetSectionId(form.structure.sections[form.structure.sections.length - 1].id);
+                                }
+                                setIsAiModalOpen(true);
+                            }}
+                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                            style={{ backgroundColor: accentColor, color: "#000" }}
+                            title="AI Assistant: Generate questions with AI"
+                        >
+                            <Sparkles className="w-4 h-4 stroke-[2.5]" />
+                            <span>AI Assistant</span>
+                        </button>
+
+                        {/* Templates Button */}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (activeTab !== "questions") setActiveTab("questions");
+                                setIsTemplatesModalOpen(true);
+                            }}
+                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                            title="Form Templates"
+                        >
+                            <LayoutTemplate className="w-4 h-4 stroke-[2.5]" />
+                            <span>Templates</span>
+                        </button>
+
+                        {/* Theme Button */}
+                        <button
+                            type="button"
+                            onClick={() => setIsThemeDrawerOpen(true)}
+                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                            title="Theme & Colors"
+                        >
+                            <Palette className="w-4 h-4 stroke-[2.5]" />
+                            <span>Theme</span>
+                        </button>
+
+                        {/* Preview Simulator Action */}
+                        <button
+                            type="button"
+                            onClick={() => setIsPreviewOpen(!isPreviewOpen)}
+                            className={`px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                                isPreviewOpen
+                                    ? "bg-black text-white dark:bg-white dark:text-black"
+                                    : "bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white"
+                            }`}
+                            title="Preview form as student"
+                        >
+                            <Eye className="w-4 h-4 stroke-[2.5]" />
+                            <span>{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
+                        </button>
+
+                        {/* Divider */}
+                        <div className="h-6 w-[2px] bg-black/20 dark:bg-white/20 mx-0.5 shrink-0" />
+
+                        {/* Save Draft */}
+                        <button
+                            type="button"
+                            onClick={handleSaveForm}
+                            disabled={saving || isPublishing}
+                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+                            title="Save working draft"
+                        >
+                            {saving ? (
+                                <>
+                                    <OrbixLoader size="xs" />
+                                    <span>Saving...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Save className="w-4 h-4 stroke-[2.5]" />
+                                    <span>Save Draft</span>
+                                </>
+                            )}
+                        </button>
+
+                        {/* Publish Live */}
+                        <button
+                            type="button"
+                            onClick={handlePublishForm}
+                            disabled={saving || isPublishing}
+                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+                            title="Publish live snapshot for students"
+                        >
+                            {isPublishing ? (
+                                <>
+                                    <OrbixLoader size="xs" />
+                                    <span>Publishing...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Send className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Publish Live</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+                </div>
             )}
 
             {/* Theme Drawer */}
