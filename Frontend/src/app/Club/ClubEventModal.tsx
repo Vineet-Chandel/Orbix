@@ -1089,21 +1089,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             {/* STEP 3: REGISTRATION FORM BUILDER WORKSPACE */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 3 && (
-                <div className="w-full rounded-3xl bg-white dark:bg-[#0A0A0A] border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6">
-                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
-                        <div>
-                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
-                                Step 3 of 3
-                            </span>
-                            <h3 className="text-base sm:text-lg font-black text-black dark:text-white">
-                                Dynamic Registration Form Builder
-                            </h3>
-                            <p className="text-xs text-neutral-600 dark:text-neutral-400 font-medium mt-0.5">
-                                Full Studio: Configure questionnaire with AI Assistant, Question Bank, Templates, Theme, and Branching Logic.
-                            </p>
-                        </div>
-                    </div>
-
+                <div className="w-full">
                     <EventFormBuilderWorkspace
                         eventId={editingEvent?.id || "create-draft"}
                         club={{ id: clubId, name: clubName, logoUrl: clubLogoUrl }}
@@ -1128,7 +1114,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             if (updatedForm.settings) setFormSettings(updatedForm.settings);
                             if (updatedForm.themeSettings) setFormTheme(updatedForm.themeSettings);
                         }}
-                        onWizardBack={() => setCurrentStep(2)}
                         onWizardSubmit={() => handleSubmitFinal()}
                     />
                 </div>

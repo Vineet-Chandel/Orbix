@@ -246,7 +246,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     initialFormRecord,
     initialEventData,
     onWizardChange,
-    onWizardBack,
+    onWizardBack: _onWizardBack,
     onWizardSubmit,
 }) => {
     const toast = useToast();
@@ -1584,19 +1584,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {activeTab !== "responses" && (
                 <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 max-w-[95vw]">
                     <div className="bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto">
-                        {/* Wizard Back Button */}
-                        {isWizardMode && onWizardBack && (
-                            <button
-                                type="button"
-                                onClick={onWizardBack}
-                                className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                                title="Back to Banner Studio"
-                            >
-                                <ArrowLeft className="w-4 h-4" />
-                                <span className="hidden sm:inline">Back: Banner</span>
-                            </button>
-                        )}
-
                         {/* AI Assistant Button */}
                         <button
                             type="button"
@@ -1675,13 +1662,13 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             )}
                         </button>
 
-                        {/* Publish (Text only "Publish", or "Publish & Create Event" in Wizard, Borderless) */}
+                        {/* Publish (Text only "Publish", Borderless) */}
                         <button
                             type="button"
                             onClick={handlePublishForm}
                             disabled={saving || isPublishing}
                             className="px-4 sm:px-6 py-2 rounded-xl sm:rounded-2xl bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0 border-0 shadow-none"
-                            title={isWizardMode ? "Publish & Create Event" : "Publish form snapshot for students"}
+                            title="Publish"
                         >
                             {isPublishing ? (
                                 <>
@@ -1689,7 +1676,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     <span>Publishing...</span>
                                 </>
                             ) : (
-                                <span>{isWizardMode ? "🚀 Publish & Create Event" : "Publish"}</span>
+                                <span>Publish</span>
                             )}
                         </button>
                     </div>
