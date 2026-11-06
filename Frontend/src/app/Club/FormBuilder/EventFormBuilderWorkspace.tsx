@@ -6,7 +6,6 @@ import {
     Settings,
     Eye,
     BarChart3,
-    Save,
     ArrowLeft,
     FileText,
     ShieldCheck,
@@ -16,7 +15,6 @@ import {
     Layers,
     UploadCloud,
     Sparkles,
-    Send,
     Undo2,
     Redo2,
     AlertTriangle,
@@ -1530,12 +1528,11 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 }
                                 setIsAiModalOpen(true);
                             }}
-                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
                             style={{ backgroundColor: accentColor, color: "#000" }}
                             title="AI Assistant: Generate questions with AI"
                         >
-                            <Sparkles className="w-4 h-4 stroke-[2.5]" />
-                            <span>AI Assistant</span>
+                            <span className="font-black text-xs tracking-wider px-1">AI AI</span>
                         </button>
 
                         {/* Templates Button */}
@@ -1552,41 +1549,39 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             <span>Templates</span>
                         </button>
 
-                        {/* Theme Button */}
+                        {/* Theme Button (Icon only) */}
                         <button
                             type="button"
                             onClick={() => setIsThemeDrawerOpen(true)}
-                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                            className="p-2 sm:px-3 sm:py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0"
                             title="Theme & Colors"
                         >
                             <Palette className="w-4 h-4 stroke-[2.5]" />
-                            <span>Theme</span>
                         </button>
 
-                        {/* Preview Simulator Action */}
+                        {/* Preview Simulator Action (Text only, no logo) */}
                         <button
                             type="button"
                             onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-                            className={`px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 shrink-0 ${
+                            className={`px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0 ${
                                 isPreviewOpen
                                     ? "bg-black text-white dark:bg-white dark:text-black"
                                     : "bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white"
                             }`}
                             title="Preview form as student"
                         >
-                            <Eye className="w-4 h-4 stroke-[2.5]" />
                             <span>{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
                         </button>
 
                         {/* Divider */}
                         <div className="h-6 w-[2px] bg-black/20 dark:bg-white/20 mx-0.5 shrink-0" />
 
-                        {/* Save Draft */}
+                        {/* Save Draft (Text only, no logo) */}
                         <button
                             type="button"
                             onClick={handleSaveForm}
                             disabled={saving || isPublishing}
-                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+                            className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
                             title="Save working draft"
                         >
                             {saving ? (
@@ -1595,20 +1590,17 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     <span>Saving...</span>
                                 </>
                             ) : (
-                                <>
-                                    <Save className="w-4 h-4 stroke-[2.5]" />
-                                    <span>Save Draft</span>
-                                </>
+                                <span>Save Draft</span>
                             )}
                         </button>
 
-                        {/* Publish Live */}
+                        {/* Publish (Text only "Publish", no logo, no "Live") */}
                         <button
                             type="button"
                             onClick={handlePublishForm}
                             disabled={saving || isPublishing}
-                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50 shrink-0"
-                            title="Publish live snapshot for students"
+                            className="px-3.5 sm:px-5 py-2 rounded-xl sm:rounded-2xl border-2 border-black bg-black text-white hover:bg-neutral-800 dark:bg-white dark:text-black dark:hover:bg-neutral-200 font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 shrink-0"
+                            title="Publish form snapshot for students"
                         >
                             {isPublishing ? (
                                 <>
@@ -1616,10 +1608,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     <span>Publishing...</span>
                                 </>
                             ) : (
-                                <>
-                                    <Send className="w-3.5 h-3.5 stroke-[2.5]" />
-                                    <span>Publish Live</span>
-                                </>
+                                <span>Publish</span>
                             )}
                         </button>
                     </div>

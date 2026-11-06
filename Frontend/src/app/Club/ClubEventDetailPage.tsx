@@ -9,7 +9,6 @@ import {
     Edit3,
     Trash2,
     Users,
-    BarChart3,
     QrCode,
     FileSpreadsheet,
     CheckCircle2,
@@ -741,19 +740,6 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         <span className="px-2 py-0.5 rounded-full bg-black text-[#a2ff86] border border-black text-[10px] font-black">
                             LIVE QR
                         </span>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => handleTabChange("analytics")}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-                            activeTab === "analytics"
-                                ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
-                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
-                        }`}
-                    >
-                        <BarChart3 className="w-4 h-4 stroke-[2.5]" />
-                        <span>Analytics & Attendance</span>
                     </button>
 
                     <button
