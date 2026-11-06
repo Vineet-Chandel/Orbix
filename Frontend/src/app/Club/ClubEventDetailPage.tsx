@@ -98,6 +98,9 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
     const handleTabChange = (tab: EventTab) => {
         setActiveTab(tab);
+        if (tab === "roster") {
+            loadApplications();
+        }
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             if (tab === "roster") {

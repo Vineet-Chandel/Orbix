@@ -7,8 +7,6 @@ import {
     Eye,
     BarChart3,
     Save,
-    Share2,
-    Check,
     ArrowLeft,
     FileText,
     ShieldCheck,
@@ -27,11 +25,9 @@ import {
     Heading,
     ClipboardList,
     Trash2,
-    CheckCircle2,
     X,
     LayoutTemplate,
     Wand2,
-    QrCode,
     CheckSquare,
     Square,
     ChevronDown,
@@ -48,7 +44,6 @@ import {
     publishClubEventForm,
     fetchClubQuestionLibrary,
     requestAiQuestionSuggestions,
-    verifyRegistrationQrCheckIn,
 } from "../../../api/clubEventFormApi";
 import {
     ORBIX_FORM_TEMPLATES,
@@ -242,7 +237,7 @@ type SaveBadgeStatus = "saved" | "saving" | "unsaved" | "error";
 export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps> = ({
     eventId,
     club,
-    onBack,
+    onBack: _onBack,
 }) => {
     const toast = useToast();
 
@@ -270,7 +265,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
-    const [copiedShareLink, setCopiedShareLink] = useState(false);
 
     // Phase 6.1 Question Library State
     const [isQuestionLibraryOpen, setIsQuestionLibraryOpen] = useState(false);
@@ -293,12 +287,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     const [selectedAiIndices, setSelectedAiIndices] = useState<Set<number>>(new Set());
     const [aiTargetSectionId, setAiTargetSectionId] = useState<string>("");
     const [aiEngineLabel, setAiEngineLabel] = useState<string | null>(null);
-
-    // Phase 6.4 QR Check-In Scanner State
-    const [isQrModalOpen, setIsQrModalOpen] = useState(false);
-    const [qrInputCode, setQrInputCode] = useState("");
-    const [isVerifyingQr, setIsVerifyingQr] = useState(false);
-    const [qrResult, setQrResult] = useState<any | null>(null);
 
     // Section Deletion with Undo Behaviour
     const [deletedSectionNotice, setDeletedSectionNotice] = useState<{
@@ -517,15 +505,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         } finally {
             setIsPublishing(false);
         }
-    };
-
-    // Copy direct registration link for students
-    const handleCopyShareLink = () => {
-        const link = `${window.location.origin}/events/${eventId}/register`;
-        navigator.clipboard.writeText(link);
-        setCopiedShareLink(true);
-        toast.success("Registration link copied to clipboard!");
-        setTimeout(() => setCopiedShareLink(false), 2500);
     };
 
     // -------------------------------------------------------------------------
@@ -931,33 +910,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
         setSelectedAiIndices(new Set());
     };
 
-    // -------------------------------------------------------------------------
-    // PHASE 6.4: QR CHECK-IN SCANNER HANDLERS
-    // -------------------------------------------------------------------------
-    const handleVerifyTicketQr = async () => {
-        if (!qrInputCode.trim()) {
-            toast.error("Please enter a valid ticket code (e.g. TKT-...)");
-            return;
-        }
-
-        setIsVerifyingQr(true);
-        setQrResult(null);
-        try {
-            const res = await verifyRegistrationQrCheckIn(eventId, qrInputCode.trim());
-            setQrResult(res);
-            if (res.valid) {
-                toast.success(res.message || "Attendee successfully checked in!");
-            } else {
-                toast.error(res.message || "Ticket verification failed.");
-            }
-        } catch (err: any) {
-            toast.error(err.message || "Failed to verify ticket.");
-            setQrResult({ valid: false, message: err.message });
-        } finally {
-            setIsVerifyingQr(false);
-        }
-    };
-
     if (loading) {
         return (
             <div className="p-16 flex flex-col items-center justify-center space-y-3">
@@ -979,18 +931,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                 {/* Upper bar: Title, Save Status, Undo/Redo, Actions */}
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="flex items-center gap-3 min-w-0">
-                        {onBack && (
-                            <button
-                                type="button"
-                                onClick={onBack}
-                                className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors"
-                                title="Back to event"
-                            >
-                                <ArrowLeft className="w-4 h-4" />
-                                <span className="hidden sm:inline">Event Details</span>
-                            </button>
-                        )}
-
                         <div className="min-w-0">
                             <div className="flex items-center gap-2.5 flex-wrap">
                                 <input
@@ -1071,17 +1011,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             <span className="hidden sm:inline">Templates</span>
                         </button>
 
-                        {/* QR Check-In Scanner */}
-                        <button
-                            type="button"
-                            onClick={() => setIsQrModalOpen(true)}
-                            className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Ticket & QR Check-In"
-                        >
-                            <QrCode className="w-4 h-4" />
-                            <span className="hidden sm:inline">Check-In</span>
-                        </button>
-
                         {/* Theme Button */}
                         <button
                             type="button"
@@ -1106,21 +1035,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         >
                             <Eye className="w-4 h-4" />
                             <span className="hidden sm:inline">{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
-                        </button>
-
-                        {/* Share Student Link */}
-                        <button
-                            type="button"
-                            onClick={handleCopyShareLink}
-                            className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Copy link"
-                        >
-                            {copiedShareLink ? (
-                                <Check className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
-                            ) : (
-                                <Share2 className="w-4 h-4" />
-                            )}
-                            <span className="hidden sm:inline">Share</span>
                         </button>
 
                         {/* Save Draft */}
@@ -1295,14 +1209,17 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {activeTab === "questions" && !isPreviewOpen && (
                 <div className="relative w-full lg:pr-20 space-y-6 pb-24">
                     {/* Phase 6 Accelerators Banner: AI, Question Library & Templates */}
-                    <div className="rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center shrink-0">
-                                <Sparkles className="w-4 h-4 text-neutral-700 dark:text-neutral-300" />
+                    <div className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] p-4 sm:p-5 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <div
+                                className="w-10 h-10 rounded-2xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0"
+                                style={{ backgroundColor: accentColor }}
+                            >
+                                <Sparkles className="w-5 h-5 text-black stroke-[2.5]" />
                             </div>
                             <div>
-                                <span className="text-xs sm:text-sm font-bold text-neutral-900 dark:text-white">Form Accelerators</span>
-                                <span className="text-[11px] text-neutral-500 hidden sm:inline ml-2 font-normal">
+                                <span className="text-sm font-black text-black dark:text-white">Form Accelerators</span>
+                                <span className="text-xs font-bold text-neutral-600 dark:text-neutral-400 hidden sm:inline ml-2">
                                     Build questionnaires in seconds with AI, reusable questions & templates
                                 </span>
                             </div>
@@ -1316,68 +1233,77 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     }
                                     setIsAiModalOpen(true);
                                 }}
-                                className="px-3 py-1.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 dark:hover:bg-neutral-100 font-medium text-xs shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                                className="px-4 py-2 rounded-xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center gap-1.5 active:translate-x-[1.5px] active:translate-y-[1.5px]"
+                                style={{ backgroundColor: accentColor, color: "#000" }}
                                 title="AI Assistant (Phase 6.3)"
                             >
-                                <Sparkles className="w-3.5 h-3.5" />
+                                <Sparkles className="w-4 h-4 stroke-[2.5]" />
                                 <span>AI Assistant</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={handleOpenQuestionLibrary}
-                                className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-medium text-xs border border-neutral-200 dark:border-neutral-800 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                                className="px-4 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center gap-1.5 active:translate-x-[1.5px] active:translate-y-[1.5px]"
                                 title="Question Library (Phase 6.1)"
                             >
-                                <ClipboardList className="w-3.5 h-3.5" />
+                                <ClipboardList className="w-4 h-4 stroke-[2.5]" />
                                 <span>Question Library</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setIsTemplatesModalOpen(true)}
-                                className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-medium text-xs border border-neutral-200 dark:border-neutral-800 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                                className="px-4 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center gap-1.5 active:translate-x-[1.5px] active:translate-y-[1.5px]"
                                 title="Templates Catalog (Phase 6.2)"
                             >
-                                <LayoutTemplate className="w-3.5 h-3.5" />
+                                <LayoutTemplate className="w-4 h-4 stroke-[2.5]" />
                                 <span>Templates</span>
                             </button>
                         </div>
                     </div>
 
                     {/* Verified Identity Notice Card */}
-                    <div className="rounded-xl bg-neutral-50/70 dark:bg-neutral-900/50 border border-neutral-200 dark:border-neutral-800 p-4 sm:p-5 space-y-3">
-                        <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 flex items-center justify-center shrink-0">
-                                <ShieldCheck className="w-4 h-4 text-emerald-800 dark:text-emerald-300" />
+                    <div className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4">
+                        <div className="flex items-start sm:items-center gap-3.5">
+                            <div
+                                className="w-11 h-11 rounded-2xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0"
+                                style={{ backgroundColor: accentColor }}
+                            >
+                                <ShieldCheck className="w-6 h-6 text-black stroke-[2.5]" />
                             </div>
-                            <div className="min-w-0">
-                                <h4 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white flex items-center gap-1.5">
-                                    Orbix Verified Identity Integration
-                                    <span className="px-2 py-0.2 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+                            <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="text-sm sm:text-base font-black text-black dark:text-white tracking-tight">
+                                        Orbix Verified Identity Integration
+                                    </h4>
+                                    <span
+                                        className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1.5px_1.5px_0px_#000] text-black"
+                                        style={{ backgroundColor: accentColor }}
+                                    >
                                         Active
                                     </span>
-                                </h4>
-                                <p className="text-[11px] text-neutral-500 font-normal">
+                                </div>
+                                <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 leading-relaxed">
                                     Orbix pre-fills and binds student name, campus email, college, roll number, and verified profile credentials automatically upon submission.
                                 </p>
                             </div>
                         </div>
 
                         {/* Quick-Add Event Question Templates */}
-                        <div className="pt-2 border-t border-neutral-200/80 dark:border-neutral-800">
-                            <div className="flex items-center justify-between mb-2">
-                                <span className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400">
+                        <div className="pt-3.5 border-t-2 border-black/10 dark:border-white/10 space-y-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <span className="text-xs font-black uppercase tracking-wider text-black dark:text-white">
                                     + Quick Add Common Event Questions:
                                 </span>
                                 <button
                                     type="button"
                                     onClick={() => setIsImportModalOpen(true)}
-                                    className="text-[11px] font-semibold text-neutral-500 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                                    className="px-3 py-1 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] flex items-center gap-1.5 cursor-pointer transition-all self-start sm:self-auto"
                                 >
-                                    <ClipboardList className="w-3.5 h-3.5" />
+                                    <ClipboardList className="w-3.5 h-3.5 stroke-[2.5]" />
                                     <span>Browse Question Bank</span>
                                 </button>
                             </div>
-                            <div className="flex flex-wrap gap-1.5">
+                            <div className="flex flex-wrap gap-2">
                                 {QUICK_TEMPLATES.map((tmpl) => (
                                     <button
                                         key={tmpl.key}
@@ -1392,7 +1318,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                             setActiveQuestionId(newQ.id);
                                             toast.success(`Added question: "${tmpl.label}"`);
                                         }}
-                                        className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 text-xs font-medium shadow-sm cursor-pointer transition-colors"
+                                        className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer transition-all"
                                     >
                                         + {tmpl.label}
                                     </button>
@@ -1524,36 +1450,37 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     <button
                                         type="button"
                                         onClick={() => handleAddQuestion(sIdx)}
-                                        className="px-3.5 py-1.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 font-semibold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                                        className="px-3.5 py-2 rounded-xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
+                                        style={{ backgroundColor: accentColor, color: "#000" }}
                                     >
-                                        <Plus className="w-3.5 h-3.5" />
+                                        <Plus className="w-3.5 h-3.5 stroke-[3]" />
                                         <span>Add Question</span>
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => handleAddTitleBlock(sIdx)}
-                                        className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 font-medium text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                                        className="px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
                                         title="Add Title & Description block"
                                     >
-                                        <Heading className="w-3.5 h-3.5" />
+                                        <Heading className="w-3.5 h-3.5 stroke-[2.5]" />
                                         <span>Title Block</span>
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => handleAddImageBlock(sIdx)}
-                                        className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 font-medium text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                                        className="px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
                                         title="Add Image block"
                                     >
-                                        <ImageIcon className="w-3.5 h-3.5" />
+                                        <ImageIcon className="w-3.5 h-3.5 stroke-[2.5]" />
                                         <span>Image</span>
                                     </button>
                                     <button
                                         type="button"
                                         onClick={() => handleAddVideoBlock(sIdx)}
-                                        className="px-3 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 font-medium text-xs text-neutral-700 dark:text-neutral-300 flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+                                        className="px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
                                         title="Add Video block"
                                     >
-                                        <Video className="w-3.5 h-3.5" />
+                                        <Video className="w-3.5 h-3.5 stroke-[2.5]" />
                                         <span>Video</span>
                                     </button>
                                 </div>
@@ -1566,18 +1493,18 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={handleAddSection}
-                            className="px-5 py-2.5 rounded-xl bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 font-semibold text-xs sm:text-sm text-neutral-800 dark:text-neutral-200 shadow-sm flex items-center gap-2 cursor-pointer transition-colors"
+                            className="px-5 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs sm:text-sm shadow-[3px_3px_0px_#000] hover:shadow-[1.5px_1.5px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[2px] active:translate-y-[2px] cursor-pointer flex items-center gap-2 transition-all"
                         >
-                            <Split className="w-4 h-4" />
+                            <Split className="w-4 h-4 stroke-[2.5]" />
                             <span>Add Section Break</span>
                         </button>
 
                         <button
                             type="button"
                             onClick={() => setIsClearConfirmOpen(true)}
-                            className="px-4 py-2 rounded-lg border border-neutral-200 dark:border-neutral-800 hover:bg-rose-50 dark:hover:bg-rose-950/20 font-medium text-xs text-neutral-500 hover:text-rose-600 cursor-pointer flex items-center gap-1.5 transition-colors"
+                            className="px-4 py-2.5 rounded-xl border-2 border-black bg-white hover:bg-rose-100 text-rose-700 font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer flex items-center gap-1.5 transition-all"
                         >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-3.5 h-3.5 stroke-[2.5]" />
                             <span>Clear Form</span>
                         </button>
                     </div>
@@ -2477,131 +2404,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 </button>
                             </div>
                         )}
-                    </div>
-                </div>
-            )}
-
-            {/* ---------------------------------------------------------------- */}
-            {/* PHASE 6.4: QR CHECK-IN SCANNER MODAL */}
-            {/* ---------------------------------------------------------------- */}
-            {isQrModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div className="w-full max-w-md bg-white dark:bg-neutral-900 rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-xl p-6 space-y-4">
-                        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                                    <QrCode className="w-4 h-4 text-neutral-800 dark:text-neutral-200" />
-                                </div>
-                                <div>
-                                    <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">Event Ticket Check-In</h3>
-                                    <p className="text-[11px] text-neutral-500 font-normal">
-                                        Scan or enter attendee ticket pass code.
-                                    </p>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setIsQrModalOpen(false);
-                                    setQrResult(null);
-                                    setQrInputCode("");
-                                }}
-                                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        {/* Input Form */}
-                        <div className="space-y-3">
-                            <div>
-                                <label className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 block mb-1">
-                                    Ticket Pass Code / QR Code:
-                                </label>
-                                <div className="flex items-center gap-2">
-                                    <input
-                                        type="text"
-                                        value={qrInputCode}
-                                        onChange={(e) => setQrInputCode(e.target.value)}
-                                        onKeyDown={(e) => {
-                                            if (e.key === "Enter") {
-                                                e.preventDefault();
-                                                handleVerifyTicketQr();
-                                            }
-                                        }}
-                                        placeholder="e.g. TKT-B1F34E89"
-                                        className="flex-1 p-2.5 rounded-lg border border-neutral-200 dark:border-neutral-800 text-xs font-mono font-bold text-neutral-900 dark:text-white bg-white dark:bg-neutral-950 focus:outline-none focus:border-neutral-400 uppercase"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={handleVerifyTicketQr}
-                                        disabled={isVerifyingQr || !qrInputCode.trim()}
-                                        className="px-4 py-2.5 rounded-lg bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-100 disabled:opacity-40 text-white dark:text-neutral-900 text-xs font-semibold shadow-sm cursor-pointer transition-colors"
-                                    >
-                                        {isVerifyingQr ? <OrbixLoader size="xs" /> : "Verify"}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Verification Result Card */}
-                        {qrResult && (
-                            <div
-                                className={`p-4 rounded-xl border space-y-2 animate-in fade-in duration-200 ${
-                                    qrResult.valid
-                                        ? "bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-800"
-                                        : "bg-rose-50/50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-800"
-                                }`}
-                            >
-                                <div className="flex items-center gap-2">
-                                    {qrResult.valid ? (
-                                        <CheckCircle2 className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
-                                    ) : (
-                                        <AlertTriangle className="w-4 h-4 text-rose-600 stroke-[2.5]" />
-                                    )}
-                                    <h4
-                                        className={`text-xs font-semibold ${
-                                            qrResult.valid ? "text-emerald-900 dark:text-emerald-200" : "text-rose-900 dark:text-rose-200"
-                                        }`}
-                                    >
-                                        {qrResult.message}
-                                    </h4>
-                                </div>
-
-                                {qrResult.registration && (
-                                    <div className="pt-2 border-t border-neutral-200/60 dark:border-neutral-800 space-y-1 text-xs text-neutral-700 dark:text-neutral-300 font-normal">
-                                        <p>
-                                            <span className="font-semibold text-neutral-900 dark:text-white">Student:</span>{" "}
-                                            {qrResult.registration.studentName || "Verified Student"}
-                                        </p>
-                                        <p>
-                                            <span className="font-semibold text-neutral-900 dark:text-white">Email:</span>{" "}
-                                            {qrResult.registration.studentEmail}
-                                        </p>
-                                        {qrResult.registration.studentRollNo && (
-                                            <p>
-                                                <span className="font-semibold text-neutral-900 dark:text-white">Roll No:</span>{" "}
-                                                {qrResult.registration.studentRollNo}
-                                            </p>
-                                        )}
-                                        <p>
-                                            <span className="font-semibold text-neutral-900 dark:text-white">Ticket:</span>{" "}
-                                            <code className="bg-neutral-100 dark:bg-neutral-800 px-1.5 py-0.5 rounded font-mono font-semibold">
-                                                {qrResult.registration.ticketCode}
-                                            </code>
-                                        </p>
-                                        <p className="text-[10px] text-neutral-500 pt-1">
-                                            Status: <span className="font-semibold uppercase text-emerald-600">Attended & Verified</span>
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        <div className="p-3 rounded-lg bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-[11px] text-neutral-500 font-normal">
-                            <span className="font-semibold text-neutral-900 dark:text-white block mb-0.5">Contactless Check-In Ready</span>
-                            Ticket QR barcodes on student registration receipts can be scanned with any smartphone camera or USB barcode scanner directly into this field.
-                        </div>
                     </div>
                 </div>
             )}

@@ -4010,10 +4010,39 @@ clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Req
         const staffUserId = req.user!.id;
 
         if (!ticketCode || typeof ticketCode !== "string" || !ticketCode.trim()) {
-            return res.status(400).json({ success: false, message: "Valid ticketCode is required." });
+            return res.status(400).json({ success: false, message: "Valid ticketCode or student ID is required." });
         }
 
-        const cleanCode = ticketCode.trim().toUpperCase();
+        let cleanCode = ticketCode.trim();
+
+        // 1. If payload is raw JSON (from custom QR generators), extract ticketCode or id
+        if (cleanCode.startsWith("{") && cleanCode.endsWith("}")) {
+            try {
+                const parsed = JSON.parse(cleanCode);
+                cleanCode = parsed.ticketCode || parsed.ticket_code || parsed.id || parsed.registrationId || parsed.code || cleanCode;
+            } catch {}
+        }
+
+        // 2. If payload is a URL, extract code, ticketCode, or id from query params or path
+        if (cleanCode.includes("?") || cleanCode.includes("/")) {
+            try {
+                const urlMatch = cleanCode.match(/(?:ticketCode|code|id|registrationId)=([A-Za-z0-9_-]+)/i);
+                if (urlMatch) {
+                    cleanCode = urlMatch[1];
+                } else if (!cleanCode.includes("?")) {
+                    const parts = cleanCode.split("/").filter(Boolean);
+                    if (parts.length > 0) {
+                        const lastPart = parts[parts.length - 1];
+                        if (lastPart.length >= 6) {
+                            cleanCode = lastPart;
+                        }
+                    }
+                }
+            } catch {}
+        }
+
+        cleanCode = cleanCode.trim();
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanCode);
 
         const eventRes = await query(
             `SELECT e.id, e.club_id, e.title, vc.name AS "clubName"
@@ -4033,7 +4062,7 @@ clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Req
             return res.status(403).json({ success: false, message: "Access forbidden. Club staff only." });
         }
 
-        // Query registration with complete user profile information
+        // Query registration with complete user profile information (matches ticket code, registration id, user id, or student roll number)
         const regRes = await query(
             `SELECT 
                 r.id AS "registrationId",
@@ -4075,16 +4104,21 @@ clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Req
              FROM club_event_registrations r
              JOIN users u ON u.id = r.user_id
              LEFT JOIN institutions inst ON inst.id = u.college_id
-             WHERE r.event_id = $1::uuid AND UPPER(TRIM(r.ticket_code)) = UPPER(TRIM($2))
+             WHERE r.event_id = $1::uuid 
+               AND (
+                   UPPER(TRIM(r.ticket_code)) = UPPER(TRIM($2))
+                   OR ($3::boolean = TRUE AND (r.id = $2::uuid OR r.user_id = $2::uuid))
+                   OR (r.roll_number IS NOT NULL AND UPPER(TRIM(r.roll_number)) = UPPER(TRIM($2)))
+               )
              LIMIT 1;`,
-            [eventId, cleanCode]
+            [eventId, cleanCode, isUuid]
         );
 
         if (!regRes.rows[0]) {
             return res.status(404).json({
                 success: false,
                 code: "TICKET_NOT_FOUND",
-                message: `Ticket "${cleanCode}" was not found for this event. Please check the code and try again.`,
+                message: `Pass ID / Ticket "${cleanCode}" was not found for this event. Please verify the code or ID and try again.`,
             });
         }
 
