@@ -1211,6 +1211,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     description={event.description || undefined}
                                     startsAt={event.startsAt}
                                     endsAt={event.endsAt || undefined}
+                                    timezone={event.timezone}
                                     venueOrLocation={event.venueOrLocation || undefined}
                                     locationType={event.locationType}
                                     registrationUrl={event.registrationUrl || undefined}

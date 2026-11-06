@@ -927,170 +927,18 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     return (
         <div className="space-y-6 text-neutral-900 dark:text-neutral-100">
             {/* Top Workspace Navigation Bar */}
-            <div className="pb-4 border-b border-neutral-200 dark:border-neutral-800 flex flex-col gap-4">
-                {/* Upper bar: Title, Save Status, Undo/Redo, Actions */}
-                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2.5 flex-wrap">
-                                <input
-                                    type="text"
-                                    value={form.title || ""}
-                                    onChange={(e) => setForm({ ...form, title: e.target.value })}
-                                    placeholder="Form Title..."
-                                    className="text-base sm:text-lg font-bold text-neutral-900 dark:text-white tracking-tight bg-transparent border-b border-transparent hover:border-neutral-300 dark:hover:border-neutral-700 focus:border-neutral-900 dark:focus:border-white focus:outline-none transition-colors px-1 py-0.5 truncate max-w-xs sm:max-w-md"
-                                />
-
-                                {/* Dynamic Save Status Badge */}
-                                <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-500">
-                                    {saveStatus === "saving" && (
-                                        <>
-                                            <OrbixLoader size="xs" />
-                                            <span>Saving...</span>
-                                        </>
-                                    )}
-                                    {saveStatus === "saved" && (
-                                        <>
-                                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                                            <span>Saved</span>
-                                        </>
-                                    )}
-                                    {saveStatus === "unsaved" && (
-                                        <>
-                                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                                            <span>Unsaved</span>
-                                        </>
-                                    )}
-                                    {saveStatus === "error" && (
-                                        <button
-                                            type="button"
-                                            onClick={handleSaveForm}
-                                            className="text-rose-600 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
-                                        >
-                                            <AlertTriangle className="w-3.5 h-3.5" />
-                                            <span>Save failed · Retry</span>
-                                        </button>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Upper Toolbar: Undo, Redo, Theme, Preview, Share, Save, Publish */}
-                    <div className="flex items-center gap-2 flex-wrap shrink-0">
-                        {/* Undo / Redo */}
-                        <div className="flex items-center bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg shadow-sm divide-x divide-neutral-200 dark:divide-neutral-800">
-                            <button
-                                type="button"
-                                onClick={handleUndo}
-                                disabled={historyIndex <= 0}
-                                className="p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-neutral-700 dark:text-neutral-300 transition-colors"
-                                title="Undo (Ctrl+Z)"
-                            >
-                                <Undo2 className="w-4 h-4" />
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleRedo}
-                                disabled={historyIndex >= history.length - 1}
-                                className="p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-neutral-700 dark:text-neutral-300 transition-colors"
-                                title="Redo (Ctrl+Shift+Z)"
-                            >
-                                <Redo2 className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        {/* Templates Button */}
-                        <button
-                            type="button"
-                            onClick={() => setIsTemplatesModalOpen(true)}
-                            className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Form Templates"
-                        >
-                            <LayoutTemplate className="w-4 h-4" />
-                            <span className="hidden sm:inline">Templates</span>
-                        </button>
-
-                        {/* Theme Button */}
-                        <button
-                            type="button"
-                            onClick={() => setIsThemeDrawerOpen(true)}
-                            className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Theme & Colors"
-                        >
-                            <Palette className="w-4 h-4" />
-                            <span className="hidden sm:inline">Theme</span>
-                        </button>
-
-                        {/* Preview Simulator Action */}
-                        <button
-                            type="button"
-                            onClick={() => setIsPreviewOpen(!isPreviewOpen)}
-                            className={`p-2 sm:px-3 sm:py-2 rounded-lg text-xs font-medium shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
-                                isPreviewOpen
-                                    ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
-                                    : "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
-                            }`}
-                            title="Preview form as student"
-                        >
-                            <Eye className="w-4 h-4" />
-                            <span className="hidden sm:inline">{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
-                        </button>
-
-                        {/* Save Draft */}
-                        <button
-                            type="button"
-                            onClick={handleSaveForm}
-                            disabled={saving || isPublishing}
-                            className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Save working draft"
-                        >
-                            {saving ? (
-                                <>
-                                    <OrbixLoader size="xs" />
-                                    <span className="hidden sm:inline">Saving...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Save className="w-4 h-4" />
-                                    <span className="hidden sm:inline">Save Draft</span>
-                                </>
-                            )}
-                        </button>
-
-                        {/* Publish Live */}
-                        <button
-                            type="button"
-                            onClick={handlePublishForm}
-                            disabled={saving || isPublishing}
-                            className="px-3.5 py-2 rounded-lg bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-black text-xs font-semibold shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
-                            title="Publish live snapshot for students"
-                        >
-                            {isPublishing ? (
-                                <>
-                                    <OrbixLoader size="xs" />
-                                    <span>Publishing...</span>
-                                </>
-                            ) : (
-                                <>
-                                    <Send className="w-3.5 h-3.5" />
-                                    <span>Publish Live</span>
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </div>
-
-                {/* 3 Main Navigation Tabs: Questions | Responses | Settings */}
-                <div className="flex items-center justify-center pt-2">
-                    <div className="flex items-center p-1 bg-neutral-100 dark:bg-neutral-900 rounded-xl border border-neutral-200/80 dark:border-neutral-800 gap-1">
+            <div className="pb-4 border-b border-neutral-200 dark:border-neutral-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                {/* Left: 3 Main Navigation Tabs + Saved/Unsaved Status Indicator */}
+                <div className="flex items-center gap-3.5 flex-wrap">
+                    {/* 3 Main Navigation Tabs: Questions | Responses | Settings */}
+                    <div className="flex items-center p-1 bg-neutral-100 dark:bg-neutral-900 rounded-xl border border-neutral-200/80 dark:border-neutral-800 gap-1 shrink-0">
                         <button
                             type="button"
                             onClick={() => {
                                 setActiveTab("questions");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all ${
+                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all ${
                                 activeTab === "questions" && !isPreviewOpen
                                     ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
                                     : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
@@ -1105,7 +953,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 setActiveTab("responses");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
+                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
                                 activeTab === "responses" && !isPreviewOpen
                                     ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
                                     : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
@@ -1126,7 +974,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 setActiveTab("settings");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
+                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
                                 activeTab === "settings" && !isPreviewOpen
                                     ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
                                     : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
@@ -1136,6 +984,142 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             <span>Settings</span>
                         </button>
                     </div>
+
+                    {/* Dynamic Save Status Badge */}
+                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 shrink-0">
+                        {saveStatus === "saving" && (
+                            <>
+                                <OrbixLoader size="xs" />
+                                <span>Saving...</span>
+                            </>
+                        )}
+                        {saveStatus === "saved" && (
+                            <>
+                                <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <span className="text-emerald-700 dark:text-emerald-400">Saved</span>
+                            </>
+                        )}
+                        {saveStatus === "unsaved" && (
+                            <>
+                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                                <span className="text-amber-700 dark:text-amber-400">Unsaved</span>
+                            </>
+                        )}
+                        {saveStatus === "error" && (
+                            <button
+                                type="button"
+                                onClick={handleSaveForm}
+                                className="text-rose-600 hover:underline flex items-center gap-1 cursor-pointer font-semibold"
+                            >
+                                <AlertTriangle className="w-3.5 h-3.5" />
+                                <span>Save failed · Retry</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Right Upper Toolbar: Undo, Redo, Theme, Preview, Save, Publish */}
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
+                    {/* Undo / Redo */}
+                    <div className="flex items-center bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg shadow-sm divide-x divide-neutral-200 dark:divide-neutral-800">
+                        <button
+                            type="button"
+                            onClick={handleUndo}
+                            disabled={historyIndex <= 0}
+                            className="p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-neutral-700 dark:text-neutral-300 transition-colors"
+                            title="Undo (Ctrl+Z)"
+                        >
+                            <Undo2 className="w-4 h-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleRedo}
+                            disabled={historyIndex >= history.length - 1}
+                            className="p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-neutral-700 dark:text-neutral-300 transition-colors"
+                            title="Redo (Ctrl+Shift+Z)"
+                        >
+                            <Redo2 className="w-4 h-4" />
+                        </button>
+                    </div>
+
+                    {/* Templates Button */}
+                    <button
+                        type="button"
+                        onClick={() => setIsTemplatesModalOpen(true)}
+                        className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                        title="Form Templates"
+                    >
+                        <LayoutTemplate className="w-4 h-4" />
+                        <span className="hidden sm:inline">Templates</span>
+                    </button>
+
+                    {/* Theme Button */}
+                    <button
+                        type="button"
+                        onClick={() => setIsThemeDrawerOpen(true)}
+                        className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                        title="Theme & Colors"
+                    >
+                        <Palette className="w-4 h-4" />
+                        <span className="hidden sm:inline">Theme</span>
+                    </button>
+
+                    {/* Preview Simulator Action */}
+                    <button
+                        type="button"
+                        onClick={() => setIsPreviewOpen(!isPreviewOpen)}
+                        className={`p-2 sm:px-3 sm:py-2 rounded-lg text-xs font-medium shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors ${
+                            isPreviewOpen
+                                ? "bg-neutral-900 text-white dark:bg-white dark:text-neutral-900"
+                                : "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
+                        }`}
+                        title="Preview form as student"
+                    >
+                        <Eye className="w-4 h-4" />
+                        <span className="hidden sm:inline">{isPreviewOpen ? "Exit Preview" : "Preview"}</span>
+                    </button>
+
+                    {/* Save Draft */}
+                    <button
+                        type="button"
+                        onClick={handleSaveForm}
+                        disabled={saving || isPublishing}
+                        className="p-2 sm:px-3 sm:py-2 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-50 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-800 text-xs font-medium text-neutral-700 dark:text-neutral-300 shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                        title="Save working draft"
+                    >
+                        {saving ? (
+                            <>
+                                <OrbixLoader size="xs" />
+                                <span className="hidden sm:inline">Saving...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Save className="w-4 h-4" />
+                                <span className="hidden sm:inline">Save Draft</span>
+                            </>
+                        )}
+                    </button>
+
+                    {/* Publish Live */}
+                    <button
+                        type="button"
+                        onClick={handlePublishForm}
+                        disabled={saving || isPublishing}
+                        className="px-3.5 py-2 rounded-lg bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 text-white dark:text-black text-xs font-semibold shadow-sm flex items-center gap-1.5 cursor-pointer transition-colors"
+                        title="Publish live snapshot for students"
+                    >
+                        {isPublishing ? (
+                            <>
+                                <OrbixLoader size="xs" />
+                                <span>Publishing...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Send className="w-3.5 h-3.5" />
+                                <span>Publish Live</span>
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
 

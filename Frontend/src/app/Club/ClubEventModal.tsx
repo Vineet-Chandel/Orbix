@@ -774,6 +774,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             description={form.description}
                             startsAt={form.startsAt}
                             endsAt={form.endsAt}
+                            timezone={form.timezone}
                             venueOrLocation={form.venueOrLocation}
                             locationType={form.locationType}
                             registrationUrl={form.registrationUrl}

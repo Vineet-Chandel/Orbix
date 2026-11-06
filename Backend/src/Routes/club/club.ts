@@ -4027,13 +4027,13 @@ clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Req
         if (cleanCode.includes("?") || cleanCode.includes("/")) {
             try {
                 const urlMatch = cleanCode.match(/(?:ticketCode|code|id|registrationId)=([A-Za-z0-9_-]+)/i);
-                if (urlMatch) {
+                if (urlMatch && urlMatch[1]) {
                     cleanCode = urlMatch[1];
                 } else if (!cleanCode.includes("?")) {
                     const parts = cleanCode.split("/").filter(Boolean);
                     if (parts.length > 0) {
                         const lastPart = parts[parts.length - 1];
-                        if (lastPart.length >= 6) {
+                        if (lastPart && lastPart.length >= 6) {
                             cleanCode = lastPart;
                         }
                     }
