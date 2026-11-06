@@ -115,7 +115,7 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
     };
 
     return (
-        <div className="max-w-3xl mx-auto space-y-5 pb-16">
+        <div className="w-full space-y-5 pb-24">
             {/* Page Header Notice */}
             <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center gap-3">
                 <Settings className="w-4 h-4 text-neutral-500 shrink-0" />

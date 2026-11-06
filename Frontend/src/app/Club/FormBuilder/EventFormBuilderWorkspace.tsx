@@ -1227,7 +1227,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
             {/* Branching Warning Banner if broken links exist */}
             {branchingWarnings.length > 0 && activeTab === "questions" && (
-                <div className="max-w-3xl mx-auto p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 shadow-sm">
+                <div className="w-full p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 shadow-sm">
                     <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                     <div className="text-xs text-amber-900 dark:text-amber-200 space-y-1">
                         <span className="font-semibold block">Branching Logic Alert:</span>
@@ -1242,7 +1242,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* PREVIEW SIMULATOR OVERLAY */}
             {/* ---------------------------------------------------------------- */}
             {isPreviewOpen && (
-                <div className="space-y-4 animate-in fade-in duration-200">
+                <div className="w-full space-y-4 animate-in fade-in duration-200">
                     <div className="p-3.5 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border border-neutral-800 dark:border-neutral-200 shadow-sm flex items-center justify-between gap-3 text-xs font-medium">
                         <div className="flex items-center gap-2">
                             <Eye className="w-4 h-4 text-neutral-300 dark:text-neutral-700" />
@@ -1293,7 +1293,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* TAB 1: QUESTIONS (GOOGLE FORMS BUILDER CANVAS) */}
             {/* ---------------------------------------------------------------- */}
             {activeTab === "questions" && !isPreviewOpen && (
-                <div className="relative max-w-3xl mx-auto space-y-6 pb-24">
+                <div className="relative w-full lg:pr-20 space-y-6 pb-24">
                     {/* Phase 6 Accelerators Banner: AI, Question Library & Templates */}
                     <div className="rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5">
@@ -1350,7 +1350,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 src={getCloudinaryBannerUrl(form.headerImageUrl)}
                                 alt="Form Header Banner"
                                 loading="lazy"
-                                className="w-full h-36 sm:h-48 object-cover"
+                                className="w-full h-44 sm:h-64 lg:h-72 object-cover"
                             />
                             <button
                                 type="button"
@@ -1624,11 +1624,11 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                     </div>
 
                     {/* Floating Quick-Add Toolbar (Desktop docked right, Mobile bottom bar) */}
-                    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 lg:translate-x-0 lg:bottom-auto lg:top-44 lg:right-6 bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-md p-1.5 flex lg:flex-col items-center gap-1 z-40">
+                    <div className="fixed bottom-4 left-1/2 -translate-x-1/2 lg:left-auto lg:translate-x-0 lg:bottom-auto lg:top-44 lg:right-4 xl:right-6 w-fit bg-white/95 dark:bg-neutral-900/95 backdrop-blur-md border border-neutral-200 dark:border-neutral-800 rounded-2xl shadow-xl p-1.5 flex lg:flex-col items-center gap-1 z-40">
                         <button
                             type="button"
                             onClick={() => handleAddQuestion()}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
                             title="Add Question (+)"
                         >
                             <Plus className="w-4 h-4" />
@@ -1641,7 +1641,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 }
                                 setIsAiModalOpen(true);
                             }}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
                             title="AI Assistant"
                         >
                             <Sparkles className="w-4 h-4" />
@@ -1649,7 +1649,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={handleOpenQuestionLibrary}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
                             title="Past Events Question Library"
                         >
                             <ClipboardList className="w-4 h-4" />
@@ -1657,7 +1657,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={() => setIsTemplatesModalOpen(true)}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
                             title="Form Templates"
                         >
                             <LayoutTemplate className="w-4 h-4" />
@@ -1665,7 +1665,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={() => handleAddTitleBlock()}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
                             title="Add Title and description (Tt)"
                         >
                             <Heading className="w-4 h-4" />
@@ -1673,7 +1673,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={() => handleAddImageBlock()}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
                             title="Add Image block"
                         >
                             <ImageIcon className="w-4 h-4" />
@@ -1681,7 +1681,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={() => handleAddVideoBlock()}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
                             title="Add Video block"
                         >
                             <Video className="w-4 h-4" />
@@ -1689,7 +1689,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         <button
                             type="button"
                             onClick={handleAddSection}
-                            className="p-2 rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
                             title="Add Section Break (=)"
                         >
                             <Split className="w-4 h-4" />
@@ -1726,7 +1726,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* TAB 2: RESPONSES (LIVE ANALYTICS & INSPECTOR) */}
             {/* ---------------------------------------------------------------- */}
             {activeTab === "responses" && !isPreviewOpen && (
-                <div className="max-w-4xl mx-auto space-y-6">
+                <div className="w-full space-y-6 pb-24">
                     {/* Accepting Responses Bar */}
                     <div className="p-5 rounded-2xl bg-white dark:bg-[#0A0A0A] border border-neutral-200 dark:border-neutral-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>

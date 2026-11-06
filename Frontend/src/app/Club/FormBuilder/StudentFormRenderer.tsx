@@ -1146,7 +1146,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
     const progressPercent = totalSections > 1 ? Math.round(((currentSecIdx + 1) / totalSections) * 100) : 100;
 
     return (
-        <div className="max-w-2xl mx-auto space-y-6 text-neutral-900 dark:text-neutral-100">
+        <div className={`w-full ${isPreview ? "max-w-full" : "max-w-5xl xl:max-w-6xl"} mx-auto space-y-6 text-neutral-900 dark:text-neutral-100`}>
             {/* Header Banner if present */}
             {form.headerImageUrl && (
                 <div className="rounded-2xl border border-neutral-200 dark:border-neutral-800 overflow-hidden shadow-sm bg-neutral-100 dark:bg-neutral-900">
@@ -1154,7 +1154,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                         src={getCloudinaryBannerUrl(form.headerImageUrl)}
                         alt="Form Banner"
                         loading="lazy"
-                        className="w-full h-36 sm:h-48 object-cover"
+                        className="w-full h-44 sm:h-64 lg:h-72 object-cover"
                     />
                 </div>
             )}
