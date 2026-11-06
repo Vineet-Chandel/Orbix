@@ -39,9 +39,8 @@ export const SectionCard: React.FC<SectionCardProps> = React.memo(({
 }) => {
     return (
         <div
-            className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4 transition-all"
+            className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black dark:border-white shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4 transition-all"
             style={{
-                borderColor: accentColor,
                 backgroundColor: cardSurfaceColor || undefined,
             }}
         >

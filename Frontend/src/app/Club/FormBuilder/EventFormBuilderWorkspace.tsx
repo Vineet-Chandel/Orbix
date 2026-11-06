@@ -1183,8 +1183,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                 <div className="relative w-full lg:pr-20 space-y-6 pb-36">
                     {/* Verified Identity Notice Card */}
                     <div
-                        className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4"
-                        style={{ borderColor: accentColor }}
+                        className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black dark:border-white shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4"
                     >
                         <div className="flex items-start sm:items-center gap-3.5">
                             <div

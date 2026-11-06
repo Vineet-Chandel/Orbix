@@ -1499,9 +1499,8 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
             {/* Active Section Header Card (Section Title & Description) */}
             {activeSection && (activeSection.title || activeSection.description) && (
                 <div
-                    className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] shadow-[4px_4px_0px_#000] space-y-1"
+                    className="p-5 sm:p-6 rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black dark:border-white shadow-[4px_4px_0px_#000] space-y-1"
                     style={{
-                        borderColor: accentColor,
                         backgroundColor: cardSurfaceColor || undefined,
                     }}
                 >
