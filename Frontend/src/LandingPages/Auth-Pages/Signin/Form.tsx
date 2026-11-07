@@ -142,38 +142,64 @@ export default function SigninForm() {
         setLoading(true);
 
         try {
+            // Safely resolve client device identifier without blocking sign-in
+            let deviceId = "";
+            try {
+                deviceId = getOrCreateDeviceId();
+            } catch (didErr) {
+                console.warn("[Orbix Auth] Non-fatal: Device ID skipped:", didErr);
+            }
+
+            const requestHeaders: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (deviceId) {
+                requestHeaders["x-orbix-device-id"] = deviceId;
+            }
+
+            const requestBody = JSON.stringify({
+                gmail: formData.gmail.trim().toLowerCase(),
+                password: formData.password,
+                accountType: "personal",
+            });
+
             const primaryEndpoint = buildApiUrl("/api/auth/signin");
             const endpoints = import.meta.env.DEV
                 ? [primaryEndpoint, "http://localhost:3000/api/auth/signin"]
                 : [primaryEndpoint];
+
             let response: Response | null = null;
             let resultData: any = null;
+            let lastNetworkError: Error | null = null;
 
             for (const url of endpoints) {
                 try {
                     const res = await fetch(url, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "x-orbix-device-id": getOrCreateDeviceId(),
-                        },
+                        headers: requestHeaders,
                         credentials: "include",
-                        body: JSON.stringify({
-                            gmail: formData.gmail.trim().toLowerCase(),
-                            password: formData.password,
-                            accountType: "personal",
-                        }),
+                        body: requestBody,
                     });
                     response = res;
                     resultData = await res.json().catch(() => null);
                     break;
-                } catch {
+                } catch (netErr: any) {
+                    lastNetworkError = netErr;
+                    console.warn("[Orbix Auth] Sign-in endpoint attempt failed:", {
+                        endpoint: url,
+                        errorType: netErr?.name,
+                        message: netErr?.message,
+                    });
                     continue;
                 }
             }
 
             if (!response) {
-                throw new Error("Unable to connect to the authentication server. Please check backend status.");
+                console.error("[Orbix Auth] All sign-in endpoints unreachable", {
+                    errorType: lastNetworkError?.name,
+                    message: lastNetworkError?.message,
+                });
+                throw new Error("Unable to connect to the authentication server. Please check your network connection or server status.");
             }
 
             if (!response.ok) {
@@ -259,38 +285,63 @@ export default function SigninForm() {
 
         setIsVerifying2FA(true);
         try {
+            let deviceId = "";
+            try {
+                deviceId = getOrCreateDeviceId();
+            } catch (didErr) {
+                console.warn("[Orbix Auth] Non-fatal: Device ID skipped for 2FA:", didErr);
+            }
+
+            const requestHeaders: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (deviceId) {
+                requestHeaders["x-orbix-device-id"] = deviceId;
+            }
+
+            const requestBody = JSON.stringify({
+                challengeToken,
+                otp: code,
+                accountType: "personal",
+            });
+
             const primaryEndpoint = buildApiUrl("/api/auth/2fa/verify-login");
             const endpoints = import.meta.env.DEV
                 ? [primaryEndpoint, "http://localhost:3000/api/auth/2fa/verify-login"]
                 : [primaryEndpoint];
+
             let response: Response | null = null;
             let resultData: any = null;
+            let lastNetworkError: Error | null = null;
 
             for (const url of endpoints) {
                 try {
                     const res = await fetch(url, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "x-orbix-device-id": getOrCreateDeviceId(),
-                        },
+                        headers: requestHeaders,
                         credentials: "include",
-                        body: JSON.stringify({
-                            challengeToken,
-                            otp: code,
-                            accountType: "personal",
-                        }),
+                        body: requestBody,
                     });
                     response = res;
                     resultData = await res.json().catch(() => null);
                     break;
-                } catch {
+                } catch (netErr: any) {
+                    lastNetworkError = netErr;
+                    console.warn("[Orbix Auth] 2FA endpoint attempt failed:", {
+                        endpoint: url,
+                        errorType: netErr?.name,
+                        message: netErr?.message,
+                    });
                     continue;
                 }
             }
 
             if (!response) {
-                throw new Error("Unable to connect to verification server.");
+                console.error("[Orbix Auth] 2FA verification unreachable:", {
+                    errorType: lastNetworkError?.name,
+                    message: lastNetworkError?.message,
+                });
+                throw new Error("Unable to connect to verification server. Please check your network connection.");
             }
 
             if (!response.ok) {
@@ -320,6 +371,7 @@ export default function SigninForm() {
                 : [primaryEndpoint];
             let response: Response | null = null;
             let resultData: any = null;
+            let lastNetworkError: Error | null = null;
 
             for (const url of endpoints) {
                 try {
@@ -332,12 +384,26 @@ export default function SigninForm() {
                     response = res;
                     resultData = await res.json().catch(() => null);
                     break;
-                } catch {
+                } catch (netErr: any) {
+                    lastNetworkError = netErr;
+                    console.warn("[Orbix Auth] 2FA resend endpoint attempt failed:", {
+                        endpoint: url,
+                        errorType: netErr?.name,
+                        message: netErr?.message,
+                    });
                     continue;
                 }
             }
 
-            if (!response || !response.ok) {
+            if (!response) {
+                console.error("[Orbix Auth] 2FA resend unreachable:", {
+                    errorType: lastNetworkError?.name,
+                    message: lastNetworkError?.message,
+                });
+                throw new Error("Unable to connect to verification server. Please check your network connection.");
+            }
+
+            if (!response.ok) {
                 await toast.handleError(response, "Unable to resend verification code.");
                 return;
             }

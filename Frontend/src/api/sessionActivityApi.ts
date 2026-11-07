@@ -1,15 +1,150 @@
 // Frontend/src/api/sessionActivityApi.ts
 
 const API_BASE = "/api";
+const DEVICE_ID_STORAGE_KEY = "orbix_did";
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export function getOrCreateDeviceId(): string {
-    if (typeof window === "undefined") return "";
-    let did = localStorage.getItem("orbix_did");
-    if (!did) {
-        did = crypto.randomUUID();
-        localStorage.setItem("orbix_did", did);
+// Module-level memory cache ensuring stable ID persistence during the session
+// even if localStorage, sessionStorage, or cookies are disabled/restricted by browser privacy modes.
+let inMemoryDeviceId: string | null = null;
+
+/**
+ * Validates whether a candidate string is a well-formed UUID.
+ */
+export function isValidDeviceId(id: unknown): id is string {
+    return typeof id === "string" && UUID_V4_REGEX.test(id.trim());
+}
+
+/**
+ * Generates an RFC 4122 version 4 compliant UUID using window.crypto.getRandomValues().
+ * Supported in both secure (HTTPS) and non-secure (HTTP) browser contexts across all modern browsers.
+ */
+function generateCryptoRandomUUID(): string {
+    const bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+
+    // Per RFC 4122 Section 4.4:
+    // Set 4 most significant bits of 7th byte (time_hi_and_version) to 0100 (version 4)
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    // Set 2 most significant bits of 9th byte (clock_seq_hi_and_reserved) to 10 (RFC 4122 variant)
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+    const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+}
+
+/**
+ * Last-resort fallback for environments without Web Crypto API (e.g. archaic browser or restricted iframe).
+ * Produces an RFC 4122-compatible UUID string using high-precision timestamps and pseudo-randomness.
+ * NOTE: Device IDs are non-secret client telemetry hints for device recognition, not security credentials.
+ */
+function generatePseudoRandomUUID(): string {
+    let d = Date.now();
+    let d2 = (typeof performance !== "undefined" && performance.now && (performance.now() * 1000)) || 0;
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        let r = Math.random() * 16;
+        if (d > 0) {
+            r = (d + r) % 16 | 0;
+            d = Math.floor(d / 16);
+        } else if (d2 > 0) {
+            r = (d2 + r) % 16 | 0;
+            d2 = Math.floor(d2 / 16);
+        } else {
+            r = r | 0;
+        }
+        const val = c === "x" ? (r | 0) : (((r | 0) & 0x3) | 0x8);
+        return val.toString(16);
+    });
+}
+
+/**
+ * Safely generates a standard UUID v4 without throwing in any browser context.
+ * 1. window.crypto.randomUUID() (available in HTTPS / Secure Contexts)
+ * 2. window.crypto.getRandomValues() (available in both HTTP and HTTPS)
+ * 3. Pseudo-random fallback (last resort for non-crypto environments)
+ */
+export function createNewDeviceId(): string {
+    try {
+        if (typeof window !== "undefined" && window.crypto && typeof window.crypto.randomUUID === "function") {
+            return window.crypto.randomUUID();
+        }
+    } catch {
+        // Fall through to getRandomValues
     }
-    return did;
+
+    try {
+        if (typeof window !== "undefined" && window.crypto && typeof window.crypto.getRandomValues === "function") {
+            return generateCryptoRandomUUID();
+        }
+    } catch {
+        // Fall through to pseudo-random
+    }
+
+    return generatePseudoRandomUUID();
+}
+
+/**
+ * Retrieves or generates a persistent device identifier.
+ *
+ * Guarantees:
+ * 1. NEVER throws an exception under any circumstance (SecurityError, QuotaExceededError, missing Crypto, HTTP origin).
+ * 2. Reuses existing valid device IDs from localStorage, falling back to sessionStorage, then in-memory cache.
+ * 3. Safely generates UUID v4 on both HTTP and HTTPS contexts without assuming window.crypto.randomUUID exists.
+ * 4. Silently handles storage failures, maintaining in-memory continuity across calls.
+ */
+export function getOrCreateDeviceId(): string {
+    if (typeof window === "undefined") {
+        return "";
+    }
+
+    // 1. Check in-memory cache first for fast, non-throwing return
+    if (isValidDeviceId(inMemoryDeviceId)) {
+        return inMemoryDeviceId;
+    }
+
+    let existingId: string | null = null;
+
+    // 2. Try localStorage
+    try {
+        existingId = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+        if (isValidDeviceId(existingId)) {
+            inMemoryDeviceId = existingId;
+            return existingId;
+        }
+    } catch {
+        // localStorage is disabled, restricted, or throws SecurityError
+    }
+
+    // 3. Try sessionStorage fallback
+    try {
+        existingId = sessionStorage.getItem(DEVICE_ID_STORAGE_KEY);
+        if (isValidDeviceId(existingId)) {
+            inMemoryDeviceId = existingId;
+            try {
+                localStorage.setItem(DEVICE_ID_STORAGE_KEY, existingId);
+            } catch {}
+            return existingId;
+        }
+    } catch {
+        // sessionStorage restricted
+    }
+
+    // 4. Generate a new valid identifier
+    const newId = createNewDeviceId();
+    inMemoryDeviceId = newId;
+
+    // 5. Attempt persistence
+    try {
+        localStorage.setItem(DEVICE_ID_STORAGE_KEY, newId);
+    } catch {
+        try {
+            sessionStorage.setItem(DEVICE_ID_STORAGE_KEY, newId);
+        } catch {
+            // Memory cache remains active for the lifespan of the page
+        }
+    }
+
+    return newId;
 }
 
 function getSessionHeaders(): Record<string, string> {

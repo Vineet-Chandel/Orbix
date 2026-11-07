@@ -119,38 +119,64 @@ export default function ClubSigninForm() {
         setLoading(true);
 
         try {
+            // Safely resolve client device identifier without blocking club sign-in
+            let deviceId = "";
+            try {
+                deviceId = getOrCreateDeviceId();
+            } catch (didErr) {
+                console.warn("[Orbix Auth] Non-fatal: Device ID skipped for club signin:", didErr);
+            }
+
+            const requestHeaders: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (deviceId) {
+                requestHeaders["x-orbix-device-id"] = deviceId;
+            }
+
+            const requestBody = JSON.stringify({
+                gmail: formData.identity.trim().toLowerCase(),
+                password: formData.password,
+                accountType: "club",
+            });
+
             const primaryEndpoint = buildApiUrl("/api/auth/signin");
             const endpoints = import.meta.env.DEV
                 ? [primaryEndpoint, "http://localhost:3000/api/auth/signin"]
                 : [primaryEndpoint];
+
             let response: Response | null = null;
             let resultData: any = null;
+            let lastNetworkError: Error | null = null;
 
             for (const url of endpoints) {
                 try {
                     const res = await fetch(url, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                            "x-orbix-device-id": getOrCreateDeviceId(),
-                        },
+                        headers: requestHeaders,
                         credentials: "include",
-                        body: JSON.stringify({
-                            gmail: formData.identity.trim().toLowerCase(),
-                            password: formData.password,
-                            accountType: "club",
-                        }),
+                        body: requestBody,
                     });
                     response = res;
                     resultData = await res.json().catch(() => null);
                     break;
-                } catch {
+                } catch (netErr: any) {
+                    lastNetworkError = netErr;
+                    console.warn("[Orbix Auth] Club sign-in endpoint attempt failed:", {
+                        endpoint: url,
+                        errorType: netErr?.name,
+                        message: netErr?.message,
+                    });
                     continue;
                 }
             }
 
             if (!response) {
-                throw new Error("Unable to connect to the authentication server. Please check backend status.");
+                console.error("[Orbix Auth] All club sign-in endpoints unreachable", {
+                    errorType: lastNetworkError?.name,
+                    message: lastNetworkError?.message,
+                });
+                throw new Error("Unable to connect to the authentication server. Please check your network connection or server status.");
             }
 
             if (!response.ok) {
@@ -233,34 +259,63 @@ export default function ClubSigninForm() {
 
         setIsVerifying2FA(true);
         try {
+            let deviceId = "";
+            try {
+                deviceId = getOrCreateDeviceId();
+            } catch (didErr) {
+                console.warn("[Orbix Auth] Non-fatal: Device ID skipped for club 2FA:", didErr);
+            }
+
+            const requestHeaders: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (deviceId) {
+                requestHeaders["x-orbix-device-id"] = deviceId;
+            }
+
+            const requestBody = JSON.stringify({
+                challengeToken,
+                otp: code,
+                accountType: "club",
+            });
+
             const primaryEndpoint = buildApiUrl("/api/auth/2fa/verify-login");
             const endpoints = import.meta.env.DEV
                 ? [primaryEndpoint, "http://localhost:3000/api/auth/2fa/verify-login"]
                 : [primaryEndpoint];
+
             let response: Response | null = null;
             let resultData: any = null;
+            let lastNetworkError: Error | null = null;
 
             for (const url of endpoints) {
                 try {
                     const res = await fetch(url, {
                         method: "POST",
-                        headers: { 
-                            "Content-Type": "application/json",
-                            "x-orbix-device-id": getOrCreateDeviceId(),
-                        },
+                        headers: requestHeaders,
                         credentials: "include",
-                        body: JSON.stringify({
-                            challengeToken,
-                            otp: code,
-                            accountType: "club",
-                        }),
+                        body: requestBody,
                     });
                     response = res;
                     resultData = await res.json().catch(() => null);
                     break;
-                } catch {
+                } catch (netErr: any) {
+                    lastNetworkError = netErr;
+                    console.warn("[Orbix Auth] Club 2FA verify endpoint attempt failed:", {
+                        endpoint: url,
+                        errorType: netErr?.name,
+                        message: netErr?.message,
+                    });
                     continue;
                 }
+            }
+
+            if (!response) {
+                console.error("[Orbix Auth] Club 2FA verify unreachable:", {
+                    errorType: lastNetworkError?.name,
+                    message: lastNetworkError?.message,
+                });
+                throw new Error("Unable to connect to verification server. Please check your network connection.");
             }
 
             if (!response || !response.ok) {
@@ -283,33 +338,59 @@ export default function ClubSigninForm() {
         if (cooldownSeconds > 0 || isResending) return;
         setIsResending(true);
         try {
+            let deviceId = "";
+            try {
+                deviceId = getOrCreateDeviceId();
+            } catch (didErr) {
+                console.warn("[Orbix Auth] Non-fatal: Device ID skipped for club 2FA resend:", didErr);
+            }
+
+            const requestHeaders: Record<string, string> = {
+                "Content-Type": "application/json",
+            };
+            if (deviceId) {
+                requestHeaders["x-orbix-device-id"] = deviceId;
+            }
+
             const primaryEndpoint = buildApiUrl("/api/auth/2fa/resend-login-otp");
             const endpoints = import.meta.env.DEV
                 ? [primaryEndpoint, "http://localhost:3000/api/auth/2fa/resend-login-otp"]
                 : [primaryEndpoint];
             let response: Response | null = null;
             let resultData: any = null;
+            let lastNetworkError: Error | null = null;
 
             for (const url of endpoints) {
                 try {
                     const res = await fetch(url, {
                         method: "POST",
-                        headers: { 
-                            "Content-Type": "application/json",
-                            "x-orbix-device-id": getOrCreateDeviceId(),
-                        },
+                        headers: requestHeaders,
                         credentials: "include",
                         body: JSON.stringify({ challengeToken }),
                     });
                     response = res;
                     resultData = await res.json().catch(() => null);
                     break;
-                } catch {
+                } catch (netErr: any) {
+                    lastNetworkError = netErr;
+                    console.warn("[Orbix Auth] Club 2FA resend endpoint attempt failed:", {
+                        endpoint: url,
+                        errorType: netErr?.name,
+                        message: netErr?.message,
+                    });
                     continue;
                 }
             }
 
-            if (!response || !response.ok) {
+            if (!response) {
+                console.error("[Orbix Auth] Club 2FA resend unreachable:", {
+                    errorType: lastNetworkError?.name,
+                    message: lastNetworkError?.message,
+                });
+                throw new Error("Unable to connect to verification server. Please check your network connection.");
+            }
+
+            if (!response.ok) {
                 await toast.handleError(response, "Unable to resend verification code.");
                 return;
             }
