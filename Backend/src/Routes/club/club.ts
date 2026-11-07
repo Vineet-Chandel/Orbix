@@ -4104,7 +4104,19 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
             `SELECT structure FROM club_event_forms WHERE event_id = $1 LIMIT 1;`,
             [eventId]
         );
-        const formStructure = formRes.rows[0]?.structure;
+        let formStructure = formRes.rows[0]?.structure;
+        if (!formStructure || !Array.isArray(formStructure?.sections) || formStructure.sections.length === 0) {
+            const versionRes = await query(
+                `SELECT structure FROM club_event_form_versions
+                 WHERE event_id = $1
+                 ORDER BY is_published DESC, version_number DESC LIMIT 1;`,
+                [eventId]
+            );
+            if (versionRes.rows[0]?.structure) {
+                formStructure = versionRes.rows[0].structure;
+            }
+        }
+
         const customQuestions: { id: string; title: string; type: string }[] = [];
         const seenQuestionIds = new Set<string>();
 
@@ -4134,9 +4146,21 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
 
         // Also discover any other submitted question keys in answers
         applicantsRes.rows.forEach((r) => {
-            const ansObj = r.form_response || r.answers || {};
+            const ansObj = { ...(r.form_response || {}), ...(r.answers || {}) };
             Object.keys(ansObj).forEach((k) => {
-                if (k === "q_roll_number" || k === "q_department" || k === "q_year") return;
+                if (
+                    k === "q_roll_number" ||
+                    k === "q_department" ||
+                    k === "q_year" ||
+                    k === "q_student_name" ||
+                    k === "q_student_email" ||
+                    k === "q_phone" ||
+                    k === "id" ||
+                    k === "eventId" ||
+                    k === "userId"
+                ) {
+                    return;
+                }
                 if (!seenQuestionIds.has(k)) {
                     seenQuestionIds.add(k);
                     let title = k;
@@ -4172,13 +4196,14 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
             "Name",
             "Username",
             "Email",
-            "Profile Photo URL",
+            "Roll Number / Student ID",
+            "Department",
+            "Year of Study",
+            "Phone Number",
             "Institution / College",
             "University",
             "City",
             "State",
-            "Institution Verification",
-            "Phone",
             "Status",
             "Applied At",
             "Reviewed At",
@@ -4193,7 +4218,7 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
         ];
 
         const rows = applicantsRes.rows.map((r) => {
-            const ansObj = r.form_response || r.answers || {};
+            const ansObj = { ...(r.form_response || {}), ...(r.answers || {}) };
             const attachments = r.file_attachments || [];
 
             const standardRow = [
@@ -4201,13 +4226,14 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
                 escapeCsv(r.name),
                 escapeCsv(r.username),
                 escapeCsv(r.email),
-                escapeCsv(r.avatar_url),
+                escapeCsv(r.roll_number || ansObj["q_roll_number"] || ""),
+                escapeCsv(r.department || ansObj["q_department"] || ""),
+                escapeCsv(r.year_of_study || ansObj["q_year"] || ""),
+                escapeCsv(r.phone || ansObj["q_phone"] || ""),
                 escapeCsv(r.institution_name),
                 escapeCsv(r.university_name),
                 escapeCsv(r.institution_city),
                 escapeCsv(r.institution_state),
-                escapeCsv(r.institution_verification_status),
-                escapeCsv(r.phone),
                 escapeCsv(r.status === "registered" ? "accepted" : r.status),
                 escapeCsv(r.registered_at ? new Date(r.registered_at).toISOString() : ""),
                 escapeCsv(r.reviewed_at ? new Date(r.reviewed_at).toISOString() : ""),
@@ -4222,9 +4248,18 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
                         return escapeCsv(matchedFiles.map((f: any) => f.fileUrl).join(" ; "));
                     }
                 }
-                const val = ansObj[q.id];
+                let val = ansObj[q.id];
+                if (val === undefined && q.id.startsWith("q_")) {
+                    val = ansObj[q.id.replace(/^q_/, "")];
+                } else if (val === undefined) {
+                    val = ansObj[`q_${q.id}`];
+                }
+
                 if (Array.isArray(val)) {
                     return escapeCsv(val.join(", "));
+                }
+                if (typeof val === "object" && val !== null) {
+                    return escapeCsv(Object.entries(val).map(([k, v]) => `${k}: ${v}`).join("; "));
                 }
                 return escapeCsv(val ?? "");
             });

@@ -19,6 +19,7 @@ import {
     ShieldCheck,
     ShieldAlert,
     ArrowRight,
+    Globe2,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import type { CollegeEventItem } from "../../api/collegeEventsApi";
@@ -96,8 +97,10 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                 {/* Modal Top Bar */}
                 <div className="px-5 py-3.5 bg-white border-b-3 border-black flex items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-2 min-w-0">
-                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] shrink-0">
-                            Campus Session
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] shrink-0 ${
+                            event.scope === "PAN_INDIA" ? "bg-[#FF9933] text-black" : "bg-[#a2ff86] text-black"
+                        }`}>
+                            {event.scope === "PAN_INDIA" ? "🇮🇳 Pan-India Flagship" : "🏛️ Campus Session"}
                         </span>
                         <span className="text-xs font-bold text-neutral-600 truncate hidden sm:inline">
                             {event.collegeName || "Verified College Event"}
@@ -301,6 +304,20 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                         <span>{event.registrationsCount || 0} registered</span>
                                     </div>
                                 </div>
+
+                                {event.scope === "PAN_INDIA" && (
+                                    <div className="p-3 rounded-xl bg-[#FAF6EE] border border-black/40 text-xs space-y-1">
+                                        <div className="flex items-center gap-1.5 font-black text-black">
+                                            <Globe2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                            <span>Pan-India Live Notification Shield</span>
+                                        </div>
+                                        <p className="text-[11px] text-neutral-600 leading-relaxed font-medium">
+                                            {event.isRegistered || event.registrationStatus === "registered"
+                                                ? "✅ Live tracking active: Start countdown, pass synchronization, and critical organizer updates are enabled for this national event."
+                                                : "🔒 Non-registered students do not receive start reminders or tracking notifications. Register below to activate live entry tracking, deadline alerts, and verified pass sync."}
+                                        </p>
+                                    </div>
+                                )}
 
                                 {event.registrationStatus === "registered" || event.registrationStatus === "attended" || (event.isRegistered && event.registrationStatus !== "pending") ? (
                                     <div className="p-3.5 rounded-xl bg-emerald-50 border-2 border-emerald-600 space-y-2">

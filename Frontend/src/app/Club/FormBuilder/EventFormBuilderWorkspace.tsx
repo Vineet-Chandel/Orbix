@@ -9,7 +9,6 @@ import {
     BarChart3,
     ArrowLeft,
     FileText,
-    ShieldCheck,
     Code2,
     Trophy,
     Users,
@@ -31,6 +30,7 @@ import {
     Square,
     ChevronDown,
     ChevronUp,
+    ArrowRight,
 } from "lucide-react";
 import {
     type ClubEventFormRecord,
@@ -276,6 +276,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     const [isThemeDrawerOpen, setIsThemeDrawerOpen] = useState(false);
     const [isPreviewOpen, setIsPreviewOpen] = useState(false);
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [isTemplatesHubModalOpen, setIsTemplatesHubModalOpen] = useState(false);
     const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
 
     // Phase 6.1 Question Library State
@@ -998,23 +999,24 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
     return (
         <div className="space-y-6 text-neutral-900 dark:text-neutral-100">
             {/* Top Workspace Navigation Bar */}
-            <div className="pb-4 border-b border-neutral-200 dark:border-neutral-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="pb-4 border-b-2 border-black/10 dark:border-white/10 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 {/* Left: 3 Main Navigation Tabs + Saved/Unsaved Status Indicator */}
                 <div className="flex items-center gap-3.5 flex-wrap">
-                    {/* 3 Main Navigation Tabs: Questions | Responses | Settings */}
-                    <div className="flex items-center p-1 bg-neutral-100 dark:bg-neutral-900 rounded-xl border border-neutral-200/80 dark:border-neutral-800 gap-1 shrink-0">
+                    {/* Unified Neo-Brutalist Toggler Capsule: Questions | Responses | Settings | Save Status */}
+                    <div className="flex items-center p-1.5 bg-[#FAF6EE] dark:bg-[#121212] rounded-2xl border-2 sm:border-[2.5px] border-black shadow-[3.5px_3.5px_0px_#000] gap-1.5 shrink-0 flex-wrap sm:flex-nowrap">
                         <button
                             type="button"
                             onClick={() => {
                                 setActiveTab("questions");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all ${activeTab === "questions" && !isPreviewOpen
-                                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
-                                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                                }`}
+                            className={`px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-black cursor-pointer transition-all flex items-center gap-1.5 active:translate-x-0.5 active:translate-y-0.5 ${
+                                activeTab === "questions" && !isPreviewOpen
+                                    ? "bg-black text-[#FFE566] dark:bg-white dark:text-black border-2 border-black shadow-[2px_2px_0px_#000] translate-x-[-1px] translate-y-[-1px]"
+                                    : "text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 border-2 border-transparent"
+                            }`}
                         >
-                            Questions
+                            <span>Questions</span>
                         </button>
 
                         <button
@@ -1023,15 +1025,20 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 setActiveTab("responses");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${activeTab === "responses" && !isPreviewOpen
-                                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
-                                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                                }`}
+                            className={`px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-black cursor-pointer transition-all flex items-center gap-2 active:translate-x-0.5 active:translate-y-0.5 ${
+                                activeTab === "responses" && !isPreviewOpen
+                                    ? "bg-black text-[#FFE566] dark:bg-white dark:text-black border-2 border-black shadow-[2px_2px_0px_#000] translate-x-[-1px] translate-y-[-1px]"
+                                    : "text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 border-2 border-transparent"
+                            }`}
                         >
-                            <BarChart3 className="w-4 h-4" />
+                            <BarChart3 className="w-4 h-4 stroke-[2.5]" />
                             <span>Responses</span>
                             <span
-                                className="px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-neutral-200 dark:bg-neutral-700 text-neutral-700 dark:text-neutral-300"
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-black border border-black shadow-[1px_1px_0px_#000] ${
+                                    activeTab === "responses" && !isPreviewOpen
+                                        ? "bg-[#FFE566] text-black"
+                                        : "bg-white text-black"
+                                }`}
                             >
                                 {registeredCount}
                             </span>
@@ -1043,70 +1050,75 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 setActiveTab("settings");
                                 setIsPreviewOpen(false);
                             }}
-                            className={`px-4 sm:px-5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${activeTab === "settings" && !isPreviewOpen
-                                ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm"
-                                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                                }`}
+                            className={`px-4 sm:px-5 py-2 rounded-xl text-xs sm:text-sm font-black cursor-pointer transition-all flex items-center gap-1.5 active:translate-x-0.5 active:translate-y-0.5 ${
+                                activeTab === "settings" && !isPreviewOpen
+                                    ? "bg-black text-[#FFE566] dark:bg-white dark:text-black border-2 border-black shadow-[2px_2px_0px_#000] translate-x-[-1px] translate-y-[-1px]"
+                                    : "text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 border-2 border-transparent"
+                            }`}
                         >
-                            <Settings className="w-4 h-4" />
+                            <Settings className="w-4 h-4 stroke-[2.5]" />
                             <span>Settings</span>
                         </button>
-                    </div>
 
-                    {/* Dynamic Save Status Badge (Fixed height to prevent any layout jumping) */}
-                    <div className="flex items-center gap-1.5 text-xs font-semibold text-neutral-500 shrink-0 h-8">
-                        {saveStatus === "saving" && (
-                            <span className="inline-flex items-center gap-1.5 text-neutral-500 dark:text-neutral-400">
-                                <span className="w-2.5 h-2.5 rounded-full border-2 border-neutral-400 border-t-neutral-800 dark:border-neutral-600 dark:border-t-neutral-200 animate-spin shrink-0" />
-                                <span>Saving...</span>
-                            </span>
-                        )}
-                        {saveStatus === "saved" && (
-                            <span className="inline-flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                                <span>Saved</span>
-                            </span>
-                        )}
-                        {saveStatus === "unsaved" && (
-                            <span className="inline-flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                                <span>Unsaved</span>
-                            </span>
-                        )}
-                        {saveStatus === "error" && (
-                            <button
-                                type="button"
-                                onClick={handleSaveForm}
-                                className="text-rose-600 hover:underline inline-flex items-center gap-1 cursor-pointer font-semibold"
-                            >
-                                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                                <span>Save failed · Retry</span>
-                            </button>
-                        )}
+                        {/* Brutalist Divider */}
+                        <div className="hidden sm:block h-6 w-[2px] bg-black/15 dark:bg-white/15 mx-1" />
+
+                        {/* Save Status Badge Integrated Directly Inside the Capsule */}
+                        <div className="flex items-center shrink-0">
+                            {saveStatus === "saving" && (
+                                <span className="px-3 py-1.5 rounded-xl bg-[#FFE566] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] text-xs font-black inline-flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-full border-2 border-black border-t-transparent animate-spin shrink-0" />
+                                    <span>Saving...</span>
+                                </span>
+                            )}
+                            {saveStatus === "saved" && (
+                                <span className="px-3 py-1.5 rounded-xl bg-[#a2ff86] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] text-xs font-black inline-flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-black shrink-0" />
+                                    <span>Saved</span>
+                                </span>
+                            )}
+                            {saveStatus === "unsaved" && (
+                                <span className="px-3 py-1.5 rounded-xl bg-[#FF9933] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] text-xs font-black inline-flex items-center gap-1.5">
+                                    <span className="w-2 h-2 rounded-full bg-black animate-pulse shrink-0" />
+                                    <span>Unsaved</span>
+                                </span>
+                            )}
+                            {saveStatus === "error" && (
+                                <button
+                                    type="button"
+                                    onClick={handleSaveForm}
+                                    className="px-3 py-1.5 rounded-xl bg-[#FB7185] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] text-xs font-black inline-flex items-center gap-1.5 cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                                    title="Click to retry saving"
+                                >
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0 stroke-[2.5]" />
+                                    <span>Save failed · Retry</span>
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
 
                 {/* Right Upper Toolbar: Undo, Redo */}
                 <div className="flex items-center gap-2 shrink-0">
                     {/* Undo / Redo */}
-                    <div className="flex items-center bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-lg shadow-sm divide-x divide-neutral-200 dark:divide-neutral-800">
+                    <div className="flex items-center bg-white dark:bg-[#121212] border-2 border-black shadow-[2.5px_2.5px_0px_#000] rounded-xl divide-x-2 divide-black overflow-hidden">
                         <button
                             type="button"
                             onClick={handleUndo}
                             disabled={historyIndex <= 0}
-                            className="p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-neutral-700 dark:text-neutral-300 transition-colors"
+                            className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-black dark:text-white transition-colors"
                             title="Undo (Ctrl+Z)"
                         >
-                            <Undo2 className="w-4 h-4" />
+                            <Undo2 className="w-4 h-4 stroke-[2.5]" />
                         </button>
                         <button
                             type="button"
                             onClick={handleRedo}
                             disabled={historyIndex >= history.length - 1}
-                            className="p-1.5 hover:bg-neutral-50 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-neutral-700 dark:text-neutral-300 transition-colors"
+                            className="p-2 hover:bg-neutral-100 dark:hover:bg-neutral-800 disabled:opacity-30 disabled:hover:bg-transparent cursor-pointer text-black dark:text-white transition-colors"
                             title="Redo (Ctrl+Shift+Z)"
                         >
-                            <Redo2 className="w-4 h-4" />
+                            <Redo2 className="w-4 h-4 stroke-[2.5]" />
                         </button>
                     </div>
                 </div>
@@ -1181,85 +1193,6 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* ---------------------------------------------------------------- */}
             {activeTab === "questions" && !isPreviewOpen && (
                 <div className="relative w-full lg:pr-20 space-y-6 pb-36">
-                    {/* Verified Identity Notice Card */}
-                    <div
-                        className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black dark:border-white shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4"
-                    >
-                        <div className="flex items-start sm:items-center gap-3.5">
-                            <div
-                                className="w-11 h-11 rounded-2xl border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0"
-                                style={{ backgroundColor: accentColor }}
-                            >
-                                <ShieldCheck className="w-6 h-6 text-black stroke-[2.5]" />
-                            </div>
-                            <div className="space-y-1 min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="text-sm sm:text-base font-black text-black dark:text-white tracking-tight">
-                                        Orbix Verified Identity Integration
-                                    </h4>
-                                    <span
-                                        className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1.5px_1.5px_0px_#000] text-black"
-                                        style={{ backgroundColor: accentColor }}
-                                    >
-                                        Active
-                                    </span>
-                                </div>
-                                <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 leading-relaxed">
-                                    Orbix pre-fills and binds student name, campus email, college, roll number, and verified profile credentials automatically upon submission.
-                                </p>
-                            </div>
-                        </div>
-
-                        {/* Quick-Add Event Question Templates */}
-                        <div className="pt-3.5 border-t-2 border-black/10 dark:border-white/10 space-y-3">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                                <span className="text-xs font-black uppercase tracking-wider text-black dark:text-white">
-                                    + Quick Add Common Event Questions:
-                                </span>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                    <button
-                                        type="button"
-                                        onClick={handleOpenQuestionLibrary}
-                                        className="px-3 py-1 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] flex items-center gap-1.5 cursor-pointer transition-all self-start sm:self-auto"
-                                        title="Past Events Question Library"
-                                    >
-                                        <FileText className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>Past Questions</span>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsImportModalOpen(true)}
-                                        className="px-3 py-1 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] flex items-center gap-1.5 cursor-pointer transition-all self-start sm:self-auto"
-                                    >
-                                        <ClipboardList className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>Browse Question Bank</span>
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {QUICK_TEMPLATES.map((tmpl) => (
-                                    <button
-                                        key={tmpl.key}
-                                        type="button"
-                                        onClick={() => {
-                                            const targetSecIdx = (form?.structure?.sections?.length || 1) - 1;
-                                            const newQ = tmpl.build();
-                                            updateSections((secs) => {
-                                                if (secs[targetSecIdx]) secs[targetSecIdx].questions.push(newQ);
-                                                return secs;
-                                            });
-                                            setActiveQuestionId(newQ.id);
-                                            toast.success(`Added question: "${tmpl.label}"`);
-                                        }}
-                                        className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-[#FAF6EE] dark:bg-neutral-900 dark:hover:bg-neutral-800 text-black dark:text-white font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] cursor-pointer transition-all"
-                                    >
-                                        + {tmpl.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Sections & Questions Matrix */}
                     {sections.map((section, sIdx) => (
                         <div key={section.id} className="space-y-4">
@@ -1593,7 +1526,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {activeTab !== "responses" && (
                 <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 max-w-[95vw]">
                     <div className="bg-white/95 dark:bg-[#0A0A0A]/95 backdrop-blur-md border-2 sm:border-[3px] border-black shadow-[4px_4px_0px_#000] rounded-2xl sm:rounded-3xl p-1.5 sm:p-2 flex items-center gap-1.5 sm:gap-2.5 overflow-x-auto">
-                        {/* AI Assistant Button */}
+                        {/* Circular AI Assistant Button */}
                         <button
                             type="button"
                             onClick={() => {
@@ -1603,25 +1536,22 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 }
                                 setIsAiModalOpen(true);
                             }}
-                            className="px-3.5 sm:px-4 py-2 rounded-xl sm:rounded-2xl border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
+                            className="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-black font-black text-xs sm:text-sm shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] active:translate-x-[1.5px] active:translate-y-[1.5px] transition-all cursor-pointer flex items-center justify-center shrink-0 select-none"
                             style={{ backgroundColor: accentColor, color: "#000" }}
                             title="AI Assistant: Generate questions with AI"
                         >
-                            <span className="inline-flex items-center gap-1 font-black text-xs tracking-wider">
-                                <Sparkles className="w-3.5 h-3.5 fill-black text-black stroke-[2.5]" />
-                                <span>AI AI</span>
-                            </span>
+                            <span className="font-black text-xs sm:text-sm tracking-tight text-black">AI</span>
                         </button>
 
-                        {/* Templates Button (Borderless) */}
+                        {/* Templates Button (Merged with Question Bank & Past Questions) */}
                         <button
                             type="button"
                             onClick={() => {
                                 if (activeTab !== "questions") setActiveTab("questions");
-                                setIsTemplatesModalOpen(true);
+                                setIsTemplatesHubModalOpen(true);
                             }}
                             className="px-3 sm:px-4 py-2 rounded-xl sm:rounded-2xl bg-transparent hover:bg-neutral-100 dark:hover:bg-neutral-800 text-black dark:text-white font-bold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border-0 shadow-none"
-                            title="Form Templates"
+                            title="Templates, Question Bank & Past Questions"
                         >
                             <LayoutTemplate className="w-4 h-4 stroke-[2.5]" />
                             <span>Templates</span>
@@ -1707,36 +1637,187 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                 />
             </React.Suspense>
 
-            {/* Import Questions Modal */}
-            {isImportModalOpen && typeof document !== "undefined" && createPortal(
-                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
-                    <div className="w-full max-w-xl bg-white dark:bg-neutral-900 rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 space-y-4 max-h-[85vh] overflow-y-auto">
-                        <div className="flex items-center justify-between border-b-2 border-black/10 dark:border-white/10 pb-3">
-                            <div className="flex items-center gap-2">
-                                <ClipboardList className="w-5 h-5 text-black dark:text-white stroke-[2.5]" />
-                                <h3 className="text-base font-black text-black dark:text-white">Import Questions</h3>
+            {/* ---------------------------------------------------------------- */}
+            {/* TEMPLATES & QUESTION HUB CHOOSER MODAL (Templates vs Question Bank vs Past Questions) */}
+            {/* ---------------------------------------------------------------- */}
+            {isTemplatesHubModalOpen && typeof document !== "undefined" && createPortal(
+                <div
+                    onClick={() => setIsTemplatesHubModalOpen(false)}
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm select-none"
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-3xl lg:max-w-4xl bg-[#FAF6EE] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 space-y-6 my-auto overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+                    >
+                        {/* Modal Header */}
+                        <div className="flex items-start justify-between gap-4 pb-4 border-b-2 border-black/10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-2xl border-2 border-black bg-[#FFE566] flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0">
+                                    <LayoutTemplate className="w-6 h-6 text-black stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg sm:text-xl font-black text-black tracking-tight">
+                                        Templates & Questions Hub
+                                    </h3>
+                                    <p className="text-xs font-bold text-neutral-600 mt-0.5">
+                                        Choose how you want to build your form: full templates, curated questions, or club history.
+                                    </p>
+                                </div>
                             </div>
                             <button
                                 type="button"
-                                onClick={() => setIsImportModalOpen(false)}
-                                className="p-1.5 rounded-lg border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[1.5px_1.5px_0px_#000] cursor-pointer transition-colors"
+                                onClick={() => setIsTemplatesHubModalOpen(false)}
+                                className="p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 shrink-0"
                             >
                                 <X className="w-4 h-4 stroke-[2.5]" />
                             </button>
                         </div>
 
-                        <p className="text-xs text-neutral-600 dark:text-neutral-400 font-bold">
-                            Select questions from the template bank to append directly to the active section.
-                        </p>
+                        {/* Options Grid (3 Columns: Templates, Question Bank, Past Questions) */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Option 1: Form Templates */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsTemplatesHubModalOpen(false);
+                                    setIsTemplatesModalOpen(true);
+                                }}
+                                className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-0.5 active:translate-y-0.5 text-left flex flex-col justify-between space-y-4 transition-all cursor-pointer group"
+                            >
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="w-10 h-10 rounded-xl border-2 border-black bg-[#FFE566] flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                            <LayoutTemplate className="w-5 h-5 text-black stroke-[2.5]" />
+                                        </div>
+                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-[#FFE566] border border-black">
+                                            Templates
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-base font-black text-black group-hover:underline leading-tight">
+                                            Form Templates
+                                        </h4>
+                                        <p className="text-xs font-bold text-neutral-600 mt-1 leading-relaxed">
+                                            Pre-built full questionnaires for Hackathons, Workshops, Recruitments, and Competitions.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="pt-2 border-t border-black/10 flex items-center justify-between text-xs font-black text-black">
+                                    <span>Browse Templates</span>
+                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </div>
+                            </button>
 
-                        <div className="space-y-2">
+                            {/* Option 2: Browse Question Bank */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsTemplatesHubModalOpen(false);
+                                    setIsImportModalOpen(true);
+                                }}
+                                className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-0.5 active:translate-y-0.5 text-left flex flex-col justify-between space-y-4 transition-all cursor-pointer group"
+                            >
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="w-10 h-10 rounded-xl border-2 border-black bg-[#A6E3E9] flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                            <ClipboardList className="w-5 h-5 text-black stroke-[2.5]" />
+                                        </div>
+                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black">
+                                            Question Bank
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-base font-black text-black group-hover:underline leading-tight">
+                                            Question Bank
+                                        </h4>
+                                        <p className="text-xs font-bold text-neutral-600 mt-1 leading-relaxed">
+                                            Import curated questions for tech stacks, hackathon experience, pitch decks, and GitHub profiles.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="pt-2 border-t border-black/10 flex items-center justify-between text-xs font-black text-black">
+                                    <span>Browse Bank</span>
+                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </div>
+                            </button>
+
+                            {/* Option 3: Past Questions */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setIsTemplatesHubModalOpen(false);
+                                    handleOpenQuestionLibrary();
+                                }}
+                                className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] hover:shadow-[6px_6px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] active:translate-x-0.5 active:translate-y-0.5 text-left flex flex-col justify-between space-y-4 transition-all cursor-pointer group"
+                            >
+                                <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <div className="w-10 h-10 rounded-xl border-2 border-black bg-[#a2ff86] flex items-center justify-center shadow-[2px_2px_0px_#000]">
+                                            <FileText className="w-5 h-5 text-black stroke-[2.5]" />
+                                        </div>
+                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-black text-[#a2ff86] border border-black">
+                                            Club History
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <h4 className="text-base font-black text-black group-hover:underline leading-tight">
+                                            Past Questions
+                                        </h4>
+                                        <p className="text-xs font-bold text-neutral-600 mt-1 leading-relaxed">
+                                            Reuse questions and sections from previous event forms created by your club chapter.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="pt-2 border-t border-black/10 flex items-center justify-between text-xs font-black text-black">
+                                    <span>Open Library</span>
+                                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
+
+            {/* Import Questions Modal (Browse Question Bank) */}
+            {isImportModalOpen && typeof document !== "undefined" && createPortal(
+                <div
+                    onClick={() => setIsImportModalOpen(false)}
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm select-none"
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-xl bg-[#FAF6EE] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 space-y-4 max-h-[85vh] overflow-y-auto"
+                    >
+                        <div className="flex items-start justify-between pb-3 border-b-2 border-black/10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl border-2 border-black bg-[#A6E3E9] flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0">
+                                    <ClipboardList className="w-5 h-5 text-black stroke-[2.5]" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black text-black tracking-tight">Browse Question Bank</h3>
+                                    <p className="text-xs font-bold text-neutral-600 mt-0.5">
+                                        Select questions from the template bank to append directly to the active section.
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsImportModalOpen(false)}
+                                className="p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 shrink-0"
+                            >
+                                <X className="w-4 h-4 stroke-[2.5]" />
+                            </button>
+                        </div>
+
+                        <div className="space-y-2.5 pt-1">
                             {QUICK_TEMPLATES.map((tmpl) => (
                                 <div
                                     key={tmpl.key}
-                                    className="p-3.5 rounded-xl border-2 border-black bg-neutral-50/70 dark:bg-neutral-950 hover:bg-neutral-100 dark:hover:bg-neutral-900 flex items-center justify-between gap-3 shadow-[2px_2px_0px_#000] transition-colors"
+                                    className="p-4 rounded-2xl border-2 border-black bg-white hover:bg-neutral-50 flex items-center justify-between gap-3 shadow-[3px_3px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all"
                                 >
                                     <div className="min-w-0">
-                                        <h5 className="text-xs sm:text-sm font-black text-neutral-900 dark:text-white truncate">
+                                        <h5 className="text-xs sm:text-sm font-black text-black truncate">
                                             {tmpl.label}
                                         </h5>
                                         <p className="text-[11px] text-neutral-500 font-bold truncate">
@@ -1756,7 +1837,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                             toast.success(`Imported: "${tmpl.label}"`);
                                             setIsImportModalOpen(false);
                                         }}
-                                        className="px-3.5 py-1.5 rounded-xl bg-black dark:bg-white text-white dark:text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer shrink-0 transition-transform"
+                                        className="px-4 py-2 rounded-xl bg-[#a2ff86] hover:bg-[#8cee70] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer shrink-0 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                     >
                                         + Import
                                     </button>
@@ -1801,19 +1882,26 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             )}
 
             {/* ---------------------------------------------------------------- */}
-            {/* PHASE 6.1: QUESTION LIBRARY MODAL */}
+            {/* PHASE 6.1: QUESTION LIBRARY MODAL (Past Questions) */}
             {/* ---------------------------------------------------------------- */}
             {isQuestionLibraryOpen && typeof document !== "undefined" && createPortal(
-                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
-                    <div className="w-full max-w-3xl bg-white dark:bg-neutral-900 rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 space-y-5 max-h-[85vh] flex flex-col">
-                        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                                    <ClipboardList className="w-4 h-4 text-neutral-800 dark:text-neutral-200" />
+                <div
+                    onClick={() => setIsQuestionLibraryOpen(false)}
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm select-none"
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-3xl bg-[#FAF6EE] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 space-y-4 max-h-[88vh] flex flex-col"
+                    >
+                        {/* Header */}
+                        <div className="flex items-start justify-between pb-3 border-b-2 border-black/10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl border-2 border-black bg-[#FFE566] flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0">
+                                    <FileText className="w-5 h-5 text-black stroke-[2.5]" />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">Past Events Question Library</h3>
-                                    <p className="text-[11px] text-neutral-500 font-normal">
+                                    <h3 className="text-base sm:text-lg font-black text-black tracking-tight">Past Events Question Library</h3>
+                                    <p className="text-xs font-bold text-neutral-600 mt-0.5">
                                         Select and reuse questions from previous forms created by your club.
                                     </p>
                                 </div>
@@ -1821,16 +1909,16 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             <button
                                 type="button"
                                 onClick={() => setIsQuestionLibraryOpen(false)}
-                                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                                className="p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 shrink-0"
                             >
-                                <X className="w-4 h-4" />
+                                <X className="w-4 h-4 stroke-[2.5]" />
                             </button>
                         </div>
 
                         {/* Destination section selector */}
                         {sections.length > 0 && (
-                            <div className="flex items-center gap-3 p-3 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 text-xs font-medium">
-                                <span className="text-neutral-600 dark:text-neutral-400 shrink-0">Insert Selected Into:</span>
+                            <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] text-xs font-bold">
+                                <span className="text-black font-black shrink-0">Insert Selected Into:</span>
                                 <NeoSelect
                                     value={libTargetSectionId}
                                     onChange={(val) => setLibTargetSectionId(val)}
@@ -1849,15 +1937,15 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             {loadingLibrary ? (
                                 <div className="p-12 flex flex-col items-center justify-center space-y-2">
                                     <OrbixLoader size="md" />
-                                    <span className="text-xs font-medium text-neutral-500">
+                                    <span className="text-xs font-black text-black">
                                         Retrieving past club questionnaires...
                                     </span>
                                 </div>
                             ) : pastEventsLibrary.length === 0 ? (
-                                <div className="p-10 text-center rounded-xl border border-dashed border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950 space-y-2">
-                                    <ClipboardList className="w-8 h-8 text-neutral-400 mx-auto" />
-                                    <h4 className="text-sm font-bold text-neutral-900 dark:text-white">No Past Questions Found</h4>
-                                    <p className="text-xs text-neutral-500 max-w-md mx-auto font-normal">
+                                <div className="p-10 text-center rounded-2xl border-2 border-dashed border-black bg-white shadow-[3px_3px_0px_#000] space-y-2">
+                                    <ClipboardList className="w-10 h-10 text-neutral-400 mx-auto" />
+                                    <h4 className="text-sm font-black text-black">No Past Questions Found</h4>
+                                    <p className="text-xs font-bold text-neutral-600 max-w-md mx-auto">
                                         As your club creates and publishes more event forms in Orbix, their questions will automatically appear here for one-click reuse!
                                     </p>
                                 </div>
@@ -1872,10 +1960,10 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     return (
                                         <div
                                             key={evt.eventId}
-                                            className="rounded-xl border border-neutral-200 dark:border-neutral-800 overflow-hidden bg-white dark:bg-neutral-900"
+                                            className="rounded-2xl border-2 border-black overflow-hidden bg-white shadow-[3px_3px_0px_#000]"
                                         >
                                             {/* Event Accordion Header */}
-                                            <div className="p-3 bg-neutral-50 dark:bg-neutral-950 border-b border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-3">
+                                            <div className="p-3.5 bg-[#FAF6EE] border-b-2 border-black flex items-center justify-between gap-3">
                                                 <button
                                                     type="button"
                                                     onClick={() =>
@@ -1884,15 +1972,15 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                                     className="flex items-center gap-2.5 text-left min-w-0 cursor-pointer flex-1"
                                                 >
                                                     {isExpanded ? (
-                                                        <ChevronUp className="w-4 h-4 text-neutral-600 dark:text-neutral-400 shrink-0" />
+                                                        <ChevronUp className="w-4 h-4 text-black stroke-[3] shrink-0" />
                                                     ) : (
-                                                        <ChevronDown className="w-4 h-4 text-neutral-600 dark:text-neutral-400 shrink-0" />
+                                                        <ChevronDown className="w-4 h-4 text-black stroke-[3] shrink-0" />
                                                     )}
                                                     <div className="min-w-0">
-                                                        <h4 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white truncate">
+                                                        <h4 className="text-xs sm:text-sm font-black text-black truncate">
                                                             {evt.eventTitle || evt.formTitle}
                                                         </h4>
-                                                        <span className="text-[10px] text-neutral-500 font-normal">
+                                                        <span className="text-[11px] font-bold text-neutral-500">
                                                             {evt.sectionsCount || 1} sections • {allQuestions.length} questions
                                                         </span>
                                                     </div>
@@ -1901,7 +1989,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleToggleSelectAllInEvent(allQuestions)}
-                                                    className="px-2.5 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 cursor-pointer shrink-0 transition-colors"
+                                                    className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black text-black shadow-[2px_2px_0px_#000] cursor-pointer shrink-0 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                                 >
                                                     {allSelected ? "Deselect All" : "Select All"}
                                                 </button>
@@ -1909,39 +1997,44 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
                                             {/* Questions Checklist */}
                                             {isExpanded && (
-                                                <div className="p-3 space-y-2 bg-white dark:bg-neutral-900 divide-y divide-neutral-100 dark:divide-neutral-800">
+                                                <div className="p-3 space-y-2 bg-white divide-y divide-black/10">
                                                     {allQuestions.map((q: FormQuestion) => {
                                                         const isSelected = selectedLibQuestionIds.has(q.id);
                                                         return (
                                                             <div
                                                                 key={q.id}
                                                                 onClick={() => handleToggleSelectLibQuestion(q.id)}
-                                                                className={`pt-2 pb-2 px-2 rounded-lg flex items-start gap-3 cursor-pointer transition-colors ${isSelected ? "bg-neutral-50 dark:bg-neutral-800/60" : "hover:bg-neutral-50 dark:hover:bg-neutral-800/30"
-                                                                    }`}
+                                                                className={`pt-2.5 pb-2.5 px-3 rounded-xl flex items-start gap-3 cursor-pointer transition-colors ${
+                                                                    isSelected ? "bg-[#FAF6EE] border border-black" : "hover:bg-neutral-50"
+                                                                }`}
                                                             >
                                                                 <div className="pt-0.5 shrink-0">
-                                                                    {isSelected ? (
-                                                                        <CheckSquare className="w-4 h-4 text-neutral-900 dark:text-white" />
-                                                                    ) : (
-                                                                        <Square className="w-4 h-4 text-neutral-400" />
-                                                                    )}
+                                                                    <div
+                                                                        className={`w-5 h-5 rounded-lg border-2 border-black flex items-center justify-center shadow-[1px_1px_0px_#000] transition-colors ${
+                                                                            isSelected ? "bg-[#a2ff86]" : "bg-white"
+                                                                        }`}
+                                                                    >
+                                                                        {isSelected && (
+                                                                            <CheckSquare className="w-3.5 h-3.5 text-black stroke-[3]" />
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                                 <div className="min-w-0 flex-1">
                                                                     <div className="flex items-center gap-2 flex-wrap">
-                                                                        <span className="text-xs font-semibold text-neutral-900 dark:text-white">
+                                                                        <span className="text-xs font-black text-black">
                                                                             {q.title || "Untitled Question"}
                                                                         </span>
-                                                                        <span className="px-2 py-0.2 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+                                                                        <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] text-black">
                                                                             {q.type.replace("_", " ")}
                                                                         </span>
                                                                         {q.required && (
-                                                                            <span className="text-[10px] font-semibold text-rose-500">
+                                                                            <span className="text-[10px] font-black text-rose-600">
                                                                                 * Required
                                                                             </span>
                                                                         )}
                                                                     </div>
                                                                     {q.description && (
-                                                                        <p className="text-[11px] text-neutral-500 font-normal truncate mt-0.5">
+                                                                        <p className="text-[11px] font-medium text-neutral-600 truncate mt-0.5">
                                                                             {q.description}
                                                                         </p>
                                                                     )}
@@ -1958,8 +2051,8 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                         </div>
 
                         {/* Footer Actions */}
-                        <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-3">
-                            <span className="text-xs font-medium text-neutral-500">
+                        <div className="pt-3 border-t-2 border-black/10 flex items-center justify-between gap-3">
+                            <span className="text-xs font-black text-black">
                                 {selectedLibQuestionIds.size}{" "}
                                 {selectedLibQuestionIds.size === 1 ? "question" : "questions"} selected
                             </span>
@@ -1967,7 +2060,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 <button
                                     type="button"
                                     onClick={() => setIsQuestionLibraryOpen(false)}
-                                    className="px-4 py-2 rounded-lg border border-neutral-200 dark:border-neutral-800 text-xs font-semibold hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                                    className="px-4 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                 >
                                     Cancel
                                 </button>
@@ -1975,9 +2068,9 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     type="button"
                                     onClick={handleInsertLibraryQuestions}
                                     disabled={selectedLibQuestionIds.size === 0}
-                                    className="px-4 py-2 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 disabled:opacity-40 text-xs font-semibold shadow-sm cursor-pointer flex items-center gap-1.5 transition-colors"
+                                    className="px-4 py-2 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] text-black text-xs font-black shadow-[3px_3px_0px_#000] disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                 >
-                                    <Plus className="w-3.5 h-3.5" />
+                                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
                                     <span>Insert Selected ({selectedLibQuestionIds.size})</span>
                                 </button>
                             </div>
@@ -1991,18 +2084,27 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
             {/* PHASE 6.2: FORM TEMPLATES CATALOG MODAL */}
             {/* ---------------------------------------------------------------- */}
             {isTemplatesModalOpen && typeof document !== "undefined" && createPortal(
-                <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm select-none">
-                    <div className="w-full max-w-4xl bg-white dark:bg-neutral-900 rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 space-y-5 max-h-[85vh] flex flex-col">
-                        <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-3">
-                            <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
-                                    <LayoutTemplate className="w-4 h-4 text-neutral-800 dark:text-neutral-200" />
+                <div
+                    onClick={() => {
+                        setIsTemplatesModalOpen(false);
+                        setPreviewTemplate(null);
+                    }}
+                    className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm select-none"
+                >
+                    <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-full max-w-4xl bg-[#FAF6EE] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] p-6 sm:p-7 space-y-5 max-h-[85vh] flex flex-col"
+                    >
+                        <div className="flex items-start justify-between pb-3 border-b-2 border-black/10">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl border-2 border-black bg-[#FFE566] flex items-center justify-center shadow-[2px_2px_0px_#000] shrink-0">
+                                    <LayoutTemplate className="w-5 h-5 text-black stroke-[2.5]" />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm sm:text-base font-bold text-neutral-900 dark:text-white">
+                                    <h3 className="text-base sm:text-lg font-black text-black tracking-tight">
                                         Orbix Form Templates Catalog ({ORBIX_FORM_TEMPLATES.length})
                                     </h3>
-                                    <p className="text-[11px] text-neutral-500 font-normal">
+                                    <p className="text-xs font-bold text-neutral-600 mt-0.5">
                                         Battle-tested, fully editable starting questionnaires designed for college events.
                                     </p>
                                 </div>
@@ -2013,9 +2115,9 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                     setIsTemplatesModalOpen(false);
                                     setPreviewTemplate(null);
                                 }}
-                                className="p-1 rounded-lg text-neutral-400 hover:text-neutral-900 dark:hover:text-white hover:bg-neutral-100 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
+                                className="p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 shrink-0"
                             >
-                                <X className="w-4 h-4" />
+                                <X className="w-4 h-4 stroke-[2.5]" />
                             </button>
                         </div>
 
@@ -2025,21 +2127,21 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 <button
                                     type="button"
                                     onClick={() => setPreviewTemplate(null)}
-                                    className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                                    className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black text-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                 >
-                                    <ArrowLeft className="w-3.5 h-3.5" />
+                                    <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
                                     <span>Back to all templates</span>
                                 </button>
 
-                                <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 space-y-2">
+                                <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2">
                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <h4 className="text-sm font-bold text-neutral-900 dark:text-white">{previewTemplate.title}</h4>
-                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-neutral-200 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+                                        <h4 className="text-sm font-black text-black">{previewTemplate.title}</h4>
+                                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#FFE566] text-black border border-black">
                                             {previewTemplate.category}
                                         </span>
                                     </div>
-                                    <p className="text-xs text-neutral-500 font-normal">{previewTemplate.description || previewTemplate.summary}</p>
-                                    <div className="flex items-center gap-3 pt-1 text-[11px] font-medium text-neutral-500">
+                                    <p className="text-xs text-neutral-600 font-bold">{previewTemplate.description || previewTemplate.summary}</p>
+                                    <div className="flex items-center gap-3 pt-1 text-[11px] font-black text-black">
                                         <span>• {previewTemplate.structure.sections.length} Sections</span>
                                         <span>
                                             •{" "}
@@ -2049,37 +2151,37 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                             )}{" "}
                                             Questions
                                         </span>
-                                        <span>• Includes Conditional Logic & File Uploads</span>
+                                        <span className="text-neutral-500 font-bold">• Includes Conditional Logic & File Uploads</span>
                                     </div>
                                 </div>
 
                                 {/* Preview sections & questions */}
                                 <div className="space-y-3">
-                                    <h5 className="text-xs font-semibold uppercase tracking-wider text-neutral-500">
+                                    <h5 className="text-xs font-black uppercase tracking-wider text-neutral-600">
                                         Template Questionnaire Structure:
                                     </h5>
                                     {previewTemplate.structure.sections.map((sec, sIdx) => (
                                         <div
                                             key={sec.id || sIdx}
-                                            className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-900 space-y-2"
+                                            className="p-4 rounded-2xl border-2 border-black bg-white shadow-[3px_3px_0px_#000] space-y-2"
                                         >
-                                            <div className="flex items-center justify-between border-b border-neutral-100 dark:border-neutral-800 pb-2">
-                                                <h6 className="text-xs font-semibold text-neutral-900 dark:text-white">
+                                            <div className="flex items-center justify-between border-b-2 border-black/10 pb-2">
+                                                <h6 className="text-xs font-black text-black">
                                                     Section {sIdx + 1}: {sec.title}
                                                 </h6>
-                                                <span className="text-[10px] text-neutral-500 font-medium">
+                                                <span className="text-[10px] text-neutral-600 font-bold">
                                                     {sec.questions.length} questions
                                                 </span>
                                             </div>
                                             <div className="space-y-1.5 pl-2">
                                                 {sec.questions.map((q, qIdx) => (
-                                                    <div key={q.id || qIdx} className="text-xs font-normal text-neutral-700 dark:text-neutral-300 flex items-center gap-2">
-                                                        <span className="text-neutral-400 font-medium">{qIdx + 1}.</span>
-                                                        <span className="font-medium text-neutral-900 dark:text-white">{q.title}</span>
-                                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
+                                                    <div key={q.id || qIdx} className="text-xs font-bold text-neutral-700 flex items-center gap-2">
+                                                        <span className="text-neutral-400 font-black">{qIdx + 1}.</span>
+                                                        <span className="font-black text-black">{q.title}</span>
+                                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-100 border border-black/20 text-black font-bold">
                                                             {q.type}
                                                         </span>
-                                                        {q.required && <span className="text-[10px] text-rose-500 font-bold">*</span>}
+                                                        {q.required && <span className="text-[10px] text-rose-500 font-black">*</span>}
                                                     </div>
                                                 ))}
                                             </div>
@@ -2088,23 +2190,23 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 </div>
 
                                 {/* Template Action Bar */}
-                                <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                    <div className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
-                                        <span className="font-semibold text-neutral-900 dark:text-white block">Choose how to apply this template:</span>
+                                <div className="p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="text-xs font-bold text-neutral-600">
+                                        <span className="font-black text-black block">Choose how to apply this template:</span>
                                         Replace wipes your current draft, while Append adds these sections below existing questions.
                                     </div>
                                     <div className="flex items-center gap-2 shrink-0">
                                         <button
                                             type="button"
                                             onClick={() => handleApplyTemplate(previewTemplate, "append")}
-                                            className="px-3.5 py-1.5 rounded-lg bg-white dark:bg-neutral-900 hover:bg-neutral-100 dark:hover:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs font-semibold text-neutral-800 dark:text-neutral-200 cursor-pointer shadow-sm transition-colors"
+                                            className="px-3.5 py-2 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-xs font-black text-black cursor-pointer shadow-[2px_2px_0px_#000] transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                         >
                                             Append to Form
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => handleApplyTemplate(previewTemplate, "replace")}
-                                            className="px-3.5 py-1.5 rounded-lg bg-neutral-900 dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold cursor-pointer shadow-sm transition-colors"
+                                            className="px-3.5 py-2 rounded-xl bg-[#a2ff86] hover:bg-[#8cee70] border-2 border-black text-xs font-black text-black cursor-pointer shadow-[2px_2px_0px_#000] transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                         >
                                             Replace Entire Form
                                         </button>
@@ -2115,16 +2217,16 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                             /* Templates Grid */
                             <>
                                 {/* Category Filter Pills */}
-                                <div className="flex items-center gap-1.5 flex-wrap">
+                                <div className="flex items-center gap-2 flex-wrap">
                                     {["All", "Hackathon", "Workshop", "Recruitment", "Competition", "Careers"].map(
                                         (cat) => (
                                             <button
                                                 key={cat}
                                                 type="button"
                                                 onClick={() => setTemplateCategoryFilter(cat)}
-                                                className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${templateCategoryFilter === cat
-                                                    ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900"
-                                                    : "bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-800"
+                                                className={`px-3 py-1 rounded-xl text-xs font-black cursor-pointer transition-all border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5 ${templateCategoryFilter === cat
+                                                    ? "bg-black text-white"
+                                                    : "bg-white text-black hover:bg-neutral-100"
                                                     }`}
                                             >
                                                 {cat}
@@ -2134,7 +2236,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                 </div>
 
                                 <div className="flex-1 overflow-y-auto pr-1">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                         {ORBIX_FORM_TEMPLATES.filter(
                                             (t) =>
                                                 templateCategoryFilter === "All" ||
@@ -2147,37 +2249,37 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                             return (
                                                 <div
                                                     key={tmpl.id}
-                                                    className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-neutral-300 dark:hover:border-neutral-700 transition-all flex flex-col justify-between space-y-3"
+                                                    className="p-4 rounded-2xl border-2 border-black bg-white shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all flex flex-col justify-between space-y-3"
                                                 >
                                                     <div className="space-y-1.5">
                                                         <div className="flex items-center justify-between gap-2">
-                                                            <span className="px-2 py-0.2 rounded-full text-[9px] font-semibold uppercase tracking-wider bg-neutral-100 dark:bg-neutral-800 text-neutral-700 dark:text-neutral-300">
+                                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#FFE566] text-black border border-black">
                                                                 {tmpl.category}
                                                             </span>
-                                                            <span className="text-[10px] font-medium text-neutral-500">
+                                                            <span className="text-[11px] font-black text-black">
                                                                 {tmpl.structure.sections.length} sec • {totalQuestions} Qs
                                                             </span>
                                                         </div>
-                                                        <h4 className="text-xs sm:text-sm font-semibold text-neutral-900 dark:text-white">{tmpl.title}</h4>
-                                                        <p className="text-xs text-neutral-500 font-normal line-clamp-2">
+                                                        <h4 className="text-xs sm:text-sm font-black text-black">{tmpl.title}</h4>
+                                                        <p className="text-xs text-neutral-600 font-bold line-clamp-2">
                                                             {tmpl.description || tmpl.summary}
                                                         </p>
                                                     </div>
 
-                                                    <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 flex items-center justify-between gap-2">
+                                                    <div className="pt-2 border-t-2 border-black/10 flex items-center justify-between gap-2">
                                                         <button
                                                             type="button"
                                                             onClick={() => setPreviewTemplate(tmpl)}
-                                                            className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                                                            className="text-xs font-black text-black hover:underline flex items-center gap-1 cursor-pointer transition-colors"
                                                         >
-                                                            <Eye className="w-3.5 h-3.5" />
+                                                            <Eye className="w-3.5 h-3.5 stroke-[2.5]" />
                                                             <span>Preview</span>
                                                         </button>
                                                         <div className="flex items-center gap-1.5">
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleApplyTemplate(tmpl, "append")}
-                                                                className="px-2.5 py-1 rounded-lg bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 text-[11px] font-semibold text-neutral-700 dark:text-neutral-300 cursor-pointer transition-colors"
+                                                                className="px-2.5 py-1 rounded-xl bg-white hover:bg-neutral-100 border-2 border-black text-[11px] font-black text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                                                 title="Append sections to current form"
                                                             >
                                                                 + Append
@@ -2185,7 +2287,7 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleApplyTemplate(tmpl, "replace")}
-                                                                className="px-2.5 py-1 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 hover:bg-neutral-800 text-[11px] font-semibold cursor-pointer transition-colors"
+                                                                className="px-2.5 py-1 rounded-xl bg-[#a2ff86] hover:bg-[#8cee70] border-2 border-black text-[11px] font-black text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                                                 title="Replace entire form with template"
                                                             >
                                                                 Apply

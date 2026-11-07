@@ -514,49 +514,57 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
             {/* ============================================================== */}
             {/* PRIMARY VIEW SWITCHER (5.1 Summary, 5.2 Question, 5.3 Individual) */}
             {/* ============================================================== */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-neutral-200 dark:border-neutral-800 pb-3">
-                <div className="flex items-center p-1 bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl gap-1 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-black/10 dark:border-white/10 pb-3">
+                <div className="flex items-center p-1.5 bg-[#FAF6EE] dark:bg-[#121212] border-2 border-black shadow-[3px_3px_0px_#000] rounded-2xl gap-1.5 flex-wrap">
                     <button
                         type="button"
                         onClick={() => setViewMode("summary")}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 ${
-                            viewMode === "summary" ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm" : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all flex items-center gap-1.5 active:translate-x-0.5 active:translate-y-0.5 ${
+                            viewMode === "summary"
+                                ? "bg-black text-[#FFE566] dark:bg-white dark:text-black border-2 border-black shadow-[2px_2px_0px_#000] translate-x-[-1px] translate-y-[-1px]"
+                                : "text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 border-2 border-transparent"
                         }`}
                     >
-                        <BarChart3 className="w-3.5 h-3.5" />
-                        <span>Summary (5.1)</span>
+                        <BarChart3 className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>Summary</span>
                     </button>
 
                     <button
                         type="button"
                         onClick={() => setViewMode("question")}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 ${
-                            viewMode === "question" ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm" : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all flex items-center gap-1.5 active:translate-x-0.5 active:translate-y-0.5 ${
+                            viewMode === "question"
+                                ? "bg-black text-[#FFE566] dark:bg-white dark:text-black border-2 border-black shadow-[2px_2px_0px_#000] translate-x-[-1px] translate-y-[-1px]"
+                                : "text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 border-2 border-transparent"
                         }`}
                     >
-                        <HelpCircle className="w-3.5 h-3.5" />
-                        <span>Question-wise (5.2)</span>
+                        <HelpCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+                        <span>Question-wise</span>
                     </button>
 
                     <button
                         type="button"
                         onClick={() => setViewMode("individual")}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 ${
-                            viewMode === "individual" ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm" : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all flex items-center gap-1.5 active:translate-x-0.5 active:translate-y-0.5 ${
+                            viewMode === "individual"
+                                ? "bg-black text-[#FFE566] dark:bg-white dark:text-black border-2 border-black shadow-[2px_2px_0px_#000] translate-x-[-1px] translate-y-[-1px]"
+                                : "text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 border-2 border-transparent"
                         }`}
                     >
-                        <User className="w-3.5 h-3.5" />
+                        <User className="w-3.5 h-3.5 stroke-[2.5]" />
                         <span>Individual ({totalResponses})</span>
                     </button>
 
                     <button
                         type="button"
                         onClick={() => setViewMode("versions")}
-                        className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1.5 ${
-                            viewMode === "versions" ? "bg-white dark:bg-neutral-800 text-neutral-900 dark:text-white shadow-sm" : "text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100"
+                        className={`px-3.5 py-1.5 rounded-xl text-xs font-black cursor-pointer transition-all flex items-center gap-1.5 active:translate-x-0.5 active:translate-y-0.5 ${
+                            viewMode === "versions"
+                                ? "bg-black text-[#FFE566] dark:bg-white dark:text-black border-2 border-black shadow-[2px_2px_0px_#000] translate-x-[-1px] translate-y-[-1px]"
+                                : "text-neutral-700 dark:text-neutral-300 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 border-2 border-transparent"
                         }`}
                     >
-                        <History className="w-3.5 h-3.5" />
+                        <History className="w-3.5 h-3.5 stroke-[2.5]" />
                         <span>Snapshots</span>
                     </button>
                 </div>

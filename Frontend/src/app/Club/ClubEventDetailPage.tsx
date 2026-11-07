@@ -93,13 +93,22 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [accessDenied, setAccessDenied] = useState(false);
     const [searchParams, setSearchParams] = useSearchParams();
     const location = useLocation();
-    const isCheckinRoute = location.pathname.endsWith("/checkin") || searchParams.get("tab") === "checkin";
+    const isCheckinRoute = location.pathname.endsWith("/checkin") || searchParams.get("tab") === "checkin" || searchParams.get("eventTab") === "checkin";
+    const eventTabQuery = (searchParams.get("eventTab") || searchParams.get("tab")) as EventTab | null;
     const initialTab: EventTab = isCheckinRoute
         ? "checkin"
-        : (searchParams.get("tab") as EventTab) || "roster";
-    const [activeTab, setActiveTab] = useState<EventTab>(
-        ["roster", "form", "checkin", "pass", "settings"].includes(initialTab) ? initialTab : "roster"
-    );
+        : (eventTabQuery && ["roster", "form", "checkin", "pass", "settings"].includes(eventTabQuery) ? eventTabQuery : "roster");
+    const [activeTab, setActiveTab] = useState<EventTab>(initialTab);
+
+    // Keep activeTab in sync with URL searchParams (e.g. browser back/forward or tab changes)
+    useEffect(() => {
+        const queryTab = (searchParams.get("eventTab") || searchParams.get("tab")) as EventTab | null;
+        if (queryTab && ["roster", "form", "checkin", "pass", "settings"].includes(queryTab)) {
+            setActiveTab(queryTab);
+        } else if (!queryTab && !location.pathname.endsWith("/checkin")) {
+            setActiveTab("roster");
+        }
+    }, [searchParams, location.pathname]);
 
     const handleTabChange = (tab: EventTab) => {
         setActiveTab(tab);
@@ -108,10 +117,11 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         }
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
+            next.delete("tab");
             if (tab === "roster") {
-                next.delete("tab");
+                next.delete("eventTab");
             } else {
-                next.set("tab", tab);
+                next.set("eventTab", tab);
             }
             return next;
         });

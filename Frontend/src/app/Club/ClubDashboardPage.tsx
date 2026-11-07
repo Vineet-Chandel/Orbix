@@ -149,9 +149,11 @@ export default function ClubDashboardPage() {
     const location = useLocation();
     const [searchParams] = useSearchParams();
     const [activeTab, setActiveTabState] = useState<ClubTab>(() => {
-        const tabQuery = searchParams.get("tab") as ClubTab | null;
-        if (tabQuery && clubTabToPath[tabQuery]) {
-            return tabQuery;
+        if (!eventId && !location.pathname.startsWith("/club/events")) {
+            const tabQuery = searchParams.get("tab") as ClubTab | null;
+            if (tabQuery && clubTabToPath[tabQuery]) {
+                return tabQuery;
+            }
         }
         return getClubTabFromPath(location.pathname);
     });
@@ -164,11 +166,14 @@ export default function ClubDashboardPage() {
 
     // Backward compatibility: automatically migrate legacy query parameters (?tab=team) to clean full routes (/club/team)
     useEffect(() => {
+        if (eventId || location.pathname.startsWith("/club/events")) {
+            return;
+        }
         const tabQuery = searchParams.get("tab") as ClubTab | null;
         if (tabQuery && clubTabToPath[tabQuery]) {
             navigate(clubTabToPath[tabQuery], { replace: true });
         }
-    }, [searchParams, navigate]);
+    }, [searchParams, navigate, eventId, location.pathname]);
 
     // Deep link support for /club/inbox
     useEffect(() => {
