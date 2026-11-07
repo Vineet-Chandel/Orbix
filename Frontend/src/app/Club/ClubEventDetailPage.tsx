@@ -31,6 +31,7 @@ import {
     Paperclip,
     X,
     Heart,
+    Settings,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -56,7 +57,7 @@ import { ClubEventCheckinTerminal } from "./ClubEventCheckinTerminal";
 import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
 import { OrbixLoader } from "../../components/ui/loader";
 
-type EventTab = "roster" | "form" | "checkin" | "analytics" | "pass";
+type EventTab = "roster" | "form" | "checkin" | "pass" | "settings" | "analytics";
 
 export interface ClubEventDetailWorkspaceProps {
     eventId?: string;
@@ -95,7 +96,13 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [searchParams, setSearchParams] = useSearchParams();
     const location = useLocation();
     const isCheckinRoute = location.pathname.endsWith("/checkin") || searchParams.get("tab") === "checkin";
-    const [activeTab, setActiveTab] = useState<EventTab>(isCheckinRoute ? "checkin" : "roster");
+    const tabParam = searchParams.get("tab") as EventTab | null;
+    const initialTab: EventTab = isCheckinRoute
+        ? "checkin"
+        : tabParam && ["roster", "form", "checkin", "pass", "settings"].includes(tabParam)
+        ? tabParam
+        : "roster";
+    const [activeTab, setActiveTab] = useState<EventTab>(initialTab);
 
     const handleTabChange = (tab: EventTab) => {
         setActiveTab(tab);
@@ -913,6 +920,19 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         <QrCode className="w-4 h-4 stroke-[2.5]" />
                         <span>Invitation Card & QR Pass</span>
                     </button>
+
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange("settings")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                            activeTab === "settings"
+                                ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
+                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
+                        }`}
+                    >
+                        <Settings className="w-4 h-4 stroke-[2.5]" />
+                        <span>Event Settings</span>
+                    </button>
                 </div>
 
                 {/* TAB 1: APPLICATIONS SHEET & ATTENDEE ROSTER */}
@@ -1376,8 +1396,10 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                     </div>
                 )}
 
-                {/* DEDICATED BOTTOM EVENT ACTIONS & CONTROLS */}
-                <div className="p-6 sm:p-8 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-5">
+                {/* TAB 5: EVENT SETTINGS (EVENT ACTIONS & CONTROLS) */}
+                {activeTab === "settings" && event && (
+                    <div className="space-y-6">
+                        <div className="p-6 sm:p-8 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-black/10">
                         <div>
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566] tracking-wider">
@@ -1598,6 +1620,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         </div>
                     </div>
                 </div>
+            </div>
+        )}
 
             {/* ATTACHED HIGH-SECURITY CONFIRMATION CHALLENGE MODAL */}
             <EventSecurityConfirmModal
