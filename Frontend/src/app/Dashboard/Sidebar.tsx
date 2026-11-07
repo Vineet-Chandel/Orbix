@@ -6,6 +6,7 @@ import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { OrbixLogo } from "../../components/OrbixLogo";
+import { buildApiUrl } from "../../api/apiClient";
 
 export type SidebarTab =
     | "home"
@@ -210,7 +211,10 @@ export const Sidebar = ({
 
     const handleSignOut = async () => {
         try {
-            const endpoints = ["http://localhost:3000/api/signout", "/api/signout"];
+            const primarySignout = buildApiUrl("/api/auth/logout");
+            const endpoints = import.meta.env.DEV
+                ? [primarySignout, "/api/auth/signout", "http://localhost:3000/api/auth/logout", "/api/signout"]
+                : [primarySignout, "/api/auth/signout", "/api/signout"];
             await Promise.allSettled(
                 endpoints.map((url) =>
                     fetch(url, {

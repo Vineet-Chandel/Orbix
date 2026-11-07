@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Search, Building2, MapPin, ChevronDown, X } from "lucide-react";
 import type { ParticipatingCollege } from "./types";
+import { buildApiUrl } from "../../api/apiClient";
 
 interface CollegeSelectorProps {
     selectedCollege: ParticipatingCollege | null;
@@ -50,10 +51,10 @@ export const CollegeSelector: React.FC<CollegeSelectorProps> = ({
         const timer = setTimeout(async () => {
             setIsSearching(true);
             try {
-                const endpoints = [
-                    `/api/institutions/search?q=${encodeURIComponent(searchQuery)}&limit=15`,
-                    `http://localhost:3000/api/institutions/search?q=${encodeURIComponent(searchQuery)}&limit=15`,
-                ];
+                const primaryEndpoint = buildApiUrl(`/api/institutions/search?q=${encodeURIComponent(searchQuery)}&limit=15`);
+                const endpoints = import.meta.env.DEV
+                    ? [primaryEndpoint, `http://localhost:3000/api/institutions/search?q=${encodeURIComponent(searchQuery)}&limit=15`]
+                    : [primaryEndpoint];
 
                 let res: Response | null = null;
                 for (const url of endpoints) {

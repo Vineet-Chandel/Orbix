@@ -42,6 +42,7 @@ import {
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { OrbixLogo } from "../../components/OrbixLogo";
+import { buildApiUrl } from "../../api/apiClient";
 import type { ConnectedUserItem } from "../../api/relationshipApi";
 import { HelpCenterView } from "./HelpCenterView";
 import { ManageAccountView } from "./ManageAccountView";
@@ -152,7 +153,10 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
             setSetupOtpDigits(["", "", "", "", "", ""]);
             setSetupCooldownSeconds(60);
             try {
-                const endpoints = ["http://localhost:3000/api/auth/2fa/setup/send-otp", "/api/auth/2fa/setup/send-otp"];
+                const primarySetup = buildApiUrl("/api/auth/2fa/setup/send-otp");
+                const endpoints = import.meta.env.DEV
+                    ? [primarySetup, "http://localhost:3000/api/auth/2fa/setup/send-otp"]
+                    : [primarySetup];
                 let response: Response | null = null;
                 let resultData: any = null;
 
@@ -201,7 +205,10 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
         if (setupCooldownSeconds > 0 || isSendingSetupOtp) return;
         setIsSendingSetupOtp(true);
         try {
-            const endpoints = ["http://localhost:3000/api/auth/2fa/setup/send-otp", "/api/auth/2fa/setup/send-otp"];
+            const primaryResend = buildApiUrl("/api/auth/2fa/setup/send-otp");
+            const endpoints = import.meta.env.DEV
+                ? [primaryResend, "http://localhost:3000/api/auth/2fa/setup/send-otp"]
+                : [primaryResend];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -284,7 +291,10 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
         setIsVerifyingSetupOtp(true);
         try {
-            const endpoints = ["http://localhost:3000/api/auth/2fa/setup/verify-otp", "/api/auth/2fa/setup/verify-otp"];
+            const primaryVerify = buildApiUrl("/api/auth/2fa/setup/verify-otp");
+            const endpoints = import.meta.env.DEV
+                ? [primaryVerify, "http://localhost:3000/api/auth/2fa/setup/verify-otp"]
+                : [primaryVerify];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -332,7 +342,10 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
         if (e) e.preventDefault();
         setIsDisabling2FA(true);
         try {
-            const endpoints = ["http://localhost:3000/api/auth/2fa/disable", "/api/auth/2fa/disable"];
+            const primaryDisable = buildApiUrl("/api/auth/2fa/disable");
+            const endpoints = import.meta.env.DEV
+                ? [primaryDisable, "http://localhost:3000/api/auth/2fa/disable"]
+                : [primaryDisable];
             let response: Response | null = null;
 
             for (const url of endpoints) {

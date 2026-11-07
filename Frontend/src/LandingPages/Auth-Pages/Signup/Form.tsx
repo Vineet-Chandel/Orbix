@@ -272,10 +272,10 @@ export default function SignupForm() {
 
         try {
             // Step 1: Verify OTP and acquire cryptographic proof token
-            const verifyEndpoints = [
-                "http://localhost:3000/api/signup/verify-email-otp",
-                "/api/signup/verify-email-otp"
-            ];
+            const primaryVerify = buildApiUrl("/api/auth/signup/verify-email-otp");
+            const verifyEndpoints = import.meta.env.DEV
+                ? [primaryVerify, "http://localhost:3000/api/auth/signup/verify-email-otp", "/api/signup/verify-email-otp"]
+                : [primaryVerify, "/api/signup/verify-email-otp"];
 
             let verifyResponse: Response | null = null;
             let verifyData: any = null;

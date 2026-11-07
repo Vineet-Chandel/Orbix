@@ -2230,7 +2230,7 @@ clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Respo
             return res.status(401).json({ success: false, message: "Unauthorized." });
         }
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
@@ -2481,7 +2481,7 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
             return res.status(401).json({ success: false, message: "Unauthorized." });
         }
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
@@ -2677,7 +2677,7 @@ clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Re
             return res.status(401).json({ success: false, message: "Unauthorized." });
         }
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
@@ -3129,7 +3129,7 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
 clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
@@ -3193,7 +3193,7 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
 clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         const userId = req.user!.id;
 
         const checkEvent = await query(
@@ -3250,7 +3250,7 @@ clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res:
 clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
@@ -3569,7 +3569,7 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
 clubRouter.post("/events/:eventId/cancel", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
@@ -3660,7 +3660,7 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
 clubRouter.get("/events/:eventId/applications", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
@@ -3921,7 +3921,7 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
 clubRouter.get("/events/:eventId/applications/export", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
@@ -4103,7 +4103,7 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
 clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
@@ -4154,7 +4154,7 @@ clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, r
 clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isEventUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isEventUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isEventUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
@@ -4730,7 +4730,7 @@ clubRouter.get("/certificates/events", authenticate, async (req: Request, res: R
 clubRouter.get("/certificates/event/:eventId/recipients", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        const isUuid = Boolean(typeof eventId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId));
         if (!isUuid) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }

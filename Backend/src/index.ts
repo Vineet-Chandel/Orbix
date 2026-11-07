@@ -35,10 +35,8 @@ app.use((req: Request, res: Response, next: express.NextFunction) => {
     const origin = req.headers.origin;
     if (origin) {
         res.setHeader("Access-Control-Allow-Origin", origin);
-    } else {
-        res.setHeader("Access-Control-Allow-Origin", "*");
+        res.setHeader("Access-Control-Allow-Credentials", "true");
     }
-    res.setHeader("Access-Control-Allow-Credentials", "true");
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
     
     const requestedHeaders = req.headers["access-control-request-headers"];
@@ -47,7 +45,7 @@ app.use((req: Request, res: Response, next: express.NextFunction) => {
     } else {
         res.setHeader(
             "Access-Control-Allow-Headers",
-            "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-orbix-device-id, X-Orbix-Device-Id, *"
+            "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-orbix-device-id, X-Orbix-Device-Id"
         );
     }
     res.setHeader("Access-Control-Expose-Headers", "Authorization, Set-Cookie");
@@ -73,6 +71,25 @@ app.use((err: any, req: Request, res: Response, next: express.NextFunction) => {
 // CENTRALIZED API ROUTE ARCHITECTURE (EVERY BACKEND ENDPOINT PREFIXED WITH /api)
 // ============================================================================
 const apiRouter = express.Router();
+
+// System Health & Root Status Endpoints
+apiRouter.get('/health', (req: Request, res: Response) => {
+    res.status(200).json({
+        success: true,
+        service: "orbix-backend",
+        status: "healthy",
+        timestamp: new Date().toISOString()
+    });
+});
+
+apiRouter.get('/', (req: Request, res: Response) => {
+    res.status(200).json({
+        success: true,
+        service: "orbix-backend",
+        message: "Orbix API v1 operational",
+        timestamp: new Date().toISOString()
+    });
+});
 
 // Authentication & OAuth
 apiRouter.use('/auth', authRouter);
@@ -129,8 +146,24 @@ apiRouter.use('/', authRouter);
 
 // Mount centralized apiRouter exclusively under /api
 app.use('/api', apiRouter);
+
+// Root health and service check (for ELB, reverse proxies & process managers)
+app.get('/health', (req: Request, res: Response) => {
+    res.status(200).json({
+        success: true,
+        service: "orbix-backend",
+        status: "healthy",
+        timestamp: new Date().toISOString()
+    });
+});
+
 app.get('/', (req: Request, res: Response) => {
-    res.send('Hello World!');
+    res.status(200).json({
+        success: true,
+        service: "orbix-backend",
+        message: "Orbix Backend Service Operational",
+        api: "/api"
+    });
 });
 
 

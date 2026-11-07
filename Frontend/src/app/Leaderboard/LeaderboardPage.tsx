@@ -17,6 +17,7 @@ import type {
 import { Trophy, AlertCircle, Sparkles, ArrowUpRight, Building2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
+import { buildApiUrl } from "../../api/apiClient";
 
 export const LeaderboardPage: React.FC = () => {
     const { user } = useAppSelector((state) => state.user);
@@ -75,10 +76,10 @@ export const LeaderboardPage: React.FC = () => {
         let isMounted = true;
         const fetchParticipating = async () => {
             try {
-                const endpoints = [
-                    "/api/leaderboard/colleges/participating",
-                    "http://localhost:3000/api/leaderboard/colleges/participating",
-                ];
+                const primaryColleges = buildApiUrl("/api/leaderboard/colleges/participating");
+                const endpoints = import.meta.env.DEV
+                    ? [primaryColleges, "http://localhost:3000/api/leaderboard/colleges/participating"]
+                    : [primaryColleges];
                 let res: Response | null = null;
                 for (const url of endpoints) {
                     try {
@@ -211,10 +212,10 @@ export const LeaderboardPage: React.FC = () => {
                 endpointPath = `/api/leaderboard/colleges/${encodeURIComponent(selectedCollege.id)}?${queryParams.toString()}`;
             }
 
-            const endpoints = [
-                endpointPath,
-                `http://localhost:3000${endpointPath}`,
-            ];
+            const primaryRankings = buildApiUrl(endpointPath);
+            const endpoints = import.meta.env.DEV
+                ? [primaryRankings, `http://localhost:3000${endpointPath}`]
+                : [primaryRankings];
 
             let res: Response | null = null;
             for (const url of endpoints) {
@@ -301,10 +302,10 @@ export const LeaderboardPage: React.FC = () => {
     const handleSyncNow = async () => {
         setIsSyncing(true);
         try {
-            const endpoints = [
-                "/api/leaderboard/sync",
-                "http://localhost:3000/api/leaderboard/sync",
-            ];
+            const primarySync = buildApiUrl("/api/leaderboard/sync");
+            const endpoints = import.meta.env.DEV
+                ? [primarySync, "http://localhost:3000/api/leaderboard/sync"]
+                : [primarySync];
             let res: Response | null = null;
             for (const url of endpoints) {
                 try {
