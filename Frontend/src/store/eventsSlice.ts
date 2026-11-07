@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from "@reduxjs/toolkit";
+import { buildApiUrl } from "../api/apiClient";
 
 export interface EventItem {
     id: string;
@@ -112,7 +113,8 @@ export const fetchEvents = createAsyncThunk(
             if (params.type) search.set("type", params.type);
             if (params.platform) search.set("platform", params.platform);
 
-            const res = await fetch(`http://localhost:3000/api/events?${search.toString()}`);
+            const endpoint = buildApiUrl(`/api/events?${search.toString()}`);
+            const res = await fetch(endpoint);
             if (!res.ok) {
                 throw new Error(`Failed to fetch events: ${res.statusText}`);
             }
@@ -129,7 +131,7 @@ export const toggleReminder = createAsyncThunk(
     async (eventId: string, { rejectWithValue }) => {
         try {
             const token = localStorage.getItem("token") || "";
-            const res = await fetch("http://localhost:3000/api/events/reminders", {
+            const res = await fetch(buildApiUrl("/api/events/reminders"), {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -153,7 +155,7 @@ export const fetchReminders = createAsyncThunk(
     async (_, { rejectWithValue }) => {
         try {
             const token = localStorage.getItem("token") || "";
-            const res = await fetch("http://localhost:3000/api/events/reminders", {
+            const res = await fetch(buildApiUrl("/api/events/reminders"), {
                 headers: {
                     ...(token ? { Authorization: `Bearer ${token}` } : {}),
                 },

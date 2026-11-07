@@ -936,7 +936,7 @@ authRouter.post('/refresh', handleTokenRefresh);
 authRouter.post('/refresh-token', handleTokenRefresh);
 authRouter.get('/refresh', handleTokenRefresh);
 
-authRouter.post('/signout', async (req: Request, res: Response) => {
+const handleSignout = async (req: Request, res: Response) => {
     try {
         let gmail = req.body?.gmail;
         let sessionId: string | null = null;
@@ -1007,7 +1007,10 @@ authRouter.post('/signout', async (req: Request, res: Response) => {
             message: "Error signing out"
         });
     }
-});
+};
+
+authRouter.post('/signout', handleSignout);
+authRouter.post('/logout', handleSignout);
 
 const handleMeEndpoint = handleGetMyProfile;
 
@@ -1137,7 +1140,6 @@ const handleVerifyLogin2FA = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/2fa/verify-login', handleVerifyLogin2FA);
 authRouter.post('/2fa/verify-login', handleVerifyLogin2FA);
 
 /**
@@ -1172,7 +1174,6 @@ const handleResendLoginOtp = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/2fa/resend-login-otp', handleResendLoginOtp);
 authRouter.post('/2fa/resend-login-otp', handleResendLoginOtp);
 
 /**
@@ -1217,7 +1218,6 @@ const handleSendSetupOtp = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/2fa/setup/send-otp', authenticate, handleSendSetupOtp);
 authRouter.post('/2fa/setup/send-otp', authenticate, handleSendSetupOtp);
 
 /**
@@ -1253,7 +1253,6 @@ const handleVerifySetupOtp = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/2fa/setup/verify-otp', authenticate, handleVerifySetupOtp);
 authRouter.post('/2fa/setup/verify-otp', authenticate, handleVerifySetupOtp);
 
 /**
@@ -1289,7 +1288,6 @@ const handleDisable2FA = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/2fa/disable', authenticate, handleDisable2FA);
 authRouter.post('/2fa/disable', authenticate, handleDisable2FA);
 
 /**
@@ -1316,7 +1314,6 @@ const handlePasswordChange = async (req: Request, res: Response) => {
     }
 };
 
-authRouter.post('/auth/password/change', authenticate, handlePasswordChange);
 authRouter.post('/password/change', authenticate, handlePasswordChange);
 
 export default authRouter;

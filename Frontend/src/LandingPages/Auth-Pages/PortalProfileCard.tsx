@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { PORTALS } from "../../utils/portalParser";
+import { buildApiUrl } from "../../api/apiClient";
 
 export interface PortalProfileData {
     success: boolean;
@@ -77,10 +78,10 @@ export const PortalProfileCard = ({
             setFetchError(null);
             onFetchStateChange?.({ loading: true, error: null, profile: null });
 
-            const endpoints = [
-                `/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`,
-                `http://localhost:3000/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`,
-            ];
+            const primaryEndpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`);
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, `http://localhost:3000${primaryEndpoint}`]
+                : [primaryEndpoint];
 
             let data: PortalProfileData | null = null;
             let errorMessage: string | null = null;

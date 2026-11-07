@@ -11,6 +11,7 @@ import { disconnectPlatform } from "../../../utils/profileApi";
 import { invalidateConnectedPlatformCaches } from "../../../utils/cacheManager";
 import { SectionBottomIllustration } from "../../../app/common/SectionBottomIllustration";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
+import { buildApiUrl } from "../../../api/apiClient";
 
 type CategoryFilter = "all" | "cp" | "practice" | "dev";
 
@@ -231,7 +232,8 @@ export default function ProfilesOnboardingPage() {
                 const headers: Record<string, string> = { "Content-Type": "application/json" };
                 if (token) headers["Authorization"] = `Bearer ${token}`;
 
-                const endpoints = ["/api/portals/save", "http://localhost:3000/api/portals/save"];
+                const primarySave = buildApiUrl("/api/portals/save");
+                const endpoints = import.meta.env.DEV ? [primarySave, "http://localhost:3000/api/portals/save"] : [primarySave];
                 let serverLinks: any[] = [];
 
                 for (const url of endpoints) {
@@ -322,10 +324,8 @@ export default function ProfilesOnboardingPage() {
                     if (!uname) continue;
 
                     try {
-                        const endpoints = [
-                            `/api/portals/fetch?portal=${encodeURIComponent(pId)}&username=${encodeURIComponent(uname)}`,
-                            `http://localhost:3000/api/portals/fetch?portal=${encodeURIComponent(pId)}&username=${encodeURIComponent(uname)}`,
-                        ];
+                        const primaryFetch = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(pId)}&username=${encodeURIComponent(uname)}`);
+                        const endpoints = import.meta.env.DEV ? [primaryFetch, `http://localhost:3000${primaryFetch}`] : [primaryFetch];
                         for (const url of endpoints) {
                             try {
                                 const res = await fetch(url);
@@ -589,10 +589,11 @@ export default function ProfilesOnboardingPage() {
                 syncMode: "exact",
             };
 
-            // Call primary endpoint, fallback to secondary if needed
+            // Call primary endpoint, fallback to secondary if needed in dev
+            const saveUrl = buildApiUrl("/api/portals/save");
             let saveSuccessful = false;
             try {
-                const res = await fetch("/api/portals/save", {
+                const res = await fetch(saveUrl, {
                     method: "POST",
                     headers,
                     credentials: "include",
@@ -603,7 +604,7 @@ export default function ProfilesOnboardingPage() {
                 // try fallback
             }
 
-            if (!saveSuccessful) {
+            if (!saveSuccessful && import.meta.env.DEV) {
                 try {
                     const fallbackRes = await fetch("http://localhost:3000/api/portals/save", {
                         method: "POST",

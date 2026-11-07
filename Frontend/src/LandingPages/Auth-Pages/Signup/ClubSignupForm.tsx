@@ -9,6 +9,7 @@ import {
     confirmFirebasePhoneOtp,
     isFirebaseConfigured,
 } from "../../../services/phoneAuthService";
+import { buildApiUrl } from "../../../api/apiClient";
 import {
     Building2,
     UserCheck,
@@ -857,7 +858,10 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
         };
 
         try {
-            const endpoints = ["http://localhost:3000/api/club/register", "/api/club/register"];
+            const primaryEndpoint = buildApiUrl("/api/club/register");
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/club/register"]
+                : [primaryEndpoint];
             let response: Response | null = null;
             let resultData: any = null;
 

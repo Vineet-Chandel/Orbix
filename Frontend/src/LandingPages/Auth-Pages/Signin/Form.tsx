@@ -5,6 +5,7 @@ import { FormInput } from "../FormInput";
 import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
 import { getOrCreateDeviceId } from "../../../api/sessionActivityApi";
+import { buildApiUrl } from "../../../api/apiClient";
 import { OrbixLoader } from "../../../components/ui/loader";
 
 export default function SigninForm() {
@@ -141,7 +142,10 @@ export default function SigninForm() {
         setLoading(true);
 
         try {
-            const endpoints = ["/api/signin", "http://localhost:3000/api/signin"];
+            const primaryEndpoint = buildApiUrl("/api/auth/signin");
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/signin"]
+                : [primaryEndpoint];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -255,7 +259,10 @@ export default function SigninForm() {
 
         setIsVerifying2FA(true);
         try {
-            const endpoints = ["/api/auth/2fa/verify-login", "http://localhost:3000/api/auth/2fa/verify-login"];
+            const primaryEndpoint = buildApiUrl("/api/auth/2fa/verify-login");
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/2fa/verify-login"]
+                : [primaryEndpoint];
             let response: Response | null = null;
             let resultData: any = null;
 
@@ -307,7 +314,10 @@ export default function SigninForm() {
         if (cooldownSeconds > 0 || isResending) return;
         setIsResending(true);
         try {
-            const endpoints = ["/api/auth/2fa/resend-login-otp", "http://localhost:3000/api/auth/2fa/resend-login-otp"];
+            const primaryEndpoint = buildApiUrl("/api/auth/2fa/resend-login-otp");
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/2fa/resend-login-otp"]
+                : [primaryEndpoint];
             let response: Response | null = null;
             let resultData: any = null;
 

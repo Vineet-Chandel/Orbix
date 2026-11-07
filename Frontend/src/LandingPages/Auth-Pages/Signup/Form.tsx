@@ -16,6 +16,7 @@ import { useToast } from "../../../context/ToastContext";
 import { useAppDispatch, setUser } from "../../../store";
 import { useModalDismiss } from "../../../hooks/useModalDismiss";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
+import { buildApiUrl } from "../../../api/apiClient";
 
 export default function SignupForm() {
     const navigate = useNavigate();
@@ -148,10 +149,10 @@ export default function SignupForm() {
         const lastName = formData.lastName.trim();
 
         try {
-            const endpoints = [
-                "http://localhost:3000/api/signup/send-email-otp",
-                "/api/signup/send-email-otp"
-            ];
+            const primaryEndpoint = buildApiUrl("/api/auth/signup/send-email-otp");
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp"]
+                : [primaryEndpoint];
 
             let response: Response | null = null;
             let resData: any = null;
@@ -214,10 +215,10 @@ export default function SignupForm() {
 
         setResendingOtp(true);
         try {
-            const endpoints = [
-                "http://localhost:3000/api/signup/send-email-otp",
-                "/api/signup/send-email-otp"
-            ];
+            const primaryEndpoint = buildApiUrl("/api/auth/signup/send-email-otp");
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp"]
+                : [primaryEndpoint];
 
             let response: Response | null = null;
             let resData: any = null;
@@ -318,10 +319,10 @@ export default function SignupForm() {
                 verificationToken,
             };
 
-            const signupEndpoints = [
-                "http://localhost:3000/api/signup",
-                "/api/signup"
-            ];
+            const primarySignup = buildApiUrl("/api/auth/signup");
+            const signupEndpoints = import.meta.env.DEV
+                ? [primarySignup, "http://localhost:3000/api/auth/signup"]
+                : [primarySignup];
 
             let signupResponse: Response | null = null;
             let signupData: any = null;
