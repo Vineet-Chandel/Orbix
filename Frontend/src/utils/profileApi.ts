@@ -38,6 +38,8 @@ export interface PublicProfileData {
     isEmailVerified?: boolean;
     isVerifiedCoder?: boolean;
     isVerified?: boolean;
+    isCollegeVerified?: boolean;
+    collegeVerificationStatus?: string;
     resumeUrl?: string | null;
     resumeFilename?: string | null;
     resumeFilesize?: number | null;

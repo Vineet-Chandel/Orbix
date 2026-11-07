@@ -1,5 +1,5 @@
 import express, { type Request, type Response } from "express";
-import { query } from "../../database/client.js";
+import { query, pool } from "../../database/client.js";
 import { authenticate, optionalAuthenticate } from "../../middlewares/auth.middleware.js";
 import {
     getCachedPublicProfile,
@@ -261,6 +261,35 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
             }
         }
 
+        
+        let isCollegeVerified = false;
+        let collegeVerificationStatus = 'NOT_VERIFIED';
+        if (userRow.collegeId) {
+            try {
+                const cvRes = await query(
+                    'SELECT id, status, college_id FROM college_verifications WHERE user_id = $1 ORDER BY created_at DESC;',
+                    [userRow.id]
+                );
+                const appRows = cvRes.rows;
+                const approved = appRows.find(r => r.status === 'APPROVED' && r.college_id === userRow.collegeId);
+                if (approved) {
+                    isCollegeVerified = true;
+                    collegeVerificationStatus = 'APPROVED';
+                } else {
+                    const pending = appRows.find(r => r.status === 'PENDING' || r.status === 'PROCESSING');
+                    if (pending) {
+                        collegeVerificationStatus = pending.status;
+                    } else if (appRows[0]?.status === 'REJECTED') {
+                        collegeVerificationStatus = 'REJECTED';
+                    } else {
+                        collegeVerificationStatus = 'NOT_VERIFIED';
+                    }
+                }
+            } catch (cvErr) {
+                console.warn('College verification status resolution error:', cvErr);
+            }
+        }
+
         const cooldownInfo = computeCollegeCooldown(userRow.collegeUpdatedAt);
 
         const fullUser: any = {
@@ -270,6 +299,8 @@ export const handleGetMyProfile = async (req: Request, res: Response) => {
             collegeUpdatedAt: userRow.collegeUpdatedAt,
             canChangeCollege: cooldownInfo.canChangeCollege,
             collegeLockRemainingMs: cooldownInfo.collegeLockRemainingMs,
+            isCollegeVerified,
+            collegeVerificationStatus,
             nextAllowedCollegeChangeAt: cooldownInfo.nextAllowedCollegeChangeAt,
             skills: Array.isArray(userRow.skills) ? userRow.skills : [],
             links: parseLinks(userRow.links, userRow),
@@ -628,96 +659,115 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
             }
         }
 
-        const updateResult = await query(
-            `UPDATE users
-             SET
-                firstname = COALESCE($1, firstname),
-                lastname = COALESCE($2, lastname),
-                headline = $3,
-                bio = $4,
-                avatar_url = $5,
-                cover_image_url = $6,
-                website = $7,
-                linkedin = $8,
-                github = $9,
-                custom_link = $10,
-                location = $11,
-                skills = $12::jsonb,
-                is_public = $13,
-                links = COALESCE($14::jsonb, '[]'::jsonb),
-                is_open_to_work = (CASE WHEN $13 = false THEN false WHEN $15::boolean IS NULL THEN is_open_to_work ELSE $15::boolean END),
-                is_hireable = (CASE WHEN $13 = false THEN false WHEN $16::boolean IS NULL THEN is_hireable ELSE $16::boolean END),
-                is_resume_public = (CASE WHEN $13 = false THEN false ELSE is_resume_public END),
-                college_id = $17,
-                college = $18,
-                college_updated_at = (CASE WHEN $21::boolean THEN CURRENT_TIMESTAMP ELSE college_updated_at END),
-                updated_at = CURRENT_TIMESTAMP
-             WHERE id = $19 OR email = $20
-             RETURNING
-                id,
-                username,
-                firstname AS "firstName",
-                middlename AS "middleName",
-                lastname AS "lastName",
-                email AS gmail,
-                termsaccepted AS "termsAccepted",
-                account_type AS "accountType",
-                headline,
-                bio,
-                avatar_url AS "avatarUrl",
-                cover_image_url AS "coverImageUrl",
-                website,
-                linkedin,
-                github,
-                custom_link AS "customLink",
-                location,
-                skills,
-                links,
-                is_open_to_work AS "isOpenToWork",
-                is_hireable AS "isHireable",
-                is_public AS "isPublic",
-                is_resume_public AS "isResumePublic",
-                college,
-                college_id AS "collegeId",
-                college_updated_at AS "collegeUpdatedAt",
-                updated_at AS "updatedAt";`,
-            [
-                finalFirstName || null,
-                finalLastName || null,
-                finalHeadline,
-                finalBio,
-                finalAvatarUrl,
-                finalCoverImageUrl,
-                finalWebsite,
-                finalLinkedin,
-                finalGithub,
-                finalCustomLink,
-                finalLocation,
-                JSON.stringify(finalSkills),
-                finalIsPublic,
-                finalLinksJson,
-                typeof isOpenToWork === "boolean" ? isOpenToWork : null,
-                typeof isHireable === "boolean" ? isHireable : null,
-                finalCollegeId,
-                resolvedCollegeName,
-                authUser.id,
-                authUser.gmail,
-                Boolean(isCollegeChanged),
-            ]
-        );
-
-        if (!updateResult.rows[0]) {
-            return res.status(404).json({
-                success: false,
-                message: "User account not found",
-            });
-        }
-
-        const updatedUser = updateResult.rows[0];
-
-        // Keep leaderboard_entries synchronized with updated college and profile details
+        const client = await pool.connect();
+        let updatedUser: any;
         try {
-            await query(
+            await client.query("BEGIN");
+
+            const updateResult = await client.query(
+                `UPDATE users
+                 SET
+                    firstname = COALESCE($1, firstname),
+                    lastname = COALESCE($2, lastname),
+                    headline = $3,
+                    bio = $4,
+                    avatar_url = $5,
+                    cover_image_url = $6,
+                    website = $7,
+                    linkedin = $8,
+                    github = $9,
+                    custom_link = $10,
+                    location = $11,
+                    skills = $12::jsonb,
+                    is_public = $13,
+                    links = COALESCE($14::jsonb, '[]'::jsonb),
+                    is_open_to_work = (CASE WHEN $13 = false THEN false WHEN $15::boolean IS NULL THEN is_open_to_work ELSE $15::boolean END),
+                    is_hireable = (CASE WHEN $13 = false THEN false WHEN $16::boolean IS NULL THEN is_hireable ELSE $16::boolean END),
+                    is_resume_public = (CASE WHEN $13 = false THEN false ELSE is_resume_public END),
+                    college_id = $17,
+                    college = $18,
+                    college_updated_at = (CASE WHEN $21::boolean THEN CURRENT_TIMESTAMP ELSE college_updated_at END),
+                    is_college_verified = (CASE WHEN $21::boolean THEN false ELSE is_college_verified END),
+                    college_verified_at = (CASE WHEN $21::boolean THEN NULL ELSE college_verified_at END),
+                    updated_at = CURRENT_TIMESTAMP
+                 WHERE id = $19 OR email = $20
+                 RETURNING
+                    id,
+                    username,
+                    firstname AS "firstName",
+                    middlename AS "middleName",
+                    lastname AS "lastName",
+                    email AS gmail,
+                    termsaccepted AS "termsAccepted",
+                    account_type AS "accountType",
+                    headline,
+                    bio,
+                    avatar_url AS "avatarUrl",
+                    cover_image_url AS "coverImageUrl",
+                    website,
+                    linkedin,
+                    github,
+                    custom_link AS "customLink",
+                    location,
+                    skills,
+                    links,
+                    is_open_to_work AS "isOpenToWork",
+                    is_hireable AS "isHireable",
+                    is_public AS "isPublic",
+                    is_resume_public AS "isResumePublic",
+                    is_college_verified AS "isCollegeVerified",
+                    college_verified_at AS "collegeVerifiedAt",
+                    college,
+                    college_id AS "collegeId",
+                    college_updated_at AS "collegeUpdatedAt",
+                    updated_at AS "updatedAt";`,
+                [
+                    finalFirstName || null,
+                    finalLastName || null,
+                    finalHeadline,
+                    finalBio,
+                    finalAvatarUrl,
+                    finalCoverImageUrl,
+                    finalWebsite,
+                    finalLinkedin,
+                    finalGithub,
+                    finalCustomLink,
+                    finalLocation,
+                    JSON.stringify(finalSkills),
+                    finalIsPublic,
+                    finalLinksJson,
+                    typeof isOpenToWork === "boolean" ? isOpenToWork : null,
+                    typeof isHireable === "boolean" ? isHireable : null,
+                    finalCollegeId,
+                    resolvedCollegeName,
+                    authUser.id,
+                    authUser.gmail,
+                    Boolean(isCollegeChanged),
+                ]
+            );
+
+            if (!updateResult.rows[0]) {
+                await client.query("ROLLBACK");
+                return res.status(404).json({
+                    success: false,
+                    message: "User account not found",
+                });
+            }
+
+            updatedUser = updateResult.rows[0];
+
+            // Invalidate prior college verification applications transactionally if college affiliation changed
+            if (isCollegeChanged) {
+                await client.query(
+                    `UPDATE college_verifications 
+                     SET status = 'INVALIDATED', updated_at = CURRENT_TIMESTAMP 
+                     WHERE user_id = $1 AND status IN ('APPROVED', 'PENDING', 'PROCESSING');`,
+                    [authUser.id]
+                );
+            }
+
+            // Keep leaderboard_entries synchronized with updated college and profile details
+            await client.query(
                 `UPDATE leaderboard_entries
                  SET college = $1,
                      college_id = $2,
@@ -735,8 +785,13 @@ profileRouter.put("/", authenticate, async (req: Request, res: Response) => {
                     updatedUser.id,
                 ]
             );
-        } catch (lErr: any) {
-            console.warn("Leaderboard update on profile change warning:", lErr?.message);
+
+            await client.query("COMMIT");
+        } catch (txErr) {
+            await client.query("ROLLBACK");
+            throw txErr;
+        } finally {
+            client.release();
         }
 
         // Trigger leaderboard recalculation and cache invalidation
@@ -1124,6 +1179,22 @@ export const handleGetPublicProfile = async (req: Request, res: Response) => {
             );
             if (collegeRes.rows[0]) {
                 college = collegeRes.rows[0];
+            }
+        }
+
+        
+        let isCollegeVerified = false;
+        if (userRow.collegeId) {
+            try {
+                const cvRes = await query(
+                    'SELECT id FROM college_verifications WHERE user_id = $1 AND college_id = $2 AND status = \'APPROVED\' LIMIT 1;',
+                    [userRow.id, userRow.collegeId]
+                );
+                if (cvRes.rows.length > 0) {
+                    isCollegeVerified = true;
+                }
+            } catch (pCvErr) {
+                console.warn('Public college verification check warning:', pCvErr);
             }
         }
 

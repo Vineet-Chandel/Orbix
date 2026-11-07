@@ -740,3 +740,129 @@ export async function sendGuardianConsentEmail(options: SendGuardianConsentEmail
     logContext: "Guardian consent verification",
   });
 }
+
+export interface SendCollegeVerificationEmailOptions {
+  to: string;
+  studentName?: string;
+  collegeName: string;
+  verificationLink: string;
+  expiresInHours?: number;
+}
+
+function escapeHtml(str: string): string {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/**
+ * Builds the template for institutional college verification email.
+ */
+export function buildCollegeVerificationEmailTemplate(options: SendCollegeVerificationEmailOptions): {
+  subject: string;
+  headline: string;
+  html: string;
+  text: string;
+  safeLink: string;
+} {
+  const {
+    studentName = "Student",
+    collegeName,
+    verificationLink,
+    expiresInHours = 24,
+  } = options;
+
+  const safeStudent = escapeHtml(studentName);
+  const safeCollege = escapeHtml(collegeName);
+  const safeLink = verificationLink.replace(/"/g, "%22");
+
+  const subject = `Verify your institutional email for ${collegeName} — Orbix`;
+  const headline = `Verify your ${collegeName} Email`;
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(subject)}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F4F4F0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #F4F4F0; padding: 30px 10px;">
+    <tr>
+      <td align="center">
+        <table width="100%" border="0" cellspacing="0" cellpadding="0" style="max-width: 580px; background-color: #FAF6EE; border: 3px solid #000000; box-shadow: 6px 6px 0px 0px #000000; border-radius: 8px; overflow: hidden;">
+          <tr>
+            <td style="background-color: #000000; padding: 20px 24px;">
+              <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                <tr>
+                  <td>
+                    <span style="font-size: 20px; font-weight: 900; letter-spacing: 1.5px; color: #FFE566; text-transform: uppercase;">ORBIX</span>
+                  </td>
+                  <td align="right">
+                    <span style="background-color: #FFE566; color: #000000; padding: 4px 10px; border-radius: 999px; border: 1.5px solid #000000; font-size: 11px; font-weight: 900; text-transform: uppercase;">College Verification</span>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 28px 24px;">
+              <h1 style="margin: 0 0 12px 0; font-size: 22px; font-weight: 900; color: #000000;">${headline}</h1>
+              <p style="font-size: 14px; line-height: 1.6; color: #333333;">Hello <strong>${safeStudent}</strong>,</p>
+              <p style="font-size: 14px; line-height: 1.6; color: #333333;">
+                You requested to verify this institutional email address as part of your college verification application for <strong>${safeCollege}</strong> on Orbix.
+              </p>
+              <p style="font-size: 14px; line-height: 1.6; color: #333333;">
+                Verifying your institutional email helps confirm your active academic affiliation and expedites review by Orbix founders for your <strong>College Verified</strong> profile badge.
+              </p>
+
+              <div style="text-align: center; margin: 32px 0;">
+                <a href="${safeLink}" style="display: inline-block; background-color: #FFE566; color: #000000; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; text-decoration: none; padding: 14px 28px; border: 2.5px solid #000000; border-radius: 6px; box-shadow: 4px 4px 0px 0px #000000;">Verify My College Email</a>
+              </div>
+
+              <div style="background-color: #FFFFFF; border: 2px solid #000000; padding: 14px 16px; margin: 20px 0; border-radius: 6px; box-shadow: 3px 3px 0px 0px #000000;">
+                <p style="margin: 0 0 6px 0; font-size: 12px; font-weight: 700; color: #000000;">Can't click the button? Copy and paste this link into your browser:</p>
+                <p style="margin: 0; font-size: 11px; word-break: break-all; color: #555555; font-family: monospace;">${safeLink}</p>
+              </div>
+
+              <p style="font-size: 12px; line-height: 1.5; color: #666666; border-top: 1px solid #DDDDDD; padding-top: 16px; margin-top: 24px;">
+                This single-use link will expire in <strong>${expiresInHours} hours</strong>. If you did not initiate this college verification request, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 24px; background-color: #F0EDE6; border-top: 2px solid #000000; text-align: center;">
+              <p style="margin: 0; font-size: 11px; color: #777777;">Orbix Platform • Digital Identity & Collegiate Chapter Network</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+
+  const text = `Hello ${safeStudent},\n\nYou requested to verify your institutional email address for ${safeCollege} on Orbix.\n\nPlease verify your email by opening the following link within ${expiresInHours} hours:\n\n${verificationLink}\n\nIf you did not request this, please ignore this email.\n\nOrbix Platform`;
+
+  return { subject, headline, html, text, safeLink };
+}
+
+/**
+ * Sends a single-use institutional email verification link for student college verification.
+ */
+export async function sendCollegeVerificationEmail(options: SendCollegeVerificationEmailOptions): Promise<SendEmailResult> {
+  const { to } = options;
+  const template = buildCollegeVerificationEmailTemplate(options);
+
+  return dispatchEmail({
+    to,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+    fromName: "Orbix College Verification",
+    defaultFromEmail: "onboarding@resend.dev",
+    logContext: "College institutional email verification",
+  });
+}

@@ -1528,12 +1528,17 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                                     <span className="truncate font-black tracking-tight text-black">
                                                         {profile.college.officialName}
                                                     </span>
-                                                    {profile.college.verificationStatus === "verified" && (
-                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-black text-[10px] font-black text-black uppercase shadow-[1px_1px_0px_#000]">
+                                                    {Boolean(profile.isCollegeVerified) ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 border border-black text-[10px] font-black text-emerald-950 uppercase shadow-[1px_1px_0px_#000]">
                                                             <VerifiedBadge size="xs" />
-                                                            Verified
+                                                            College Verified
                                                         </span>
-                                                    )}
+                                                    ) : profile.college.verificationStatus === "verified" ? (
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white border border-black text-[10px] font-black text-neutral-800 uppercase shadow-[1px_1px_0px_#000]">
+                                                            <VerifiedBadge size="xs" />
+                                                            Verified Directory
+                                                        </span>
+                                                    ) : null}
                                                 </div>
                                                 {(profile.college.city || profile.college.state) && (
                                                     <span className="text-[10px] text-neutral-600 font-semibold block truncate mt-0.5">

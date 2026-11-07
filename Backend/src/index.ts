@@ -18,6 +18,7 @@ import {
 } from './Routes/relationships/relationshipRoutes.js';
 import { helpRouter } from './Routes/help/helpRoutes.js';
 import verificationRouter from './Routes/verification/verificationRoutes.js';
+import { studentCollegeVerificationRouter, founderCollegeVerificationRouter } from './Routes/verification/collegeVerificationRoutes.js';
 import manageAccountsRouter from './Routes/account/manageAccountsRoutes.js';
 import blogRouter from './Routes/blog/blogRoutes.js';
 import { accountGovernanceRouter } from './Routes/account/accountGovernanceRoutes.js';
@@ -85,6 +86,9 @@ app.use('/api/blocks', blockRouter);
 app.use('/api/settings', settingsRelationshipRouter);
 app.use('/api/help', helpRouter);
 app.use('/help', helpRouter);
+app.use('/api/verification/college', studentCollegeVerificationRouter);
+app.use('/api/college-verification', studentCollegeVerificationRouter);
+app.use('/api/internal/college-verifications', founderCollegeVerificationRouter);
 app.use('/api/verification', verificationRouter);
 app.use('/api/settings/verification', verificationRouter);
 app.use('/api/settings/manage-account', manageAccountsRouter);

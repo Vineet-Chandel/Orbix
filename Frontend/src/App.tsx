@@ -35,6 +35,7 @@ const PublicClubProfilePage = lazy(() => import("./app/Club/PublicClubProfilePag
 const PrivacyPolicyPage = lazy(() => import("./LandingPages/Legal/PrivacyPolicyPage"));
 const TermsConditionsPage = lazy(() => import("./LandingPages/Legal/TermsConditionsPage"));
 const GuardianConsentPage = lazy(() => import("./LandingPages/Legal/GuardianConsentPage"));
+const FounderCollegeVerificationsPage = lazy(() => import("./app/Internal/FounderCollegeVerificationsPage"));
 
 const WorkspaceRedirect = () => {
   const { user } = useAppSelector((state) => state.user);
@@ -166,6 +167,9 @@ const App = () => {
 
           {/* Protected Routes */}
           <Route element={<ProtectedRoute />}>
+            {/* Internal Founder College Verification Review Console */}
+            <Route path="/internal/college-verifications" element={<FounderCollegeVerificationsPage />} />
+            <Route path="/internal/college-verification" element={<Navigate to="/internal/college-verifications" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/clubs" element={<Dashboard />} />
             <Route path="/college-events" element={<Dashboard />} />
