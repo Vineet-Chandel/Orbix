@@ -114,10 +114,10 @@ export const fetchUnifiedDevelopment = createAsyncThunk<
         }
 
         const isRefreshing = force || hasGhMismatch;
-        const endpoints = [
-            `/api/portals/development/unified?username=${encodeURIComponent(effectiveUser)}${isRefreshing ? "&refresh=true" : ""}${portalsQuery}`,
-            `http://localhost:3000/api/portals/development/unified?username=${encodeURIComponent(effectiveUser)}${isRefreshing ? "&refresh=true" : ""}${portalsQuery}`,
-        ];
+        const primaryUrl = `/api/portals/development/unified?username=${encodeURIComponent(effectiveUser)}${isRefreshing ? "&refresh=true" : ""}${portalsQuery}`;
+        const endpoints = import.meta.env.DEV
+            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
+            : [primaryUrl];
 
         let authToken = "";
         try {

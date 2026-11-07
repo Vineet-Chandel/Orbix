@@ -60,7 +60,7 @@ export const GuardianConsentPage: React.FC = () => {
 
       try {
         setIsLoading(true);
-        const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3000";
+        const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3000" : "");
         const res = await fetch(
           `${apiBase}/api/club/events/guardian-consent/verify?token=${encodeURIComponent(token)}&registrationId=${encodeURIComponent(registrationId)}`
         );
@@ -98,7 +98,7 @@ export const GuardianConsentPage: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      const apiBase = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      const apiBase = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3000" : "");
       const res = await fetch(`${apiBase}/api/club/events/guardian-consent/confirm`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

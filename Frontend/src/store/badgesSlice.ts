@@ -93,10 +93,10 @@ export const fetchUnifiedBadges = createAsyncThunk<
         // Instantly return enhanced data for demo profile
         if (isDemoProfileUsername(effectiveUser)) {
             try {
-                const endpoints = [
-                    `/api/portals/badges/unified?username=${encodeURIComponent(effectiveUser)}`,
-                    `http://localhost:3000/api/portals/badges/unified?username=${encodeURIComponent(effectiveUser)}`,
-                ];
+                const primaryUrl = `/api/portals/badges/unified?username=${encodeURIComponent(effectiveUser)}`;
+                const endpoints = import.meta.env.DEV
+                    ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
+                    : [primaryUrl];
                 for (const url of endpoints) {
                     try {
                         const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
@@ -138,10 +138,10 @@ export const fetchUnifiedBadges = createAsyncThunk<
         const reqHeaders: Record<string, string> = { "Content-Type": "application/json" };
         if (token) reqHeaders["Authorization"] = `Bearer ${token}`;
 
-        const endpoints = [
-            `/api/portals/badges/unified?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}`,
-            `http://localhost:3000/api/portals/badges/unified?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}`,
-        ];
+        const primaryUrl = `/api/portals/badges/unified?username=${encodeURIComponent(effectiveUser)}${force ? "&refresh=true" : ""}`;
+        const endpoints = import.meta.env.DEV
+            ? [primaryUrl, `http://localhost:3000${primaryUrl}`]
+            : [primaryUrl];
 
         let lastError = "Failed to fetch badges";
         for (const url of endpoints) {

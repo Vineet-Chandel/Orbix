@@ -118,10 +118,10 @@ export default function ClubStatusPage() {
         setError(null);
 
         try {
-            const endpoints = [
-                "/api/club/application-status",
-                "http://localhost:3000/api/club/application-status",
-            ];
+            const primaryEndpoint = "/api/club/application-status";
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, "http://localhost:3000/api/club/application-status"]
+                : [primaryEndpoint];
             let res: Response | null = null;
             let data: any = null;
 
@@ -179,7 +179,7 @@ export default function ClubStatusPage() {
 
     const handleLogout = async () => {
         try {
-            await fetch("/api/signout", { method: "POST", credentials: "include" }).catch(() => {});
+            await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
         } catch {
             // ignore
         }
