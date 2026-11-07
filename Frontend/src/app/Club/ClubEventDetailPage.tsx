@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { createPortal } from "react-dom";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import {
     ArrowLeft,
@@ -27,9 +26,7 @@ import {
     Award,
     ScanLine,
     Sliders,
-    Eye,
     Paperclip,
-    X,
     Heart,
     Settings,
 } from "lucide-react";
@@ -57,7 +54,7 @@ import { ClubEventCheckinTerminal } from "./ClubEventCheckinTerminal";
 import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
 import { OrbixLoader } from "../../components/ui/loader";
 
-type EventTab = "roster" | "form" | "checkin" | "pass" | "settings" | "analytics";
+type EventTab = "roster" | "form" | "checkin" | "analytics" | "pass" | "settings";
 
 export interface ClubEventDetailWorkspaceProps {
     eventId?: string;
@@ -96,13 +93,12 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [searchParams, setSearchParams] = useSearchParams();
     const location = useLocation();
     const isCheckinRoute = location.pathname.endsWith("/checkin") || searchParams.get("tab") === "checkin";
-    const tabParam = searchParams.get("tab") as EventTab | null;
     const initialTab: EventTab = isCheckinRoute
         ? "checkin"
-        : tabParam && ["roster", "form", "checkin", "pass", "settings"].includes(tabParam)
-        ? tabParam
-        : "roster";
-    const [activeTab, setActiveTab] = useState<EventTab>(initialTab);
+        : (searchParams.get("tab") as EventTab) || "roster";
+    const [activeTab, setActiveTab] = useState<EventTab>(
+        ["roster", "form", "checkin", "pass", "settings"].includes(initialTab) ? initialTab : "roster"
+    );
 
     const handleTabChange = (tab: EventTab) => {
         setActiveTab(tab);
@@ -1396,232 +1392,259 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                     </div>
                 )}
 
-                {/* TAB 5: EVENT SETTINGS (EVENT ACTIONS & CONTROLS) */}
+                {/* TAB 4: EVENT SETTINGS & CONTROLS */}
                 {activeTab === "settings" && event && (
                     <div className="space-y-6">
                         <div className="p-6 sm:p-8 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-5">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-black/10">
-                        <div>
-                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566] tracking-wider">
-                                Event Operations
-                            </span>
-                            <h3 className="text-lg sm:text-xl font-black text-black mt-1">
-                                Event Actions & Controls
-                            </h3>
-                            <p className="text-xs text-neutral-600 font-bold">
-                                Update details, mark completion, change publication state, or delete event.
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-neutral-500">Status:</span>
-                            <span
-                                className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border-2 border-black ${
-                                    event.status === "published"
-                                        ? "bg-emerald-300 text-black shadow-[1.5px_1.5px_0px_#000]"
-                                        : event.status === "completed"
-                                        ? "bg-sky-200 text-black shadow-[1.5px_1.5px_0px_#000]"
-                                        : event.status === "draft"
-                                        ? "bg-amber-200 text-black shadow-[1.5px_1.5px_0px_#000]"
-                                        : "bg-rose-200 text-black shadow-[1.5px_1.5px_0px_#000]"
-                                }`}
-                            >
-                                {event.status}
-                            </span>
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-black/10">
+                                <div>
+                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566] tracking-wider">
+                                        Event Operations
+                                    </span>
+                                    <h3 className="text-lg sm:text-xl font-black text-black mt-1">
+                                        Event Actions & Controls
+                                    </h3>
+                                    <p className="text-xs text-neutral-600 font-bold">
+                                        Update details, mark completion, change publication state, or delete event.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold text-neutral-500">Status:</span>
+                                    <span
+                                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider border-2 border-black ${
+                                            event.status === "published"
+                                                ? "bg-emerald-300 text-black shadow-[1.5px_1.5px_0px_#000]"
+                                                : event.status === "completed"
+                                                ? "bg-sky-200 text-black shadow-[1.5px_1.5px_0px_#000]"
+                                                : event.status === "draft"
+                                                ? "bg-amber-200 text-black shadow-[1.5px_1.5px_0px_#000]"
+                                                : "bg-rose-200 text-black shadow-[1.5px_1.5px_0px_#000]"
+                                        }`}
+                                    >
+                                        {event.status}
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Action Controls & Impact Guidelines (Row-by-Row: Left Info / Right Button) */}
+                            <div className="space-y-4 pt-1">
+                                {/* 0. Edit Event Details & Basic Info */}
+                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1 max-w-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 border border-black"></span>
+                                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
+                                                Event Information & Poster
+                                            </h4>
+                                        </div>
+                                        <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                            Update session title, cover banner graphic, event schedule date & time, venue or virtual meeting link, and public description.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-60 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsEditModalOpen(true)}
+                                            className="w-full py-3 px-4 rounded-2xl bg-[#FFE566] hover:bg-[#ebd04e] text-black text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            title="Edit event details"
+                                        >
+                                            <Edit3 className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Edit Event Details</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* 1. Mark Completed / Re-open Live (Sky Blue / Emerald) */}
+                                <div className="p-4 sm:p-5 rounded-2xl bg-[#F0F9FF] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1 max-w-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-sky-500 border border-black"></span>
+                                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-sky-950">
+                                                {event.status === "published"
+                                                    ? "Conclude Event Session"
+                                                    : event.status === "completed"
+                                                    ? "Re-open Live Session"
+                                                    : "Publish to Campus"}
+                                            </h4>
+                                        </div>
+                                        <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                            {event.status === "published"
+                                                ? "Conclude the live event once it has finished. Freezes new RSVP registrations, preserves verified attendee records, and archives it into chapter completed milestones."
+                                                : event.status === "completed"
+                                                ? "Re-publish this completed event back to the live campus directory and resume public student RSVP registrations."
+                                                : event.status === "draft"
+                                                ? "Make this draft event live and visible in the public campus directory for students to view and register."
+                                                : "Reactivate this cancelled event and restore public RSVPs in the campus directory."}
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-60 shrink-0">
+                                        {event.status === "published" && (
+                                            <button
+                                                type="button"
+                                                onClick={handleMarkCompleted}
+                                                className="w-full py-3 px-6 rounded-2xl bg-[#BAE6FD] hover:bg-[#93c5fd] text-sky-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Mark session as completed with final attendee roster"
+                                            >
+                                                <CheckCheck className="w-4 h-4 stroke-[2.5]" />
+                                                <span>Mark Completed</span>
+                                            </button>
+                                        )}
+
+                                        {event.status === "completed" && (
+                                            <button
+                                                type="button"
+                                                onClick={handlePublishLive}
+                                                className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Re-open this event as live in campus directory"
+                                            >
+                                                <RotateCcw className="w-4 h-4 stroke-[2.5]" />
+                                                <span>Re-open as Live Event</span>
+                                            </button>
+                                        )}
+
+                                        {event.status === "draft" && (
+                                            <button
+                                                type="button"
+                                                onClick={handlePublishLive}
+                                                className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Publish live to campus directory"
+                                            >
+                                                <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                                <span>Publish Live to Campus</span>
+                                            </button>
+                                        )}
+
+                                        {event.status === "cancelled" && (
+                                            <button
+                                                type="button"
+                                                onClick={handlePublishLive}
+                                                className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Restore and publish live"
+                                            >
+                                                <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                                                <span>Restore & Publish Live</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* 2. [To Draft] and [Cancel Event] side-by-side with Left Guidelines */}
+                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1 max-w-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-black"></span>
+                                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
+                                                Campus Directory Visibility
+                                            </h4>
+                                        </div>
+                                        <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                            Move to Draft to temporarily unpublish this event from campus feeds for offline changes, or mark as Cancelled to display a cancellation notice while preserving student applicant records. Both actions require security verification.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-60 shrink-0 grid grid-cols-2 gap-2.5">
+                                        {event.status !== "draft" ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSecurityTarget({ action: "draft" })}
+                                                className="w-full py-2.5 px-3 rounded-2xl bg-[#FEF3C7] hover:bg-[#fde68a] text-amber-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Move event to draft status"
+                                            >
+                                                <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>To Draft</span>
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={handlePublishLive}
+                                                className="w-full py-2.5 px-3 rounded-2xl bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            >
+                                                <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Publish Live</span>
+                                            </button>
+                                        )}
+
+                                        {event.status !== "cancelled" ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSecurityTarget({ action: "cancelled" })}
+                                                className="w-full py-2.5 px-3 rounded-2xl bg-[#FECDD3] hover:bg-[#fca5a5] text-rose-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                                title="Cancel event with notification"
+                                            >
+                                                <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Cancel</span>
+                                            </button>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                onClick={() => setSecurityTarget({ action: "draft" })}
+                                                className="w-full py-2.5 px-3 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            >
+                                                <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                <span>Restore Draft</span>
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* 2.5 Issue Participation & Turnout Certificates */}
+                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1 max-w-xl">
+                                        <div className="flex items-center gap-2">
+                                            <Award className="w-4 h-4 text-black stroke-[2.5]" />
+                                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
+                                                Participation & Merit Certificates
+                                            </h4>
+                                        </div>
+                                        <p className="text-xs text-neutral-600 font-medium leading-relaxed">
+                                            Issue verifiable credentials to students who attended or registered for "{event.title}". Dispatches in-app notifications to each recipient's Activity portfolio.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-60 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCertStudioOpen(true)}
+                                            className="w-full py-3 px-4 rounded-2xl bg-[#a2ff86] hover:bg-[#8ee673] text-black text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                        >
+                                            <Award className="w-4 h-4 stroke-[2.5]" />
+                                            <span>Issue Certificates</span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* 3. Delete Event... with Danger Zone Guidelines */}
+                                <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF1F2] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="space-y-1 max-w-xl">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 border border-black"></span>
+                                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-rose-950">
+                                                Danger Zone — Permanent Removal
+                                            </h4>
+                                        </div>
+                                        <p className="text-xs text-rose-900/80 font-medium leading-relaxed">
+                                            Permanently delete this event listing, remove the public invitation pass, and erase all student RSVP applications from the database. Irreversible action protected by title confirmation and coordinator password verification.
+                                        </p>
+                                    </div>
+
+                                    <div className="w-full md:w-60 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSecurityTarget({ action: "delete" })}
+                                            className="w-full py-3 px-6 rounded-2xl bg-[#FFE4E6] hover:bg-[#fecdd3] text-rose-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
+                                            title="Permanently delete this event from the system"
+                                        >
+                                            <Trash2 className="w-4 h-4 stroke-[2.2] text-rose-900" />
+                                            <span>Delete Event...</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
-
-                    {/* Action Controls & Impact Guidelines (Row-by-Row: Left Info / Right Button) */}
-                    <div className="space-y-4 pt-1">
-                        {/* 1. Mark Completed / Re-open Live (Sky Blue / Emerald) */}
-                        <div className="p-4 sm:p-5 rounded-2xl bg-[#F0F9FF] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="space-y-1 max-w-xl">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-sky-500 border border-black"></span>
-                                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-sky-950">
-                                        {event.status === "published"
-                                            ? "Conclude Event Session"
-                                            : event.status === "completed"
-                                            ? "Re-open Live Session"
-                                            : "Publish to Campus"}
-                                    </h4>
-                                </div>
-                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                                    {event.status === "published"
-                                        ? "Conclude the live event once it has finished. Freezes new RSVP registrations, preserves verified attendee records, and archives it into chapter completed milestones."
-                                        : event.status === "completed"
-                                        ? "Re-publish this completed event back to the live campus directory and resume public student RSVP registrations."
-                                        : event.status === "draft"
-                                        ? "Make this draft event live and visible in the public campus directory for students to view and register."
-                                        : "Reactivate this cancelled event and restore public RSVPs in the campus directory."}
-                                </p>
-                            </div>
-
-                            <div className="w-full md:w-60 shrink-0">
-                                {event.status === "published" && (
-                                    <button
-                                        type="button"
-                                        onClick={handleMarkCompleted}
-                                        className="w-full py-3 px-6 rounded-2xl bg-[#BAE6FD] hover:bg-[#93c5fd] text-sky-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Mark session as completed with final attendee roster"
-                                    >
-                                        <CheckCheck className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Mark Completed</span>
-                                    </button>
-                                )}
-
-                                {event.status === "completed" && (
-                                    <button
-                                        type="button"
-                                        onClick={handlePublishLive}
-                                        className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Re-open this event as live in campus directory"
-                                    >
-                                        <RotateCcw className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Re-open as Live Event</span>
-                                    </button>
-                                )}
-
-                                {event.status === "draft" && (
-                                    <button
-                                        type="button"
-                                        onClick={handlePublishLive}
-                                        className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Publish live to campus directory"
-                                    >
-                                        <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Publish Live to Campus</span>
-                                    </button>
-                                )}
-
-                                {event.status === "cancelled" && (
-                                    <button
-                                        type="button"
-                                        onClick={handlePublishLive}
-                                        className="w-full py-3 px-6 rounded-2xl bg-emerald-200 hover:bg-emerald-300 text-emerald-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Restore and publish live"
-                                    >
-                                        <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
-                                        <span>Restore & Publish Live</span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 2. [To Draft] and [Cancel Event] side-by-side with Left Guidelines */}
-                        <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="space-y-1 max-w-xl">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-amber-500 border border-black"></span>
-                                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
-                                        Campus Directory Visibility
-                                    </h4>
-                                </div>
-                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                                    Move to Draft to temporarily unpublish this event from campus feeds for offline changes, or mark as Cancelled to display a cancellation notice while preserving student applicant records. Both actions require security verification.
-                                </p>
-                            </div>
-
-                            <div className="w-full md:w-60 shrink-0 grid grid-cols-2 gap-2.5">
-                                {event.status !== "draft" ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSecurityTarget({ action: "draft" })}
-                                        className="w-full py-2.5 px-3 rounded-2xl bg-[#FEF3C7] hover:bg-[#fde68a] text-amber-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Move event to draft status"
-                                    >
-                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>To Draft</span>
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={handlePublishLive}
-                                        className="w-full py-2.5 px-3 rounded-2xl bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <CheckCircle2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>Publish Live</span>
-                                    </button>
-                                )}
-
-                                {event.status !== "cancelled" ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSecurityTarget({ action: "cancelled" })}
-                                        className="w-full py-2.5 px-3 rounded-2xl bg-[#FECDD3] hover:bg-[#fca5a5] text-rose-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                        title="Cancel event with notification"
-                                    >
-                                        <XCircle className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>Cancel</span>
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => setSecurityTarget({ action: "draft" })}
-                                        className="w-full py-2.5 px-3 rounded-2xl bg-amber-100 hover:bg-amber-200 text-amber-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    >
-                                        <RotateCcw className="w-3.5 h-3.5 stroke-[2.5]" />
-                                        <span>Restore Draft</span>
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* 2.5 Issue Participation & Turnout Certificates */}
-                        <div className="p-4 sm:p-5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="space-y-1 max-w-xl">
-                                <div className="flex items-center gap-2">
-                                    <Award className="w-4 h-4 text-black stroke-[2.5]" />
-                                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-neutral-900">
-                                        Participation & Merit Certificates
-                                    </h4>
-                                </div>
-                                <p className="text-xs text-neutral-600 font-medium leading-relaxed">
-                                    Issue verifiable credentials to students who attended or registered for "{event.title}". Dispatches in-app notifications to each recipient's Activity portfolio.
-                                </p>
-                            </div>
-
-                            <div className="w-full md:w-60 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCertStudioOpen(true)}
-                                    className="w-full py-3 px-4 rounded-2xl bg-[#a2ff86] hover:bg-[#8ee673] text-black text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                >
-                                    <Award className="w-4 h-4 stroke-[2.5]" />
-                                    <span>Issue Certificates</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* 3. Delete Event... with Danger Zone Guidelines */}
-                        <div className="p-4 sm:p-5 rounded-2xl bg-[#FFF1F2] border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                            <div className="space-y-1 max-w-xl">
-                                <div className="flex items-center gap-2">
-                                    <span className="w-2.5 h-2.5 rounded-full bg-rose-500 border border-black"></span>
-                                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-rose-950">
-                                        Danger Zone — Permanent Removal
-                                    </h4>
-                                </div>
-                                <p className="text-xs text-rose-900/80 font-medium leading-relaxed">
-                                    Permanently delete this event listing, remove the public invitation pass, and erase all student RSVP applications from the database. Irreversible action protected by title confirmation and coordinator password verification.
-                                </p>
-                            </div>
-
-                            <div className="w-full md:w-60 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => setSecurityTarget({ action: "delete" })}
-                                    className="w-full py-3 px-6 rounded-2xl bg-[#FFE4E6] hover:bg-[#fecdd3] text-rose-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
-                                    title="Permanently delete this event from the system"
-                                >
-                                    <Trash2 className="w-4 h-4 stroke-[2.2] text-rose-900" />
-                                    <span>Delete Event...</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        )}
+                )}
 
             {/* ATTACHED HIGH-SECURITY CONFIRMATION CHALLENGE MODAL */}
             <EventSecurityConfirmModal
