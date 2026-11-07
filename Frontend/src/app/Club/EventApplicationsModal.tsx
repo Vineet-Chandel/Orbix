@@ -112,6 +112,60 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
         toast.success(`${label} copied!`);
     };
 
+    const formQuestions = useMemo(() => {
+        const questions: { id: string; label: string; type?: string }[] = [];
+        const seenIds = new Set<string>();
+
+        if (data?.formStructure && Array.isArray(data.formStructure.sections)) {
+            data.formStructure.sections.forEach((sec: any) => {
+                const list = sec.questions || sec.fields || [];
+                list.forEach((q: any) => {
+                    if (
+                        q &&
+                        q.id &&
+                        !seenIds.has(q.id) &&
+                        q.type !== "image_card" &&
+                        q.type !== "markdown_card" &&
+                        q.type !== "image_block" &&
+                        q.type !== "video_block" &&
+                        q.type !== "title_card"
+                    ) {
+                        seenIds.add(q.id);
+                        questions.push({
+                            id: q.id,
+                            label: q.title || q.label || "Question",
+                            type: q.type,
+                        });
+                    }
+                });
+            });
+        }
+
+        if (data?.applications) {
+            data.applications.forEach((app) => {
+                const ans = app.answers || app.formResponse || {};
+                Object.keys(ans).forEach((k) => {
+                    if (k === "q_roll_number" || k === "q_department" || k === "q_year") return;
+                    if (!seenIds.has(k)) {
+                        seenIds.add(k);
+                        let cleanLabel = k;
+                        if (cleanLabel.startsWith("q_")) {
+                            cleanLabel = cleanLabel.substring(2).replace(/_/g, " ");
+                            cleanLabel = cleanLabel.charAt(0).toUpperCase() + cleanLabel.slice(1);
+                        }
+                        questions.push({
+                            id: k,
+                            label: cleanLabel,
+                            type: "text",
+                        });
+                    }
+                });
+            });
+        }
+
+        return questions;
+    }, [data]);
+
     const filteredApplications = useMemo(() => {
         if (!data) return [];
         let list = data.applications;
@@ -127,8 +181,9 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                     a.applicantName.toLowerCase().includes(q) ||
                     a.applicantEmail.toLowerCase().includes(q) ||
                     a.ticketCode.toLowerCase().includes(q) ||
-                    a.department.toLowerCase().includes(q) ||
-                    a.rollNumber.toLowerCase().includes(q)
+                    Object.values(a.answers || a.formResponse || {}).some((v) =>
+                        String(v || "").toLowerCase().includes(q)
+                    )
             );
         }
 
@@ -320,15 +375,15 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                                     <th className="p-3 border-r-2 border-black font-black text-black uppercase text-[10px] min-w-[180px]">
                                         Email Address
                                     </th>
-                                    <th className="p-3 border-r-2 border-black font-black text-black uppercase text-[10px] min-w-[140px]">
-                                        Department
-                                    </th>
-                                    <th className="p-3 border-r-2 border-black font-black text-black uppercase text-[10px] min-w-[100px]">
-                                        Year
-                                    </th>
-                                    <th className="p-3 border-r-2 border-black font-black text-black uppercase text-[10px] min-w-[120px]">
-                                        Roll Number
-                                    </th>
+                                    {formQuestions.map((q) => (
+                                        <th
+                                            key={q.id}
+                                            className="p-3 border-r-2 border-black font-black text-black uppercase text-[10px] min-w-[150px] max-w-[260px] truncate"
+                                            title={q.label}
+                                        >
+                                            {q.label}
+                                        </th>
+                                    ))}
                                     <th className="p-3 border-r-2 border-black font-black text-black uppercase text-[10px] min-w-[120px]">
                                         Phone
                                     </th>
@@ -429,20 +484,27 @@ export const EventApplicationsModal: React.FC<EventApplicationsModalProps> = ({
                                                 </button>
                                             </td>
 
-                                            {/* Department */}
-                                            <td className="p-3 border-r-2 border-black/15 font-bold text-neutral-700 truncate max-w-[140px]">
-                                                {app.department || "—"}
-                                            </td>
-
-                                            {/* Year */}
-                                            <td className="p-3 border-r-2 border-black/15 font-bold text-neutral-700">
-                                                {app.yearOfStudy || "—"}
-                                            </td>
-
-                                            {/* Roll No */}
-                                            <td className="p-3 border-r-2 border-black/15 font-mono font-bold text-neutral-700">
-                                                {app.rollNumber || "—"}
-                                            </td>
+                                            {/* Dynamic Form Questions & Answers */}
+                                            {formQuestions.map((q) => {
+                                                const val = (app.answers || app.formResponse || {})[q.id];
+                                                let display: any = val;
+                                                if (display === null || display === undefined || display === "") {
+                                                    display = "—";
+                                                } else if (Array.isArray(display)) {
+                                                    display = display.join(", ");
+                                                } else if (typeof display === "object") {
+                                                    display = JSON.stringify(display);
+                                                }
+                                                return (
+                                                    <td
+                                                        key={q.id}
+                                                        className="p-3 border-r-2 border-black/15 font-medium text-neutral-800 truncate max-w-[220px]"
+                                                        title={String(display)}
+                                                    >
+                                                        {String(display)}
+                                                    </td>
+                                                );
+                                            })}
 
                                             {/* Phone */}
                                             <td className="p-3 border-r-2 border-black/15 font-mono text-neutral-700">

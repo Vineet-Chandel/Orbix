@@ -33,12 +33,17 @@ import {
     LifeBuoy,
     Calendar,
     Clock,
+    Ticket,
+    QrCode,
+    Printer,
+    CheckCircle2,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { OrbixLoader, OrbixButton } from "../../components/ui/loader";
 import { VerifiedBadge } from "../../components/VerifiedBadge";
 import { terminateSession } from "../../api/sessionActivityApi";
 import { useAppSelector } from "../../store";
+import { OrbixCardQR } from "../Profile/CardStudio/OrbixCardQR";
 import {
     fetchNotifications,
     deleteNotification,
@@ -791,13 +796,23 @@ export const NotificationsView: React.FC = () => {
                                                 </div>
                                             ) : isClubEvt ? (
                                                 <div className={`relative w-10 h-10 rounded-xl border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 mt-0.5 ${
-                                                    meta.action === "cancelled"
+                                                    meta.action === "application_approved" || Boolean(meta.ticketCode)
+                                                        ? "bg-[#a2ff86] text-black"
+                                                        : meta.action === "application_submitted" || meta.action === "application_received"
+                                                        ? "bg-amber-100 text-amber-900"
+                                                        : meta.action === "cancelled"
                                                         ? "bg-rose-100 text-rose-800"
                                                         : meta.action === "completed"
                                                         ? "bg-sky-100 text-sky-800"
                                                         : "bg-[#a2ff86] text-black"
                                                 }`}>
-                                                    <Calendar className="w-5 h-5 stroke-[2.2]" />
+                                                    {meta.action === "application_approved" || Boolean(meta.ticketCode) ? (
+                                                        <Ticket className="w-5 h-5 stroke-[2.2]" />
+                                                    ) : meta.action === "application_submitted" || meta.action === "application_received" ? (
+                                                        <Clock className="w-5 h-5 stroke-[2.2]" />
+                                                    ) : (
+                                                        <Calendar className="w-5 h-5 stroke-[2.2]" />
+                                                    )}
                                                     {!item.isRead && (
                                                         <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border border-black ${
                                                             meta.action === "cancelled" ? "bg-rose-500" : "bg-emerald-500"
@@ -1351,6 +1366,20 @@ export const NotificationsView: React.FC = () => {
                                       })
                                     : null;
 
+                                const isAppApproved =
+                                    action === "application_approved" ||
+                                    (activeItem.type || (activeItem as any).notification_type) === "application_approved" ||
+                                    Boolean(meta.ticketCode);
+                                const isAppSubmitted =
+                                    action === "application_submitted" ||
+                                    (activeItem.type || (activeItem as any).notification_type) === "application_submitted";
+                                const isAppReceived =
+                                    action === "application_received" ||
+                                    (activeItem.type || (activeItem as any).notification_type) === "application_received";
+                                const isAppRejected =
+                                    action === "application_rejected" ||
+                                    (activeItem.type || (activeItem as any).notification_type) === "application_rejected";
+
                                 const isCancelled = action === "cancelled";
                                 const isCompleted = action === "completed";
 
@@ -1361,14 +1390,24 @@ export const NotificationsView: React.FC = () => {
                                             <div className="flex items-center gap-3.5 min-w-0">
                                                 <div
                                                     className={`w-14 h-14 sm:w-16 sm:h-16 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] overflow-hidden shrink-0 flex items-center justify-center font-black ${
-                                                        isCancelled
+                                                        isAppApproved
+                                                            ? "bg-[#a2ff86] text-black"
+                                                            : isAppSubmitted || isAppReceived
+                                                            ? "bg-amber-100 text-amber-900"
+                                                            : isCancelled || isAppRejected
                                                             ? "bg-rose-100 text-rose-700"
                                                             : isCompleted
                                                             ? "bg-sky-100 text-sky-700"
                                                             : "bg-[#a2ff86] text-black"
                                                     }`}
                                                 >
-                                                    <Calendar className="w-8 h-8 stroke-[2.2]" />
+                                                    {isAppApproved ? (
+                                                        <Ticket className="w-8 h-8 stroke-[2.2]" />
+                                                    ) : isAppSubmitted || isAppReceived ? (
+                                                        <Clock className="w-8 h-8 stroke-[2.2]" />
+                                                    ) : (
+                                                        <Calendar className="w-8 h-8 stroke-[2.2]" />
+                                                    )}
                                                 </div>
 
                                                 <div className="min-w-0 space-y-1">
@@ -1378,7 +1417,11 @@ export const NotificationsView: React.FC = () => {
                                                         </h3>
                                                         <span
                                                             className={`inline-flex items-center gap-1 text-[11px] font-black px-2.5 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000] shrink-0 ${
-                                                                isCancelled
+                                                                isAppApproved
+                                                                    ? "bg-[#a2ff86] text-black"
+                                                                    : isAppSubmitted || isAppReceived
+                                                                    ? "bg-amber-200 text-amber-950"
+                                                                    : isCancelled || isAppRejected
                                                                     ? "bg-rose-300 text-black"
                                                                     : isCompleted
                                                                     ? "bg-sky-300 text-black"
@@ -1386,7 +1429,15 @@ export const NotificationsView: React.FC = () => {
                                                             }`}
                                                         >
                                                             <span>
-                                                                {isCancelled
+                                                                {isAppApproved
+                                                                    ? "Application Accepted · Pass Active"
+                                                                    : isAppSubmitted
+                                                                    ? "Application Submitted · Under Review"
+                                                                    : isAppReceived
+                                                                    ? "New Applicant · Review Needed"
+                                                                    : isAppRejected
+                                                                    ? "Application Rejected"
+                                                                    : isCancelled
                                                                     ? "Cancelled"
                                                                     : isCompleted
                                                                     ? "Completed"
@@ -1416,7 +1467,11 @@ export const NotificationsView: React.FC = () => {
                                         {/* Status Message / Banner */}
                                         <div
                                             className={`p-4 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] ${
-                                                isCancelled
+                                                isAppApproved
+                                                    ? "bg-[#a2ff86] border-black"
+                                                    : isAppSubmitted || isAppReceived
+                                                    ? "bg-amber-50 border-amber-950"
+                                                    : isCancelled || isAppRejected
                                                     ? "bg-rose-50 border-rose-950"
                                                     : isCompleted
                                                     ? "bg-sky-50 border-sky-950"
@@ -1426,25 +1481,150 @@ export const NotificationsView: React.FC = () => {
                                             <div className="flex items-start gap-3">
                                                 <div
                                                     className={`p-2 rounded-xl border border-black shrink-0 ${
-                                                        isCancelled
+                                                        isAppApproved
+                                                            ? "bg-black text-[#a2ff86]"
+                                                            : isAppSubmitted || isAppReceived
+                                                            ? "bg-amber-200 text-amber-950"
+                                                            : isCancelled || isAppRejected
                                                             ? "bg-rose-200 text-rose-900"
                                                             : isCompleted
                                                             ? "bg-sky-200 text-sky-900"
                                                             : "bg-[#a2ff86] text-black"
                                                     }`}
                                                 >
-                                                    <Calendar className="w-5 h-5 stroke-[2.2]" />
+                                                    {isAppApproved ? (
+                                                        <CheckCircle2 className="w-5 h-5 stroke-[2.2]" />
+                                                    ) : isAppSubmitted || isAppReceived ? (
+                                                        <Clock className="w-5 h-5 stroke-[2.2]" />
+                                                    ) : (
+                                                        <Calendar className="w-5 h-5 stroke-[2.2]" />
+                                                    )}
                                                 </div>
                                                 <div className="space-y-1 min-w-0 flex-1">
                                                     <h4 className="text-sm font-black text-black">
                                                         {activeItem.title}
                                                     </h4>
-                                                    <p className="text-xs text-neutral-700 leading-relaxed font-medium">
+                                                    <p className="text-xs text-neutral-800 leading-relaxed font-bold">
                                                         {activeItem.body}
                                                     </p>
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* Case: Application Accepted - Display Scannable Digital Entry Pass with Real QR Code */}
+                                        {isAppApproved && meta.ticketCode && (
+                                            <div className="p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4 text-center">
+                                                <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-neutral-500 border-b border-black/10 pb-2">
+                                                    <span className="flex items-center gap-1.5 text-black">
+                                                        <Ticket className="w-4 h-4 text-black" />
+                                                        Verified Event Entry Pass
+                                                    </span>
+                                                    <span className="text-[10px] font-black px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                                        Active Admission Pass
+                                                    </span>
+                                                </div>
+
+                                                {/* High-DPI Scannable QR Code */}
+                                                <div className="flex flex-col items-center justify-center py-2">
+                                                    <div className="p-4 bg-white rounded-2xl border-3 border-black shadow-[4px_4px_0px_#000] inline-block">
+                                                        <OrbixCardQR
+                                                            value={meta.ticketCode}
+                                                            size={190}
+                                                            showLogo={true}
+                                                            noShadow={true}
+                                                        />
+                                                    </div>
+                                                    <span className="text-[11px] font-mono font-bold text-neutral-600 mt-2.5 flex items-center gap-1.5 justify-center">
+                                                        <QrCode className="w-3.5 h-3.5 text-black" />
+                                                        Scan at registration desk for campus admission check-in
+                                                    </span>
+                                                </div>
+
+                                                {/* Pass Code Box */}
+                                                <div className="p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1.5">
+                                                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500 block">
+                                                        Your Ticket Pass Code
+                                                    </span>
+                                                    <div className="flex items-center justify-center gap-2.5">
+                                                        <span className="font-mono text-xl sm:text-2xl font-black text-black tracking-widest bg-white px-4 py-1.5 rounded-xl border border-black shadow-[1px_1px_0px_#000]">
+                                                            {meta.ticketCode}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(meta.ticketCode);
+                                                                setCopiedField("pass_code");
+                                                                toast.success("Ticket pass code copied!");
+                                                                setTimeout(() => setCopiedField(null), 2000);
+                                                            }}
+                                                            className="p-2.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                                            title="Copy Ticket Pass Code"
+                                                        >
+                                                            {copiedField === "pass_code" ? (
+                                                                <Check className="w-4 h-4 text-emerald-600" />
+                                                            ) : (
+                                                                <Copy className="w-4 h-4" />
+                                                            )}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Attendee Details Strip */}
+                                                <div className="p-3 rounded-xl bg-neutral-50 border border-black/20 text-xs font-bold text-left grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                    <div>
+                                                        <span className="text-[9px] uppercase font-black text-neutral-400 block">
+                                                            Ticket Holder
+                                                        </span>
+                                                        <span className="text-black font-black truncate block">
+                                                            {meta.applicantName || user?.firstName || user?.username || "Student Attendee"}
+                                                        </span>
+                                                    </div>
+                                                    {meta.rollNumber && (
+                                                        <div>
+                                                            <span className="text-[9px] uppercase font-black text-neutral-400 block">
+                                                                Student ID / Roll No
+                                                            </span>
+                                                            <span className="text-neutral-800 font-mono text-[11px] block">
+                                                                {meta.rollNumber}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {meta.department && (
+                                                        <div>
+                                                            <span className="text-[9px] uppercase font-black text-neutral-400 block">
+                                                                Department
+                                                            </span>
+                                                            <span className="text-neutral-800 text-[11px] block">
+                                                                {meta.department}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                    {meta.registrationId && (
+                                                        <div>
+                                                            <span className="text-[9px] uppercase font-black text-neutral-400 block">
+                                                                Registration ID
+                                                            </span>
+                                                            <span className="text-neutral-600 font-mono text-[10px] truncate block">
+                                                                {meta.registrationId}
+                                                            </span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Case: Application Pending Review */}
+                                        {isAppSubmitted && (
+                                            <div className="p-4 rounded-2xl bg-amber-50/70 border-2 border-amber-800/40 text-amber-950 space-y-2 text-left">
+                                                <div className="flex items-center gap-2 font-black text-xs">
+                                                    <Clock className="w-4 h-4 text-amber-700" />
+                                                    <span>Entry Pass Pending Review</span>
+                                                </div>
+                                                <p className="text-xs text-amber-900 leading-relaxed font-medium">
+                                                    The {clubName} organizers have been notified of your registration. Your admission entry pass and check-in QR code will be generated immediately once your application is accepted.
+                                                </p>
+                                            </div>
+                                        )}
 
                                         {/* Event Specific Info Cards */}
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1472,6 +1652,24 @@ export const NotificationsView: React.FC = () => {
                                         {/* Actions Footer */}
                                         <div className="mt-auto pt-4 border-t-2 border-black/10 flex flex-wrap items-center justify-between gap-3">
                                             <div className="flex items-center gap-2">
+                                                {isAppApproved && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => window.print()}
+                                                        className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all cursor-pointer"
+                                                    >
+                                                        <Printer className="w-3.5 h-3.5" />
+                                                        <span>Print Pass Receipt</span>
+                                                    </button>
+                                                )}
+
+                                                <Link
+                                                    to="/applications"
+                                                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all"
+                                                >
+                                                    <span>View My Applications</span>
+                                                </Link>
+
                                                 {clubSlug && (
                                                     <Link
                                                         to={`/clubs/${clubSlug}`}
@@ -1486,7 +1684,7 @@ export const NotificationsView: React.FC = () => {
                                             <div className="flex items-center gap-2">
                                                 {eventId && (
                                                     <Link
-                                                        to={`/events?eventId=${eventId}`}
+                                                        to={`/college-events?eventId=${eventId}`}
                                                         className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] text-xs font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 transition-all"
                                                     >
                                                         <span>Open Event Details</span>

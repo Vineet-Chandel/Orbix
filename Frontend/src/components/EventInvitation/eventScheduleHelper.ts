@@ -182,7 +182,7 @@ export function buildEventRegistrationUrl(
     }
     const origin = typeof window !== "undefined" ? window.location.origin : "https://orbix.dev";
     const targetIdentifier = eventId || slug || "preview";
-    return `${origin}/events?tab=college-events&eventId=${encodeURIComponent(
+    return `${origin}/college-events?eventId=${encodeURIComponent(
         targetIdentifier
     )}&college=${encodeURIComponent(collegeName || "campus")}`;
 }

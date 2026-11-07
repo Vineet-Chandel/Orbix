@@ -367,9 +367,6 @@ export class ClubEventFormService {
                         u.college AS "collegeText",
                         u.college_id AS "collegeId",
                         inst.official_name AS "collegeName",
-                        u.roll_number AS "rollNumber",
-                        u.department,
-                        u.year_of_study AS "yearOfStudy",
                         u.phone AS "phoneNumber",
                         u.github,
                         u.linkedin,
@@ -385,25 +382,19 @@ export class ClubEventFormService {
             if (userRes.rows[0]) {
                 const u = userRes.rows[0];
 
-                let pastRoll = u.rollNumber;
-                let pastDept = u.department;
-                let pastYear = u.yearOfStudy;
                 let pastPhone = u.phoneNumber;
 
-                // If academic details are null on users table, check past registrations
-                if (!pastRoll || !pastDept || !pastPhone) {
+                // If phone is null on users table, check past registrations
+                if (!pastPhone) {
                     const pastReg = await query(
-                        `SELECT roll_number, department, year_of_study, phone_number
+                        `SELECT phone_number
                          FROM club_event_registrations
-                         WHERE user_id = $1 AND (roll_number IS NOT NULL OR department IS NOT NULL OR phone_number IS NOT NULL)
+                         WHERE user_id = $1 AND phone_number IS NOT NULL
                          ORDER BY registered_at DESC LIMIT 1;`,
                         [userId]
                     );
                     if (pastReg.rows[0]) {
-                        if (!pastRoll) pastRoll = pastReg.rows[0].roll_number;
-                        if (!pastDept) pastDept = pastReg.rows[0].department;
-                        if (!pastYear) pastYear = pastReg.rows[0].year_of_study;
-                        if (!pastPhone) pastPhone = pastReg.rows[0].phone_number;
+                        pastPhone = pastReg.rows[0].phone_number;
                     }
                 }
 
@@ -417,9 +408,6 @@ export class ClubEventFormService {
                     avatarUrl: u.avatarUrl,
                     college: u.collegeName || u.collegeText || "Not Linked",
                     collegeId: u.collegeId || null,
-                    rollNumber: pastRoll || null,
-                    department: pastDept || null,
-                    yearOfStudy: pastYear || null,
                     phoneNumber: pastPhone || null,
                     github: u.github || null,
                     linkedin: u.linkedin || null,
@@ -432,7 +420,9 @@ export class ClubEventFormService {
 
             // 2. Fetch existing event registration
             const regRes = await query(
-                `SELECT id, status, ticket_code AS "ticketCode", applicant_name AS "applicantName",
+                `SELECT id, status,
+                        CASE WHEN status IN ('registered', 'attended') THEN ticket_code ELSE NULL END AS "ticketCode",
+                        applicant_name AS "applicantName",
                         applicant_email AS "applicantEmail", department, year_of_study AS "yearOfStudy",
                         roll_number AS "rollNumber", phone_number AS "phoneNumber", notes,
                         answers, form_response AS "formResponse", file_attachments AS "fileAttachments",
@@ -2100,10 +2090,14 @@ Organizer Request: ${userPrompt}`;
                 );
                 if (idemRes.rows[0]) {
                     await client.query("COMMIT;");
+                    const isApproved = idemRes.rows[0].status === "registered" || idemRes.rows[0].status === "attended";
                     return {
                         success: true,
                         message: "Your submission has already been recorded.",
-                        registration: idemRes.rows[0],
+                        registration: {
+                            ...idemRes.rows[0],
+                            ticketCode: isApproved ? idemRes.rows[0].ticketCode : null,
+                        },
                         isUpdate: false,
                     };
                 }
@@ -2116,7 +2110,7 @@ Organizer Request: ${userPrompt}`;
                         c.college_id AS "clubCollegeId"
                  FROM club_events e
                  JOIN verified_clubs c ON c.id = e.club_id
-                 WHERE e.id = $1 FOR UPDATE;`,
+                 WHERE e.id = $1 FOR UPDATE OF e;`,
                 [eventId]
             );
 
@@ -2142,7 +2136,7 @@ Organizer Request: ${userPrompt}`;
                         v.id AS "activeVersionId"
                  FROM club_event_forms f
                  LEFT JOIN club_event_form_versions v ON v.id = f.published_version_id
-                 WHERE f.event_id = $1 FOR UPDATE;`,
+                 WHERE f.event_id = $1 FOR UPDATE OF f;`,
                 [eventId]
             );
 
@@ -2431,9 +2425,9 @@ Organizer Request: ${userPrompt}`;
                 : userRow?.username || "Student";
             const applicantName = (payload.applicantName && payload.applicantName.trim()) || answers["q_student_name"] || defaultName;
             const applicantEmail = (payload.applicantEmail && payload.applicantEmail.trim()) || answers["q_student_email"] || userRow?.email || "";
-            const department = payload.department || answers["q_department"] || userRow?.department || null;
-            const yearOfStudy = payload.yearOfStudy || answers["q_year"] || userRow?.year_of_study || null;
-            const rollNumber = payload.rollNumber || answers["q_roll_number"] || userRow?.roll_number || null;
+            const department = payload.department || answers["q_department"] || null;
+            const yearOfStudy = payload.yearOfStudy || answers["q_year"] || null;
+            const rollNumber = payload.rollNumber || answers["q_roll_number"] || null;
             const phoneNumber = payload.phoneNumber || answers["q_phone"] || userRow?.phone || null;
             const notes = payload.notes || answers["q_notes"] || null;
             const formVersionId = formRow?.activeVersionId || null;
@@ -2628,10 +2622,14 @@ Organizer Request: ${userPrompt}`;
                         }
 
                         await client.query("COMMIT;");
+                        const isApproved = updateRes.rows[0]?.status === "registered" || updateRes.rows[0]?.status === "attended";
                         return {
                             success: true,
                             message: formSettings.confirmationMessage || "Your response has been updated successfully!",
-                            registration: updateRes.rows[0],
+                            registration: {
+                                ...updateRes.rows[0],
+                                ticketCode: isApproved ? updateRes.rows[0]?.ticketCode : null,
+                            },
                             isUpdate: true,
                         };
                     }
@@ -2694,10 +2692,14 @@ Organizer Request: ${userPrompt}`;
                         );
 
                         await client.query("COMMIT;");
+                        const isReactivatedApproved = reactivated.rows[0]?.status === "registered" || reactivated.rows[0]?.status === "attended";
                         return {
                             success: true,
                             message: formSettings.confirmationMessage || `Application submitted for review for ${event.title}!`,
-                            registration: reactivated.rows[0],
+                            registration: {
+                                ...reactivated.rows[0],
+                                ticketCode: isReactivatedApproved ? reactivated.rows[0]?.ticketCode : null,
+                            },
                             isUpdate: false,
                         };
                     }
@@ -2796,16 +2798,13 @@ Organizer Request: ${userPrompt}`;
                 }
             }
 
-            // Sync newly provided academic info to student profile
-            if (userId && (rollNumber || department || yearOfStudy || phoneNumber)) {
+            // Sync phone number to student profile if provided
+            if (userId && phoneNumber) {
                 await client.query(
                     `UPDATE users
-                     SET roll_number = COALESCE($1, roll_number),
-                         department = COALESCE($2, department),
-                         year_of_study = COALESCE($3, year_of_study),
-                         phone = COALESCE($4, phone)
-                     WHERE id = $5;`,
-                    [rollNumber || null, department || null, yearOfStudy || null, phoneNumber || null, userId]
+                     SET phone = COALESCE($1, phone)
+                     WHERE id = $2;`,
+                    [phoneNumber || null, userId]
                 );
             }
 
@@ -2851,6 +2850,7 @@ Organizer Request: ${userPrompt}`;
             }
 
             // Enqueue background notifications & analytics cache refresh (Requirement 4.5)
+            const isApproved = newReg.status === "registered" || newReg.status === "attended";
             await FormBackgroundQueue.enqueue(
                 "DISPATCH_NOTIFICATIONS",
                 eventId,
@@ -2861,7 +2861,7 @@ Organizer Request: ${userPrompt}`;
                     userId: userId || undefined,
                     applicantName: String(newReg.applicantName || "Student"),
                     applicantEmail: String(newReg.applicantEmail || ""),
-                    ticketCode: newReg.ticketCode || undefined,
+                    ticketCode: isApproved ? newReg.ticketCode : undefined,
                     registrationId: String(newReg.id),
                     status: String(newReg.status),
                 },
@@ -2881,14 +2881,17 @@ Organizer Request: ${userPrompt}`;
                 userId,
                 meta: {
                     registrationId: newReg.id,
-                    ticketCode: newReg.ticketCode,
+                    status: newReg.status,
                 },
             });
 
             return {
                 success: true,
                 message: formSettings.confirmationMessage || `Your application for ${event.title} has been submitted!`,
-                registration: newReg,
+                registration: {
+                    ...newReg,
+                    ticketCode: isApproved ? newReg.ticketCode : null,
+                },
                 isUpdate: false,
             };
         } catch (err: any) {
@@ -2995,7 +2998,9 @@ Organizer Request: ${userPrompt}`;
     static async getStudentRegistration(eventId: string, userId: string) {
         const res = await query(
             `SELECT r.id, r.event_id AS "eventId", r.club_id AS "clubId", r.user_id AS "userId",
-                    r.status, r.ticket_code AS "ticketCode", r.applicant_name AS "applicantName",
+                    r.status,
+                    CASE WHEN r.status IN ('registered', 'attended') THEN r.ticket_code ELSE NULL END AS "ticketCode",
+                    r.applicant_name AS "applicantName",
                     r.applicant_email AS "applicantEmail", r.department, r.year_of_study AS "yearOfStudy",
                     r.roll_number AS "rollNumber", r.phone_number AS "phoneNumber", r.notes,
                     r.answers, r.form_response AS "formResponse", r.file_attachments AS "fileAttachments",
@@ -3320,7 +3325,9 @@ Organizer Request: ${userPrompt}`;
                  checked_in_at = CASE WHEN $4 = true AND checked_in_at IS NULL THEN NOW() ELSE checked_in_at END,
                  updated_at = NOW()
              WHERE id = $5 AND event_id = $6
-             RETURNING id, user_id AS "userId", status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
+             RETURNING id, user_id AS "userId", applicant_name AS "applicantName", applicant_email AS "applicantEmail",
+                       department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
+                       status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
             [status, userId, reviewNotes || null, isAttended, registrationId, eventId]
         );
 
@@ -3329,6 +3336,8 @@ Organizer Request: ${userPrompt}`;
             error.statusCode = 404;
             throw error;
         }
+
+        const updatedRow = updateRes.rows[0];
 
         // Keep event registered count synchronized
         try {
@@ -3345,7 +3354,100 @@ Organizer Request: ${userPrompt}`;
             console.warn("Could not synchronize event registered_count:", countErr);
         }
 
-        return updateRes.rows[0];
+        // Dispatch in-app notification to applicant on status acceptance / rejection
+        try {
+            const evDataRes = await query(
+                `SELECT e.id, e.title, e.starts_at AS "startsAt", e.venue_or_location AS "venueOrLocation",
+                        vc.name AS "clubName", vc.slug AS "clubSlug"
+                 FROM club_events e
+                 JOIN verified_clubs vc ON vc.id = e.club_id
+                 WHERE e.id = $1 LIMIT 1;`,
+                [eventId]
+            );
+            const evData = evDataRes.rows[0];
+            const eventTitle = evData?.title || "Event";
+            const clubName = evData?.clubName || "Verified Club";
+
+            if (updatedRow.userId) {
+                const userRes = await query(`SELECT username FROM users WHERE id = $1 LIMIT 1;`, [updatedRow.userId]);
+                const username = userRes.rows[0]?.username || "student";
+
+                if (status === "registered") {
+                    const idempotencyKey = `app_approved_${registrationId}_${Date.now()}`;
+                    await query(
+                        `INSERT INTO user_notifications (
+                            user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
+                        ) VALUES (
+                            $1::uuid, $1::uuid, $2,
+                            'Application Accepted! 🎉',
+                            $3,
+                            'club_event',
+                            'application_approved',
+                            $4::jsonb,
+                            $5,
+                            false,
+                            NOW()
+                        ) ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
+                        [
+                            updatedRow.userId,
+                            username,
+                            `Your application for "${eventTitle}" was accepted by ${clubName}. Your session entry pass is now ready!`,
+                            JSON.stringify({
+                                eventId,
+                                registrationId,
+                                ticketCode: updatedRow.ticketCode,
+                                eventTitle,
+                                clubName,
+                                clubSlug: evData?.clubSlug || "",
+                                startsAt: evData?.startsAt,
+                                venueOrLocation: evData?.venueOrLocation,
+                                applicantName: updatedRow.applicantName,
+                                rollNumber: updatedRow.rollNumber,
+                                department: updatedRow.department,
+                                action: "application_approved",
+                                status: "registered",
+                            }),
+                            idempotencyKey,
+                        ]
+                    );
+                } else if (status === "rejected") {
+                    const idempotencyKey = `app_rejected_${registrationId}_${Date.now()}`;
+                    await query(
+                        `INSERT INTO user_notifications (
+                            user_id, recipient_id, username, title, body, type, notification_type, metadata, idempotency_key, is_read, created_at
+                        ) VALUES (
+                            $1::uuid, $1::uuid, $2,
+                            'Application Update',
+                            $3,
+                            'club_event',
+                            'application_rejected',
+                            $4::jsonb,
+                            $5,
+                            false,
+                            NOW()
+                        ) ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
+                        [
+                            updatedRow.userId,
+                            username,
+                            `Your application for "${eventTitle}" was not selected by ${clubName}.`,
+                            JSON.stringify({
+                                eventId,
+                                registrationId,
+                                eventTitle,
+                                clubName,
+                                action: "application_rejected",
+                                status: "rejected",
+                            }),
+                            idempotencyKey,
+                        ]
+                    );
+                }
+            }
+        } catch (notifErr) {
+            console.warn("[updateResponseStatus] Notification dispatch warning:", notifErr);
+        }
+
+        return updatedRow;
     }
 
     /**
@@ -3469,9 +3571,6 @@ Organizer Request: ${userPrompt}`;
             "Full Name",
             "Email",
             "Username",
-            "Roll Number",
-            "Department",
-            "Year of Study",
             "Phone",
             "Status",
             "Form Version",
@@ -3505,9 +3604,6 @@ Organizer Request: ${userPrompt}`;
                 escapeCsv(r.applicant_name),
                 escapeCsv(r.applicant_email),
                 escapeCsv(r.username || ""),
-                escapeCsv(r.roll_number || ""),
-                escapeCsv(r.department || ""),
-                escapeCsv(r.year_of_study || ""),
                 escapeCsv(r.phone_number || ""),
                 escapeCsv(r.status),
                 escapeCsv(r.version_number ? `v${r.version_number}` : "v1"),
@@ -3971,7 +4067,11 @@ Organizer Request: ${userPrompt}`;
         status: string;
     }) {
         try {
-            // 1. Notify student (in-app user_notifications)
+            const clubRes = await query(`SELECT auth_user_id AS "ownerId", name FROM verified_clubs WHERE id = $1 LIMIT 1;`, [payload.clubId]);
+            const ownerId = clubRes.rows[0]?.ownerId;
+            const clubName = clubRes.rows[0]?.name || "Verified Club";
+
+            // 1. Notify student that application has been submitted and is under review (in-app user_notifications)
             if (payload.userId) {
                 const userRes = await query(`SELECT username FROM users WHERE id = $1 LIMIT 1;`, [payload.userId]);
                 const username = userRes.rows[0]?.username || "student";
@@ -3990,32 +4090,37 @@ Organizer Request: ${userPrompt}`;
                         idempotency_key,
                         is_read,
                         created_at
-                    ) VALUES ($1, $1, $2, $3, $4, 'event_registration', 'event_registration', $5, $6, false, NOW())
-                    ON CONFLICT (idempotency_key) DO NOTHING;`,
+                    ) VALUES ($1, $1, $2, $3, $4, 'event_registration', 'application_submitted', $5, $6, false, NOW())
+                    ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
                     [
                         payload.userId,
                         username,
-                        `Registration Confirmed: ${payload.eventTitle}`,
-                        `Your registration for "${payload.eventTitle}" was received! Ticket Pass: ${payload.ticketCode || "PENDING"}`,
+                        `Application Submitted: ${payload.eventTitle}`,
+                        `Your application for "${payload.eventTitle}" was received and is under review by ${clubName}. Once accepted, your entry pass and check-in QR code will be issued.`,
                         JSON.stringify({
                             eventId: payload.eventId,
                             registrationId: payload.registrationId,
-                            ticketCode: payload.ticketCode,
                             eventTitle: payload.eventTitle,
+                            clubName,
+                            action: "application_submitted",
+                            status: "pending",
                         }),
                         idempotencyKey,
                     ]
                 );
             }
 
-            // 2. Notify club owner & coordinators
-            const clubRes = await query(`SELECT auth_user_id AS "ownerId", name FROM verified_clubs WHERE id = $1 LIMIT 1;`, [payload.clubId]);
-            const ownerId = clubRes.rows[0]?.ownerId;
-            if (ownerId && ownerId !== payload.userId) {
-                const ownerUserRes = await query(`SELECT username FROM users WHERE id = $1 LIMIT 1;`, [ownerId]);
-                const ownerUsername = ownerUserRes.rows[0]?.username || "organizer";
-                const idempotencyKey = `reg_notif_club_${payload.registrationId}`;
+            // 2. Notify club owner & active coordinators that a new application was received
+            const staffRes = await query(
+                `SELECT DISTINCT u.id, u.username
+                 FROM users u
+                 WHERE (u.id = $1 OR u.id IN (SELECT user_id FROM club_team_members WHERE club_id = $2 AND status = 'active'))
+                   AND u.id != $3;`,
+                [ownerId, payload.clubId, payload.userId || "00000000-0000-0000-0000-000000000000"]
+            );
 
+            for (const staff of staffRes.rows) {
+                const idempotencyKey = `reg_notif_club_${staff.id}_${payload.registrationId}`;
                 await query(
                     `INSERT INTO user_notifications (
                         user_id,
@@ -4029,19 +4134,23 @@ Organizer Request: ${userPrompt}`;
                         idempotency_key,
                         is_read,
                         created_at
-                    ) VALUES ($1, $1, $2, $3, $4, 'event_registration_received', 'event_registration_received', $5, $6, false, NOW())
-                    ON CONFLICT (idempotency_key) DO NOTHING;`,
+                    ) VALUES ($1, $1, $2, $3, $4, 'club_event', 'application_received', $5, $6, false, NOW())
+                    ON CONFLICT (idempotency_key) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, metadata = EXCLUDED.metadata;`,
                     [
-                        ownerId,
-                        ownerUsername,
-                        `New RSVP: ${payload.eventTitle}`,
-                        `${payload.applicantName} registered (${payload.ticketCode || "RSVP"}). Status: ${payload.status}.`,
+                        staff.id,
+                        staff.username,
+                        `New Application: ${payload.eventTitle}`,
+                        `${payload.applicantName} submitted an application for "${payload.eventTitle}". Review the application to accept and issue their entry pass.`,
                         JSON.stringify({
                             eventId: payload.eventId,
                             registrationId: payload.registrationId,
                             applicantName: payload.applicantName,
                             applicantEmail: payload.applicantEmail,
-                            ticketCode: payload.ticketCode,
+                            eventTitle: payload.eventTitle,
+                            clubId: payload.clubId,
+                            clubName,
+                            action: "application_received",
+                            status: "pending",
                         }),
                         idempotencyKey,
                     ]

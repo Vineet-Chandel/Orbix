@@ -53,8 +53,8 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                 : user?.username || "";
             setApplicantName(defaultName);
             setApplicantEmail(user?.gmail || (user as any)?.email || "");
-            setDepartment(user?.college?.city || "");
-            setYearOfStudy("3rd Year");
+            setDepartment("");
+            setYearOfStudy("");
             setRollNumber("");
             setPhoneNumber("");
             setNotes("");
