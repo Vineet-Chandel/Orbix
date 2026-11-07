@@ -15,7 +15,6 @@ import {
     Copy,
     ShieldCheck,
     School,
-    GraduationCap,
     ExternalLink,
     Edit3,
     FileText,
