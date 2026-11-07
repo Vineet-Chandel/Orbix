@@ -16,6 +16,7 @@ import {
     Share2,
     Building2,
     X,
+    Printer,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -109,6 +110,10 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
         if (!code) return;
         navigator.clipboard.writeText(code);
         toast.success("Ticket code copied to clipboard!");
+    };
+
+    const handlePrintPass = () => {
+        window.print();
     };
 
     const handleConfirmWithdraw = async () => {
@@ -415,11 +420,11 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                         >
                                             {/* Event Banner */}
                                             {app.coverImageUrl && (
-                                                <div className="w-full h-36 sm:h-48 rounded-xl border-2 border-black overflow-hidden relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                                <div className="w-full rounded-xl border-2 border-black overflow-hidden relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                                     <img
                                                         src={app.coverImageUrl}
                                                         alt={app.eventTitle}
-                                                        className="w-full h-full object-cover"
+                                                        className="w-full h-auto max-h-[560px] object-contain block"
                                                         loading="lazy"
                                                     />
                                                 </div>
@@ -627,11 +632,11 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                         >
                                             {/* Cover Banner */}
                                             {item.coverImageUrl && (
-                                                <div className="w-full h-32 rounded-xl border-2 border-black overflow-hidden relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                                <div className="w-full rounded-xl border-2 border-black overflow-hidden relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                                     <img
                                                         src={item.coverImageUrl}
                                                         alt={item.eventTitle}
-                                                        className="w-full h-full object-cover"
+                                                        className="w-full h-auto max-h-[380px] object-contain block"
                                                         loading="lazy"
                                                     />
                                                 </div>
@@ -837,27 +842,53 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
             {activePassApp && (
                 <div
                     onClick={handlePassBackdropClick}
-                    className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm overflow-y-auto"
+                    className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white print:static"
                 >
+                    <style>{`
+                        @media print {
+                            body * {
+                                visibility: hidden !important;
+                            }
+                            #orbix-printable-pass, #orbix-printable-pass * {
+                                visibility: visible !important;
+                            }
+                            #orbix-printable-pass {
+                                position: absolute !important;
+                                left: 50% !important;
+                                top: 20px !important;
+                                transform: translateX(-50%) !important;
+                                width: 100% !important;
+                                max-width: 480px !important;
+                                margin: 0 auto !important;
+                                background: #ffffff !important;
+                                border: 3px solid #000000 !important;
+                                border-radius: 24px !important;
+                                box-shadow: none !important;
+                                -webkit-print-color-adjust: exact !important;
+                                print-color-adjust: exact !important;
+                            }
+                        }
+                    `}</style>
                     <div
+                        id="orbix-printable-pass"
                         onClick={(e) => e.stopPropagation()}
-                        className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl border-4 border-black shadow-[8px_8px_0px_#000] p-5 sm:p-6 text-center space-y-4 my-auto overflow-hidden"
+                        className="relative w-full max-w-sm sm:max-w-md bg-white rounded-3xl border-4 border-black shadow-[8px_8px_0px_#000] p-5 sm:p-6 text-center space-y-4 my-auto overflow-hidden print:border-3 print:shadow-none print:max-w-md print:mx-auto print:my-0"
                     >
                         {/* Close button */}
                         <button
                             onClick={() => setActivePassApp(null)}
-                            className="absolute top-3 right-3 p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 z-20 shadow-[1px_1px_0px_#000] cursor-pointer"
+                            className="absolute top-3 right-3 p-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 z-20 shadow-[1px_1px_0px_#000] cursor-pointer print:hidden"
                         >
                             <X className="w-4 h-4 text-black stroke-[2.5]" />
                         </button>
 
                         {/* Event Banner */}
                         {activePassApp.coverImageUrl && (
-                            <div className="w-full h-32 sm:h-36 rounded-2xl border-2 border-black overflow-hidden relative shadow-[2px_2px_0px_#000] -mt-1">
+                            <div className="w-full rounded-2xl border-2 border-black overflow-hidden relative shadow-[2px_2px_0px_#000] -mt-1 bg-neutral-950 flex items-center justify-center">
                                 <img
                                     src={activePassApp.coverImageUrl}
                                     alt={activePassApp.eventTitle}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-auto max-h-[260px] object-contain block"
                                 />
                             </div>
                         )}
@@ -925,28 +956,53 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </div>
                         </div>
 
-                        {/* Attendee Info Strip */}
-                        <div className="p-2.5 rounded-xl bg-white border border-black/20 text-xs font-bold text-left flex items-center justify-between">
-                            <div className="truncate">
+                        {/* Attendee Info Grid: Name, College, Applied Time, Student ID/Dept */}
+                        <div className="p-3 sm:p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-left grid grid-cols-2 gap-2.5 shadow-[1.5px_1.5px_0px_#000]">
+                            <div>
                                 <span className="text-[9px] uppercase font-black text-neutral-500 block">
                                     Ticket Holder
                                 </span>
-                                <span className="text-black font-black truncate block">
-                                    {activePassApp.applicantName}
+                                <span className="text-black font-black truncate block text-xs">
+                                    {activePassApp.applicantName || "Attendee"}
                                 </span>
                             </div>
-                            <div className="text-right shrink-0">
+                            <div>
+                                <span className="text-[9px] uppercase font-black text-neutral-500 block">
+                                    College / Campus
+                                </span>
+                                <span className="text-black font-black truncate block text-xs" title={activePassApp.collegeName || "Campus Student"}>
+                                    {activePassApp.collegeName || "Campus Student"}
+                                </span>
+                            </div>
+                            <div>
+                                <span className="text-[9px] uppercase font-black text-neutral-500 block">
+                                    Applied Time
+                                </span>
+                                <span className="text-neutral-800 font-mono text-[11px] block truncate">
+                                    {activePassApp.registeredAt
+                                        ? new Date(activePassApp.registeredAt).toLocaleString("en-US", {
+                                              month: "short",
+                                              day: "numeric",
+                                              year: "numeric",
+                                              hour: "numeric",
+                                              minute: "2-digit",
+                                              hour12: true,
+                                          })
+                                        : "Verified Registration"}
+                                </span>
+                            </div>
+                            <div>
                                 <span className="text-[9px] uppercase font-black text-neutral-500 block">
                                     Student ID / Dept
                                 </span>
-                                <span className="text-neutral-700 font-mono text-[11px]">
+                                <span className="text-neutral-800 font-mono text-[11px] block truncate">
                                     {activePassApp.rollNumber || activePassApp.department || "Verified"}
                                 </span>
                             </div>
                         </div>
 
                         {/* Modal Action Controls */}
-                        <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div className="grid grid-cols-2 gap-2 pt-1 print:hidden">
                             <button
                                 type="button"
                                 onClick={() => handleCopyTicket(activePassApp.ticketCode)}
@@ -957,10 +1013,11 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setActivePassApp(null)}
-                                className="py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer active:translate-x-0.5 active:translate-y-0.5"
+                                onClick={handlePrintPass}
+                                className="py-2.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] font-black text-xs shadow-[2px_2px_0px_#000] cursor-pointer active:translate-x-0.5 active:translate-y-0.5 flex items-center justify-center gap-1.5"
                             >
-                                Done / Close
+                                <Printer className="w-3.5 h-3.5" />
+                                Print Pass
                             </button>
                         </div>
                     </div>

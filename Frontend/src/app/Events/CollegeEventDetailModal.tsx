@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     X,
@@ -87,8 +88,10 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
         setTimeout(() => setCopiedShareLink(false), 2000);
     };
 
-    return (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm overflow-y-auto">
+    if (typeof document === "undefined") return null;
+
+    return createPortal(
+        <div className="fixed inset-0 top-0 left-0 right-0 bottom-0 w-screen h-screen z-[120] flex items-center justify-center p-3 sm:p-5 bg-black/75 backdrop-blur-sm overflow-y-auto">
             <div className="relative w-full max-w-5xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-2xl border-4 border-black shadow-[10px_10px_0px_#000] overflow-hidden my-auto flex flex-col max-h-[92vh]">
                 {/* Modal Top Bar */}
                 <div className="px-5 py-3.5 bg-white border-b-3 border-black flex items-center justify-between gap-3 shrink-0">
@@ -147,13 +150,13 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
                     {/* Hero Header Card */}
                     <div className="p-5 sm:p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                        {/* Cover Image Banner (if available) */}
+                        {/* Cover Image Banner (100% full view, never cropped) */}
                         {event.coverImageUrl && (
-                            <div className="relative w-full h-48 sm:h-64 rounded-xl border-2 border-black overflow-hidden shadow-[2px_2px_0px_#000] bg-neutral-100">
+                            <div className="relative w-full aspect-[2.4/1] rounded-xl border-2 border-black overflow-hidden shadow-[2px_2px_0px_#000] bg-neutral-950 flex items-center justify-center">
                                 <img
                                     src={event.coverImageUrl}
                                     alt={event.title}
-                                    className="w-full h-full object-cover"
+                                    className="w-full h-full object-contain"
                                 />
                                 <div className="absolute top-3 left-3 flex items-center gap-2">
                                     <span
@@ -422,6 +425,7 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };

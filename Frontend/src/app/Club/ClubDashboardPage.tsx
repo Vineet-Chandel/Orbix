@@ -18,6 +18,7 @@ import {
     Settings,
     TrendingUp,
     Award,
+    Heart,
 } from "lucide-react";
 import {
     useAppDispatch,
@@ -612,14 +613,9 @@ export default function ClubDashboardPage() {
                                     )}
 
                                     {activeTab === "events" && (
-                                        <>
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#38BDF8] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                                Active Schedule
-                                            </span>
-                                            <span className="text-xs font-bold text-neutral-700">
-                                                · Manage published sessions, drafts, and meetups
-                                            </span>
-                                        </>
+                                        <span className="text-xs font-bold text-neutral-700">
+                                            Manage published sessions, drafts, and meetups
+                                        </span>
                                     )}
 
                                     {activeTab === "analytics" && (
@@ -985,8 +981,8 @@ export default function ClubDashboardPage() {
                                                 >
                                                     <div>
                                                         {ev.coverImageUrl && (
-                                                            <div className="w-full h-24 rounded-lg border border-black overflow-hidden mb-2 bg-neutral-100 shadow-[1px_1px_0px_#000]">
-                                                                <img src={ev.coverImageUrl} alt={ev.title} className="w-full h-full object-cover" />
+                                                            <div className="w-full aspect-[2.4/1] rounded-lg border border-black overflow-hidden mb-2 bg-neutral-950 shadow-[1px_1px_0px_#000] flex items-center justify-center">
+                                                                <img src={ev.coverImageUrl} alt={ev.title} className="w-full h-full object-contain" />
                                                             </div>
                                                         )}
                                                         <div className="flex items-center justify-between gap-1.5 mb-1.5">
@@ -1141,10 +1137,6 @@ export default function ClubDashboardPage() {
                                             Cancelled ({cancelledEvents.length})
                                         </button>
                                     </div>
-
-                                    <span className="text-xs font-bold text-neutral-500">
-                                        Showing {filteredEvents.length} event{filteredEvents.length === 1 ? "" : "s"}
-                                    </span>
                                 </div>
 
                                 {/* Event Cards Grid */}
@@ -1179,19 +1171,23 @@ export default function ClubDashboardPage() {
                                                 className="p-5 sm:p-6 rounded-3xl bg-white border-4 border-black shadow-[4px_4px_0px_#000] hover:shadow-[7px_7px_0px_#000] hover:-translate-y-1 hover:-translate-x-1 transition-all cursor-pointer flex flex-col justify-between group"
                                             >
                                                 <div>
-                                                    {/* Cover Banner if attached */}
+                                                    {/* Cover Banner if attached (100% full view, never cropped) */}
                                                     {ev.coverImageUrl && (
-                                                        <div className="w-full h-40 sm:h-48 rounded-2xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                                        <div className="w-full aspect-[2.4/1] rounded-2xl border-2 border-black overflow-hidden mb-3.5 relative bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                                             <img
                                                                 src={ev.coverImageUrl}
                                                                 alt={ev.title}
-                                                                className="w-full h-full object-cover group-hover:scale-102 transition-transform duration-300"
+                                                                className="w-full h-full object-contain group-hover:scale-102 transition-transform duration-300"
                                                             />
                                                             {ev.isOptimistic && (
                                                                 <span className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-white border border-black shadow-[1px_1px_0px_#000] animate-pulse">
                                                                     Syncing...
                                                                 </span>
                                                             )}
+                                                            <span className="absolute top-2 right-2 px-2.5 py-0.5 rounded-full text-[11px] font-black bg-white/95 text-rose-700 border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-1">
+                                                                <Heart className="w-3 h-3 fill-rose-600 text-rose-600" />
+                                                                <span>{ev.likesCount || 0}</span>
+                                                            </span>
                                                         </div>
                                                     )}
 
@@ -1263,6 +1259,10 @@ export default function ClubDashboardPage() {
                                                         <span className="inline-flex items-center gap-1 text-emerald-950 bg-emerald-50 px-2 py-0.5 rounded-md border border-black/20">
                                                             <UserCheck className="w-3 h-3 text-emerald-700 stroke-[2.5]" />
                                                             <span>{ev.attendeesCount || 0} Attended</span>
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1 text-rose-950 bg-rose-50 px-2 py-0.5 rounded-md border border-black/20">
+                                                            <Heart className="w-3 h-3 text-rose-600 fill-rose-600 stroke-[2.5]" />
+                                                            <span>{ev.likesCount || 0} Likes</span>
                                                         </span>
                                                         {(ev.rejectedCount ?? 0) > 0 && (
                                                             <span className="inline-flex items-center gap-1 text-rose-950 bg-rose-50 px-2 py-0.5 rounded-md border border-black/20">

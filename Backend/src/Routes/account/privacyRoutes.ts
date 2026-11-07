@@ -9,6 +9,7 @@ import {
     cancelAccountDeletion,
     getPrivacyRequestHistory,
 } from "../../services/account/privacyCenterService.js";
+import { processPendingAccountDeletions } from "../../services/account/accountPurgeService.js";
 
 export const privacyRouter = express.Router();
 
@@ -123,6 +124,24 @@ privacyRouter.get("/history", authenticate, async (req: Request, res: Response) 
         return res.status(200).json({ success: true, ...history });
     } catch (err: any) {
         console.error("[Privacy] Get history error:", err);
+        return res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * POST /api/account/privacy/purge/execute
+ * Triggers the automated permanent purge of expired 7-day deletion requests.
+ */
+privacyRouter.post("/purge/execute", async (req: Request, res: Response) => {
+    try {
+        const purgeResult = await processPendingAccountDeletions();
+        return res.status(200).json({
+            success: true,
+            message: "Account purge worker executed successfully.",
+            result: purgeResult,
+        });
+    } catch (err: any) {
+        console.error("[Privacy] Account purge execution error:", err);
         return res.status(500).json({ success: false, message: err.message });
     }
 });

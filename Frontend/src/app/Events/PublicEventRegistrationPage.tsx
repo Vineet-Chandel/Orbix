@@ -19,7 +19,7 @@ const StudentFormRenderer = React.lazy(() =>
 function FormRendererSkeleton() {
     return (
         <div
-            className="max-w-2xl mx-auto space-y-6 animate-pulse"
+            className="w-full max-w-5xl xl:max-w-6xl mx-auto space-y-6 animate-pulse"
             aria-busy="true"
             aria-label="Loading registration form"
         >
@@ -122,7 +122,7 @@ export default function PublicEventRegistrationPage() {
             </div>
 
             {/* Main Content */}
-            <main className="flex-1 max-w-3xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+            <main className="flex-1 max-w-5xl xl:max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8">
                 {loading ? (
                     <FormRendererSkeleton />
                 ) : errorMsg ? (

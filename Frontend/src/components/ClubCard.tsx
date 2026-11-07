@@ -62,12 +62,12 @@ export const ClubCard: React.FC<ClubCardProps> = ({
         >
             {/* Top Cover / Header Visual Area */}
             <div>
-                <div className="relative h-28 sm:h-32 w-full bg-neutral-900 border-b-2 border-black overflow-hidden flex-shrink-0">
+                <div className="relative aspect-[2.4/1] w-full bg-neutral-950 border-b-2 border-black overflow-hidden flex-shrink-0 flex items-center justify-center">
                     {club.coverImageUrl ? (
                         <img
                             src={club.coverImageUrl}
                             alt={`${club.name} banner`}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                             loading="lazy"
                         />
                     ) : (

@@ -907,7 +907,10 @@ export async function clearStudentDraft(eventId: string): Promise<{ success: boo
 /**
  * Phase 6.1 Question Library: Fetch questions from past club events
  */
-export async function fetchClubQuestionLibrary(eventId: string): Promise<{
+export async function fetchClubQuestionLibrary(
+    eventId: string,
+    clubId?: string
+): Promise<{
     success: boolean;
     library: Array<{
         eventId: string;
@@ -918,7 +921,8 @@ export async function fetchClubQuestionLibrary(eventId: string): Promise<{
         questions: FormQuestion[];
     }>;
 }> {
-    const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form/question-library`, {
+    const queryParam = clubId ? `?clubId=${encodeURIComponent(clubId)}` : "";
+    const res = await fetch(`/api/club/events/${encodeURIComponent(eventId)}/form/question-library${queryParam}`, {
         credentials: "include",
     });
     const data = await res.json();
@@ -954,7 +958,7 @@ export async function importQuestionsToForm(
  */
 export async function requestAiQuestionSuggestions(
     eventId: string,
-    payload: { prompt?: string; eventType?: string; eventDescription?: string }
+    payload: { prompt?: string; eventType?: string; eventDescription?: string; eventTitle?: string; clubId?: string }
 ): Promise<{
     success: boolean;
     suggestedQuestions: FormQuestion[];

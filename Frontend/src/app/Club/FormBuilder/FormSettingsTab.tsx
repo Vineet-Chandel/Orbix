@@ -10,6 +10,7 @@ import {
     Settings,
 } from "lucide-react";
 import { NeoToggle } from "../../../components/NeoToggle";
+import { NeoDateTimePicker } from "../../../components/NeoDateTimePicker";
 import type { ClubEventFormRecord, FormSettings } from "../../../api/clubEventFormApi";
 import { useToast } from "../../../context/ToastContext";
 
@@ -115,7 +116,7 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
     };
 
     return (
-        <div className="max-w-3xl mx-auto space-y-5 pb-16">
+        <div className="w-full space-y-5 pb-24">
             {/* Page Header Notice */}
             <div className="p-4 rounded-xl bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 flex items-center gap-3">
                 <Settings className="w-4 h-4 text-neutral-500 shrink-0" />
@@ -554,19 +555,21 @@ export const FormSettingsTab: React.FC<FormSettingsTabProps> = ({
                                     Scheduled Closing Date & Time (Optional)
                                 </label>
                                 <div className="flex items-center gap-2">
-                                    <input
-                                        type="datetime-local"
-                                        value={s.responses?.closingDateTime || ""}
-                                        onChange={(e) =>
-                                            updateSettings({
-                                                responses: {
-                                                    ...s.responses,
-                                                    closingDateTime: e.target.value || null,
-                                                },
-                                            })
-                                        }
-                                        className="w-full border border-neutral-200 dark:border-neutral-800 rounded-lg p-2.5 text-xs sm:text-sm font-medium bg-white dark:bg-neutral-900 text-neutral-900 dark:text-white focus:outline-none focus:border-neutral-400"
-                                    />
+                                    <div className="flex-1">
+                                        <NeoDateTimePicker
+                                            value={s.responses?.closingDateTime || ""}
+                                            onChange={(val) =>
+                                                updateSettings({
+                                                    responses: {
+                                                        ...s.responses,
+                                                        closingDateTime: val || null,
+                                                    },
+                                                })
+                                            }
+                                            mode="datetime"
+                                            placeholder="Select closing date & time..."
+                                        />
+                                    </div>
                                     {s.responses?.closingDateTime && (
                                         <button
                                             type="button"

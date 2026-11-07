@@ -156,11 +156,11 @@ export const AuthLayout = ({
 
                 {/* Footer copyright */}
                 <div className="mt-6 pt-4 border-t-2 border-black/10 flex flex-col sm:flex-row items-center justify-between text-xs font-semibold text-neutral-600 gap-2">
-                    <p>© {new Date().getFullYear()} Orbix Inc. All rights reserved.</p>
+                    <p>© {new Date().getFullYear()} Orbix. All rights reserved.</p>
                     <div className="flex gap-3 text-neutral-800 font-bold">
-                        <a href="#privacy" className="hover:text-black hover:underline transition-colors">Privacy</a>
+                        <Link to="/privacy" className="hover:text-black hover:underline transition-colors">Privacy</Link>
                         <span>•</span>
-                        <a href="#terms" className="hover:text-black hover:underline transition-colors">Terms</a>
+                        <Link to="/terms" className="hover:text-black hover:underline transition-colors">Terms</Link>
                     </div>
                 </div>
             </div>

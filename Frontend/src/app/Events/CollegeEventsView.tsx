@@ -1,11 +1,10 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
     Calendar,
     Clock,
     MapPin,
     Heart,
-    Ticket,
     Search,
     ExternalLink,
     Building2,
@@ -51,15 +50,16 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
 
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Modal state for registration & restriction
     const [selectedEventForModal, setSelectedEventForModal] = useState<CollegeEventItem | null>(null);
     const [selectedEventForDetail, setSelectedEventForDetail] = useState<CollegeEventItem | null>(null);
     const [restrictedEvent, setRestrictedEvent] = useState<CollegeEventItem | null>(null);
 
-    const eventIdParam = searchParams.get("eventId");
+    const eventIdParam = searchParams.get("eventId") || searchParams.get("event");
 
-    // Automatically check QR/deep-link eventId param and enforce college check
+    // Automatically check QR/deep-link eventId param and open exact event details
     useEffect(() => {
         if (!eventIdParam || loading) return;
 
@@ -70,26 +70,32 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
             }
             if (!targetEvent) return;
 
-            const userCollegeId = user?.collegeId || user?.college?.id;
-            const userCollegeName = user?.college?.officialName || (typeof user?.college === "string" ? user.college : "");
+            const shouldRegister = searchParams.get("action") === "register" || searchParams.get("register") === "true";
 
-            const isSameCollege =
-                (targetEvent.collegeId && userCollegeId && String(targetEvent.collegeId).trim().toLowerCase() === String(userCollegeId).trim().toLowerCase()) ||
-                (targetEvent.collegeName && userCollegeName && targetEvent.collegeName.trim().toLowerCase() === userCollegeName.trim().toLowerCase());
+            if (shouldRegister) {
+                const userCollegeId = user?.collegeId || user?.college?.id;
+                const userCollegeName = user?.college?.officialName || (typeof user?.college === "string" ? user.college : "");
 
-            if (!isSameCollege) {
-                setRestrictedEvent(targetEvent);
+                const isSameCollege =
+                    (targetEvent.collegeId && userCollegeId && String(targetEvent.collegeId).trim().toLowerCase() === String(userCollegeId).trim().toLowerCase()) ||
+                    (targetEvent.collegeName && userCollegeName && targetEvent.collegeName.trim().toLowerCase() === userCollegeName.trim().toLowerCase());
+
+                if (!isSameCollege) {
+                    setRestrictedEvent(targetEvent);
+                } else {
+                    setSelectedEventForModal(targetEvent);
+                }
             } else {
-                setSelectedEventForModal(targetEvent);
+                setSelectedEventForDetail(targetEvent);
             }
         };
 
         checkAndOpenEvent();
-    }, [eventIdParam, loading, events, user]);
+    }, [eventIdParam, loading, events, user, searchParams]);
 
     const handleInitiateRegistration = (ev: CollegeEventItem) => {
         if (!user) {
-            const redirectUrl = `/events?tab=college-events&eventId=${ev.id}`;
+            const redirectUrl = `/college-events?eventId=${ev.id}`;
             navigate(`/auth/signin?redirect=${encodeURIComponent(redirectUrl)}`);
             return;
         }
@@ -144,7 +150,7 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
     // Optimistic Heart / Appreciation Toggle
     const handleToggleHeart = async (event: CollegeEventItem) => {
         if (!user) {
-            const redirectUrl = `/events?tab=college-events&eventId=${event.id}`;
+            const redirectUrl = `/college-events?eventId=${event.id}`;
             navigate(`/auth/signin?redirect=${encodeURIComponent(redirectUrl)}`);
             return;
         }
@@ -164,6 +170,12 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
             )
         );
 
+        setSelectedEventForDetail((prev) =>
+            prev && prev.id === event.id
+                ? { ...prev, hasLiked: updatedLiked, likesCount: updatedCount }
+                : prev
+        );
+
         if (updatedLiked) {
             toast.success("Added your appreciation! ❤️", { title: "Appreciated" });
         }
@@ -178,6 +190,11 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                         : e
                 )
             );
+            setSelectedEventForDetail((prev) =>
+                prev && prev.id === event.id
+                    ? { ...prev, hasLiked: res.liked, likesCount: res.likesCount }
+                    : prev
+            );
         } catch {
             // Rollback
             setEvents((prev) =>
@@ -186,6 +203,11 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                         ? { ...e, hasLiked: previousLiked, likesCount: previousCount }
                         : e
                 )
+            );
+            setSelectedEventForDetail((prev) =>
+                prev && prev.id === event.id
+                    ? { ...prev, hasLiked: previousLiked, likesCount: previousCount }
+                    : prev
             );
             toast.error("Failed to update appreciation.");
         }
@@ -302,8 +324,8 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                 {/* Header Banner */}
                 <div className="p-5 sm:p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="space-y-1.5">
-                        <div className="flex items-center gap-2">
-                            {onOpenMobileSidebar && (
+                        {onOpenMobileSidebar && (
+                            <div className="flex items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={onOpenMobileSidebar}
@@ -311,11 +333,8 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                                 >
                                     <Menu className="w-4 h-4" />
                                 </button>
-                            )}
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] border border-black shadow-[1px_1px_0px_#000]">
-                                Verified Campus Hub
-                            </span>
-                        </div>
+                            </div>
+                        )}
                         <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-black tracking-tight">
                             Campus Events & Workshops
                         </h1>
@@ -324,106 +343,6 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                             <span>Showing verified club sessions at <strong className="font-black text-black">{collegeName}</strong></span>
                         </p>
                     </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                        <Link
-                            to="/applications"
-                            className="px-4 py-2 rounded-xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                        >
-                            <Ticket className="w-3.5 h-3.5 text-black" />
-                            <span>My Passes ({myRegisteredEventsCount})</span>
-                        </Link>
-                        <Link
-                            to="/clubs"
-                            className="px-4 py-2 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-[1px] active:translate-y-[1px]"
-                        >
-                            <Users className="w-3.5 h-3.5 text-black" />
-                            <span>Explore Clubs</span>
-                        </Link>
-                    </div>
-                </div>
-
-                {/* Metrics Summary Row */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                    <button
-                        type="button"
-                        onClick={() => setTimeFilter("live")}
-                        className={`p-4 rounded-xl border-2 border-black text-left cursor-pointer transition-all ${
-                            timeFilter === "live" || timeFilter === "all"
-                                ? "bg-[#a2ff86] text-black shadow-[3px_3px_0px_#000] font-black"
-                                : "bg-white text-neutral-900 shadow-[2px_2px_0px_#000] hover:bg-[#FAF6EE]"
-                        }`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-neutral-600">
-                                Live & Upcoming
-                            </span>
-                            <Clock className="w-4 h-4 text-emerald-700" />
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-black mt-2 text-neutral-900">
-                            {activeEvents.length}
-                        </div>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setTimeFilter("today")}
-                        className={`p-4 rounded-xl border-2 border-black text-left cursor-pointer transition-all ${
-                            timeFilter === "today"
-                                ? "bg-amber-300 text-black shadow-[3px_3px_0px_#000] font-black"
-                                : "bg-amber-50 text-amber-950 shadow-[2px_2px_0px_#000] hover:bg-amber-100"
-                        }`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-amber-900">
-                                Today&apos;s Sessions
-                            </span>
-                            <Sparkles className="w-4 h-4 text-amber-700" />
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-black mt-2 text-neutral-900">
-                            {todayEvents.length}
-                        </div>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setTimeFilter("completed")}
-                        className={`p-4 rounded-xl border-2 border-black text-left cursor-pointer transition-all ${
-                            timeFilter === "completed"
-                                ? "bg-sky-300 text-black shadow-[3px_3px_0px_#000] font-black"
-                                : "bg-white text-neutral-900 shadow-[2px_2px_0px_#000] hover:bg-sky-50"
-                        }`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-neutral-600">
-                                Completed
-                            </span>
-                            <CheckCircle2 className="w-4 h-4 text-sky-700" />
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-black mt-2 text-neutral-900">
-                            {completedEvents.length}
-                        </div>
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setTimeFilter("passes")}
-                        className={`p-4 rounded-xl border-2 border-black text-left cursor-pointer transition-all ${
-                            timeFilter === "passes"
-                                ? "bg-purple-300 text-black shadow-[3px_3px_0px_#000] font-black"
-                                : "bg-purple-50 text-purple-950 shadow-[2px_2px_0px_#000] hover:bg-purple-100"
-                        }`}
-                    >
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-purple-900">
-                                My Passes
-                            </span>
-                            <Ticket className="w-4 h-4 text-purple-700" />
-                        </div>
-                        <div className="text-2xl sm:text-3xl font-black mt-2 text-neutral-900">
-                            {myRegisteredEventsCount}
-                        </div>
-                    </button>
                 </div>
 
                 {/* Filter and Search Bar */}
@@ -576,13 +495,13 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                                     className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer group"
                                 >
                                     <div>
-                                        {/* Cover Banner */}
-                                        <div className="relative w-full h-40 rounded-xl border-2 border-black overflow-hidden mb-3.5 bg-neutral-100 shadow-[2px_2px_0px_#000]">
+                                        {/* Cover Banner (100% full view, never cropped) */}
+                                        <div className="relative w-full aspect-[2.4/1] rounded-xl border-2 border-black overflow-hidden mb-3.5 bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                             {ev.coverImageUrl ? (
                                                 <img
                                                     src={ev.coverImageUrl}
                                                     alt={ev.title}
-                                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                                    className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full bg-[#FAF6EE] flex items-center justify-center font-black text-neutral-400 text-sm">
@@ -797,7 +716,19 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
             {/* Full Event Details Preview Modal (Right: Description/Agenda, Left: Details) */}
             <CollegeEventDetailModal
                 isOpen={Boolean(selectedEventForDetail)}
-                onClose={() => setSelectedEventForDetail(null)}
+                onClose={() => {
+                    setSelectedEventForDetail(null);
+                    if (searchParams.has("eventId") || searchParams.has("event")) {
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.delete("eventId");
+                        newParams.delete("event");
+                        const searchStr = newParams.toString();
+                        navigate(
+                            { pathname: location.pathname, search: searchStr ? `?${searchStr}` : "" },
+                            { replace: true }
+                        );
+                    }
+                }}
                 event={selectedEventForDetail}
                 onApply={(ev) => handleInitiateRegistration(ev)}
                 onToggleHeart={(ev) => handleToggleHeart(ev)}
@@ -806,7 +737,19 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
             {/* Dynamic Registration Modal */}
             <DynamicEventRegistrationModal
                 isOpen={Boolean(selectedEventForModal)}
-                onClose={() => setSelectedEventForModal(null)}
+                onClose={() => {
+                    setSelectedEventForModal(null);
+                    if (searchParams.has("action") || searchParams.has("register")) {
+                        const newParams = new URLSearchParams(searchParams);
+                        newParams.delete("action");
+                        newParams.delete("register");
+                        const searchStr = newParams.toString();
+                        navigate(
+                            { pathname: location.pathname, search: searchStr ? `?${searchStr}` : "" },
+                            { replace: true }
+                        );
+                    }
+                }}
                 event={selectedEventForModal}
                 onSuccess={(updated) => {
                     setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));

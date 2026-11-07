@@ -33,6 +33,8 @@ import clubProfileRouter from "./clubProfileRoutes.js";
 import clubSettingsRouter from "./clubSettingsRoutes.js";
 import { ClubProfileService } from "../../services/club/clubProfileService.js";
 import { notifyClubAndCollegeUsers } from "../../services/club/clubEventNotificationService.js";
+import { ClubEventFormService } from "../../services/club/clubEventFormService.js";
+import { sendGuardianConsentEmail } from "../../services/email/resendService.js";
 
 const clubRouter = express.Router();
 
@@ -49,6 +51,9 @@ clubRouter.use("/settings", clubSettingsRouter);
 clubRouter.get("/college-clubs", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const collegeId = (req.query.collegeId as string) || undefined;
         const collegeName = (req.query.collegeName as string) || undefined;
         const clubId = (req.query.clubId as string) || undefined;
@@ -1210,6 +1215,13 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
                     email,
                     password,
                     termsaccepted,
+                    terms_version,
+                    terms_accepted_at,
+                    privacy_policy_accepted,
+                    privacy_policy_version,
+                    privacy_policy_accepted_at,
+                    is_age_18_confirmed,
+                    age_confirmed_at,
                     account_type,
                     avatar_url,
                     college_id,
@@ -1219,7 +1231,7 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
                     is_phone_verified,
                     phone_verified_at,
                     phone_confirmed_at
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'club', $8, $9, $10, $11, $12, $13, $14, $15);`,
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'v1.0', CURRENT_TIMESTAMP, true, 'v1.0', CURRENT_TIMESTAMP, true, CURRENT_TIMESTAMP, 'club', $8, $9, $10, $11, $12, $13, $14, $15);`,
                 [
                     effectiveUserId,
                     validated.username,
@@ -1238,6 +1250,26 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
                     isPhoneVerified ? verificationTimestamp : null,
                 ]
             );
+
+            // Audit Trail: Append-only legal consent records for club representative
+            try {
+                const repUserAgent = (req.headers["user-agent"] as string) || "Unknown User-Agent";
+                await query(
+                    `INSERT INTO user_legal_consents (user_id, document_type, document_version, action, ip_address, user_agent, metadata)
+                     VALUES
+                     ($1, 'terms_and_conditions', 'v1.0', 'accepted', $2, $3, $4),
+                     ($1, 'privacy_policy', 'v1.0', 'accepted', $2, $3, $4),
+                     ($1, 'age_confirmation', 'v1.0', 'accepted', $2, $3, $4);`,
+                    [
+                        effectiveUserId,
+                        ip,
+                        repUserAgent,
+                        JSON.stringify({ registrationType: "club_representative", clubName: validated.clubName, agreedAt: new Date().toISOString() })
+                    ]
+                );
+            } catch (repConsentErr) {
+                console.error("Failed to log club representative legal consents:", repConsentErr);
+            }
         } else {
             // Existing user linking: update phone & college
             await query(
@@ -1427,6 +1459,9 @@ clubRouter.post("/register", optionalAuthenticate, async (req: Request, res: Res
 clubRouter.get("/application-status", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const userEmail = req.user?.gmail || req.user?.email;
 
         if (!userId && !userEmail) {
@@ -2043,6 +2078,9 @@ clubRouter.get("/session-state", authenticate, async (req: Request, res: Respons
     try {
         const userId = req.user?.id;
         if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
+        if (!userId) {
             return res.status(401).json({ success: false, message: "Authentication required" });
         }
 
@@ -2112,6 +2150,9 @@ const normalizeLocationTypeForDb = (type?: string): string => {
 clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const requestedClubId = (req.query.clubId as string) || undefined;
         let clubId: string | null = null;
 
@@ -2185,7 +2226,14 @@ clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
 clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
 
         let club: any = null;
         if (userId) {
@@ -2264,6 +2312,9 @@ clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Respo
 clubRouter.post("/events", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const clubRes = await query(
             `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
             [userId]
@@ -2285,6 +2336,9 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
             registrationUrl,
             coverImageUrl,
             status = "draft",
+            initialFormStructure,
+            initialFormSettings,
+            initialFormTheme,
         } = req.body;
 
         if (!title || typeof title !== "string" || title.trim().length < 3) {
@@ -2375,7 +2429,24 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
 
         const newEvent = insertRes.rows[0];
 
-        // Notify club staff and college students if event is published live
+        // Save and publish initial registration form configured during 3-step event creation
+        if (initialFormStructure && Array.isArray(initialFormStructure?.sections)) {
+            try {
+                await ClubEventFormService.saveFormDraft(newEvent.id, userId, {
+                    structure: initialFormStructure,
+                    title: `${title.trim()} Registration`,
+                    settings: initialFormSettings || {},
+                    themeSettings: initialFormTheme || {},
+                });
+                if (finalStatus === "published") {
+                    await ClubEventFormService.publishForm(newEvent.id, userId, "Initial event publication");
+                }
+            } catch (formSaveErr) {
+                console.error("[POST /events] Error saving initial form structure:", formSaveErr);
+            }
+        }
+
+        // Notify club staff and college students ONLY AFTER event and registration form are ready
         if (finalStatus === "published") {
             notifyClubAndCollegeUsers(newEvent.id, clubId, "published", userId).catch((err) =>
                 console.error("[POST /events] Notification dispatch error:", err)
@@ -2406,7 +2477,14 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
 clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
 
         const clubRes = await query(
             `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
@@ -2595,7 +2673,14 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
 clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
 
         const clubRes = await query(
             `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
@@ -3044,6 +3129,10 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
 clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user?.id || null;
 
         const eventRes = await query(
@@ -3104,36 +3193,41 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
 clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
         const userId = req.user!.id;
 
-        const checkEvent = await query(`SELECT id FROM club_events WHERE id = $1 LIMIT 1;`, [eventId]);
+        const checkEvent = await query(
+            `SELECT id FROM club_events WHERE ($1::boolean = true AND id = $2::uuid) OR slug = $3 LIMIT 1;`,
+            [isUuid, isUuid ? eventId : null, eventId]
+        );
         if (!checkEvent.rows[0]) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
+        const targetEventId = checkEvent.rows[0].id;
 
         const existing = await query(
             `SELECT id FROM club_event_likes WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
-            [eventId, userId]
+            [targetEventId, userId]
         );
 
         let liked = false;
         if (existing.rows[0]) {
             await query(
                 `DELETE FROM club_event_likes WHERE event_id = $1 AND user_id = $2;`,
-                [eventId, userId]
+                [targetEventId, userId]
             );
             liked = false;
         } else {
             await query(
                 `INSERT INTO club_event_likes (event_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING;`,
-                [eventId, userId]
+                [targetEventId, userId]
             );
             liked = true;
         }
 
         const countRes = await query(
             `SELECT COUNT(*)::int AS count FROM club_event_likes WHERE event_id = $1;`,
-            [eventId]
+            [targetEventId]
         );
         const likesCount = countRes.rows[0]?.count || 0;
 
@@ -3156,6 +3250,10 @@ clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res:
 clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
         const {
             applicantName,
@@ -3166,6 +3264,11 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
             phoneNumber,
             notes,
             answers,
+            isAttendeeUnder18,
+            guardianName,
+            guardianEmail,
+            guardianPhone,
+            guardianRelationship,
         } = req.body || {};
 
         const eventRes = await query(
@@ -3297,9 +3400,68 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                 return res.json({
                     success: true,
                     message: `Application submitted for review for ${event.title}!`,
-                    registration: reactivated.rows[0],
+                    registration: {
+                        ...reactivated.rows[0],
+                        ticketCode: null,
+                    },
                 });
             }
+        }
+
+        // Minor Attendee & Guardian Verification Processing
+        const isMinor = Boolean(isAttendeeUnder18);
+        let normGuardianName: string | null = null;
+        let normGuardianEmail: string | null = null;
+        let normGuardianPhone: string | null = null;
+        let normGuardianRelationship: string | null = null;
+        let guardianConsentStatus = "not_required";
+        let guardianConsentToken: string | null = null;
+        let guardianConsentTokenExpiresAt: Date | null = null;
+
+        if (isMinor) {
+            normGuardianName = typeof guardianName === "string" ? guardianName.trim() : "";
+            normGuardianEmail = typeof guardianEmail === "string" ? guardianEmail.trim().toLowerCase() : "";
+            normGuardianPhone = typeof guardianPhone === "string" ? guardianPhone.trim() : "";
+            normGuardianRelationship = typeof guardianRelationship === "string" ? guardianRelationship.trim() : "";
+
+            if (!normGuardianName || normGuardianName.length < 2) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Parent or legal guardian's full name is required for attendees under 18.",
+                });
+            }
+
+            if (!normGuardianEmail || !normGuardianEmail.includes("@")) {
+                return res.status(400).json({
+                    success: false,
+                    message: "A valid email address for your parent or legal guardian is required.",
+                });
+            }
+
+            if (normGuardianEmail.toLowerCase() === finalEmail.toLowerCase() || normGuardianEmail.toLowerCase() === (userRow?.email || "").toLowerCase()) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Guardian email address must be distinct from the attendee's personal email address.",
+                });
+            }
+
+            if (!normGuardianPhone || normGuardianPhone.length < 7) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Parent or legal guardian's contact phone number is required.",
+                });
+            }
+
+            if (!normGuardianRelationship) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Relationship to parent or legal guardian (e.g., Mother, Father, Guardian) is required.",
+                });
+            }
+
+            guardianConsentStatus = "pending_verification";
+            guardianConsentToken = crypto.randomBytes(32).toString("hex");
+            guardianConsentTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
         }
 
         // 3. Register user application with status 'pending'
@@ -3317,11 +3479,19 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                 phone_number,
                 notes,
                 answers,
+                is_attendee_under_18,
+                guardian_name,
+                guardian_email,
+                guardian_phone,
+                guardian_relationship,
+                guardian_consent_status,
+                guardian_consent_token,
+                guardian_consent_token_expires_at,
                 registered_at,
                 created_at,
                 updated_at
-            ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW(), NOW())
-            RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt";`,
+            ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW(), NOW())
+            RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt", is_attendee_under_18 AS "isAttendeeUnder18", guardian_consent_status AS "guardianConsentStatus";`,
             [
                 eventId,
                 event.club_id,
@@ -3334,13 +3504,57 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                 phoneNumber || null,
                 notes || null,
                 answers ? JSON.stringify(answers) : "{}",
+                isMinor,
+                normGuardianName,
+                normGuardianEmail,
+                normGuardianPhone,
+                normGuardianRelationship,
+                guardianConsentStatus,
+                guardianConsentToken,
+                guardianConsentTokenExpiresAt,
             ]
         );
+
+        const createdReg = regRes.rows[0];
+
+        // If minor, dispatch verification email to parent/guardian
+        if (isMinor && normGuardianEmail && guardianConsentToken) {
+            const frontendBaseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+            const consentLink = `${frontendBaseUrl}/events/guardian-consent?token=${guardianConsentToken}&registrationId=${createdReg.id}`;
+            
+            try {
+                await sendGuardianConsentEmail({
+                    to: normGuardianEmail,
+                    guardianName: normGuardianName || "Parent / Guardian",
+                    studentName: finalName,
+                    eventTitle: event.title,
+                    clubName: event.clubName,
+                    collegeName: event.eventCollegeName || "Host Campus",
+                    consentLink,
+                    expiresInDays: 7,
+                });
+            } catch (emailErr) {
+                console.error("[MinorProtection] Failed to dispatch guardian consent email:", emailErr);
+            }
+
+            return res.status(201).json({
+                success: true,
+                message: `Registration received! Because you are under 18, a verification link has been emailed to your parent/guardian (${normGuardianEmail}). Registration will remain pending until parental consent is verified.`,
+                registration: {
+                    ...createdReg,
+                    ticketCode: null,
+                },
+                minorConsentPending: true,
+            });
+        }
 
         return res.status(201).json({
             success: true,
             message: `Application submitted for ${event.title}! The club coordinators will review your application.`,
-            registration: regRes.rows[0],
+            registration: {
+                ...createdReg,
+                ticketCode: null,
+            },
         });
     } catch (err: any) {
         console.error("Event registration error:", err);
@@ -3355,6 +3569,10 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
 clubRouter.post("/events/:eventId/cancel", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
 
         const updateRes = await query(
@@ -3442,6 +3660,10 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
 clubRouter.get("/events/:eventId/applications", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
 
         // Verify event and staff permission
@@ -3481,6 +3703,13 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
                 r.reviewed_at AS "reviewedAt",
                 r.review_notes AS "reviewNotes",
                 COALESCE(r.notes, '') AS "notes",
+                COALESCE(r.is_attendee_under_18, false) AS "isAttendeeUnder18",
+                r.guardian_name AS "guardianName",
+                r.guardian_email AS "guardianEmail",
+                r.guardian_phone AS "guardianPhone",
+                r.guardian_relationship AS "guardianRelationship",
+                COALESCE(r.guardian_consent_status, 'not_required') AS "guardianConsentStatus",
+                r.guardian_consent_verified_at AS "guardianConsentVerifiedAt",
                 r.answers,
                 r.form_response AS "formResponse",
                 r.file_attachments AS "fileAttachments"
@@ -3558,6 +3787,22 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
         const staffClub = await getStaffClub(userId, eventRes.rows[0].club_id);
         if (!staffClub) return res.status(403).json({ success: false, message: "Access forbidden." });
 
+        // Enforce Minor Protection: Cannot approve an under-18 attendee without verified guardian consent
+        if (status === "registered" || status === "attended") {
+            const curRegRes = await query(
+                `SELECT is_attendee_under_18, guardian_consent_status FROM club_event_registrations WHERE id = $1::uuid AND event_id = $2::uuid LIMIT 1;`,
+                [registrationId, eventId]
+            );
+            const curReg = curRegRes.rows[0];
+            if (curReg?.is_attendee_under_18 && curReg?.guardian_consent_status !== "verified") {
+                return res.status(400).json({
+                    success: false,
+                    code: "GUARDIAN_CONSENT_REQUIRED",
+                    message: `Cannot approve applicant under 18 years of age: Verifiable parental/guardian consent is currently "${curReg.guardian_consent_status || 'pending'}". Electronic guardian verification must be completed first.`,
+                });
+            }
+        }
+
         const isAttended = status === "attended";
         const updateRes = await query(
             `UPDATE club_event_registrations
@@ -3568,7 +3813,9 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
                  checked_in_at = CASE WHEN $6::boolean = true AND checked_in_at IS NULL THEN NOW() ELSE checked_in_at END,
                  updated_at = NOW()
              WHERE id = $4::uuid AND event_id = $5::uuid
-             RETURNING id, user_id AS "userId", status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
+             RETURNING id, user_id AS "userId", applicant_name AS "applicantName", applicant_email AS "applicantEmail",
+                       department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
+                       status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
             [status, userId, reviewNotes || null, registrationId, eventId, isAttended]
         );
 
@@ -3583,6 +3830,9 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
                 const appUser = applicantUserRes.rows[0];
                 const eventTitle = eventRes.rows[0].title;
                 const clubName = eventRes.rows[0].clubName;
+                const clubSlug = eventRes.rows[0].clubSlug;
+                const startsAt = eventRes.rows[0].starts_at;
+                const venueOrLocation = eventRes.rows[0].venue_or_location;
 
                 if (status === "registered") {
                     await query(
@@ -3602,8 +3852,22 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
                         [
                             appUser.id,
                             appUser.username,
-                            `Your application for "${eventTitle}" was accepted by ${clubName}. Your session entry pass is now active!`,
-                            JSON.stringify({ eventId, ticketCode: updatedRow.ticketCode, clubName }),
+                            `Your application for "${eventTitle}" was accepted by ${clubName}. Your session entry pass is now ready!`,
+                            JSON.stringify({
+                                eventId,
+                                registrationId,
+                                ticketCode: updatedRow.ticketCode,
+                                eventTitle,
+                                clubName,
+                                clubSlug: clubSlug || "",
+                                startsAt,
+                                venueOrLocation,
+                                applicantName: updatedRow.applicantName,
+                                rollNumber: updatedRow.rollNumber,
+                                department: updatedRow.department,
+                                action: "application_approved",
+                                status: "registered",
+                            }),
                             `app-approved-${registrationId}-${Date.now()}`,
                         ]
                     );
@@ -3626,7 +3890,14 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
                             appUser.id,
                             appUser.username,
                             `Your application for "${eventTitle}" was not selected by ${clubName}.`,
-                            JSON.stringify({ eventId, clubName }),
+                            JSON.stringify({
+                                eventId,
+                                registrationId,
+                                eventTitle,
+                                clubName,
+                                action: "application_rejected",
+                                status: "rejected",
+                            }),
                             `app-rejected-${registrationId}-${Date.now()}`,
                         ]
                     );
@@ -3650,6 +3921,10 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
 clubRouter.get("/events/:eventId/applications/export", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
 
         const eventRes = await query(
@@ -3697,19 +3972,52 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
         );
         const formStructure = formRes.rows[0]?.structure;
         const customQuestions: { id: string; title: string; type: string }[] = [];
+        const seenQuestionIds = new Set<string>();
+
         if (formStructure && Array.isArray(formStructure.sections)) {
             formStructure.sections.forEach((sec: any) => {
-                (sec.questions || []).forEach((q: any) => {
-                    if (q.type !== "image_card" && q.type !== "markdown_card") {
+                (sec.questions || sec.fields || []).forEach((q: any) => {
+                    if (
+                        q &&
+                        q.id &&
+                        !seenQuestionIds.has(q.id) &&
+                        q.type !== "image_card" &&
+                        q.type !== "markdown_card" &&
+                        q.type !== "image_block" &&
+                        q.type !== "video_block" &&
+                        q.type !== "title_card"
+                    ) {
+                        seenQuestionIds.add(q.id);
                         customQuestions.push({
                             id: q.id,
-                            title: q.title || "Question",
-                            type: q.type,
+                            title: q.title || q.label || "Question",
+                            type: q.type || "text",
                         });
                     }
                 });
             });
         }
+
+        // Also discover any other submitted question keys in answers
+        applicantsRes.rows.forEach((r) => {
+            const ansObj = r.form_response || r.answers || {};
+            Object.keys(ansObj).forEach((k) => {
+                if (k === "q_roll_number" || k === "q_department" || k === "q_year") return;
+                if (!seenQuestionIds.has(k)) {
+                    seenQuestionIds.add(k);
+                    let title = k;
+                    if (title.startsWith("q_")) {
+                        title = title.substring(2).replace(/_/g, " ");
+                        title = title.charAt(0).toUpperCase() + title.slice(1);
+                    }
+                    customQuestions.push({
+                        id: k,
+                        title,
+                        type: "text",
+                    });
+                }
+            });
+        });
 
         const escapeCsv = (val: any) => {
             if (val === null || val === undefined) return '""';
@@ -3727,9 +4035,6 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
             "Username",
             "Email",
             "Profile Photo URL",
-            "Department",
-            "Year of Study",
-            "Roll Number",
             "Phone",
             "Status",
             "Applied At",
@@ -3754,9 +4059,6 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
                 escapeCsv(r.username),
                 escapeCsv(r.email),
                 escapeCsv(r.avatar_url),
-                escapeCsv(r.department),
-                escapeCsv(r.year_of_study),
-                escapeCsv(r.roll_number),
                 escapeCsv(r.phone),
                 escapeCsv(r.status === "registered" ? "accepted" : r.status),
                 escapeCsv(r.registered_at ? new Date(r.registered_at).toISOString() : ""),
@@ -3801,6 +4103,10 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
 clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const { ticketCode, attendeeUserId } = req.body;
         const targetUserId = attendeeUserId || req.user!.id;
 
@@ -3848,14 +4154,47 @@ clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, r
 clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isEventUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isEventUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const { ticketCode, forceCheckIn } = req.body;
         const staffUserId = req.user!.id;
 
         if (!ticketCode || typeof ticketCode !== "string" || !ticketCode.trim()) {
-            return res.status(400).json({ success: false, message: "Valid ticketCode is required." });
+            return res.status(400).json({ success: false, message: "Valid ticketCode or student ID is required." });
         }
 
-        const cleanCode = ticketCode.trim().toUpperCase();
+        let cleanCode = ticketCode.trim();
+
+        // 1. If payload is raw JSON (from custom QR generators), extract ticketCode or id
+        if (cleanCode.startsWith("{") && cleanCode.endsWith("}")) {
+            try {
+                const parsed = JSON.parse(cleanCode);
+                cleanCode = parsed.ticketCode || parsed.ticket_code || parsed.id || parsed.registrationId || parsed.code || cleanCode;
+            } catch {}
+        }
+
+        // 2. If payload is a URL, extract code, ticketCode, or id from query params or path
+        if (cleanCode.includes("?") || cleanCode.includes("/")) {
+            try {
+                const urlMatch = cleanCode.match(/(?:ticketCode|code|id|registrationId)=([A-Za-z0-9_-]+)/i);
+                if (urlMatch && urlMatch[1]) {
+                    cleanCode = urlMatch[1];
+                } else if (!cleanCode.includes("?")) {
+                    const parts = cleanCode.split("/").filter(Boolean);
+                    if (parts.length > 0) {
+                        const lastPart = parts[parts.length - 1];
+                        if (lastPart && lastPart.length >= 6) {
+                            cleanCode = lastPart;
+                        }
+                    }
+                }
+            } catch {}
+        }
+
+        cleanCode = cleanCode.trim();
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanCode);
 
         const eventRes = await query(
             `SELECT e.id, e.club_id, e.title, vc.name AS "clubName"
@@ -3875,7 +4214,7 @@ clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Req
             return res.status(403).json({ success: false, message: "Access forbidden. Club staff only." });
         }
 
-        // Query registration with complete user profile information
+        // Query registration with complete user profile information (matches ticket code, registration id, user id, or student roll number)
         const regRes = await query(
             `SELECT 
                 r.id AS "registrationId",
@@ -3917,16 +4256,21 @@ clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Req
              FROM club_event_registrations r
              JOIN users u ON u.id = r.user_id
              LEFT JOIN institutions inst ON inst.id = u.college_id
-             WHERE r.event_id = $1::uuid AND UPPER(TRIM(r.ticket_code)) = UPPER(TRIM($2))
+             WHERE r.event_id = $1::uuid 
+               AND (
+                   UPPER(TRIM(r.ticket_code)) = UPPER(TRIM($2))
+                   OR ($3::boolean = TRUE AND (r.id = $2::uuid OR r.user_id = $2::uuid))
+                   OR (r.roll_number IS NOT NULL AND UPPER(TRIM(r.roll_number)) = UPPER(TRIM($2)))
+               )
              LIMIT 1;`,
-            [eventId, cleanCode]
+            [eventId, cleanCode, isUuid]
         );
 
         if (!regRes.rows[0]) {
             return res.status(404).json({
                 success: false,
                 code: "TICKET_NOT_FOUND",
-                message: `Ticket "${cleanCode}" was not found for this event. Please check the code and try again.`,
+                message: `Pass ID / Ticket "${cleanCode}" was not found for this event. Please verify the code or ID and try again.`,
             });
         }
 
@@ -4386,6 +4730,10 @@ clubRouter.get("/certificates/events", authenticate, async (req: Request, res: R
 clubRouter.get("/certificates/event/:eventId/recipients", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
@@ -4977,3 +5325,153 @@ clubRouter.get("/public/:slug", optionalAuthenticate, handleGetPublicClub);
 clubRouter.get("/:slug", optionalAuthenticate, handleGetPublicClub);
 
 export default clubRouter;
+
+
+/**
+ * GET /api/club/events/guardian-consent/verify
+ * Public endpoint allowing parents/guardians to inspect the event details & minor registration
+ */
+clubRouter.get("/events/guardian-consent/verify", async (req: Request, res: Response) => {
+    try {
+        const token = typeof req.query.token === "string" ? req.query.token.trim() : "";
+        const registrationId = typeof req.query.registrationId === "string" ? req.query.registrationId.trim() : "";
+
+        if (!token || !registrationId) {
+            return res.status(400).json({
+                success: false,
+                message: "Valid consent token and registration ID are required.",
+            });
+        }
+
+        const regRes = await query(
+            `SELECT r.id, r.event_id, r.applicant_name AS "applicantName", r.applicant_email AS "applicantEmail",
+                    r.is_attendee_under_18 AS "isAttendeeUnder18", r.guardian_name AS "guardianName",
+                    r.guardian_email AS "guardianEmail", r.guardian_phone AS "guardianPhone",
+                    r.guardian_relationship AS "guardianRelationship", r.guardian_consent_status AS "guardianConsentStatus",
+                    r.guardian_consent_token_expires_at AS "expiresAt", r.guardian_consent_verified_at AS "verifiedAt",
+                    e.title AS "eventTitle", e.description AS "eventDescription", e.starts_at AS "startsAt",
+                    e.venue_or_location AS "venue", vc.name AS "clubName", vc.college_name AS "collegeName"
+             FROM club_event_registrations r
+             JOIN club_events e ON e.id = r.event_id
+             JOIN verified_clubs vc ON vc.id = e.club_id
+             WHERE r.id = $1::uuid AND r.guardian_consent_token = $2
+             LIMIT 1;`,
+            [registrationId, token]
+        );
+
+        if (!regRes.rows[0]) {
+            return res.status(404).json({
+                success: false,
+                message: "Consent record not found or security token is invalid.",
+            });
+        }
+
+        const reg = regRes.rows[0];
+
+        // Check if token has expired
+        if (reg.expiresAt && new Date(reg.expiresAt) < new Date()) {
+            return res.status(410).json({
+                success: false,
+                message: "This guardian consent request link has expired. Please have the student re-apply.",
+                isExpired: true,
+            });
+        }
+
+        return res.json({
+            success: true,
+            details: reg,
+        });
+    } catch (err: any) {
+        console.error("Guardian consent verify error:", err);
+        return res.status(500).json({ success: false, message: "Failed to verify guardian consent token." });
+    }
+});
+
+/**
+ * POST /api/club/events/guardian-consent/confirm
+ * Public endpoint for parent/guardian to grant or decline electronic consent
+ */
+clubRouter.post("/events/guardian-consent/confirm", async (req: Request, res: Response) => {
+    try {
+        const { token, registrationId, action, guardianName, relationshipConfirm, remarks } = req.body || {};
+
+        if (!token || !registrationId || !["grant", "reject"].includes(action)) {
+            return res.status(400).json({
+                success: false,
+                message: "Token, registrationId, and valid action ('grant' or 'reject') are required.",
+            });
+        }
+
+        const ip = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = req.headers["user-agent"] || "unknown";
+
+        const regRes = await query(
+            `SELECT id, event_id, guardian_consent_status, guardian_consent_token_expires_at, applicant_name
+             FROM club_event_registrations
+             WHERE id = $1::uuid AND guardian_consent_token = $2
+             LIMIT 1;`,
+            [registrationId, token]
+        );
+
+        if (!regRes.rows[0]) {
+            return res.status(404).json({
+                success: false,
+                message: "Invalid consent record or authorization token.",
+            });
+        }
+
+        const reg = regRes.rows[0];
+
+        if (reg.guardian_consent_token_expires_at && new Date(reg.guardian_consent_token_expires_at) < new Date()) {
+            return res.status(410).json({
+                success: false,
+                message: "This consent request has expired.",
+                isExpired: true,
+            });
+        }
+
+        if (action === "grant") {
+            await query(
+                `UPDATE club_event_registrations
+                 SET guardian_consent_status = 'verified',
+                     guardian_consent_verified_at = NOW(),
+                     guardian_consent_ip = $1,
+                     guardian_consent_user_agent = $2,
+                     guardian_name = COALESCE($3, guardian_name),
+                     guardian_relationship = COALESCE($4, guardian_relationship),
+                     updated_at = NOW()
+                 WHERE id = $5::uuid;`,
+                [ip, userAgent, guardianName || null, relationshipConfirm || null, registrationId]
+            );
+
+            return res.json({
+                success: true,
+                message: "Parental/guardian consent has been confirmed successfully. The student's registration is now forwarded to the event coordinators.",
+                consentStatus: "verified",
+            });
+        } else {
+            // Action === "reject"
+            await query(
+                `UPDATE club_event_registrations
+                 SET guardian_consent_status = 'rejected',
+                     status = 'rejected',
+                     review_notes = 'Parental/guardian consent was declined by guardian.',
+                     reviewed_at = NOW(),
+                     guardian_consent_ip = $1,
+                     guardian_consent_user_agent = $2,
+                     updated_at = NOW()
+                 WHERE id = $3::uuid;`,
+                [ip, userAgent, registrationId]
+            );
+
+            return res.json({
+                success: true,
+                message: "Consent declined. The collegiate event registration has been cancelled.",
+                consentStatus: "rejected",
+            });
+        }
+    } catch (err: any) {
+        console.error("Guardian consent confirm error:", err);
+        return res.status(500).json({ success: false, message: "Failed to submit guardian consent decision." });
+    }
+});

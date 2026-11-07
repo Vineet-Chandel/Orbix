@@ -38,6 +38,9 @@ export interface CreateClubEventPayload {
     registrationUrl?: string | null;
     coverImageUrl?: string | null;
     status: "draft" | "published" | "completed" | "cancelled";
+    initialFormStructure?: any;
+    initialFormSettings?: any;
+    initialFormTheme?: any;
 }
 
 export type ClubEventStatus = "draft" | "published" | "completed" | "cancelled";

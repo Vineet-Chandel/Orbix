@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import {
     ArrowLeft,
@@ -9,7 +10,6 @@ import {
     Edit3,
     Trash2,
     Users,
-    BarChart3,
     QrCode,
     FileSpreadsheet,
     CheckCircle2,
@@ -30,6 +30,8 @@ import {
     Eye,
     Paperclip,
     X,
+    Heart,
+    Settings,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -55,7 +57,7 @@ import { ClubEventCheckinTerminal } from "./ClubEventCheckinTerminal";
 import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
 import { OrbixLoader } from "../../components/ui/loader";
 
-type EventTab = "roster" | "form" | "checkin" | "analytics" | "pass";
+type EventTab = "roster" | "form" | "checkin" | "pass" | "settings" | "analytics";
 
 export interface ClubEventDetailWorkspaceProps {
     eventId?: string;
@@ -94,10 +96,19 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [searchParams, setSearchParams] = useSearchParams();
     const location = useLocation();
     const isCheckinRoute = location.pathname.endsWith("/checkin") || searchParams.get("tab") === "checkin";
-    const [activeTab, setActiveTab] = useState<EventTab>(isCheckinRoute ? "checkin" : "roster");
+    const tabParam = searchParams.get("tab") as EventTab | null;
+    const initialTab: EventTab = isCheckinRoute
+        ? "checkin"
+        : tabParam && ["roster", "form", "checkin", "pass", "settings"].includes(tabParam)
+        ? tabParam
+        : "roster";
+    const [activeTab, setActiveTab] = useState<EventTab>(initialTab);
 
     const handleTabChange = (tab: EventTab) => {
         setActiveTab(tab);
+        if (tab === "roster") {
+            loadApplications();
+        }
         setSearchParams((prev) => {
             const next = new URLSearchParams(prev);
             if (tab === "roster") {
@@ -125,7 +136,6 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     >("all");
     const [updatingApplicantId, setUpdatingApplicantId] = useState<string | null>(null);
     const [copiedShareLink, setCopiedShareLink] = useState(false);
-    const [inspectingApplicant, setInspectingApplicant] = useState<ClubEventApplicantRow | null>(null);
 
     // Check authentication and load event from backend
     const loadEventDetails = async () => {
@@ -351,6 +361,147 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         }
     };
 
+    // Extract dynamic form question columns from form structure and response answers
+    const formQuestions = useMemo(() => {
+        const questions: { id: string; label: string; type?: string }[] = [];
+        const seenIds = new Set<string>();
+
+        // 1. From formStructure.sections
+        if (appsData?.formStructure && Array.isArray(appsData.formStructure.sections)) {
+            appsData.formStructure.sections.forEach((sec: any) => {
+                const list = sec.questions || sec.fields || [];
+                list.forEach((q: any) => {
+                    if (
+                        q &&
+                        q.id &&
+                        !seenIds.has(q.id) &&
+                        q.type !== "image_card" &&
+                        q.type !== "markdown_card" &&
+                        q.type !== "image_block" &&
+                        q.type !== "video_block" &&
+                        q.type !== "title_card"
+                    ) {
+                        seenIds.add(q.id);
+                        questions.push({
+                            id: q.id,
+                            label: q.title || q.label || "Question",
+                            type: q.type,
+                        });
+                    }
+                });
+            });
+        }
+
+        // 2. Discover any additional question keys present in applicants' answers
+        if (appsData?.applications) {
+            appsData.applications.forEach((app) => {
+                const ans = app.answers || app.formResponse || {};
+                Object.keys(ans).forEach((k) => {
+                    if (k === "q_roll_number" || k === "q_department" || k === "q_year") {
+                        return;
+                    }
+                    if (!seenIds.has(k)) {
+                        seenIds.add(k);
+                        let cleanLabel = k;
+                        if (cleanLabel.startsWith("q_")) {
+                            cleanLabel = cleanLabel.substring(2).replace(/_/g, " ");
+                            cleanLabel = cleanLabel.charAt(0).toUpperCase() + cleanLabel.slice(1);
+                        }
+                        questions.push({
+                            id: k,
+                            label: cleanLabel,
+                            type: "text",
+                        });
+                    }
+                });
+            });
+        }
+
+        return questions;
+    }, [appsData]);
+
+    // Format & render each answer cell nicely in the roster table
+    const renderAnswerValue = (
+        app: ClubEventApplicantRow,
+        question: { id: string; label: string; type?: string }
+    ) => {
+        // File attachments check
+        if (app.fileAttachments && app.fileAttachments.length > 0) {
+            const matched = app.fileAttachments.filter((f) => f.questionId === question.id);
+            if (matched.length > 0) {
+                return (
+                    <div className="flex flex-col gap-1 max-w-[220px]">
+                        {matched.map((f, idx) => (
+                            <a
+                                key={idx}
+                                href={f.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:underline truncate"
+                                title={f.fileName || "View Attachment"}
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <Paperclip className="w-3 h-3 shrink-0" />
+                                <span className="truncate">{f.fileName || "Attachment"}</span>
+                            </a>
+                        ))}
+                    </div>
+                );
+            }
+        }
+
+        const ansObj = app.answers || app.formResponse || {};
+        const val = ansObj[question.id];
+
+        if (val === null || val === undefined || val === "") {
+            return <span className="text-neutral-400 font-normal">—</span>;
+        }
+
+        if (Array.isArray(val)) {
+            if (val.length === 0) return <span className="text-neutral-400 font-normal">—</span>;
+            const text = val.join(", ");
+            return (
+                <span className="font-medium text-neutral-800 block truncate max-w-[220px]" title={text}>
+                    {text}
+                </span>
+            );
+        }
+
+        if (typeof val === "object") {
+            const jsonStr = JSON.stringify(val);
+            return (
+                <span className="font-mono text-[11px] text-neutral-700 block truncate max-w-[220px]" title={jsonStr}>
+                    {jsonStr}
+                </span>
+            );
+        }
+
+        const strVal = String(val).trim();
+        if (!strVal) return <span className="text-neutral-400 font-normal">—</span>;
+
+        if (strVal.startsWith("http://") || strVal.startsWith("https://")) {
+            return (
+                <a
+                    href={strVal}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-700 font-bold hover:underline truncate inline-flex items-center gap-1 max-w-[220px]"
+                    title={strVal}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <span className="truncate">{strVal.replace(/^https?:\/\/(www\.)?/, "")}</span>
+                    <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                </a>
+            );
+        }
+
+        return (
+            <span className="font-medium text-neutral-800 block truncate max-w-[220px]" title={strVal}>
+                {strVal}
+            </span>
+        );
+    };
+
     // Filtered Applications for Roster Tab
     const filteredApplications = useMemo(() => {
         if (!appsData?.applications) return [];
@@ -362,15 +513,19 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             const name = (a.applicantName || "").toLowerCase();
             const username = (a.username || "").toLowerCase();
             const email = (a.applicantEmail || "").toLowerCase();
-            const rollNo = (a.rollNumber || "").toLowerCase();
-            const department = (a.department || "").toLowerCase();
+            const ticketCode = (a.ticketCode || "").toLowerCase();
+
+            // Match against any answer value
+            const ansValues = Object.values(a.answers || a.formResponse || {})
+                .map((v) => (typeof v === "object" ? JSON.stringify(v) : String(v || "")).toLowerCase())
+                .join(" ");
 
             const matchesQuery =
                 name.includes(query) ||
                 username.includes(query) ||
                 email.includes(query) ||
-                rollNo.includes(query) ||
-                department.includes(query);
+                ticketCode.includes(query) ||
+                ansValues.includes(query);
 
             return matchesStatus && matchesQuery;
         });
@@ -400,11 +555,15 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         const yearMap = new Map<string, number>();
 
         appsData.applications.forEach((a) => {
-            const dept = (a.department || "General / Undeclared").trim();
-            deptMap.set(dept, (deptMap.get(dept) || 0) + 1);
+            if (a.department) {
+                const dept = a.department.trim();
+                deptMap.set(dept, (deptMap.get(dept) || 0) + 1);
+            }
 
-            const yr = a.yearOfStudy ? `Year ${a.yearOfStudy}` : "Unspecified";
-            yearMap.set(yr, (yearMap.get(yr) || 0) + 1);
+            if (a.yearOfStudy) {
+                const yr = `Year ${a.yearOfStudy}`;
+                yearMap.set(yr, (yearMap.get(yr) || 0) + 1);
+            }
         });
 
         const deptBreakdown = Array.from(deptMap.entries())
@@ -577,6 +736,11 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             : "Cancelled"}
                     </span>
 
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-100 text-rose-950 border-2 border-black text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
+                        <Heart className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
+                        <span>{(event as any).likesCount || 0} Likes</span>
+                    </span>
+
                     <button
                         type="button"
                         onClick={() => setIsEditModalOpen(true)}
@@ -610,13 +774,13 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
             {/* Hero Event Card */}
             <div className="p-6 sm:p-7 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-6">
-                    {/* Cover Banner if present */}
+                    {/* Cover Banner if present (100% full view, never cropped) */}
                     {event.coverImageUrl ? (
-                        <div className="w-full h-44 sm:h-64 rounded-2xl border-2 border-black overflow-hidden relative shadow-[3px_3px_0px_#000] bg-neutral-100">
+                        <div className="w-full aspect-[2.4/1] max-h-[420px] rounded-2xl border-2 sm:border-3 border-black overflow-hidden relative shadow-[3px_3px_0px_#000] bg-neutral-950 flex items-center justify-center">
                             <img
                                 src={event.coverImageUrl}
                                 alt={event.title}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain"
                             />
                         </div>
                     ) : (
@@ -641,6 +805,10 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FFE566] text-black border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
                                 <GraduationCap className="w-3 h-3" />
                                 {collegeAffiliation}
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-950 border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
+                                <Heart className="w-3 h-3 text-rose-600 fill-rose-600" />
+                                <span>{(event as any).likesCount || 0} Likes</span>
                             </span>
                         </div>
 
@@ -742,19 +910,6 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
                     <button
                         type="button"
-                        onClick={() => handleTabChange("analytics")}
-                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
-                            activeTab === "analytics"
-                                ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
-                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
-                        }`}
-                    >
-                        <BarChart3 className="w-4 h-4 stroke-[2.5]" />
-                        <span>Analytics & Attendance</span>
-                    </button>
-
-                    <button
-                        type="button"
                         onClick={() => handleTabChange("pass")}
                         className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
                             activeTab === "pass"
@@ -765,13 +920,26 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         <QrCode className="w-4 h-4 stroke-[2.5]" />
                         <span>Invitation Card & QR Pass</span>
                     </button>
+
+                    <button
+                        type="button"
+                        onClick={() => handleTabChange("settings")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                            activeTab === "settings"
+                                ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
+                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
+                        }`}
+                    >
+                        <Settings className="w-4 h-4 stroke-[2.5]" />
+                        <span>Event Settings</span>
+                    </button>
                 </div>
 
                 {/* TAB 1: APPLICATIONS SHEET & ATTENDEE ROSTER */}
                 {activeTab === "roster" && (
                     <div className="space-y-4">
                         {/* Summary Metrics Row */}
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
                                 <span className="text-[10px] font-black uppercase text-neutral-500">Total Signups</span>
                                 <div className="text-2xl font-black text-black mt-1">
@@ -796,6 +964,15 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     {appsData?.summary.attended || 0}
                                 </div>
                             </div>
+                            <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000]">
+                                <span className="text-[10px] font-black uppercase text-rose-700 flex items-center gap-1">
+                                    <Heart className="w-3 h-3 fill-rose-600 text-rose-600" />
+                                    <span>Likes</span>
+                                </span>
+                                <div className="text-2xl font-black text-rose-600 mt-1">
+                                    {(event as any).likesCount || 0}
+                                </div>
+                            </div>
                             <div className="p-4 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] col-span-2 sm:col-span-1">
                                 <span className="text-[10px] font-black uppercase text-neutral-500">Turnout Rate</span>
                                 <div className="text-2xl font-black text-purple-700 mt-1">
@@ -813,7 +990,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    placeholder="Search by student name, roll no, branch, or email..."
+                                    placeholder="Search by student name, username, email, or answers..."
                                     className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:outline-hidden"
                                 />
                             </div>
@@ -894,13 +1071,19 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     <table className="w-full text-left text-xs border-collapse">
                                         <thead>
                                             <tr className="bg-[#FAF6EE] border-b-2 border-black text-[11px] font-black uppercase text-neutral-700 tracking-wider">
-                                                <th className="py-3 px-4">Student</th>
-                                                <th className="py-3 px-4">Roll / ID</th>
-                                                <th className="py-3 px-4">Department</th>
-                                                <th className="py-3 px-4">Year</th>
-                                                <th className="py-3 px-4">Applied At</th>
-                                                <th className="py-3 px-4">Status</th>
-                                                <th className="py-3 px-4 text-right">Review & Action</th>
+                                                <th className="py-3 px-4 min-w-[200px]">Student</th>
+                                                {formQuestions.map((q) => (
+                                                    <th
+                                                        key={q.id}
+                                                        className="py-3 px-4 min-w-[150px] max-w-[260px] truncate"
+                                                        title={q.label}
+                                                    >
+                                                        {q.label}
+                                                    </th>
+                                                ))}
+                                                <th className="py-3 px-4 min-w-[120px]">Applied At</th>
+                                                <th className="py-3 px-4 min-w-[120px]">Status</th>
+                                                <th className="py-3 px-4 text-right min-w-[150px]">Review & Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y border-black/10">
@@ -952,16 +1135,12 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                             </div>
                                                         </div>
                                                     </td>
-                                                    <td className="py-3 px-4 font-mono font-bold text-neutral-700">
-                                                        {app.rollNumber || "—"}
-                                                    </td>
-                                                    <td className="py-3 px-4 font-bold text-neutral-800">
-                                                        {app.department || "General"}
-                                                    </td>
-                                                    <td className="py-3 px-4 font-bold text-neutral-700">
-                                                        {app.yearOfStudy ? `Year ${app.yearOfStudy}` : "—"}
-                                                    </td>
-                                                    <td className="py-3 px-4 text-neutral-500 font-medium">
+                                                    {formQuestions.map((q) => (
+                                                        <td key={q.id} className="py-3 px-4 max-w-[260px]">
+                                                            {renderAnswerValue(app, q)}
+                                                        </td>
+                                                    ))}
+                                                    <td className="py-3 px-4 text-neutral-500 font-medium whitespace-nowrap">
                                                         {new Date(app.registeredAt).toLocaleDateString(undefined, {
                                                             month: "short",
                                                             day: "numeric",
@@ -992,15 +1171,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                     </td>
                                                     <td className="py-3 px-4 text-right">
                                                         <div className="flex items-center justify-end gap-1.5">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setInspectingApplicant(app)}
-                                                                className="px-2 py-1 rounded-lg bg-white hover:bg-neutral-100 text-black font-black text-[11px] border border-black shadow-[1px_1px_0px_#000] cursor-pointer inline-flex items-center gap-1 shrink-0"
-                                                                title="Inspect student form responses & attachments"
-                                                            >
-                                                                <Eye className="w-3 h-3" />
-                                                                <span>Answers</span>
-                                                            </button>
+                                                            {/* Answers button removed - answers are displayed directly in the columns */}
 
                                                             {app.status === "pending" ? (
                                                                 <>
@@ -1208,6 +1379,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     description={event.description || undefined}
                                     startsAt={event.startsAt}
                                     endsAt={event.endsAt || undefined}
+                                    timezone={event.timezone}
                                     venueOrLocation={event.venueOrLocation || undefined}
                                     locationType={event.locationType}
                                     registrationUrl={event.registrationUrl || undefined}
@@ -1224,8 +1396,10 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                     </div>
                 )}
 
-                {/* DEDICATED BOTTOM EVENT ACTIONS & CONTROLS */}
-                <div className="p-6 sm:p-8 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-5">
+                {/* TAB 5: EVENT SETTINGS (EVENT ACTIONS & CONTROLS) */}
+                {activeTab === "settings" && event && (
+                    <div className="space-y-6">
+                        <div className="p-6 sm:p-8 rounded-3xl bg-white border-3 border-black shadow-[6px_6px_0px_#000] space-y-5">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b-2 border-black/10">
                         <div>
                             <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566] tracking-wider">
@@ -1446,193 +1620,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         </div>
                     </div>
                 </div>
-
-            {/* INSPECT APPLICANT FORM RESPONSES & ATTACHMENTS MODAL */}
-            {inspectingApplicant && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-150">
-                    <div className="w-full max-w-2xl bg-white rounded-3xl border-2 border-black shadow-[6px_6px_0px_#000] p-6 sm:p-7 space-y-5 max-h-[90vh] overflow-y-auto">
-                        {/* Header */}
-                        <div className="flex items-center justify-between border-b-2 border-black/10 pb-4">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-full bg-black text-[#a2ff86] flex items-center justify-center font-black text-sm border border-black shadow-[1.5px_1.5px_0px_#000]">
-                                    {(inspectingApplicant.applicantName || "S").slice(0, 2).toUpperCase()}
-                                </div>
-                                <div>
-                                    <h3 className="text-base sm:text-lg font-black text-black">
-                                        {inspectingApplicant.applicantName}
-                                    </h3>
-                                    <div className="text-xs text-neutral-500 font-medium flex items-center gap-2">
-                                        <span>@{inspectingApplicant.username}</span>
-                                        <span>•</span>
-                                        <span>{inspectingApplicant.applicantEmail}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setInspectingApplicant(null)}
-                                className="p-1.5 rounded-xl border-2 border-black hover:bg-neutral-100 cursor-pointer shadow-[1.5px_1.5px_0px_#000]"
-                            >
-                                <X className="w-4 h-4 text-black" />
-                            </button>
-                        </div>
-
-                        {/* Status & Pass Banner */}
-                        <div className="p-4 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex flex-wrap items-center justify-between gap-3 text-xs">
-                            <div className="flex items-center gap-2">
-                                <span className="font-black text-neutral-600 uppercase">Status:</span>
-                                <span className="px-2.5 py-0.5 rounded-full font-black uppercase text-[10px] bg-white border border-black shadow-[1px_1px_0px_#000]">
-                                    {inspectingApplicant.status}
-                                </span>
-                            </div>
-                            {inspectingApplicant.ticketCode && (
-                                <div className="flex items-center gap-2">
-                                    <span className="font-black text-neutral-600 uppercase">Pass Code:</span>
-                                    <span className="font-mono font-black text-black bg-white px-2 py-0.5 rounded-lg border border-black">
-                                        {inspectingApplicant.ticketCode}
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Basic Profile Details */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                            <div className="p-3 rounded-xl border border-black/20 bg-neutral-50">
-                                <span className="text-[10px] font-black uppercase text-neutral-500 block mb-0.5">
-                                    Department
-                                </span>
-                                <span className="font-bold text-black">{inspectingApplicant.department || "—"}</span>
-                            </div>
-                            <div className="p-3 rounded-xl border border-black/20 bg-neutral-50">
-                                <span className="text-[10px] font-black uppercase text-neutral-500 block mb-0.5">
-                                    Year
-                                </span>
-                                <span className="font-bold text-black">{inspectingApplicant.yearOfStudy || "—"}</span>
-                            </div>
-                            <div className="p-3 rounded-xl border border-black/20 bg-neutral-50">
-                                <span className="text-[10px] font-black uppercase text-neutral-500 block mb-0.5">
-                                    Roll Number
-                                </span>
-                                <span className="font-mono font-bold text-black">{inspectingApplicant.rollNumber || "—"}</span>
-                            </div>
-                            <div className="p-3 rounded-xl border border-black/20 bg-neutral-50">
-                                <span className="text-[10px] font-black uppercase text-neutral-500 block mb-0.5">
-                                    Phone
-                                </span>
-                                <span className="font-bold text-black">{inspectingApplicant.phoneNumber || "—"}</span>
-                            </div>
-                        </div>
-
-                        {/* Dynamic Custom Form Answers */}
-                        <div className="space-y-3 pt-2">
-                            <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                Dynamic Form Responses
-                            </h4>
-
-                            {inspectingApplicant.answers || inspectingApplicant.formResponse ? (
-                                <div className="space-y-2.5">
-                                    {Object.entries(
-                                        inspectingApplicant.formResponse || inspectingApplicant.answers || {}
-                                    ).map(([qKey, val]: [string, any]) => {
-                                        let displayVal = val;
-                                        if (typeof val === "object" && val !== null) {
-                                            displayVal = JSON.stringify(val);
-                                        } else if (Array.isArray(val)) {
-                                            displayVal = val.join(", ");
-                                        }
-
-                                        return (
-                                            <div
-                                                key={qKey}
-                                                className="p-3.5 rounded-xl border-2 border-black/15 bg-white space-y-1 text-xs"
-                                            >
-                                                <span className="font-black text-neutral-700 block text-[11px]">
-                                                    {qKey.replace(/^q_/, "").replace(/_/g, " ").toUpperCase()}
-                                                </span>
-                                                <div className="font-medium text-black whitespace-pre-wrap">
-                                                    {String(displayVal ?? "—")}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            ) : (
-                                <span className="text-xs text-neutral-400 font-medium">
-                                    No custom form answers recorded.
-                                </span>
-                            )}
-                        </div>
-
-                        {/* File Attachments */}
-                        {inspectingApplicant.fileAttachments && inspectingApplicant.fileAttachments.length > 0 && (
-                            <div className="space-y-2 pt-2">
-                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
-                                    Uploaded Attachments (Cloudinary)
-                                </h4>
-                                <div className="space-y-2">
-                                    {inspectingApplicant.fileAttachments.map((f: any, fIdx: number) => (
-                                        <a
-                                            key={fIdx}
-                                            href={f.fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="p-3 rounded-xl border-2 border-black bg-emerald-50/60 hover:bg-emerald-50 flex items-center justify-between text-xs font-black text-black group"
-                                        >
-                                            <div className="flex items-center gap-2 truncate">
-                                                <Paperclip className="w-4 h-4 text-emerald-800 shrink-0" />
-                                                <span className="truncate">{f.fileName || `Attachment ${fIdx + 1}`}</span>
-                                                {f.fileSize && (
-                                                    <span className="text-[10px] text-neutral-500 font-normal">
-                                                        ({(f.fileSize / (1024 * 1024)).toFixed(2)} MB)
-                                                    </span>
-                                                )}
-                                            </div>
-                                            <ExternalLink className="w-4 h-4 text-emerald-800" />
-                                        </a>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Modal Footer */}
-                        <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                {inspectingApplicant.status === "pending" && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                handleApplicantStatusChange(inspectingApplicant, "registered");
-                                                setInspectingApplicant(null);
-                                            }}
-                                            className="px-4 py-2 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                                        >
-                                            Accept Application
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                handleApplicantStatusChange(inspectingApplicant, "rejected");
-                                                setInspectingApplicant(null);
-                                            }}
-                                            className="px-4 py-2 rounded-xl bg-rose-100 hover:bg-rose-200 text-rose-950 font-black text-xs border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer"
-                                        >
-                                            Reject
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setInspectingApplicant(null)}
-                                className="px-5 py-2 rounded-xl bg-black text-white font-black text-xs hover:bg-neutral-800 cursor-pointer shadow-[2px_2px_0px_#000]"
-                            >
-                                Done
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            </div>
+        )}
 
             {/* ATTACHED HIGH-SECURITY CONFIRMATION CHALLENGE MODAL */}
             <EventSecurityConfirmModal

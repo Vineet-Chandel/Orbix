@@ -132,6 +132,7 @@ export const AccountPrivacyView: React.FC<AccountPrivacyViewProps> = ({
                         offIcon={<Lock className="w-3.5 h-3.5 text-neutral-700 stroke-[3]" />}
                         onStatusText="Status: Public"
                         offStatusText="Status: Private"
+                        showStatusText={true}
                         ariaLabel="Toggle profile public or private visibility"
                     />
                 </div>
