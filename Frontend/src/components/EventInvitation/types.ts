@@ -13,6 +13,7 @@ export interface EventInvitationData {
     registrationUrl?: string;
     coverImageUrl?: string;
     status?: "published" | "completed" | "draft" | "cancelled";
+    scope?: "PAN_INDIA" | "CAMPUS";
     clubName: string;
     clubLogoUrl?: string | null;
     collegeName: string;

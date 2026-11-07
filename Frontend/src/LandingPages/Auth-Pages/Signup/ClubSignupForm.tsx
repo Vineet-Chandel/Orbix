@@ -502,7 +502,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                 return;
             }
 
-            const res = await fetch("/api/club/verify/send-email-otp", {
+            const res = await fetch(buildApiUrl("/api/club/verify/send-email-otp"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
@@ -737,7 +737,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
 
         setVerifyingEmail(true);
         try {
-            const res = await fetch("/api/club/verify/verify-email-otp", {
+            const res = await fetch(buildApiUrl("/api/club/verify/verify-email-otp"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({

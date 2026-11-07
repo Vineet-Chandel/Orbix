@@ -678,6 +678,8 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                 answers,
                 fileAttachments,
                 idempotencyKey,
+                institutionId: studentProfile?.collegeId || (user as any)?.college_id || undefined,
+                institutionName: effectiveProfile.college || undefined,
             });
 
             const regRecord = {

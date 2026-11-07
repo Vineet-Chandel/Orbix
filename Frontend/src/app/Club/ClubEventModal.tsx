@@ -11,6 +11,8 @@ import {
     ArrowRight,
     Info,
     Check,
+    Globe2,
+    GraduationCap,
 } from "lucide-react";
 import { NeoSelect } from "../../components/NeoSelect";
 import { NeoImageDropzone } from "../../components/NeoImageDropzone";
@@ -43,6 +45,7 @@ export interface ClubEventModalProps {
     onClose: () => void;
     onSubmit: (eventData: CreateClubEventPayload, isEditing: boolean, eventId?: string) => void;
     editingEvent?: ClubEvent | null;
+    selectedScope?: "PAN_INDIA" | "CAMPUS";
     clubId?: string;
     clubName?: string;
     clubLogoUrl?: string | null;
@@ -64,6 +67,7 @@ interface FormState {
     registrationUrl: string;
     coverImageUrl: string;
     status: ClubEventStatus;
+    scope: "PAN_INDIA" | "CAMPUS";
 }
 
 interface FormErrors {
@@ -126,6 +130,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     onClose,
     onSubmit,
     editingEvent,
+    selectedScope = "CAMPUS",
     clubId,
     clubName = "Club",
     clubLogoUrl,
@@ -162,6 +167,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
         registrationUrl: "",
         coverImageUrl: "",
         status: initialStatus,
+        scope: editingEvent?.scope || selectedScope || "CAMPUS",
     });
 
     const [errors, setErrors] = useState<FormErrors>({});
@@ -211,6 +217,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     registrationUrl: editingEvent.registrationUrl || "",
                     coverImageUrl: editingEvent.coverImageUrl || "",
                     status: editingEvent.status || "published",
+                    scope: editingEvent.scope || selectedScope || "CAMPUS",
                 });
             } else {
                 const defaultBanner = getRandomPresetBanner().dataUrl;
@@ -226,6 +233,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                     registrationUrl: "",
                     coverImageUrl: defaultBanner,
                     status: initialStatus,
+                    scope: selectedScope || "CAMPUS",
                 });
                 setFormStructure({
                     sections: [
@@ -458,6 +466,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             registrationUrl: form.registrationUrl.trim() || null,
             coverImageUrl: effectiveBanner,
             status: form.status,
+            scope: form.scope,
             initialFormStructure: formStructure,
             initialFormSettings: formSettings,
             initialFormTheme: formTheme,
@@ -584,6 +593,67 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                         <span className="text-[11px] font-bold text-neutral-500 bg-white px-2.5 py-1 rounded-lg border border-black/30 shadow-[1px_1px_0px_#000]">
                             * Required Fields
                         </span>
+                    </div>
+
+                    {/* Scope Indicator Banner (Phase 2) */}
+                    <div
+                        className={`p-4 rounded-2xl border-2 border-black shadow-[3px_3px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                            form.scope === "PAN_INDIA"
+                                ? "bg-gradient-to-r from-orange-50 via-white to-emerald-50 border-orange-500"
+                                : "bg-sky-50 border-sky-600"
+                        }`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div
+                                className={`w-11 h-11 rounded-2xl border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center shrink-0 ${
+                                    form.scope === "PAN_INDIA" ? "bg-[#FF9933] text-black" : "bg-[#38BDF8] text-black"
+                                }`}
+                            >
+                                {form.scope === "PAN_INDIA" ? (
+                                    <Globe2 className="w-5 h-5 stroke-[2.3]" />
+                                ) : (
+                                    <GraduationCap className="w-5 h-5 stroke-[2.3]" />
+                                )}
+                            </div>
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] ${
+                                            form.scope === "PAN_INDIA"
+                                                ? "bg-[#FF9933] text-black"
+                                                : "bg-[#38BDF8] text-black"
+                                        }`}
+                                    >
+                                        {form.scope === "PAN_INDIA" ? "🇮🇳 Pan India Reach" : "🏛️ Campus Only"}
+                                    </span>
+                                    <span className="text-xs font-black text-black">
+                                        {form.scope === "PAN_INDIA"
+                                            ? "National Discovery & Cross-College Participation"
+                                            : `Exclusive to ${collegeName || "Host Campus"}`}
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-neutral-600 font-medium mt-0.5">
+                                    {form.scope === "PAN_INDIA"
+                                        ? "Students from colleges throughout India can discover and register for this session."
+                                        : `Registration restricted exclusively to verified students of ${collegeName || "your college"}.`}
+                                </p>
+                            </div>
+                        </div>
+
+                        {!editingEvent && (
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setForm((prev) => ({
+                                        ...prev,
+                                        scope: prev.scope === "PAN_INDIA" ? "CAMPUS" : "PAN_INDIA",
+                                    }))
+                                }
+                                className="px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-100 text-[11px] font-black border-2 border-black shadow-[2px_2px_0px_#000] cursor-pointer transition-all shrink-0 self-start sm:self-center"
+                            >
+                                Switch to {form.scope === "PAN_INDIA" ? "Campus Only" : "Pan India"}
+                            </button>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

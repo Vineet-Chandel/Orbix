@@ -2107,6 +2107,7 @@ Organizer Request: ${userPrompt}`;
             const evRes = await client.query(
                 `SELECT e.id, e.club_id AS "clubId", e.title, e.status, e.capacity,
                         e.starts_at AS "startsAt", e.ends_at AS "endsAt", e.eligibility,
+                        COALESCE(e.scope, 'CAMPUS') AS "scope",
                         c.college_id AS "clubCollegeId"
                  FROM club_events e
                  JOIN verified_clubs c ON c.id = e.club_id
@@ -2233,13 +2234,53 @@ Organizer Request: ${userPrompt}`;
                 userRow = uRes.rows[0];
             }
 
-            // Campus Eligibility Check
-            if (event.eligibility === "college_only" && event.clubCollegeId && userRow) {
+            // Campus Eligibility Check (Exclusively enforced for CAMPUS-scoped events)
+            const isCampusRestricted = event.scope !== "PAN_INDIA" && (event.scope === "CAMPUS" || event.eligibility === "college_only");
+            if (isCampusRestricted && event.clubCollegeId && userRow) {
                 if (userRow.college_id !== event.clubCollegeId) {
                     const error: any = new Error("Campus Restricted: This event is only open to students of the organizing college.");
                     error.statusCode = 403;
                     throw error;
                 }
+            }
+
+            // Resolve canonical institution snapshot for registration record
+            let regInstitutionId: string | null = null;
+            let regInstitutionName: string | null = null;
+            let regUniversityName: string | null = null;
+            let regCampusName: string | null = null;
+            let regInstitutionCity: string | null = null;
+            let regInstitutionState: string | null = null;
+            let regInstitutionVerification: string = "unverified";
+            let regIsUnlisted: boolean = false;
+
+            const targetInstId = payload.institutionId || userRow?.college_id;
+            const isValidId = Boolean(targetInstId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(targetInstId).trim()));
+            if (isValidId) {
+                try {
+                    const instRes = await client.query(
+                        `SELECT id, official_name, state, city, district, verification_status FROM institutions WHERE id = $1 LIMIT 1;`,
+                        [targetInstId]
+                    );
+                    if (instRes.rows[0]) {
+                        const inst = instRes.rows[0];
+                        regInstitutionId = inst.id;
+                        regInstitutionName = inst.official_name;
+                        regInstitutionCity = inst.city || inst.district || null;
+                        regInstitutionState = inst.state || null;
+                        regInstitutionVerification = inst.verification_status || "verified";
+                    }
+                } catch {}
+            }
+
+            if (!regInstitutionName && (payload.institutionName || payload.campusName)) {
+                regInstitutionName = (payload.institutionName || payload.campusName || "").trim();
+                regInstitutionCity = payload.institutionCity || null;
+                regInstitutionState = payload.institutionState || null;
+                regUniversityName = payload.universityName || null;
+                regCampusName = payload.campusName || null;
+                regIsUnlisted = Boolean(payload.isUnlistedInstitution);
+                regInstitutionVerification = "unverified";
             }
 
             // 5. Server-Side Schema Validation against the Published Version
@@ -2572,9 +2613,17 @@ Organizer Request: ${userPrompt}`;
                                  quiz_max_score = $14,
                                  quiz_graded_answers = $15,
                                  quiz_grades_released = $16,
+                                 institution_id = COALESCE($17, institution_id),
+                                 institution_name = COALESCE($18, institution_name),
+                                 university_name = COALESCE($19, university_name),
+                                 campus_name = COALESCE($20, campus_name),
+                                 institution_city = COALESCE($21, institution_city),
+                                 institution_state = COALESCE($22, institution_state),
+                                 institution_verification_status = COALESCE($23, institution_verification_status),
+                                 is_unlisted_institution = COALESCE($24, is_unlisted_institution),
                                  last_updated_at = NOW(),
                                  updated_at = NOW()
-                             WHERE id = $17
+                             WHERE id = $25
                              RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode",
                                        applicant_name AS "applicantName", applicant_email AS "applicantEmail",
                                        department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
@@ -2582,6 +2631,11 @@ Organizer Request: ${userPrompt}`;
                                        form_version_id AS "formVersionId",
                                        quiz_score AS "quizScore", quiz_max_score AS "quizMaxScore",
                                        quiz_graded_answers AS "quizGradedAnswers", quiz_grades_released AS "quizGradesReleased",
+                                       institution_id AS "institutionId", institution_name AS "institutionName",
+                                       university_name AS "universityName", campus_name AS "campusName",
+                                       institution_city AS "institutionCity", institution_state AS "institutionState",
+                                       institution_verification_status AS "institutionVerificationStatus",
+                                       is_unlisted_institution AS "isUnlistedInstitution",
                                        registered_at AS "registeredAt";`,
                             [
                                 applicantName,
@@ -2600,6 +2654,14 @@ Organizer Request: ${userPrompt}`;
                                 quizMaxScore,
                                 quizGradedAnswers ? JSON.stringify(quizGradedAnswers) : null,
                                 quizGradesReleased,
+                                regInstitutionId,
+                                regInstitutionName,
+                                regUniversityName,
+                                regCampusName,
+                                regInstitutionCity,
+                                regInstitutionState,
+                                regInstitutionVerification,
+                                regIsUnlisted,
                                 existingReg.rows[0].id,
                             ]
                         );
@@ -2655,13 +2717,21 @@ Organizer Request: ${userPrompt}`;
                                  quiz_max_score = $14,
                                  quiz_graded_answers = $15,
                                  quiz_grades_released = $16,
+                                 institution_id = COALESCE($17, institution_id),
+                                 institution_name = COALESCE($18, institution_name),
+                                 university_name = COALESCE($19, university_name),
+                                 campus_name = COALESCE($20, campus_name),
+                                 institution_city = COALESCE($21, institution_city),
+                                 institution_state = COALESCE($22, institution_state),
+                                 institution_verification_status = COALESCE($23, institution_verification_status),
+                                 is_unlisted_institution = COALESCE($24, is_unlisted_institution),
                                  registered_at = NOW(),
                                  last_updated_at = NOW(),
                                  reviewed_at = NULL,
                                  reviewed_by_user_id = NULL,
                                  review_notes = NULL,
                                  updated_at = NOW()
-                             WHERE id = $17
+                             WHERE id = $25
                              RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode",
                                        applicant_name AS "applicantName", applicant_email AS "applicantEmail",
                                        department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
@@ -2669,6 +2739,11 @@ Organizer Request: ${userPrompt}`;
                                        form_version_id AS "formVersionId",
                                        quiz_score AS "quizScore", quiz_max_score AS "quizMaxScore",
                                        quiz_graded_answers AS "quizGradedAnswers", quiz_grades_released AS "quizGradesReleased",
+                                       institution_id AS "institutionId", institution_name AS "institutionName",
+                                       university_name AS "universityName", campus_name AS "campusName",
+                                       institution_city AS "institutionCity", institution_state AS "institutionState",
+                                       institution_verification_status AS "institutionVerificationStatus",
+                                       is_unlisted_institution AS "isUnlistedInstitution",
                                        registered_at AS "registeredAt";`,
                             [
                                 applicantName,
@@ -2687,6 +2762,14 @@ Organizer Request: ${userPrompt}`;
                                 quizMaxScore,
                                 quizGradedAnswers ? JSON.stringify(quizGradedAnswers) : null,
                                 quizGradesReleased,
+                                regInstitutionId,
+                                regInstitutionName,
+                                regUniversityName,
+                                regCampusName,
+                                regInstitutionCity,
+                                regInstitutionState,
+                                regInstitutionVerification,
+                                regIsUnlisted,
                                 existingReg.rows[0].id,
                             ]
                         );
@@ -2743,11 +2826,19 @@ Organizer Request: ${userPrompt}`;
                     quiz_max_score,
                     quiz_graded_answers,
                     quiz_grades_released,
+                    institution_id,
+                    institution_name,
+                    university_name,
+                    campus_name,
+                    institution_city,
+                    institution_state,
+                    institution_verification_status,
+                    is_unlisted_institution,
                     registered_at,
                     last_updated_at,
                     created_at,
                     updated_at
-                ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10, $11, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW(), NOW(), NOW())
+                ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10, $11, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, NOW(), NOW(), NOW(), NOW())
                 RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode",
                           applicant_name AS "applicantName", applicant_email AS "applicantEmail",
                           department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
@@ -2755,6 +2846,11 @@ Organizer Request: ${userPrompt}`;
                           form_version_id AS "formVersionId",
                           quiz_score AS "quizScore", quiz_max_score AS "quizMaxScore",
                           quiz_graded_answers AS "quizGradedAnswers", quiz_grades_released AS "quizGradesReleased",
+                          institution_id AS "institutionId", institution_name AS "institutionName",
+                          university_name AS "universityName", campus_name AS "campusName",
+                          institution_city AS "institutionCity", institution_state AS "institutionState",
+                          institution_verification_status AS "institutionVerificationStatus",
+                          is_unlisted_institution AS "isUnlistedInstitution",
                           registered_at AS "registeredAt";`,
                 [
                     eventId,
@@ -2776,6 +2872,14 @@ Organizer Request: ${userPrompt}`;
                     quizMaxScore,
                     quizGradedAnswers ? JSON.stringify(quizGradedAnswers) : null,
                     quizGradesReleased,
+                    regInstitutionId,
+                    regInstitutionName,
+                    regUniversityName,
+                    regCampusName,
+                    regInstitutionCity,
+                    regInstitutionState,
+                    regInstitutionVerification,
+                    regIsUnlisted,
                 ]
             );
 
@@ -3549,6 +3653,7 @@ Organizer Request: ${userPrompt}`;
         const regRes = await query(
             `SELECT r.id, r.ticket_code, r.applicant_name, r.applicant_email, r.roll_number,
                     r.department, r.year_of_study, r.phone_number, r.status,
+                    r.institution_name, r.university_name, r.institution_city, r.institution_state, r.institution_verification_status,
                     r.answers, r.form_response, r.file_attachments,
                     r.quiz_score, r.quiz_max_score,
                     v.version_number AS version_number,
@@ -3571,6 +3676,11 @@ Organizer Request: ${userPrompt}`;
             "Full Name",
             "Email",
             "Username",
+            "Institution / College",
+            "University",
+            "City",
+            "State",
+            "Verification Status",
             "Phone",
             "Status",
             "Form Version",
@@ -3604,6 +3714,11 @@ Organizer Request: ${userPrompt}`;
                 escapeCsv(r.applicant_name),
                 escapeCsv(r.applicant_email),
                 escapeCsv(r.username || ""),
+                escapeCsv(r.institution_name || ""),
+                escapeCsv(r.university_name || ""),
+                escapeCsv(r.institution_city || ""),
+                escapeCsv(r.institution_state || ""),
+                escapeCsv(r.institution_verification_status || "unverified"),
                 escapeCsv(r.phone_number || ""),
                 escapeCsv(r.status),
                 escapeCsv(r.version_number ? `v${r.version_number}` : "v1"),

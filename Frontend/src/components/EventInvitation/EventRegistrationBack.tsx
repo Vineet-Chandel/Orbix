@@ -7,6 +7,7 @@ import {
     Building2,
     Ticket,
     Sparkles,
+    Globe2,
 } from "lucide-react";
 import { OrbixCardQR } from "../../app/Profile/CardStudio/OrbixCardQR";
 import { OrbixLogo } from "../OrbixLogo";
@@ -105,14 +106,27 @@ export const EventRegistrationBack: React.FC<EventRegistrationBackProps> = ({
                                 </h3>
                             </div>
 
-                            {/* College Exclusivity Pill */}
-                            <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-2 text-[10px] font-black text-black">
-                                <GraduationCap className="w-3.5 h-3.5 shrink-0 stroke-[2.5]" />
-                                <span className="truncate">
-                                    {collegeName
-                                        ? `Exclusively for students of ${collegeName}`
-                                        : "Open to all verified college students"}
-                                </span>
+                            {/* College / Pan-India Reach Pill */}
+                            <div className={`p-2 rounded-xl border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center gap-2 text-[10px] font-black text-black ${
+                                event.scope === "PAN_INDIA" ? "bg-gradient-to-r from-orange-200 via-white to-emerald-200" : "bg-[#FFE566]"
+                            }`}>
+                                {event.scope === "PAN_INDIA" ? (
+                                    <>
+                                        <Globe2 className="w-3.5 h-3.5 shrink-0 stroke-[2.5] text-orange-700" />
+                                        <span className="truncate">
+                                            🇮🇳 Pan India Event • Open to students from all Indian colleges
+                                        </span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <GraduationCap className="w-3.5 h-3.5 shrink-0 stroke-[2.5]" />
+                                        <span className="truncate">
+                                            {collegeName
+                                                ? `Exclusively for students of ${collegeName}`
+                                                : "Open to all verified college students"}
+                                        </span>
+                                    </>
+                                )}
                             </div>
 
                             {/* 2x2 Specs Matrix */}
@@ -245,14 +259,27 @@ export const EventRegistrationBack: React.FC<EventRegistrationBackProps> = ({
                     </span>
                 </div>
 
-                {/* College Exclusivity Pill Banner */}
-                <div className="w-full p-2.5 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-2 text-xs font-black text-black">
-                    <GraduationCap className="w-4 h-4 shrink-0 stroke-[2.5]" />
-                    <span className="truncate">
-                        {collegeName
-                            ? `Exclusively for students of ${collegeName}`
-                            : "Open to all verified college students"}
-                    </span>
+                {/* College / Pan-India Reach Pill Banner */}
+                <div className={`w-full p-2.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-2 text-xs font-black text-black ${
+                    event.scope === "PAN_INDIA" ? "bg-gradient-to-r from-orange-200 via-white to-emerald-200" : "bg-[#FFE566]"
+                }`}>
+                    {event.scope === "PAN_INDIA" ? (
+                        <>
+                            <Globe2 className="w-4 h-4 shrink-0 stroke-[2.5] text-orange-700" />
+                            <span className="truncate">
+                                🇮🇳 Pan India Event • Open to all Indian college students
+                            </span>
+                        </>
+                    ) : (
+                        <>
+                            <GraduationCap className="w-4 h-4 shrink-0 stroke-[2.5]" />
+                            <span className="truncate">
+                                {collegeName
+                                    ? `Exclusively for students of ${collegeName}`
+                                    : "Open to all verified college students"}
+                            </span>
+                        </>
+                    )}
                 </div>
 
                 {/* Structured Specs Mini-Table */}

@@ -873,6 +873,29 @@ export const testDatabaseConnection = async () => {
                     ON public.club_event_response_drafts(user_id, event_id);
                 CREATE INDEX IF NOT EXISTS idx_club_event_response_drafts_event_version
                     ON public.club_event_response_drafts(event_id, form_version_id);
+
+                -- Migration 035: Pan India & Campus-Only Event Scope and Institution Snapshots
+                ALTER TABLE public.club_events 
+                    ADD COLUMN IF NOT EXISTS scope VARCHAR(20) NOT NULL DEFAULT 'CAMPUS';
+                CREATE INDEX IF NOT EXISTS idx_club_events_scope 
+                    ON public.club_events(scope);
+                CREATE INDEX IF NOT EXISTS idx_club_events_scope_status 
+                    ON public.club_events(scope, status);
+
+                ALTER TABLE public.club_event_registrations
+                    ADD COLUMN IF NOT EXISTS institution_id UUID REFERENCES public.institutions(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS institution_name VARCHAR(500),
+                    ADD COLUMN IF NOT EXISTS university_name VARCHAR(500),
+                    ADD COLUMN IF NOT EXISTS campus_name VARCHAR(255),
+                    ADD COLUMN IF NOT EXISTS institution_city VARCHAR(150),
+                    ADD COLUMN IF NOT EXISTS institution_state VARCHAR(100),
+                    ADD COLUMN IF NOT EXISTS institution_verification_status VARCHAR(50) DEFAULT 'unverified',
+                    ADD COLUMN IF NOT EXISTS is_unlisted_institution BOOLEAN DEFAULT false;
+
+                CREATE INDEX IF NOT EXISTS idx_club_event_reg_institution 
+                    ON public.club_event_registrations(institution_id);
+                CREATE INDEX IF NOT EXISTS idx_club_event_reg_state 
+                    ON public.club_event_registrations(institution_state);
             END $$;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");

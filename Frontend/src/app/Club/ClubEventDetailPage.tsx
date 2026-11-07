@@ -29,6 +29,7 @@ import {
     Paperclip,
     Heart,
     Settings,
+    Globe2,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -130,6 +131,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [statusFilter, setStatusFilter] = useState<
         "all" | "pending" | "registered" | "attended" | "rejected" | "cancelled"
     >("all");
+    const [institutionFilter, setInstitutionFilter] = useState<string>("all");
+    const [stateFilter, setStateFilter] = useState<string>("all");
     const [updatingApplicantId, setUpdatingApplicantId] = useState<string | null>(null);
     const [copiedShareLink, setCopiedShareLink] = useState(false);
 
@@ -498,18 +501,46 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
         );
     };
 
+    // Unique institutions and states across all registered applications for filtering
+    const uniqueInstitutions = useMemo(() => {
+        if (!appsData?.applications) return [];
+        const set = new Set<string>();
+        appsData.applications.forEach((a: any) => {
+            if (a.institutionName && a.institutionName.trim()) {
+                set.add(a.institutionName.trim());
+            }
+        });
+        return Array.from(set).sort();
+    }, [appsData]);
+
+    const uniqueStates = useMemo(() => {
+        if (!appsData?.applications) return [];
+        const set = new Set<string>();
+        appsData.applications.forEach((a: any) => {
+            if (a.institutionState && a.institutionState.trim()) {
+                set.add(a.institutionState.trim());
+            }
+        });
+        return Array.from(set).sort();
+    }, [appsData]);
+
     // Filtered Applications for Roster Tab
     const filteredApplications = useMemo(() => {
         if (!appsData?.applications) return [];
-        return appsData.applications.filter((a) => {
+        return appsData.applications.filter((a: any) => {
             const matchesStatus = statusFilter === "all" || a.status === statusFilter;
+            const matchesInstitution = institutionFilter === "all" || a.institutionName === institutionFilter;
+            const matchesState = stateFilter === "all" || a.institutionState === stateFilter;
             const query = searchQuery.trim().toLowerCase();
-            if (!query) return matchesStatus;
+            if (!query) return matchesStatus && matchesInstitution && matchesState;
 
             const name = (a.applicantName || "").toLowerCase();
             const username = (a.username || "").toLowerCase();
             const email = (a.applicantEmail || "").toLowerCase();
             const ticketCode = (a.ticketCode || "").toLowerCase();
+            const inst = (a.institutionName || "").toLowerCase();
+            const city = (a.institutionCity || "").toLowerCase();
+            const state = (a.institutionState || "").toLowerCase();
 
             // Match against any answer value
             const ansValues = Object.values(a.answers || a.formResponse || {})
@@ -521,11 +552,14 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                 username.includes(query) ||
                 email.includes(query) ||
                 ticketCode.includes(query) ||
+                inst.includes(query) ||
+                city.includes(query) ||
+                state.includes(query) ||
                 ansValues.includes(query);
 
-            return matchesStatus && matchesQuery;
+            return matchesStatus && matchesInstitution && matchesState && matchesQuery;
         });
-    }, [appsData, statusFilter, searchQuery]);
+    }, [appsData, statusFilter, institutionFilter, stateFilter, searchQuery]);
 
     // Analytics Breakdown computations
     const analytics = useMemo(() => {
@@ -539,6 +573,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                 turnoutRate: 0,
                 deptBreakdown: [] as { name: string; count: number; pct: number }[],
                 yearBreakdown: [] as { year: string; count: number; pct: number }[],
+                collegeBreakdown: [] as { name: string; count: number; pct: number }[],
+                stateBreakdown: [] as { name: string; count: number; pct: number }[],
             };
         }
 
@@ -549,8 +585,10 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
         const deptMap = new Map<string, number>();
         const yearMap = new Map<string, number>();
+        const instMap = new Map<string, number>();
+        const stateMap = new Map<string, number>();
 
-        appsData.applications.forEach((a) => {
+        appsData.applications.forEach((a: any) => {
             if (a.department) {
                 const dept = a.department.trim();
                 deptMap.set(dept, (deptMap.get(dept) || 0) + 1);
@@ -559,6 +597,16 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             if (a.yearOfStudy) {
                 const yr = `Year ${a.yearOfStudy}`;
                 yearMap.set(yr, (yearMap.get(yr) || 0) + 1);
+            }
+
+            if (a.institutionName && a.institutionName.trim()) {
+                const inst = a.institutionName.trim();
+                instMap.set(inst, (instMap.get(inst) || 0) + 1);
+            }
+
+            if (a.institutionState && a.institutionState.trim()) {
+                const st = a.institutionState.trim();
+                stateMap.set(st, (stateMap.get(st) || 0) + 1);
             }
         });
 
@@ -579,6 +627,24 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             }))
             .sort((a, b) => a.year.localeCompare(b.year));
 
+        const collegeBreakdown = Array.from(instMap.entries())
+            .map(([name, count]) => ({
+                name,
+                count,
+                pct: total > 0 ? Math.round((count / total) * 100) : 0,
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 8);
+
+        const stateBreakdown = Array.from(stateMap.entries())
+            .map(([name, count]) => ({
+                name,
+                count,
+                pct: total > 0 ? Math.round((count / total) * 100) : 0,
+            }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 8);
+
         return {
             total,
             registered,
@@ -588,6 +654,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
             turnoutRate,
             deptBreakdown,
             yearBreakdown,
+            collegeBreakdown,
+            stateBreakdown,
         };
     }, [appsData]);
 
@@ -802,6 +870,17 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                 <GraduationCap className="w-3 h-3" />
                                 {collegeAffiliation}
                             </span>
+                            {event.scope === "PAN_INDIA" ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FF9933] text-black border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
+                                    <Globe2 className="w-3 h-3 stroke-[2.3]" />
+                                    Pan India Reach
+                                </span>
+                            ) : (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-sky-200 text-sky-950 border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
+                                    <GraduationCap className="w-3 h-3 stroke-[2.3]" />
+                                    Campus Only
+                                </span>
+                            )}
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-950 border border-black text-xs font-black shadow-[1px_1px_0px_#000]">
                                 <Heart className="w-3 h-3 text-rose-600 fill-rose-600" />
                                 <span>{(event as any).likesCount || 0} Likes</span>
@@ -1023,6 +1102,34 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     })}
                                 </div>
 
+                                {uniqueInstitutions.length > 0 && (
+                                    <select
+                                        value={institutionFilter}
+                                        onChange={(e) => setInstitutionFilter(e.target.value)}
+                                        className="px-2.5 py-1.5 rounded-xl bg-[#FAF6EE] border border-black text-[11px] font-bold text-black focus:outline-hidden max-w-[180px] truncate"
+                                        title="Filter by institution"
+                                    >
+                                        <option value="all">All Colleges ({uniqueInstitutions.length})</option>
+                                        {uniqueInstitutions.map((inst) => (
+                                            <option key={inst} value={inst}>{inst}</option>
+                                        ))}
+                                    </select>
+                                )}
+
+                                {uniqueStates.length > 0 && (
+                                    <select
+                                        value={stateFilter}
+                                        onChange={(e) => setStateFilter(e.target.value)}
+                                        className="px-2.5 py-1.5 rounded-xl bg-[#FAF6EE] border border-black text-[11px] font-bold text-black focus:outline-hidden"
+                                        title="Filter by state"
+                                    >
+                                        <option value="all">All States ({uniqueStates.length})</option>
+                                        {uniqueStates.map((st) => (
+                                            <option key={st} value={st}>{st}</option>
+                                        ))}
+                                    </select>
+                                )}
+
                                 <a
                                     href={getEventApplicationsExportUrl(event.id)}
                                     download
@@ -1068,6 +1175,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                         <thead>
                                             <tr className="bg-[#FAF6EE] border-b-2 border-black text-[11px] font-black uppercase text-neutral-700 tracking-wider">
                                                 <th className="py-3 px-4 min-w-[200px]">Student</th>
+                                                <th className="py-3 px-4 min-w-[170px]">Institution & Location</th>
                                                 {formQuestions.map((q) => (
                                                     <th
                                                         key={q.id}
@@ -1130,6 +1238,23 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                                 </div>
                                                             </div>
                                                         </div>
+                                                    </td>
+                                                    <td className="py-3 px-4">
+                                                        <div className="font-bold text-black flex items-center gap-1">
+                                                            <span className="truncate max-w-[200px]" title={app.institutionName || app.campusName || "Host Campus"}>
+                                                                {app.institutionName || app.campusName || "Host Campus"}
+                                                            </span>
+                                                            {app.institutionVerificationStatus === "verified" && (
+                                                                <span className="inline-flex items-center text-[10px] text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded border border-emerald-800 font-black shrink-0" title="AISHE Verified Institution">
+                                                                    ✓
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        {(app.institutionCity || app.institutionState) ? (
+                                                            <div className="text-[10px] text-neutral-500 font-medium truncate max-w-[200px]">
+                                                                {[app.institutionCity, app.institutionState].filter(Boolean).join(", ")}
+                                                            </div>
+                                                        ) : null}
                                                     </td>
                                                     {formQuestions.map((q) => (
                                                         <td key={q.id} className="py-3 px-4 max-w-[260px]">
@@ -1346,6 +1471,72 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                     <div
                                                         className="h-full bg-[#a2ff86] rounded-full border-r border-black"
                                                         style={{ width: `${Math.max(5, cohort.pct)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* College / Institution Breakdown */}
+                            <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                                <div className="flex items-center gap-2 pb-2 border-b-2 border-black/10">
+                                    <Globe2 className="w-5 h-5 text-black stroke-[2.5]" />
+                                    <h3 className="text-base font-black text-black">Participating Institutions ({analytics.collegeBreakdown.length})</h3>
+                                </div>
+
+                                {analytics.collegeBreakdown.length === 0 ? (
+                                    <p className="text-xs text-neutral-500 py-6 text-center">
+                                        No institution statistics recorded yet.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {analytics.collegeBreakdown.map((item) => (
+                                            <div key={item.name} className="space-y-1">
+                                                <div className="flex items-center justify-between text-xs font-bold">
+                                                    <span className="text-black truncate max-w-[280px]" title={item.name}>{item.name}</span>
+                                                    <span className="text-neutral-500 font-mono">
+                                                        {item.count} ({item.pct}%)
+                                                    </span>
+                                                </div>
+                                                <div className="h-3 w-full bg-[#FAF6EE] rounded-full border border-black overflow-hidden p-0.5">
+                                                    <div
+                                                        className="h-full bg-[#FF9933] rounded-full border-r border-black"
+                                                        style={{ width: `${Math.max(5, item.pct)}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* State Reach Breakdown */}
+                            <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                                <div className="flex items-center gap-2 pb-2 border-b-2 border-black/10">
+                                    <Building2 className="w-5 h-5 text-black stroke-[2.5]" />
+                                    <h3 className="text-base font-black text-black">Geographic State Reach ({analytics.stateBreakdown.length})</h3>
+                                </div>
+
+                                {analytics.stateBreakdown.length === 0 ? (
+                                    <p className="text-xs text-neutral-500 py-6 text-center">
+                                        No state distribution statistics available yet.
+                                    </p>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {analytics.stateBreakdown.map((item) => (
+                                            <div key={item.name} className="space-y-1">
+                                                <div className="flex items-center justify-between text-xs font-bold">
+                                                    <span className="text-black">{item.name}</span>
+                                                    <span className="text-neutral-500 font-mono">
+                                                        {item.count} ({item.pct}%)
+                                                    </span>
+                                                </div>
+                                                <div className="h-3 w-full bg-[#FAF6EE] rounded-full border border-black overflow-hidden p-0.5">
+                                                    <div
+                                                        className="h-full bg-[#38BDF8] rounded-full border-r border-black"
+                                                        style={{ width: `${Math.max(5, item.pct)}%` }}
                                                     />
                                                 </div>
                                             </div>

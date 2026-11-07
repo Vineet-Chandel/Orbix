@@ -328,6 +328,13 @@ export interface FormSubmissionPayload {
     answers: Record<string, any>;
     fileAttachments?: FileAttachmentMeta[] | undefined;
     idempotencyKey?: string | undefined;
+    institutionId?: string | undefined;
+    institutionName?: string | undefined;
+    universityName?: string | undefined;
+    campusName?: string | undefined;
+    institutionCity?: string | undefined;
+    institutionState?: string | undefined;
+    isUnlistedInstitution?: boolean | undefined;
 }
 
 export interface SaveDraftPayload {

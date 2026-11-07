@@ -13,6 +13,8 @@ import {
     Sparkles,
     SlidersHorizontal,
     Menu,
+    Globe2,
+    GraduationCap,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppSelector } from "../../store";
@@ -531,8 +533,8 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                                                 <span>{ev.likesCount || 0}</span>
                                             </button>
 
-                                            {/* Timeline Status Badge */}
-                                            <div className="absolute bottom-2.5 left-2.5">
+                                            {/* Timeline Status Badge & Scope Indicator */}
+                                            <div className="absolute bottom-2.5 left-2.5 flex items-center gap-1.5 flex-wrap">
                                                 <span
                                                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] flex items-center gap-1 ${
                                                         isCompleted
@@ -555,6 +557,26 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                                                         "Live Today"
                                                     ) : (
                                                         "Upcoming"
+                                                    )}
+                                                </span>
+
+                                                <span
+                                                    className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border-2 border-black shadow-[1px_1px_0px_#000] flex items-center gap-1 ${
+                                                        ev.scope === "PAN_INDIA"
+                                                            ? "bg-[#FF9933] text-black"
+                                                            : "bg-sky-200 text-sky-950"
+                                                    }`}
+                                                >
+                                                    {ev.scope === "PAN_INDIA" ? (
+                                                        <>
+                                                            <Globe2 className="w-2.5 h-2.5" />
+                                                            Pan India
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <GraduationCap className="w-2.5 h-2.5" />
+                                                            Campus
+                                                        </>
                                                     )}
                                                 </span>
                                             </div>

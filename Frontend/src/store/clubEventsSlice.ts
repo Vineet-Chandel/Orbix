@@ -15,6 +15,7 @@ export interface ClubEvent {
     registrationUrl: string | null;
     coverImageUrl: string | null;
     status: "draft" | "published" | "completed" | "cancelled";
+    scope?: "PAN_INDIA" | "CAMPUS";
     publishedAt: string | null;
     createdAt: string;
     updatedAt?: string;
@@ -38,6 +39,7 @@ export interface CreateClubEventPayload {
     registrationUrl?: string | null;
     coverImageUrl?: string | null;
     status: "draft" | "published" | "completed" | "cancelled";
+    scope?: "PAN_INDIA" | "CAMPUS";
     initialFormStructure?: any;
     initialFormSettings?: any;
     initialFormTheme?: any;

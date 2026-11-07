@@ -48,6 +48,7 @@ import { ClubSettingsView } from "./Settings/ClubSettingsView";
 import { OtherClubsSection } from "./OtherClubsSection";
 import { ClubEventDetailWorkspace } from "./ClubEventDetailPage";
 import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
+import { EventScopeSelectionModal } from "./EventScopeSelectionModal";
 import { OrbixLoader } from "../../components/ui/loader";
 
 interface VerifiedClub {
@@ -217,6 +218,8 @@ export default function ClubDashboardPage() {
 
     // Event Modal State
     const [isEventModalOpen, setIsEventModalOpen] = useState(false);
+    const [isScopeModalOpen, setIsScopeModalOpen] = useState(false);
+    const [selectedScope, setSelectedScope] = useState<"PAN_INDIA" | "CAMPUS">("CAMPUS");
     const [editingEvent, setEditingEvent] = useState<ClubEvent | null>(null);
     const [initialModalStatus, setInitialModalStatus] = useState<ClubEventStatus>("published");
     const [eventFilter, setEventFilter] = useState<ClubEventFilter>("all");
@@ -304,18 +307,26 @@ export default function ClubDashboardPage() {
         };
     }, []);
 
-    // Open Event Create Modal
+    // Open Event Scope Selection Modal
     const openCreateEventModal = (initialStatus: ClubEventStatus = "published") => {
         setEditingEvent(null);
         setInitialModalStatus(initialStatus);
         setActiveTabState("events");
         navigate("/club/events");
+        setIsScopeModalOpen(true);
+    };
+
+    // Callback when event scope is selected from the scope modal
+    const handleSelectScope = (scope: "PAN_INDIA" | "CAMPUS") => {
+        setSelectedScope(scope);
+        setIsScopeModalOpen(false);
         setIsEventModalOpen(true);
     };
 
     // Open Event Edit Modal
     const handleEditEvent = (ev: ClubEvent) => {
         setEditingEvent(ev);
+        setSelectedScope(ev.scope || "CAMPUS");
         setActiveTabState("events");
         navigate("/club/events");
         setIsEventModalOpen(true);
@@ -1068,6 +1079,7 @@ export default function ClubDashboardPage() {
                                     }}
                                     onSubmit={handleModalSubmit}
                                     editingEvent={editingEvent}
+                                    selectedScope={selectedScope}
                                     clubId={club?.id}
                                     clubName={club?.name}
                                     clubLogoUrl={club?.logo_url || undefined}
@@ -1412,6 +1424,14 @@ export default function ClubDashboardPage() {
                     <SectionBottomIllustration alt="Orbix club space illustration" />
                 </section>
             </div>
+
+            {/* Event Scope Selection Modal (Pan India vs Campus-Only) */}
+            <EventScopeSelectionModal
+                isOpen={isScopeModalOpen}
+                onClose={() => setIsScopeModalOpen(false)}
+                onSelectScope={handleSelectScope}
+                collegeName={club?.college_name}
+            />
 
             {/* Club Inbox Modal */}
             <ClubInboxModal

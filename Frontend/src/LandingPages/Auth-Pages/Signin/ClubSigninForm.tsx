@@ -142,8 +142,8 @@ export default function ClubSigninForm() {
 
             const primaryEndpoint = buildApiUrl("/api/auth/signin");
             const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/signin"]
-                : [primaryEndpoint];
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/signin", "/api/signin"]
+                : [primaryEndpoint, "/api/signin"];
 
             let response: Response | null = null;
             let resultData: any = null;
@@ -180,7 +180,13 @@ export default function ClubSigninForm() {
             }
 
             if (!response.ok) {
-                const message = resultData?.message || "Invalid club username/email or password.";
+                const message =
+                    resultData?.message ||
+                    (response.status === 404
+                        ? "Club authentication service route not found (HTTP 404). Please ensure the backend is running."
+                        : response.status >= 500
+                        ? "Authentication server encountered an unexpected error (HTTP 500). Please try again shortly."
+                        : "Invalid club username/email or password.");
                 toast.error(message, {
                     title: resultData?.code === "ACCOUNT_TYPE_MISMATCH" ? "Personal Account Detected" : "Club Login Failed",
                 });

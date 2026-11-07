@@ -263,6 +263,13 @@ export interface FormSubmissionPayload {
     fileAttachments?: FileAttachmentMeta[];
     idempotencyKey?: string;
     formVersionId?: string;
+    institutionId?: string;
+    institutionName?: string;
+    universityName?: string;
+    campusName?: string;
+    institutionCity?: string;
+    institutionState?: string;
+    isUnlistedInstitution?: boolean;
 }
 
 export interface UploadSignatureConfig {

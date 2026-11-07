@@ -483,11 +483,15 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             [validatedData.gmail]
         );
 
-        // 2. If not matched directly on users, check verified_clubs (slug/public_email) or club_verification_requests (contact_email)
+        // 2. If not matched directly on users, check verified_clubs (slug/name/email) or club_verification_requests
         if (Result.rows.length === 0) {
             const clubLookup = await query(
                 `SELECT auth_user_id FROM verified_clubs 
-                 WHERE LOWER(slug) = LOWER($1) OR LOWER(public_email) = LOWER($1)
+                 WHERE LOWER(slug) = LOWER($1) 
+                    OR LOWER(public_email) = LOWER($1)
+                    OR LOWER(name) = LOWER($1)
+                    OR LOWER(REPLACE(slug, '-', '')) = LOWER(REPLACE($1, '-', ''))
+                    OR LOWER(REPLACE(name, ' ', '')) = LOWER(REPLACE($1, ' ', ''))
                  LIMIT 1;`,
                 [validatedData.gmail]
             );
@@ -496,7 +500,10 @@ authRouter.post('/signin', async (req: Request, res: Response) => {
             if (!targetUserId) {
                 const reqLookup = await query(
                     `SELECT auth_user_id FROM club_verification_requests 
-                     WHERE LOWER(contact_email) = LOWER($1) OR LOWER(college_official_email) = LOWER($1)
+                     WHERE LOWER(contact_email) = LOWER($1) 
+                        OR LOWER(college_official_email) = LOWER($1)
+                        OR LOWER(club_name) = LOWER($1)
+                        OR LOWER(REPLACE(club_name, ' ', '')) = LOWER(REPLACE($1, ' ', ''))
                      LIMIT 1;`,
                     [validatedData.gmail]
                 );

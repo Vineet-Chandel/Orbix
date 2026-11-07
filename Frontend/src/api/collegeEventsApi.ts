@@ -13,6 +13,7 @@ export interface CollegeEventItem {
     registrationUrl: string | null;
     coverImageUrl: string | null;
     status: "published" | "completed" | "draft" | "cancelled";
+    scope?: "PAN_INDIA" | "CAMPUS";
     publishedAt: string | null;
     createdAt: string;
     clubName: string;
@@ -47,6 +48,13 @@ export interface ApplyForEventPayload {
     rollNumber?: string;
     phoneNumber?: string;
     notes?: string;
+    institutionId?: string;
+    institutionName?: string;
+    universityName?: string;
+    campusName?: string;
+    institutionCity?: string;
+    institutionState?: string;
+    isUnlistedInstitution?: boolean;
     isAttendeeUnder18?: boolean;
     guardianName?: string;
     guardianEmail?: string;
@@ -70,6 +78,11 @@ export interface StudentApplicationItem {
     yearOfStudy: string | null;
     rollNumber: string | null;
     phoneNumber: string | null;
+    institutionName?: string | null;
+    universityName?: string | null;
+    institutionCity?: string | null;
+    institutionState?: string | null;
+    institutionVerificationStatus?: string | null;
     notes: string | null;
     eventTitle: string;
     eventSlug: string;
@@ -82,6 +95,7 @@ export interface StudentApplicationItem {
     venueOrLocation: string | null;
     coverImageUrl: string | null;
     eventStatus: string;
+    scope?: "PAN_INDIA" | "CAMPUS";
     clubName: string;
     clubSlug: string;
     clubLogoUrl: string;
@@ -113,6 +127,14 @@ export interface ClubEventApplicantRow {
     guardianRelationship?: string | null;
     guardianConsentStatus?: "not_required" | "pending_verification" | "verified" | "rejected" | "withdrawn";
     guardianConsentVerifiedAt?: string | null;
+    institutionId?: string | null;
+    institutionName?: string | null;
+    universityName?: string | null;
+    campusName?: string | null;
+    institutionCity?: string | null;
+    institutionState?: string | null;
+    institutionVerificationStatus?: string | null;
+    isUnlistedInstitution?: boolean;
     answers?: Record<string, any>;
     formResponse?: Record<string, any>;
     fileAttachments?: Array<{

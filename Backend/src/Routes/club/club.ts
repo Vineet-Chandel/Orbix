@@ -2185,6 +2185,7 @@ clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
                 e.slug,
                 e.summary,
                 e.description,
+                COALESCE(e.scope, 'CAMPUS') AS "scope",
                 e.starts_at AS "startsAt",
                 e.ends_at AS "endsAt",
                 e.timezone,
@@ -2267,6 +2268,7 @@ clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Respo
                 e.slug,
                 e.summary,
                 e.description,
+                COALESCE(e.scope, 'CAMPUS') AS "scope",
                 e.starts_at AS "startsAt",
                 e.ends_at AS "endsAt",
                 e.timezone,
@@ -2336,10 +2338,14 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
             registrationUrl,
             coverImageUrl,
             status = "draft",
+            scope = "CAMPUS",
             initialFormStructure,
             initialFormSettings,
             initialFormTheme,
         } = req.body;
+
+        const validScopes = ["CAMPUS", "PAN_INDIA"];
+        const finalScope = validScopes.includes(scope) ? scope : "CAMPUS";
 
         if (!title || typeof title !== "string" || title.trim().length < 3) {
             return res.status(400).json({ success: false, message: "Event title must be at least 3 characters." });
@@ -2388,10 +2394,11 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
                 registration_url,
                 cover_image_url,
                 status,
+                scope,
                 published_at,
                 created_at,
                 updated_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
             RETURNING
                 id,
                 club_id AS "clubId",
@@ -2399,6 +2406,7 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
                 slug,
                 summary,
                 description,
+                scope,
                 starts_at AS "startsAt",
                 ends_at AS "endsAt",
                 timezone,
@@ -2423,6 +2431,7 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
                 registrationUrl || null,
                 coverImageUrl || null,
                 finalStatus,
+                finalScope,
                 publishedAt,
             ]
         );
@@ -2516,9 +2525,32 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
             registrationUrl,
             coverImageUrl,
             status,
+            scope,
         } = req.body;
 
         const current = existingEvent.rows[0];
+
+        if (scope !== undefined) {
+            const validScopes = ["CAMPUS", "PAN_INDIA"];
+            if (!validScopes.includes(scope)) {
+                return res.status(400).json({ success: false, message: `Invalid scope: ${scope}. Allowed: ${validScopes.join(", ")}` });
+            }
+
+            if (scope !== current.scope) {
+                const regCountRes = await query(
+                    `SELECT COUNT(*)::int AS count FROM club_event_registrations WHERE event_id = $1 AND status NOT IN ('cancelled', 'rejected');`,
+                    [eventId]
+                );
+                if ((regCountRes.rows[0]?.count || 0) > 0) {
+                    return res.status(400).json({
+                        success: false,
+                        code: "SCOPE_LOCKED",
+                        message: "Event scope cannot be altered after participant registrations have been received.",
+                    });
+                }
+            }
+        }
+
         const validStatuses = ["draft", "published", "completed", "cancelled"];
         if (status && !validStatuses.includes(status)) {
             return res.status(400).json({ success: false, message: `Invalid status: ${status}. Allowed: ${validStatuses.join(", ")}` });
@@ -2593,9 +2625,10 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                 registration_url = COALESCE($9, registration_url),
                 cover_image_url = COALESCE($10, cover_image_url),
                 status = COALESCE($11, status),
-                published_at = $12,
+                scope = COALESCE($12, scope),
+                published_at = $13,
                 updated_at = NOW()
-             WHERE id = $13 AND club_id = $14
+             WHERE id = $14 AND club_id = $15
              RETURNING id;`,
             [
                 title ? title.trim() : null,
@@ -2609,6 +2642,7 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                 registrationUrl !== undefined ? registrationUrl : null,
                 coverImageUrl !== undefined ? coverImageUrl : null,
                 status || null,
+                scope || null,
                 publishedAt,
                 eventId,
                 clubId,
@@ -2623,6 +2657,7 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                 e.slug,
                 e.summary,
                 e.description,
+                COALESCE(e.scope, 'CAMPUS') AS "scope",
                 e.starts_at AS "startsAt",
                 e.ends_at AS "endsAt",
                 e.timezone,
@@ -3049,6 +3084,7 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
                 e.slug,
                 e.summary,
                 e.description,
+                COALESCE(e.scope, 'CAMPUS') AS "scope",
                 e.starts_at AS "startsAt",
                 e.ends_at AS "endsAt",
                 e.timezone,
@@ -3083,7 +3119,8 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
         if (userCollegeId || userCollegeName) {
             params.push(userCollegeId, userCollegeName);
             sql += ` AND (
-                ($${params.length - 1}::uuid IS NOT NULL AND vc.college_id = $${params.length - 1}::uuid)
+                e.scope = 'PAN_INDIA'
+                OR ($${params.length - 1}::uuid IS NOT NULL AND vc.college_id = $${params.length - 1}::uuid)
                 OR ($${params.length}::text IS NOT NULL AND LOWER(vc.college_name) = LOWER($${params.length}))
             )`;
         }
@@ -3143,6 +3180,7 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
                 e.slug,
                 e.summary,
                 e.description,
+                COALESCE(e.scope, 'CAMPUS') AS "scope",
                 e.starts_at AS "startsAt",
                 e.ends_at AS "endsAt",
                 e.timezone,
@@ -3272,7 +3310,7 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
         } = req.body || {};
 
         const eventRes = await query(
-            `SELECT e.id, e.club_id, e.title, e.status, vc.name AS "clubName",
+            `SELECT e.id, e.club_id, e.title, e.status, COALESCE(e.scope, 'CAMPUS') AS "scope", vc.name AS "clubName",
                     vc.college_id AS "eventCollegeId", vc.college_name AS "eventCollegeName"
              FROM club_events e
              JOIN verified_clubs vc ON vc.id = e.club_id
@@ -3312,8 +3350,9 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
         const userRow = userRes.rows[0];
 
         // 2. Enforce Campus Affiliation Check:
-        // Users can only register for events belonging to their own college campus!
-        if (event.eventCollegeId) {
+        // Exclusively enforced for CAMPUS-scoped events. Pan India events allow cross-campus participation.
+        const isCampusOnly = event.scope !== "PAN_INDIA";
+        if (isCampusOnly && event.eventCollegeId) {
             if (!userRow?.userCollegeId) {
                 return res.status(403).json({
                     success: false,
@@ -3332,6 +3371,55 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                     userCollegeName: userRow.userCollegeName,
                 });
             }
+        }
+
+        // Resolve canonical institution snapshot for registration record
+        let regInstitutionId: string | null = null;
+        let regInstitutionName: string | null = null;
+        let regUniversityName: string | null = null;
+        let regCampusName: string | null = null;
+        let regInstitutionCity: string | null = null;
+        let regInstitutionState: string | null = null;
+        let regInstitutionVerification: string = "unverified";
+        let regIsUnlisted: boolean = false;
+
+        const {
+            institutionId: customInstId,
+            institutionName: customInstName,
+            universityName: customUnivName,
+            campusName: customCampName,
+            institutionCity: customInstCity,
+            institutionState: customInstState,
+            isUnlistedInstitution: customIsUnlisted,
+        } = req.body || {};
+
+        const targetInstId = customInstId || userRow?.userCollegeId;
+        const isValidId = Boolean(targetInstId && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(targetInstId).trim()));
+        if (isValidId) {
+            try {
+                const instRes = await query(
+                    `SELECT id, official_name, state, city, district, verification_status FROM institutions WHERE id = $1 LIMIT 1;`,
+                    [targetInstId]
+                );
+                if (instRes.rows[0]) {
+                    const inst = instRes.rows[0];
+                    regInstitutionId = inst.id;
+                    regInstitutionName = inst.official_name;
+                    regInstitutionCity = inst.city || inst.district || null;
+                    regInstitutionState = inst.state || null;
+                    regInstitutionVerification = inst.verification_status || "verified";
+                }
+            } catch {}
+        }
+
+        if (!regInstitutionName && (customInstName || userRow?.userCollegeName)) {
+            regInstitutionName = (customInstName || userRow?.userCollegeName || "").trim();
+            regInstitutionCity = customInstCity || null;
+            regInstitutionState = customInstState || null;
+            regUniversityName = customUnivName || null;
+            regCampusName = customCampName || null;
+            regIsUnlisted = Boolean(customIsUnlisted);
+            regInstitutionVerification = "unverified";
         }
 
         const defaultName = userRow?.firstname
@@ -3379,12 +3467,20 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                          roll_number = COALESCE($5, roll_number),
                          phone_number = COALESCE($6, phone_number),
                          notes = COALESCE($7, notes),
+                         institution_id = COALESCE($8, institution_id),
+                         institution_name = COALESCE($9, institution_name),
+                         university_name = COALESCE($10, university_name),
+                         campus_name = COALESCE($11, campus_name),
+                         institution_city = COALESCE($12, institution_city),
+                         institution_state = COALESCE($13, institution_state),
+                         institution_verification_status = COALESCE($14, institution_verification_status),
+                         is_unlisted_institution = COALESCE($15, is_unlisted_institution),
                          registered_at = NOW(),
                          reviewed_at = NULL,
                          reviewed_by_user_id = NULL,
                          review_notes = NULL,
                          updated_at = NOW()
-                     WHERE id = $8
+                     WHERE id = $16
                      RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt";`,
                     [
                         finalName,
@@ -3394,6 +3490,14 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                         rollNumber || null,
                         phoneNumber || null,
                         notes || null,
+                        regInstitutionId,
+                        regInstitutionName,
+                        regUniversityName,
+                        regCampusName,
+                        regInstitutionCity,
+                        regInstitutionState,
+                        regInstitutionVerification,
+                        regIsUnlisted,
                         existingReg.rows[0].id,
                     ]
                 );
@@ -3479,6 +3583,14 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                 phone_number,
                 notes,
                 answers,
+                institution_id,
+                institution_name,
+                university_name,
+                campus_name,
+                institution_city,
+                institution_state,
+                institution_verification_status,
+                is_unlisted_institution,
                 is_attendee_under_18,
                 guardian_name,
                 guardian_email,
@@ -3490,8 +3602,8 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                 registered_at,
                 created_at,
                 updated_at
-            ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW(), NOW())
-            RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt", is_attendee_under_18 AS "isAttendeeUnder18", guardian_consent_status AS "guardianConsentStatus";`,
+            ) VALUES ($1, $2, $3, 'pending', $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, NOW(), NOW(), NOW())
+            RETURNING id, event_id AS "eventId", club_id AS "clubId", status, ticket_code AS "ticketCode", registered_at AS "registeredAt", is_attendee_under_18 AS "isAttendeeUnder18", guardian_consent_status AS "guardianConsentStatus", institution_name AS "institutionName";`,
             [
                 eventId,
                 event.club_id,
@@ -3504,6 +3616,14 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                 phoneNumber || null,
                 notes || null,
                 answers ? JSON.stringify(answers) : "{}",
+                regInstitutionId,
+                regInstitutionName,
+                regUniversityName,
+                regCampusName,
+                regInstitutionCity,
+                regInstitutionState,
+                regInstitutionVerification,
+                regIsUnlisted,
                 isMinor,
                 normGuardianName,
                 normGuardianEmail,
@@ -3668,7 +3788,7 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
 
         // Verify event and staff permission
         const eventRes = await query(
-            `SELECT e.id, e.club_id, e.title, e.starts_at, e.venue_or_location, vc.name AS "clubName"
+            `SELECT e.id, e.club_id, e.title, e.starts_at, e.venue_or_location, COALESCE(e.scope, 'CAMPUS') AS scope, vc.name AS "clubName"
              FROM club_events e
              JOIN verified_clubs vc ON vc.id = e.club_id
              WHERE e.id = $1 LIMIT 1;`,
@@ -3696,6 +3816,14 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
                 COALESCE(r.year_of_study, '') AS "yearOfStudy",
                 COALESCE(r.roll_number, '') AS "rollNumber",
                 COALESCE(r.phone_number, '') AS "phoneNumber",
+                r.institution_id AS "institutionId",
+                COALESCE(r.institution_name, '') AS "institutionName",
+                COALESCE(r.university_name, '') AS "universityName",
+                COALESCE(r.campus_name, '') AS "campusName",
+                COALESCE(r.institution_city, '') AS "institutionCity",
+                COALESCE(r.institution_state, '') AS "institutionState",
+                COALESCE(r.institution_verification_status, 'unverified') AS "institutionVerificationStatus",
+                COALESCE(r.is_unlisted_institution, false) AS "isUnlistedInstitution",
                 r.ticket_code AS "ticketCode",
                 r.status,
                 r.registered_at AS "registeredAt",
@@ -3745,6 +3873,7 @@ clubRouter.get("/events/:eventId/applications", authenticate, async (req: Reques
                 startsAt: event.starts_at,
                 venue: event.venue_or_location,
                 clubName: event.clubName,
+                scope: event.scope || "CAMPUS",
             },
             formStructure: formRes.rows[0]?.structure || null,
             formSettings: formRes.rows[0]?.settings || null,
@@ -3946,6 +4075,11 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
                 u.username,
                 COALESCE(r.applicant_email, u.email) AS email,
                 COALESCE(u.photo_url, u.avatar_url, '') AS avatar_url,
+                COALESCE(r.institution_name, '') AS institution_name,
+                COALESCE(r.university_name, '') AS university_name,
+                COALESCE(r.institution_city, '') AS institution_city,
+                COALESCE(r.institution_state, '') AS institution_state,
+                COALESCE(r.institution_verification_status, 'unverified') AS institution_verification_status,
                 COALESCE(r.department, '') AS department,
                 COALESCE(r.year_of_study, '') AS year_of_study,
                 COALESCE(r.roll_number, '') AS roll_number,
@@ -4025,6 +4159,10 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
             if (typeof val === "object") {
                 str = JSON.stringify(val);
             }
+            // CSV Injection Protection (RFC-4180 / Spreadsheet security)
+            if (/^[=+\-@\t\r]/.test(str)) {
+                str = `'${str}`;
+            }
             str = str.replace(/"/g, '""');
             return `"${str}"`;
         };
@@ -4035,6 +4173,11 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
             "Username",
             "Email",
             "Profile Photo URL",
+            "Institution / College",
+            "University",
+            "City",
+            "State",
+            "Institution Verification",
             "Phone",
             "Status",
             "Applied At",
@@ -4059,6 +4202,11 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
                 escapeCsv(r.username),
                 escapeCsv(r.email),
                 escapeCsv(r.avatar_url),
+                escapeCsv(r.institution_name),
+                escapeCsv(r.university_name),
+                escapeCsv(r.institution_city),
+                escapeCsv(r.institution_state),
+                escapeCsv(r.institution_verification_status),
                 escapeCsv(r.phone),
                 escapeCsv(r.status === "registered" ? "accepted" : r.status),
                 escapeCsv(r.registered_at ? new Date(r.registered_at).toISOString() : ""),

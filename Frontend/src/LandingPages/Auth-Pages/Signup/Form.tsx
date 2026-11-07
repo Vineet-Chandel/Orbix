@@ -151,8 +151,8 @@ export default function SignupForm() {
         try {
             const primaryEndpoint = buildApiUrl("/api/auth/signup/send-email-otp");
             const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp"]
-                : [primaryEndpoint];
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp", "/api/signup/send-email-otp"]
+                : [primaryEndpoint, "/api/signup/send-email-otp"];
 
             let response: Response | null = null;
             let resData: any = null;
@@ -185,8 +185,18 @@ export default function SignupForm() {
             }
 
             if (!response.ok) {
-                const errorMessage = resData?.message || "Failed to dispatch verification email. Please check your information.";
-                toast.error(errorMessage, { title: "Verification Error" });
+                const errorMessage =
+                    resData?.message ||
+                    (response.status === 409
+                        ? "An account with this email address or username already exists. Please sign in instead."
+                        : response.status === 404
+                        ? "Verification service route not found (HTTP 404). Please ensure the backend is running."
+                        : response.status >= 500
+                        ? "Server encountered an error while sending the verification email. Please try again shortly."
+                        : "Failed to dispatch verification email. Please check your information.");
+                toast.error(errorMessage, {
+                    title: response.status === 409 ? "Account Exists" : "Verification Error",
+                });
                 return;
             }
 
@@ -217,8 +227,8 @@ export default function SignupForm() {
         try {
             const primaryEndpoint = buildApiUrl("/api/auth/signup/send-email-otp");
             const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp"]
-                : [primaryEndpoint];
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/signup/send-email-otp", "/api/signup/send-email-otp"]
+                : [primaryEndpoint, "/api/signup/send-email-otp"];
 
             let response: Response | null = null;
             let resData: any = null;
@@ -245,7 +255,16 @@ export default function SignupForm() {
             }
 
             if (!response || !response.ok) {
-                throw new Error(resData?.message || "Failed to resend verification code.");
+                const errorMessage =
+                    resData?.message ||
+                    (response?.status === 409
+                        ? "An account with this email address or username already exists. Please sign in instead."
+                        : response?.status === 404
+                        ? "Verification endpoint not found (HTTP 404)."
+                        : response?.status && response.status >= 500
+                        ? "Server error while dispatching verification code. Please try again shortly."
+                        : "Failed to resend verification code.");
+                throw new Error(errorMessage);
             }
 
             setEmailCooldown(resData?.cooldownSeconds || 60);

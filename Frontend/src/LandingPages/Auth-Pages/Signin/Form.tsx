@@ -165,8 +165,8 @@ export default function SigninForm() {
 
             const primaryEndpoint = buildApiUrl("/api/auth/signin");
             const endpoints = import.meta.env.DEV
-                ? [primaryEndpoint, "http://localhost:3000/api/auth/signin"]
-                : [primaryEndpoint];
+                ? [primaryEndpoint, "http://localhost:3000/api/auth/signin", "/api/signin"]
+                : [primaryEndpoint, "/api/signin"];
 
             let response: Response | null = null;
             let resultData: any = null;
@@ -203,7 +203,13 @@ export default function SigninForm() {
             }
 
             if (!response.ok) {
-                const message = resultData?.message || "Invalid credentials.";
+                const message =
+                    resultData?.message ||
+                    (response.status === 404
+                        ? "Authentication service route not found (HTTP 404). Please ensure the backend is running."
+                        : response.status >= 500
+                        ? "Authentication server encountered an unexpected error (HTTP 500). Please try again shortly."
+                        : "Invalid credentials.");
                 toast.error(message, {
                     title: resultData?.code === "ACCOUNT_TYPE_MISMATCH" ? "Club Account Detected" : "Sign In Failed",
                 });
