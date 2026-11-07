@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Link } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
     Calendar as CalendarIcon,
     List as ListIcon,
@@ -220,6 +220,18 @@ const downloadIcsFile = (event: EventItem) => {
 
 export const EventTrackerPage: React.FC = () => {
     const dispatch = useAppDispatch();
+    const [searchParams] = useSearchParams();
+    const navigate = useNavigate();
+
+    // Deep-link redirection: If user arrived with an event ID or college-events tab, forward to college-events view
+    useEffect(() => {
+        const eventId = searchParams.get("eventId") || searchParams.get("event");
+        const tab = searchParams.get("tab");
+        if (tab === "college-events" || eventId) {
+            navigate(`/college-events?${searchParams.toString()}`, { replace: true });
+        }
+    }, [searchParams, navigate]);
+
     const {
         allEvents,
         upNext,

@@ -14,6 +14,8 @@ export interface SectionCardProps {
     totalSections: number;
     allSections: FormSection[];
     accentColor: string;
+    cardSurfaceColor?: string;
+    cardShadowStyle?: "crisp" | "bold" | "soft";
     onChange: (updated: FormSection) => void;
     onDelete: () => void;
     onDuplicate: () => void;
@@ -26,7 +28,9 @@ export const SectionCard: React.FC<SectionCardProps> = React.memo(({
     index,
     totalSections,
     allSections,
-    accentColor: _accentColor,
+    accentColor,
+    cardSurfaceColor,
+    cardShadowStyle: _cardShadowStyle,
     onChange,
     onDelete,
     onDuplicate,
@@ -34,14 +38,22 @@ export const SectionCard: React.FC<SectionCardProps> = React.memo(({
     onMoveDown,
 }) => {
     return (
-        <div className="rounded-2xl bg-white border border-neutral-200 dark:border-neutral-800 shadow-sm p-5 sm:p-6 space-y-4">
+        <div
+            className="rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] border-black dark:border-white shadow-[4px_4px_0px_#000] p-5 sm:p-6 space-y-4 transition-all"
+            style={{
+                backgroundColor: cardSurfaceColor || undefined,
+            }}
+        >
             {/* Top Section Header Row */}
-            <div className="flex items-center justify-between gap-3 border-b border-neutral-100 dark:border-neutral-800 pb-3">
+            <div className="flex items-center justify-between gap-3 border-b-2 border-black/10 dark:border-white/10 pb-3">
                 <div className="flex items-center gap-2.5">
-                    <span className="px-3 py-1 rounded-full text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-800 font-semibold text-xs uppercase tracking-wider">
+                    <span
+                        className="px-3 py-1 rounded-full text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[1.5px_1.5px_0px_#000]"
+                        style={{ backgroundColor: accentColor }}
+                    >
                         Section {index + 1} of {totalSections}
                     </span>
-                    <span className="text-xs font-medium text-neutral-500">
+                    <span className="text-xs font-bold text-neutral-500">
                         {section.questions.length} {section.questions.length === 1 ? "question" : "questions"}
                     </span>
                 </div>
@@ -94,25 +106,25 @@ export const SectionCard: React.FC<SectionCardProps> = React.memo(({
                     value={section.title}
                     onChange={(e) => onChange({ ...section, title: e.target.value })}
                     placeholder="Section Title..."
-                    className="w-full text-base sm:text-lg font-bold text-neutral-900 dark:text-white border-b border-transparent hover:border-neutral-200 focus:border-neutral-900 dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 transition-colors"
+                    className="w-full text-base sm:text-lg font-black text-neutral-900 dark:text-white border-b-2 border-transparent hover:border-black/20 focus:border-black dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 transition-colors"
                 />
                 <textarea
                     value={section.description || ""}
                     onChange={(e) => onChange({ ...section, description: e.target.value })}
                     placeholder="Description (optional guidelines or context for this step)..."
                     rows={2}
-                    className="w-full text-xs sm:text-sm font-normal text-neutral-600 dark:text-neutral-300 border-b border-transparent hover:border-neutral-200 focus:border-neutral-900 dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 resize-none transition-colors"
+                    className="w-full text-xs sm:text-sm font-semibold text-neutral-600 dark:text-neutral-300 border-b-2 border-transparent hover:border-black/20 focus:border-black dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 resize-none transition-colors"
                 />
             </div>
 
             {/* After Section Navigation Flow */}
-            <div className="pt-2 border-t border-neutral-100 dark:border-neutral-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                <span className="font-medium text-neutral-500">After section {index + 1}:</span>
+            <div className="pt-2 border-t-2 border-black/10 dark:border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                <span className="font-bold text-neutral-700 dark:text-neutral-300">After section {index + 1}:</span>
                 <NeoSelect
                     value={section.afterSectionAction || "next_section"}
                     onChange={(val) => onChange({ ...section, afterSectionAction: val })}
                     size="sm"
-                    triggerClassName="font-medium min-w-[200px]"
+                    triggerClassName="font-black min-w-[200px]"
                 >
                     <option value="next_section">Continue to next section</option>
                     {allSections.map((s, sIdx) => {

@@ -37,12 +37,13 @@ export function requireClubFormManagementPermission(action: "manage" | "publish"
             }
 
             const eventId = String(req.params.eventId || req.body?.eventId || "");
-            const directClubId = String(req.params.clubId || req.body?.clubId || "");
+            const directClubId = String(req.params.clubId || req.body?.clubId || req.query?.clubId || "");
 
             let targetClubId = directClubId;
             let eventRow: any = null;
 
-            if (eventId) {
+            const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+            if (eventId && isUuid) {
                 const eventRes = await query(
                     `SELECT e.id AS "eventId", e.club_id AS "clubId", e.title AS "eventTitle",
                             vc.auth_user_id AS "clubOwnerId", vc.name AS "clubName"
@@ -61,6 +62,19 @@ export function requireClubFormManagementPermission(action: "manage" | "publish"
 
                 eventRow = eventRes.rows[0];
                 targetClubId = eventRow.clubId;
+            } else if (eventId && !isUuid) {
+                // Draft or non-UUID event (e.g. "create-draft")
+                if (!targetClubId) {
+                    const staffRes = await query(
+                        `SELECT id FROM verified_clubs WHERE auth_user_id = $1
+                         UNION
+                         SELECT club_id AS id FROM club_team_members WHERE user_id = $1 LIMIT 1;`,
+                        [userId]
+                    );
+                    if (staffRes.rows[0]) {
+                        targetClubId = staffRes.rows[0].id;
+                    }
+                }
             }
 
             if (!targetClubId) {

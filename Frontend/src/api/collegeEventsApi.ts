@@ -149,6 +149,18 @@ export interface ClubEventApplicationsResponse {
     applications: ClubEventApplicantRow[];
 }
 
+function getAuthHeaders(includeJson = false): Record<string, string> {
+    const headers: Record<string, string> = {};
+    if (includeJson) {
+        headers["Content-Type"] = "application/json";
+    }
+    const token = typeof window !== "undefined" ? localStorage.getItem("orbix_token") : null;
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
 /**
  * Fetch events for the student's college
  */
@@ -168,6 +180,7 @@ export async function fetchCollegeEvents(options?: {
 
     const qs = params.toString();
     const res = await fetch(`/api/club/college-events${qs ? `?${qs}` : ""}`, {
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();
@@ -185,6 +198,7 @@ export async function toggleEventLike(
 ): Promise<{ liked: boolean; likesCount: number }> {
     const res = await fetch(`/api/club/events/${eventId}/like`, {
         method: "POST",
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();
@@ -203,7 +217,7 @@ export async function applyForEvent(
 ): Promise<{ success: boolean; message: string; registration: any }> {
     const res = await fetch(`/api/club/events/${eventId}/register`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         credentials: "include",
         body: JSON.stringify(payload),
     });
@@ -220,6 +234,7 @@ export async function applyForEvent(
 export async function cancelEventRegistration(eventId: string): Promise<void> {
     const res = await fetch(`/api/club/events/${eventId}/cancel`, {
         method: "POST",
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();
@@ -233,6 +248,7 @@ export async function cancelEventRegistration(eventId: string): Promise<void> {
  */
 export async function fetchStudentApplications(): Promise<StudentApplicationItem[]> {
     const res = await fetch("/api/club/user/applications", {
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();
@@ -249,6 +265,7 @@ export async function fetchClubEventApplications(
     eventId: string
 ): Promise<ClubEventApplicationsResponse> {
     const res = await fetch(`/api/club/events/${eventId}/applications`, {
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();
@@ -269,7 +286,7 @@ export async function updateApplicantStatus(
 ): Promise<void> {
     const res = await fetch(`/api/club/events/${eventId}/applications/${registrationId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(true),
         credentials: "include",
         body: JSON.stringify({ status, reviewNotes }),
     });
@@ -291,6 +308,7 @@ export function getEventApplicationsExportUrl(eventId: string): string {
  */
 export async function fetchPublicEventById(eventId: string): Promise<CollegeEventItem | null> {
     const res = await fetch(`/api/club/public-events/${encodeURIComponent(eventId)}`, {
+        headers: getAuthHeaders(),
         credentials: "include",
     });
     const data = await res.json();

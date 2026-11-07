@@ -51,15 +51,15 @@ export const DynamicEventRegistrationModal: React.FC<DynamicEventRegistrationMod
 
     return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/70 backdrop-blur-md animate-in fade-in duration-150">
-            <div className="relative w-full max-w-4xl xl:max-w-5xl bg-white dark:bg-[#0A0A0A] rounded-2xl border border-neutral-200 dark:border-neutral-800 shadow-2xl p-5 sm:p-8 max-h-[92vh] overflow-y-auto text-neutral-900 dark:text-neutral-100">
+            <div className="relative w-full max-w-4xl xl:max-w-5xl bg-[#FAF6EE] bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:18px_18px] rounded-3xl border-3 border-black shadow-[8px_8px_0px_#000] p-4 sm:p-6 md:p-8 max-h-[92vh] overflow-y-auto text-black">
                 {/* Close Button */}
                 <button
                     type="button"
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-400 cursor-pointer transition-colors z-20"
+                    className="absolute top-4 right-4 p-2 rounded-xl bg-white border-2 border-black hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5 z-20"
                     title="Close"
                 >
-                    <X className="w-4 h-4" />
+                    <X className="w-4 h-4 stroke-[2.5]" />
                 </button>
 
                 {loading ? (

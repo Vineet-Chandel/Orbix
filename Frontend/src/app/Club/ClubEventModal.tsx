@@ -472,7 +472,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
     return (
         <div
             id={modalId}
-            className="w-full flex-1 flex flex-col min-h-0 text-black animate-in fade-in duration-150 space-y-6"
+            className="w-full flex-1 flex flex-col min-h-0 text-black space-y-6"
         >
             {/* Top Workspace Header Bar */}
             <div className="pb-5 border-b-2 border-black/55 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -1001,11 +1001,18 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             >
                                                 {/* Aspect 16:9 Banner Thumbnail */}
                                                 <div className="aspect-[16/9] w-full overflow-hidden bg-neutral-950 relative">
-                                                    <img
-                                                        src={banner.dataUrl}
-                                                        alt={banner.title}
-                                                        className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
-                                                    />
+                                                    {banner.svgString ? (
+                                                        <div
+                                                            dangerouslySetInnerHTML={{ __html: banner.svgString }}
+                                                            className="w-full h-full pointer-events-none transition-transform group-hover:scale-105 duration-300 [&>svg]:w-full [&>svg]:h-full [&>svg]:object-cover"
+                                                        />
+                                                    ) : (
+                                                        <img
+                                                            src={banner.dataUrl}
+                                                            alt={banner.title}
+                                                            className="w-full h-full object-cover transition-transform group-hover:scale-105 duration-300"
+                                                        />
+                                                    )}
                                                     {isSelected && (
                                                         <div className="absolute top-2 right-2 px-2 py-0.5 rounded-full bg-[#A2FF86] text-black border-2 border-black font-black text-[10px] shadow-[1px_1px_0px_#000] flex items-center gap-1">
                                                             <Check className="w-3 h-3 stroke-[3]" />
@@ -1089,21 +1096,7 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
             {/* STEP 3: REGISTRATION FORM BUILDER WORKSPACE */}
             {/* ---------------------------------------------------------------- */}
             {currentStep === 3 && (
-                <div className="w-full rounded-3xl bg-white dark:bg-[#0A0A0A] border-3 border-black shadow-[6px_6px_0px_#000] p-4 sm:p-6 lg:p-8 space-y-6">
-                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
-                        <div>
-                            <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
-                                Step 3 of 3
-                            </span>
-                            <h3 className="text-base sm:text-lg font-black text-black dark:text-white">
-                                Dynamic Registration Form Builder
-                            </h3>
-                            <p className="text-xs text-neutral-600 dark:text-neutral-400 font-medium mt-0.5">
-                                Full Studio: Configure questionnaire with AI Assistant, Question Bank, Templates, Theme, and Branching Logic.
-                            </p>
-                        </div>
-                    </div>
-
+                <div className="w-full">
                     <EventFormBuilderWorkspace
                         eventId={editingEvent?.id || "create-draft"}
                         club={{ id: clubId, name: clubName, logoUrl: clubLogoUrl }}
@@ -1128,7 +1121,6 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             if (updatedForm.settings) setFormSettings(updatedForm.settings);
                             if (updatedForm.themeSettings) setFormTheme(updatedForm.themeSettings);
                         }}
-                        onWizardBack={() => setCurrentStep(2)}
                         onWizardSubmit={() => handleSubmitFinal()}
                     />
                 </div>

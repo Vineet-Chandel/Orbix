@@ -49,6 +49,8 @@ export interface QuestionCardProps {
     sections: FormSection[];
     currentSectionId: string;
     accentColor: string;
+    cardSurfaceColor?: string;
+    cardShadowStyle?: "crisp" | "bold" | "soft";
     eventId: string;
     isActive: boolean;
     isQuiz?: boolean;
@@ -112,6 +114,8 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
     sections,
     currentSectionId: _currentSectionId,
     accentColor,
+    cardSurfaceColor,
+    cardShadowStyle: _cardShadowStyle,
     eventId,
     isActive,
     isQuiz = false,
@@ -327,23 +331,27 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
     return (
         <div
             onClick={onSelect}
-            className={`group relative rounded-2xl bg-white dark:bg-[#0A0A0A] border transition-all ${
+            className={`group relative rounded-2xl sm:rounded-3xl bg-white dark:bg-[#0A0A0A] border-2 sm:border-[3px] transition-all cursor-pointer ${
                 isActive
-                    ? "border-neutral-900 dark:border-white ring-1 ring-neutral-900/10 dark:ring-white/10 shadow-md"
-                    : "border-neutral-200 dark:border-neutral-800 shadow-sm hover:border-neutral-300 dark:hover:border-neutral-700 cursor-pointer"
+                    ? "shadow-[5px_5px_0px_#000] ring-2 ring-black/20 dark:ring-white/20 translate-x-[-1px] translate-y-[-1px]"
+                    : "shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000]"
             }`}
+            style={{
+                borderColor: accentColor,
+                backgroundColor: cardSurfaceColor || undefined,
+            }}
         >
             {/* Active Left Indicator Bar */}
             {isActive && (
                 <div
-                    className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl bg-neutral-900 dark:bg-white"
-                    style={accentColor && accentColor !== "#38BDF8" ? { backgroundColor: accentColor } : undefined}
+                    className="absolute left-0 top-0 bottom-0 w-2 rounded-l-2xl sm:rounded-l-3xl"
+                    style={{ backgroundColor: accentColor }}
                 />
             )}
 
             {/* Drag Handle at Top */}
-            <div className="pt-2 pb-1 flex justify-center items-center text-neutral-300 hover:text-neutral-600 dark:hover:text-neutral-300 cursor-grab active:cursor-grabbing transition-colors">
-                <GripVertical className="w-4 h-4 rotate-90" />
+            <div className="pt-2 pb-1 flex justify-center items-center text-neutral-400 hover:text-black dark:hover:text-white cursor-grab active:cursor-grabbing transition-colors">
+                <GripVertical className="w-4 h-4 rotate-90 stroke-[2.5]" />
             </div>
 
             <div className="p-5 sm:p-6 sm:pl-7 space-y-4">
@@ -355,7 +363,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                             value={question.title}
                             onChange={(e) => onChange({ ...question, title: e.target.value })}
                             placeholder={isContentBlock ? "Section / Block Title..." : "Question Prompt..."}
-                            className="w-full text-base sm:text-lg font-bold text-neutral-900 dark:text-white border-b border-transparent hover:border-neutral-200 dark:hover:border-neutral-800 focus:border-neutral-900 dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 transition-colors"
+                            className="w-full text-base sm:text-lg font-black text-neutral-900 dark:text-white border-b-2 border-transparent hover:border-black/20 focus:border-black dark:focus:border-white focus:outline-none bg-transparent py-1 placeholder:text-neutral-400 transition-colors"
                         />
                         {showDescription && (
                             <textarea
@@ -708,7 +716,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                 {/* 1. Short Answer */}
                 {question.type === "short_answer" && (
                     <div className="space-y-3 pt-2">
-                        <div className="p-3 rounded-xl border border-dashed border-black/30 bg-neutral-50 text-xs font-bold text-neutral-400">
+                        <div className="p-3.5 rounded-xl border-2 border-dashed border-black/20 dark:border-white/20 bg-neutral-50/80 dark:bg-neutral-900/60 text-xs font-bold text-neutral-500">
                             Short-answer text (Single-line input)
                         </div>
                     </div>
@@ -717,7 +725,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                 {/* 2. Paragraph */}
                 {question.type === "paragraph" && (
                     <div className="space-y-3 pt-2">
-                        <div className="p-4 rounded-xl border border-dashed border-black/30 bg-neutral-50 text-xs font-bold text-neutral-400">
+                        <div className="p-4 rounded-xl border-2 border-dashed border-black/20 dark:border-white/20 bg-neutral-50/80 dark:bg-neutral-900/60 text-xs font-bold text-neutral-500">
                             Long-answer text (Multi-line paragraph input)
                         </div>
                     </div>
@@ -1747,7 +1755,7 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                 {/* ------------------------------------------------------------------------- */}
                 {/* BOTTOM TOOLBAR */}
                 {/* ------------------------------------------------------------------------- */}
-                <div className="pt-3 border-t border-neutral-100 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="pt-3 border-t-2 border-black/10 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
                     <div className="flex items-center gap-1.5">
                         {/* Quiz Answer Key Trigger Button */}
                         {isQuiz && !isContentBlock && (
@@ -1810,8 +1818,8 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                     <div className="flex items-center gap-3">
                         {/* Required Toggle (Not applicable for standalone notice blocks) */}
                         {!isContentBlock && (
-                            <div className="flex items-center gap-2 pr-3 border-r border-neutral-200 dark:border-neutral-800">
-                                <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">Required</span>
+                            <div className="flex items-center gap-2 pr-3 border-r-2 border-black/10 dark:border-white/10">
+                                <span className="text-xs font-bold text-neutral-800 dark:text-neutral-200">Required</span>
                                 <NeoToggle
                                     checked={question.required}
                                     onChange={(checked) => onChange({ ...question, required: checked })}

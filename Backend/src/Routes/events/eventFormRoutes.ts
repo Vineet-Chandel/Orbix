@@ -404,8 +404,9 @@ eventFormRouter.get("/club/events/:eventId/form/question-library", ...clubManage
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
+        const clubIdQuery = String(req.query.clubId || "");
 
-        const result = await ClubEventFormService.getClubQuestionLibrary(eventId, userId);
+        const result = await ClubEventFormService.getClubQuestionLibrary(eventId, userId, clubIdQuery);
 
         return res.status(200).json(result);
     } catch (err: any) {
@@ -425,12 +426,14 @@ eventFormRouter.post("/club/events/:eventId/form/ai-suggest", ...clubManageAuth,
     try {
         const eventId = String(req.params.eventId);
         const userId = req.user!.id;
-        const { prompt, eventType, eventDescription } = req.body;
+        const { prompt, eventType, eventDescription, eventTitle, clubId } = req.body;
 
         const result = await ClubEventFormService.aiSuggestQuestions(eventId, userId, {
             prompt,
             eventType,
             eventDescription,
+            eventTitle,
+            clubId,
         });
 
         return res.status(200).json(result);

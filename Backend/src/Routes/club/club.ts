@@ -2230,6 +2230,10 @@ clubRouter.get("/events/:eventId", authenticate, async (req: Request, res: Respo
             return res.status(401).json({ success: false, message: "Unauthorized." });
         }
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
 
         let club: any = null;
         if (userId) {
@@ -2477,6 +2481,10 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
             return res.status(401).json({ success: false, message: "Unauthorized." });
         }
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
 
         const clubRes = await query(
             `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
@@ -2669,6 +2677,10 @@ clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Re
             return res.status(401).json({ success: false, message: "Unauthorized." });
         }
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
 
         const clubRes = await query(
             `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
@@ -3117,6 +3129,10 @@ clubRouter.get("/college-events", optionalAuthenticate, async (req: Request, res
 clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user?.id || null;
 
         const eventRes = await query(
@@ -3177,36 +3193,41 @@ clubRouter.get("/public-events/:eventId", optionalAuthenticate, async (req: Requ
 clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
         const userId = req.user!.id;
 
-        const checkEvent = await query(`SELECT id FROM club_events WHERE id = $1 LIMIT 1;`, [eventId]);
+        const checkEvent = await query(
+            `SELECT id FROM club_events WHERE ($1::boolean = true AND id = $2::uuid) OR slug = $3 LIMIT 1;`,
+            [isUuid, isUuid ? eventId : null, eventId]
+        );
         if (!checkEvent.rows[0]) {
             return res.status(404).json({ success: false, message: "Event not found." });
         }
+        const targetEventId = checkEvent.rows[0].id;
 
         const existing = await query(
             `SELECT id FROM club_event_likes WHERE event_id = $1 AND user_id = $2 LIMIT 1;`,
-            [eventId, userId]
+            [targetEventId, userId]
         );
 
         let liked = false;
         if (existing.rows[0]) {
             await query(
                 `DELETE FROM club_event_likes WHERE event_id = $1 AND user_id = $2;`,
-                [eventId, userId]
+                [targetEventId, userId]
             );
             liked = false;
         } else {
             await query(
                 `INSERT INTO club_event_likes (event_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING;`,
-                [eventId, userId]
+                [targetEventId, userId]
             );
             liked = true;
         }
 
         const countRes = await query(
             `SELECT COUNT(*)::int AS count FROM club_event_likes WHERE event_id = $1;`,
-            [eventId]
+            [targetEventId]
         );
         const likesCount = countRes.rows[0]?.count || 0;
 
@@ -3229,6 +3250,10 @@ clubRouter.post("/events/:eventId/like", authenticate, async (req: Request, res:
 clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
         const {
             applicantName,
@@ -3375,7 +3400,10 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
                 return res.json({
                     success: true,
                     message: `Application submitted for review for ${event.title}!`,
-                    registration: reactivated.rows[0],
+                    registration: {
+                        ...reactivated.rows[0],
+                        ticketCode: null,
+                    },
                 });
             }
         }
@@ -3512,7 +3540,10 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
             return res.status(201).json({
                 success: true,
                 message: `Registration received! Because you are under 18, a verification link has been emailed to your parent/guardian (${normGuardianEmail}). Registration will remain pending until parental consent is verified.`,
-                registration: createdReg,
+                registration: {
+                    ...createdReg,
+                    ticketCode: null,
+                },
                 minorConsentPending: true,
             });
         }
@@ -3520,7 +3551,10 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
         return res.status(201).json({
             success: true,
             message: `Application submitted for ${event.title}! The club coordinators will review your application.`,
-            registration: createdReg,
+            registration: {
+                ...createdReg,
+                ticketCode: null,
+            },
         });
     } catch (err: any) {
         console.error("Event registration error:", err);
@@ -3535,6 +3569,10 @@ clubRouter.post("/events/:eventId/register", authenticate, async (req: Request, 
 clubRouter.post("/events/:eventId/cancel", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
 
         const updateRes = await query(
@@ -3622,6 +3660,10 @@ clubRouter.get("/user/applications", authenticate, async (req: Request, res: Res
 clubRouter.get("/events/:eventId/applications", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
 
         // Verify event and staff permission
@@ -3771,7 +3813,9 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
                  checked_in_at = CASE WHEN $6::boolean = true AND checked_in_at IS NULL THEN NOW() ELSE checked_in_at END,
                  updated_at = NOW()
              WHERE id = $4::uuid AND event_id = $5::uuid
-             RETURNING id, user_id AS "userId", status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
+             RETURNING id, user_id AS "userId", applicant_name AS "applicantName", applicant_email AS "applicantEmail",
+                       department, year_of_study AS "yearOfStudy", roll_number AS "rollNumber",
+                       status, ticket_code AS "ticketCode", checked_in_at AS "checkedInAt", reviewed_at AS "reviewedAt", updated_at AS "updatedAt";`,
             [status, userId, reviewNotes || null, registrationId, eventId, isAttended]
         );
 
@@ -3786,6 +3830,9 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
                 const appUser = applicantUserRes.rows[0];
                 const eventTitle = eventRes.rows[0].title;
                 const clubName = eventRes.rows[0].clubName;
+                const clubSlug = eventRes.rows[0].clubSlug;
+                const startsAt = eventRes.rows[0].starts_at;
+                const venueOrLocation = eventRes.rows[0].venue_or_location;
 
                 if (status === "registered") {
                     await query(
@@ -3805,8 +3852,22 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
                         [
                             appUser.id,
                             appUser.username,
-                            `Your application for "${eventTitle}" was accepted by ${clubName}. Your session entry pass is now active!`,
-                            JSON.stringify({ eventId, ticketCode: updatedRow.ticketCode, clubName }),
+                            `Your application for "${eventTitle}" was accepted by ${clubName}. Your session entry pass is now ready!`,
+                            JSON.stringify({
+                                eventId,
+                                registrationId,
+                                ticketCode: updatedRow.ticketCode,
+                                eventTitle,
+                                clubName,
+                                clubSlug: clubSlug || "",
+                                startsAt,
+                                venueOrLocation,
+                                applicantName: updatedRow.applicantName,
+                                rollNumber: updatedRow.rollNumber,
+                                department: updatedRow.department,
+                                action: "application_approved",
+                                status: "registered",
+                            }),
                             `app-approved-${registrationId}-${Date.now()}`,
                         ]
                     );
@@ -3829,7 +3890,14 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
                             appUser.id,
                             appUser.username,
                             `Your application for "${eventTitle}" was not selected by ${clubName}.`,
-                            JSON.stringify({ eventId, clubName }),
+                            JSON.stringify({
+                                eventId,
+                                registrationId,
+                                eventTitle,
+                                clubName,
+                                action: "application_rejected",
+                                status: "rejected",
+                            }),
                             `app-rejected-${registrationId}-${Date.now()}`,
                         ]
                     );
@@ -3853,6 +3921,10 @@ clubRouter.patch("/events/:eventId/applications/:registrationId", authenticate, 
 clubRouter.get("/events/:eventId/applications/export", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const userId = req.user!.id;
 
         const eventRes = await query(
@@ -3900,19 +3972,52 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
         );
         const formStructure = formRes.rows[0]?.structure;
         const customQuestions: { id: string; title: string; type: string }[] = [];
+        const seenQuestionIds = new Set<string>();
+
         if (formStructure && Array.isArray(formStructure.sections)) {
             formStructure.sections.forEach((sec: any) => {
-                (sec.questions || []).forEach((q: any) => {
-                    if (q.type !== "image_card" && q.type !== "markdown_card") {
+                (sec.questions || sec.fields || []).forEach((q: any) => {
+                    if (
+                        q &&
+                        q.id &&
+                        !seenQuestionIds.has(q.id) &&
+                        q.type !== "image_card" &&
+                        q.type !== "markdown_card" &&
+                        q.type !== "image_block" &&
+                        q.type !== "video_block" &&
+                        q.type !== "title_card"
+                    ) {
+                        seenQuestionIds.add(q.id);
                         customQuestions.push({
                             id: q.id,
-                            title: q.title || "Question",
-                            type: q.type,
+                            title: q.title || q.label || "Question",
+                            type: q.type || "text",
                         });
                     }
                 });
             });
         }
+
+        // Also discover any other submitted question keys in answers
+        applicantsRes.rows.forEach((r) => {
+            const ansObj = r.form_response || r.answers || {};
+            Object.keys(ansObj).forEach((k) => {
+                if (k === "q_roll_number" || k === "q_department" || k === "q_year") return;
+                if (!seenQuestionIds.has(k)) {
+                    seenQuestionIds.add(k);
+                    let title = k;
+                    if (title.startsWith("q_")) {
+                        title = title.substring(2).replace(/_/g, " ");
+                        title = title.charAt(0).toUpperCase() + title.slice(1);
+                    }
+                    customQuestions.push({
+                        id: k,
+                        title,
+                        type: "text",
+                    });
+                }
+            });
+        });
 
         const escapeCsv = (val: any) => {
             if (val === null || val === undefined) return '""';
@@ -3930,9 +4035,6 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
             "Username",
             "Email",
             "Profile Photo URL",
-            "Department",
-            "Year of Study",
-            "Roll Number",
             "Phone",
             "Status",
             "Applied At",
@@ -3957,9 +4059,6 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
                 escapeCsv(r.username),
                 escapeCsv(r.email),
                 escapeCsv(r.avatar_url),
-                escapeCsv(r.department),
-                escapeCsv(r.year_of_study),
-                escapeCsv(r.roll_number),
                 escapeCsv(r.phone),
                 escapeCsv(r.status === "registered" ? "accepted" : r.status),
                 escapeCsv(r.registered_at ? new Date(r.registered_at).toISOString() : ""),
@@ -4004,6 +4103,10 @@ clubRouter.get("/events/:eventId/applications/export", authenticate, async (req:
 clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const { ticketCode, attendeeUserId } = req.body;
         const targetUserId = attendeeUserId || req.user!.id;
 
@@ -4051,6 +4154,10 @@ clubRouter.post("/events/:eventId/checkin", authenticate, async (req: Request, r
 clubRouter.post("/events/:eventId/checkin-verify", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isEventUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isEventUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const { ticketCode, forceCheckIn } = req.body;
         const staffUserId = req.user!.id;
 
@@ -4623,6 +4730,10 @@ clubRouter.get("/certificates/events", authenticate, async (req: Request, res: R
 clubRouter.get("/certificates/event/:eventId/recipients", authenticate, async (req: Request, res: Response) => {
     try {
         const { eventId } = req.params;
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(eventId);
+        if (!isUuid) {
+            return res.status(404).json({ success: false, message: "Event not found." });
+        }
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
