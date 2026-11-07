@@ -98,10 +98,9 @@ async function apiFetch<T = any>(
     options: RequestInit = {}
 ): Promise<T> {
     const cleanPath = path.startsWith("/api") ? path : `/api${path}`;
-    const endpoints = [
-        cleanPath,
-        `http://localhost:3000${cleanPath}`,
-    ];
+    const endpoints = import.meta.env.DEV
+        ? [cleanPath, `http://localhost:3000${cleanPath}`]
+        : [cleanPath];
 
     let lastError = "Request failed";
 
@@ -228,10 +227,12 @@ export async function fetchPublicProfile(username: string, force = false): Promi
 
     const requestPromise = (async () => {
         const encodedKey = encodeURIComponent(key);
-        const endpoints = [
-            `/api/profile/public/${encodedKey}`,
-            `http://localhost:3000/api/profile/public/${encodedKey}`,
-        ];
+        const endpoints = import.meta.env.DEV
+            ? [
+                `/api/profile/public/${encodedKey}`,
+                `http://localhost:3000/api/profile/public/${encodedKey}`,
+            ]
+            : [`/api/profile/public/${encodedKey}`];
 
         let networkErrorCount = 0;
         let lastStatus: number | undefined;
@@ -872,10 +873,12 @@ export async function uploadResume(
     const formData = new FormData();
     formData.append("resume", file);
 
-    const endpoints = [
-        "/api/profile/resume/upload",
-        "http://localhost:3000/api/profile/resume/upload",
-    ];
+    const endpoints = import.meta.env.DEV
+        ? [
+            "/api/profile/resume/upload",
+            "http://localhost:3000/api/profile/resume/upload",
+        ]
+        : ["/api/profile/resume/upload"];
 
     let lastError = "Failed to upload resume";
 

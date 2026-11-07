@@ -9,6 +9,7 @@ import { PlatformDifficultyGauge, type DifficultyBreakdown } from "./PlatformDif
 import { useAppDispatch, useAppSelector } from "../../store";
 import { invalidateConnectedPlatformCaches } from "../../utils/cacheManager";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
+import { buildApiUrl } from "../../api/apiClient";
 
 export interface PortalProfileData {
     success: boolean;
@@ -457,18 +458,21 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                 username: user?.username,
             };
 
-            fetch("/api/portals/save", {
+            const saveUrl = buildApiUrl("/api/portals/save");
+            fetch(saveUrl, {
                 method: "POST",
                 headers,
                 credentials: "include",
                 body: JSON.stringify(savePayload),
             }).catch(() => {
-                fetch("http://localhost:3000/api/portals/save", {
-                    method: "POST",
-                    headers,
-                    credentials: "include",
-                    body: JSON.stringify(savePayload),
-                }).catch(() => {});
+                if (import.meta.env.DEV) {
+                    fetch("http://localhost:3000/api/portals/save", {
+                        method: "POST",
+                        headers,
+                        credentials: "include",
+                        body: JSON.stringify(savePayload),
+                    }).catch(() => {});
+                }
             });
         } catch (e) {
             console.error("Failed to persist connected portals:", e);
@@ -542,10 +546,10 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
         setConnectError(null);
 
         const timer = setTimeout(async () => {
-            const endpoints = [
-                `/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`,
-                `http://localhost:3000/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`,
-            ];
+            const primaryEndpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(username)}`);
+            const endpoints = import.meta.env.DEV
+                ? [primaryEndpoint, `http://localhost:3000${primaryEndpoint}`]
+                : [primaryEndpoint];
 
             let data: PortalProfileData | null = null;
             let errorMessage: string | null = null;
@@ -653,10 +657,10 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
         if (!profile || !config) return;
 
         setIsSingleVerifying(true);
-        const endpoints = [
-            `/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(profile.username)}`,
-            `http://localhost:3000/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(profile.username)}`,
-        ];
+        const primaryEndpoint = buildApiUrl(`/api/portals/fetch?portal=${encodeURIComponent(portalId)}&username=${encodeURIComponent(profile.username)}`);
+        const endpoints = import.meta.env.DEV
+            ? [primaryEndpoint, `http://localhost:3000${primaryEndpoint}`]
+            : [primaryEndpoint];
 
         let fetched: PortalProfileData | null = null;
         let is404 = false;
