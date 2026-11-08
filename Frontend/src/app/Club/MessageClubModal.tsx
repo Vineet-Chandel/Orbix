@@ -42,6 +42,15 @@ export default function MessageClubModal({
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [sentSuccess, setSentSuccess] = useState(false);
 
+    const handleClose = () => {
+        setBody("");
+        setErrorMessage(null);
+        setSentSuccess(false);
+        onClose();
+    };
+
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose: handleClose });
+
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
 
@@ -94,15 +103,6 @@ export default function MessageClubModal({
             setIsSubmitting(false);
         }
     };
-
-    const handleClose = () => {
-        setBody("");
-        setErrorMessage(null);
-        setSentSuccess(false);
-        onClose();
-    };
-
-    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose: handleClose });
 
     return createPortal(
         <div

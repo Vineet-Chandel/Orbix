@@ -54,9 +54,10 @@ import { CredibilityImpactModal } from "../../components/credibility/Credibility
 import { EventLiveListingCard } from "../../components/EventLiveListingCard";
 import { ClubEventCheckinTerminal } from "./ClubEventCheckinTerminal";
 import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
+import { IssuanceConsoleView } from "./CertificateStudio/IssuanceConsoleView";
 import { OrbixLoader } from "../../components/ui/loader";
 
-type EventTab = "roster" | "form" | "checkin" | "analytics" | "pass" | "settings";
+type EventTab = "roster" | "form" | "checkin" | "certificates" | "analytics" | "pass" | "settings";
 
 export interface ClubEventDetailWorkspaceProps {
     eventId?: string;
@@ -98,13 +99,13 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const eventTabQuery = (searchParams.get("eventTab") || searchParams.get("tab")) as EventTab | null;
     const initialTab: EventTab = isCheckinRoute
         ? "checkin"
-        : (eventTabQuery && ["roster", "form", "checkin", "pass", "settings"].includes(eventTabQuery) ? eventTabQuery : "roster");
+        : (eventTabQuery && ["roster", "form", "checkin", "certificates", "analytics", "pass", "settings"].includes(eventTabQuery) ? eventTabQuery : "roster");
     const [activeTab, setActiveTab] = useState<EventTab>(initialTab);
 
     // Keep activeTab in sync with URL searchParams (e.g. browser back/forward or tab changes)
     useEffect(() => {
         const queryTab = (searchParams.get("eventTab") || searchParams.get("tab")) as EventTab | null;
-        if (queryTab && ["roster", "form", "checkin", "pass", "settings"].includes(queryTab)) {
+        if (queryTab && ["roster", "form", "checkin", "certificates", "analytics", "pass", "settings"].includes(queryTab)) {
             setActiveTab(queryTab);
         } else if (!queryTab && !location.pathname.endsWith("/checkin")) {
             setActiveTab("roster");
@@ -1006,6 +1007,22 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
 
                     <button
                         type="button"
+                        onClick={() => handleTabChange("certificates")}
+                        className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
+                            activeTab === "certificates"
+                                ? "bg-[#FFE566] text-black shadow-[3px_3px_0px_#000]"
+                                : "bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1.5px_1.5px_0px_#000]"
+                        }`}
+                    >
+                        <Award className="w-4 h-4 stroke-[2.5]" />
+                        <span>Certificates & Credentials</span>
+                        <span className="px-2 py-0.5 rounded-full bg-black text-[#FFE566] border border-black text-[10px] font-black">
+                            STUDIO
+                        </span>
+                    </button>
+
+                    <button
+                        type="button"
                         onClick={() => handleTabChange("pass")}
                         className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-black border-2 border-black transition-all cursor-pointer flex items-center gap-2 shrink-0 ${
                             activeTab === "pass"
@@ -1160,6 +1177,16 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     <Download className="w-3.5 h-3.5 stroke-[2.5]" />
                                     <span>Export CSV</span>
                                 </a>
+
+                                <button
+                                    type="button"
+                                    onClick={() => handleTabChange("certificates")}
+                                    className="px-3.5 py-2 rounded-xl bg-[#FFE566] hover:bg-[#FACC15] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
+                                    title="Open Certificate Studio for this event"
+                                >
+                                    <Award className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    <span>Issue Certificates</span>
+                                </button>
 
                                 <button
                                     type="button"
@@ -1428,6 +1455,20 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                             });
                         }}
                     />
+                )}
+
+                {/* TAB: EVENT CERTIFICATE STUDIO & CREDENTIAL ISSUANCE */}
+                {activeTab === "certificates" && event && (
+                    <div className="space-y-6">
+                        <IssuanceConsoleView
+                            preselectedEventId={event.id}
+                            preselectedEventTitle={event.title}
+                            onBatchIssued={() => {
+                                toast.success("Certificate batch successfully issued!");
+                                loadApplications();
+                            }}
+                        />
+                    </div>
                 )}
 
                 {/* TAB 2: ANALYTICS & ATTENDANCE */}
@@ -1824,7 +1865,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     <div className="w-full md:w-60 shrink-0">
                                         <button
                                             type="button"
-                                            onClick={() => setIsCertStudioOpen(true)}
+                                            onClick={() => handleTabChange("certificates")}
                                             className="w-full py-3 px-4 rounded-2xl bg-[#a2ff86] hover:bg-[#8ee673] text-black text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
                                         >
                                             <Award className="w-4 h-4 stroke-[2.5]" />

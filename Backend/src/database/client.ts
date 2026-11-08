@@ -668,6 +668,70 @@ export const testDatabaseConnection = async () => {
                 CREATE INDEX IF NOT EXISTS idx_club_certificates_event ON public.club_certificates(event_id);
                 CREATE INDEX IF NOT EXISTS idx_club_certificates_code ON public.club_certificates(credential_code);
 
+                -- Certificate Studio Ecosystem (Migration 037)
+                CREATE TABLE IF NOT EXISTS public.certificate_templates (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    is_system BOOLEAN NOT NULL DEFAULT false,
+                    name VARCHAR(255) NOT NULL,
+                    category VARCHAR(100) NOT NULL DEFAULT 'event',
+                    design JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    background_asset_url TEXT,
+                    background_fit VARCHAR(20) DEFAULT 'cover',
+                    orientation VARCHAR(20) NOT NULL DEFAULT 'landscape',
+                    page_width INT NOT NULL DEFAULT 842,
+                    page_height INT NOT NULL DEFAULT 595,
+                    version INT NOT NULL DEFAULT 1,
+                    status VARCHAR(30) NOT NULL DEFAULT 'published',
+                    thumbnail_url TEXT,
+                    created_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_cert_templates_club ON public.certificate_templates(club_id, status);
+                CREATE INDEX IF NOT EXISTS idx_cert_templates_system ON public.certificate_templates(is_system, category);
+
+                CREATE TABLE IF NOT EXISTS public.certificate_batches (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    event_id UUID REFERENCES public.club_events(id) ON DELETE SET NULL,
+                    template_id UUID REFERENCES public.certificate_templates(id) ON DELETE SET NULL,
+                    template_version INT NOT NULL DEFAULT 1,
+                    title VARCHAR(255) NOT NULL,
+                    certificate_type VARCHAR(50) NOT NULL DEFAULT 'participation',
+                    issuance_source VARCHAR(50) NOT NULL DEFAULT 'event',
+                    total_recipients INT NOT NULL DEFAULT 0,
+                    successful_count INT NOT NULL DEFAULT 0,
+                    failed_count INT NOT NULL DEFAULT 0,
+                    status VARCHAR(30) NOT NULL DEFAULT 'completed',
+                    error_log JSONB DEFAULT '[]'::jsonb,
+                    batch_payload JSONB DEFAULT '{}'::jsonb,
+                    idempotency_key VARCHAR(128),
+                    issued_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                );
+                CREATE INDEX IF NOT EXISTS idx_cert_batches_club ON public.certificate_batches(club_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_cert_batches_event ON public.certificate_batches(event_id);
+                CREATE INDEX IF NOT EXISTS idx_cert_batches_idempotency ON public.certificate_batches(idempotency_key) WHERE idempotency_key IS NOT NULL;
+
+                ALTER TABLE public.club_certificates
+                    ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES public.certificate_templates(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS template_version INT DEFAULT 1,
+                    ADD COLUMN IF NOT EXISTS batch_id UUID REFERENCES public.certificate_batches(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS team_id UUID REFERENCES public.club_teams(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS design_snapshot JSONB DEFAULT '{}'::jsonb,
+                    ADD COLUMN IF NOT EXISTS recipient_snapshot JSONB DEFAULT '{}'::jsonb,
+                    ADD COLUMN IF NOT EXISTS pdf_url TEXT,
+                    ADD COLUMN IF NOT EXISTS preview_url TEXT,
+                    ADD COLUMN IF NOT EXISTS sha256_hash VARCHAR(64),
+                    ADD COLUMN IF NOT EXISTS is_revoked BOOLEAN NOT NULL DEFAULT false,
+                    ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ,
+                    ADD COLUMN IF NOT EXISTS revocation_reason TEXT,
+                    ADD COLUMN IF NOT EXISTS revoked_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    ADD COLUMN IF NOT EXISTS verification_count INT NOT NULL DEFAULT 0,
+                    ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ;
+
                 -- Legal Consent & Minor Protection (Migration 030)
                 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS terms_version VARCHAR(32) DEFAULT 'v1.0';
                 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;
@@ -973,6 +1037,43 @@ export const testDatabaseConnection = async () => {
                 );
                 CREATE INDEX IF NOT EXISTS idx_club_creation_hist_club_scope 
                     ON public.club_event_creation_history(club_id, scope, created_at DESC);
+
+                -- Migration 038: User Projects Showcase System & 4-Project Atomic Cap
+                CREATE TABLE IF NOT EXISTS public.user_projects (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+                    title VARCHAR(150) NOT NULL,
+                    slug VARCHAR(180) NOT NULL,
+                    tagline VARCHAR(255),
+                    description TEXT,
+                    category VARCHAR(50) DEFAULT 'Full-Stack',
+                    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'published')),
+                    is_published BOOLEAN DEFAULT false,
+                    is_pinned BOOLEAN DEFAULT false,
+                    display_order INT NOT NULL DEFAULT 0,
+                    repo_url TEXT NULL,
+                    repo_name VARCHAR(150) NULL,
+                    repo_stars INT DEFAULT 0,
+                    repo_forks INT DEFAULT 0,
+                    repo_license VARCHAR(100) NULL,
+                    repo_language VARCHAR(60) NULL,
+                    repo_pushed_at TIMESTAMPTZ NULL,
+                    live_url TEXT NULL,
+                    demo_video_url TEXT NULL,
+                    documentation_url TEXT NULL,
+                    image_url TEXT NULL,
+                    gallery_images JSONB DEFAULT '[]'::jsonb,
+                    technologies JSONB DEFAULT '[]'::jsonb,
+                    features JSONB DEFAULT '[]'::jsonb,
+                    external_links JSONB DEFAULT '[]'::jsonb,
+                    architecture_notes TEXT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_user_projects_user_id ON public.user_projects(user_id);
+                CREATE INDEX IF NOT EXISTS idx_user_projects_user_order ON public.user_projects(user_id, display_order ASC, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_user_projects_published ON public.user_projects(user_id, is_published);
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_user_projects_user_slug ON public.user_projects(user_id, slug);
             END $$;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");

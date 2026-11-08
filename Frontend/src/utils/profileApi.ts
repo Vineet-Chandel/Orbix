@@ -1,4 +1,5 @@
 import { demoPublicProfile, isDemoProfileUsername } from "../data/demoProfileData";
+import type { ProjectItem } from "../types/project";
 
 export interface PublicProfilePlatform {
     portal: string;
@@ -56,6 +57,7 @@ export interface PublicProfileData {
     createdAt?: string;
     isOwner: boolean;
     platforms: PublicProfilePlatform[];
+    projects?: ProjectItem[];
 }
 
 // In-memory client-side cache for public profile requests (5 minutes freshness)

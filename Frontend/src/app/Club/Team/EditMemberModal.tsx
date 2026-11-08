@@ -41,6 +41,8 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
     const [assignPositionTitle, setAssignPositionTitle] = useState("Member");
     const [isAssigning, setIsAssigning] = useState(false);
 
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
     useEffect(() => {
         if (member) {
             setClubRole(member.clubRole || "member");
@@ -189,8 +191,6 @@ export const EditMemberModal: React.FC<EditMemberModalProps> = ({
     const unassignedTeams = teams.filter(
         (t) => !t.isArchived && !member.teams.some((mt) => mt.teamId === t.id)
     );
-
-    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     return createPortal(
         <div

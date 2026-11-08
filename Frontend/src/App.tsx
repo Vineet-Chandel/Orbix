@@ -36,6 +36,7 @@ const PrivacyPolicyPage = lazy(() => import("./LandingPages/Legal/PrivacyPolicyP
 const TermsConditionsPage = lazy(() => import("./LandingPages/Legal/TermsConditionsPage"));
 const GuardianConsentPage = lazy(() => import("./LandingPages/Legal/GuardianConsentPage"));
 const PublicEventRegistrationPage = lazy(() => import("./app/Events/PublicEventRegistrationPage"));
+const PublicCertificateVerifyPage = lazy(() => import("./app/Certificates/PublicCertificateVerifyPage"));
 
 const WorkspaceRedirect = () => {
   const { user } = useAppSelector((state) => state.user);
@@ -131,6 +132,12 @@ const App = () => {
           <Route path="/profile/u/:username" element={<PublicProfilePage />} />
           <Route path="/profile/:username" element={<LegacyProfileRedirect />} />
           <Route path="/u/:username" element={<LegacyProfileRedirect />} />
+
+          {/* Public Certificate Verification Routes */}
+          <Route path="/verify/certificate/:credentialCode" element={<PublicCertificateVerifyPage />} />
+          <Route path="/verify-cert/:credentialCode" element={<PublicCertificateVerifyPage />} />
+          <Route path="/verify/:credentialCode" element={<PublicCertificateVerifyPage />} />
+          <Route path="/verify" element={<PublicCertificateVerifyPage />} />
 
           {/* Auth Pages */}
           <Route path="/auth/signup" element={<SignUpPage />} />

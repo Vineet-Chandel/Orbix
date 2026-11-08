@@ -26,6 +26,7 @@ import { platformRouter } from './Routes/platform/platformRoutes.js';
 import { sessionRouter } from './Routes/session/sessionRoutes.js';
 import { eventFormRouter } from './Routes/events/eventFormRoutes.js';
 import { clubCredibilityRouter } from './Routes/club/clubCredibilityRoutes.js';
+import projectRouter from './Routes/projects/projectRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import { startAccountPurgeWorker } from './services/account/accountPurgeService.js';
 import redis from './redis/client.js';
@@ -100,6 +101,7 @@ apiRouter.use('/auth', oauthRouter);
 apiRouter.use('/profile', profileRouter);
 apiRouter.use('/users', profileRouter);
 apiRouter.use('/portals', portalsRouter);
+apiRouter.use('/projects', projectRouter);
 
 // Leaderboard & Competitions
 apiRouter.use('/leaderboard', leaderboardRouter);

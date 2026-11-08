@@ -7,7 +7,6 @@ import {
     Edit3,
     Bell,
     Users,
-    ShieldCheck,
     ArrowRight,
     Building2,
     Mail,
@@ -43,6 +42,7 @@ import { ClubSettingsView } from "./Settings/ClubSettingsView";
 import { OtherClubsSection } from "./OtherClubsSection";
 import { ClubEventDetailWorkspace } from "./ClubEventDetailPage";
 import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
+import { CertificateStudioWorkspace } from "./CertificateStudio/CertificateStudioWorkspace";
 import { EventScopeSelectionModal } from "./EventScopeSelectionModal";
 import { ClubCredibilityWorkspace } from "./Credibility/ClubCredibilityWorkspace";
 import { ClubEventCard } from "./ClubEventCard";
@@ -1049,76 +1049,12 @@ export default function ClubDashboardPage() {
 
                         {/* TAB: CERTIFICATES & CREDENTIALS STUDIO */}
                         {activeTab === "certificates" && (
-                            <div className="space-y-6">
-                                <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row items-center justify-between gap-4">
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                                Official Credential Studio
-                                            </span>
-                                            <span className="text-xs font-bold text-neutral-500">
-                                                Cryptographically Signed · Strict Eligibility Enforced
-                                            </span>
-                                        </div>
-                                        <h2 className="text-xl sm:text-2xl font-black text-black">
-                                            Campus Certificates & Turnout Recognition
-                                        </h2>
-                                        <p className="text-xs sm:text-sm font-bold text-neutral-600 max-w-2xl">
-                                            Issue verified achievement and participation certificates directly to campus students and event attendees. Dispatches automated in-app notifications to each recipient.
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsCertStudioOpen(true)}
-                                        className="px-5 py-3 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-3 border-black font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] flex items-center gap-2 transition-transform active:translate-x-0.5 active:translate-y-0.5 shrink-0"
-                                    >
-                                        <Award className="w-5 h-5 stroke-[2.5]" />
-                                        <span>+ Launch Issuance Studio</span>
-                                    </button>
-                                </div>
-
-                                {/* Quick Launch Cards for the Two Perspectives */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                    <div
-                                        onClick={() => setIsCertStudioOpen(true)}
-                                        className="p-6 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all cursor-pointer space-y-3 group"
-                                    >
-                                        <div className="w-12 h-12 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                            <CalendarDays className="w-6 h-6 text-black" />
-                                        </div>
-                                        <h3 className="text-lg font-black text-black group-hover:text-neutral-800 flex items-center justify-between">
-                                            <span>1. Event Participation Turnout</span>
-                                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                                        </h3>
-                                        <p className="text-xs font-medium text-neutral-600 leading-relaxed">
-                                            Select a completed or live event, review verified attendees and checked-in students, and issue participation or merit certificates with 1-click batch delivery.
-                                        </p>
-                                        <div className="pt-2 text-xs font-black text-black flex items-center gap-1">
-                                            <span>Select Event Roster</span> &rarr;
-                                        </div>
-                                    </div>
-
-                                    <div
-                                        onClick={() => setIsCertStudioOpen(true)}
-                                        className="p-6 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] hover:shadow-[7px_7px_0px_#000] transition-all cursor-pointer space-y-3 group"
-                                    >
-                                        <div className="w-12 h-12 rounded-xl bg-[#FFDE59] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                            <ShieldCheck className="w-6 h-6 text-black" />
-                                        </div>
-                                        <h3 className="text-lg font-black text-black group-hover:text-neutral-800 flex items-center justify-between">
-                                            <span>2. Credible Campus Network</span>
-                                            <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
-                                        </h3>
-                                        <p className="text-xs font-medium text-neutral-600 leading-relaxed">
-                                            Categorize students by credibility (attended sessions count, team contributors, campus verified). Hand-pick standout individuals for excellence & appreciation awards.
-                                        </p>
-                                        <div className="pt-2 text-xs font-black text-black flex items-center gap-1">
-                                            <span>Browse Connected Students</span> &rarr;
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                            <CertificateStudioWorkspace
+                                clubId={club.id}
+                                clubName={club.name}
+                                clubLogo={club.logo_url}
+                                onOpenLegacyModal={() => setIsCertStudioOpen(true)}
+                            />
                         )}
 
                         {/* TAB: CAMPUS CLUBS & DIRECTORY */}

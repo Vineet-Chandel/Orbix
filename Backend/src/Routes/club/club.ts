@@ -31,6 +31,7 @@ import {
 import clubTeamRouter from "./clubTeamRoutes.js";
 import clubProfileRouter from "./clubProfileRoutes.js";
 import clubSettingsRouter from "./clubSettingsRoutes.js";
+import clubCertificateRouter from "./clubCertificateRoutes.js";
 import { ClubProfileService } from "../../services/club/clubProfileService.js";
 import { notifyClubAndCollegeUsers } from "../../services/club/clubEventNotificationService.js";
 import { ClubEventFormService } from "../../services/club/clubEventFormService.js";
@@ -48,6 +49,9 @@ clubRouter.use("/profile", clubProfileRouter);
 
 // Mount dedicated Club Settings Management router (/api/club/settings)
 clubRouter.use("/settings", clubSettingsRouter);
+
+// Mount dedicated Certificate Studio router (/api/club/certificates)
+clubRouter.use("/certificates", clubCertificateRouter);
 
 // GET /api/club/college-clubs - direct route for campus clubs listing
 clubRouter.get("/college-clubs", authenticate, async (req: Request, res: Response) => {

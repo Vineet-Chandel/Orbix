@@ -1,4 +1,5 @@
 import type { PublicProfileData, PublicProfilePlatform } from "../utils/profileApi";
+import type { ProjectItem } from "../types/project";
 import type { UnifiedSubmissionsData } from "../store/submissionsSlice";
 import type { PracticeAnalyticsData } from "../store/practiceAnalyticsSlice";
 import type { UnifiedContestData, PlatformContestAnalytics, UnifiedRecentContestItem } from "../store/contestsSlice";
@@ -252,6 +253,157 @@ export const demoPublicProfilePlatforms: PublicProfilePlatform[] = [
     },
 ];
 
+// ---------------------------------------------------------------------------
+// 1.5 FLAGSHIP DEMO PROJECTS SHOWCASE (4 CAPACITY SLOTS)
+// ---------------------------------------------------------------------------
+export const demoProjects: ProjectItem[] = [
+    {
+        id: "demo-proj-1",
+        userId: "demo-vineet-chandel",
+        title: "Orbix Core Engine",
+        slug: "orbix-core-engine",
+        tagline: "High-performance developer profile analytics engine and multi-platform aggregator.",
+        description: "Core backend architecture powering real-time developer profiling across 12 platforms. Leverages PostgreSQL connection pooling with exponential retry backoff, Redis caching layers, and deterministic AST parsing.",
+        category: "Full-Stack",
+        status: "published",
+        isPublished: true,
+        isPinned: true,
+        displayOrder: 0,
+        repoUrl: "https://github.com/Vineet-Chandel/orbix-core",
+        repoName: "Vineet-Chandel/orbix-core",
+        repoStars: 680,
+        repoForks: 124,
+        repoLanguage: "TypeScript",
+        repoLicense: "MIT",
+        liveUrl: "https://orbix.dev",
+        documentationUrl: "https://orbix.dev/docs",
+        coverImageUrl: "/Dashboard.png",
+        imageUrl: "/Dashboard.png",
+        galleryImages: [
+            { url: "/Dashboard.png", caption: "Orbix Real-Time Ingress & Analytics Engine Dashboard" }
+        ],
+        technologies: ["TypeScript", "Node.js", "Express", "PostgreSQL", "Redis", "Docker", "Tailwind CSS"],
+        features: [
+            { title: "Sub-50ms deterministic caching pipeline across 12 coding portals" },
+            { title: "Deterministic AST provenance parser for resume & portfolio verification" },
+            { title: "Neo-brutalist component design system with zero layout shifts" },
+        ],
+        externalLinks: [
+            { label: "Live System", url: "https://orbix.dev" },
+            { label: "Architecture Docs", url: "https://orbix.dev/docs" },
+        ],
+        architectureNotes: "Layered hexagonal architecture separating protocol ingestion, ranking mathematics, and high-performance caching. Employs connection pooling with failover detection.",
+        createdAt: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
+    {
+        id: "demo-proj-2",
+        userId: "demo-vineet-chandel",
+        title: "Distributed In-Memory Cache",
+        slug: "distributed-in-memory-cache",
+        tagline: "In-memory distributed key-value store with Raft consensus and LRU eviction.",
+        description: "High-throughput distributed caching cluster designed for low-latency state synchronization. Implements custom Raft state machine replication with automated leader election and shard rebalancing.",
+        category: "Distributed Systems",
+        status: "published",
+        isPublished: true,
+        isPinned: true,
+        displayOrder: 1,
+        repoUrl: "https://github.com/Vineet-Chandel/distributed-cache-engine",
+        repoName: "Vineet-Chandel/distributed-cache-engine",
+        repoStars: 410,
+        repoForks: 86,
+        repoLanguage: "Go",
+        repoLicense: "Apache-2.0",
+        liveUrl: "https://orbix.dev",
+        documentationUrl: "https://orbix.dev/docs",
+        coverImageUrl: "/platform-graphic.png",
+        imageUrl: "/platform-graphic.png",
+        galleryImages: [
+            { url: "/platform-graphic.png", caption: "High-Throughput Distributed Raft Cluster Benchmark" }
+        ],
+        technologies: ["Go", "Raft", "gRPC", "Protobuf", "Docker", "Prometheus"],
+        features: [
+            { title: "Linearizable read/write consistency guaranteed by Raft state replication" },
+            { title: "Sub-millisecond P99 response times under 50,000 req/sec benchmark" },
+            { title: "Zero-loss partition healing with dynamic cluster topology discovery" },
+        ],
+        externalLinks: [
+            { label: "Benchmark Suite", url: "https://github.com/Vineet-Chandel/distributed-cache-engine" },
+        ],
+        architectureNotes: "Thread-safe lock-striped hash rings minimize mutex contention under high concurrent writes. Custom memory-efficient binary wire protocol over TCP/gRPC.",
+        createdAt: new Date(Date.now() - 150 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
+    {
+        id: "demo-proj-3",
+        userId: "demo-vineet-chandel",
+        title: "Algorithm Forge",
+        slug: "algorithm-forge",
+        tagline: "Production implementations of 1,200+ advanced data structures and graph algorithms.",
+        description: "Exhaustive algorithmic library containing modern C++20 implementations of heavy-light decomposition, segment trees with lazy propagation, max-flow push-relabel, and suffix automata.",
+        category: "Open Source",
+        status: "published",
+        isPublished: true,
+        isPinned: false,
+        displayOrder: 2,
+        repoUrl: "https://github.com/Vineet-Chandel/algorithm-forge",
+        repoName: "Vineet-Chandel/algorithm-forge",
+        repoStars: 215,
+        repoForks: 49,
+        repoLanguage: "C++",
+        repoLicense: "MIT",
+        galleryImages: [],
+        technologies: ["C++20", "CMake", "Google Test", "Python", "GitHub Actions"],
+        features: [
+            { title: "1,200+ data structures verified against competitive programming test suites" },
+            { title: "Cache-conscious memory layouts with SIMD vectorization" },
+            { title: "Exhaustive fuzz-testing pipeline with 100% code coverage" },
+        ],
+        externalLinks: [
+            { label: "Repository", url: "https://github.com/Vineet-Chandel/algorithm-forge" },
+        ],
+        createdAt: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
+    {
+        id: "demo-proj-4",
+        userId: "demo-vineet-chandel",
+        title: "Next Cloud Runtime",
+        slug: "next-cloud-runtime",
+        tagline: "Serverless microservice deployment framework with zero-cold-start edge routing.",
+        description: "Next-generation serverless execution runtime leveraging lightweight WebAssembly sandboxes and Linux eBPF hooks for instantaneous function execution with zero cold-start latency.",
+        category: "Cloud & DevOps",
+        status: "published",
+        isPublished: true,
+        isPinned: false,
+        displayOrder: 3,
+        repoUrl: "https://github.com/Vineet-Chandel/next-cloud-runtime",
+        repoName: "Vineet-Chandel/next-cloud-runtime",
+        repoStars: 115,
+        repoForks: 22,
+        repoLanguage: "Rust",
+        repoLicense: "MIT",
+        liveUrl: "https://orbix.dev",
+        documentationUrl: "https://orbix.dev/docs",
+        coverImageUrl: "/assets/deployment-flow.png",
+        imageUrl: "/assets/deployment-flow.png",
+        galleryImages: [
+            { url: "/assets/deployment-flow.png", caption: "Zero-Cold-Start eBPF Routing Pipeline" }
+        ],
+        technologies: ["Rust", "WASM", "Tokio", "eBPF", "Linux", "Docker"],
+        features: [
+            { title: "Microsecond WebAssembly sandbox isolation via Wasmtime engine" },
+            { title: "Kernel-bypass packet routing using custom eBPF XDP programs" },
+            { title: "Memory snapshotting enabling instant cold-start resumption" },
+        ],
+        externalLinks: [
+            { label: "Design RFC", url: "https://github.com/Vineet-Chandel/next-cloud-runtime" },
+        ],
+        createdAt: new Date(Date.now() - 280 * 24 * 60 * 60 * 1000).toISOString(),
+        updatedAt: new Date().toISOString(),
+    },
+];
+
 export const demoPublicProfile: PublicProfileData = {
     id: "demo-vineet-chandel",
     username: DEMO_USERNAME,
@@ -300,6 +452,7 @@ export const demoPublicProfile: PublicProfileData = {
         { label: "LeetCode", url: "https://leetcode.com/u/Vineet-Chandel", platform: "leetcode" },
     ],
     platforms: demoPublicProfilePlatforms,
+    projects: demoProjects,
 };
 
 // ---------------------------------------------------------------------------
@@ -2627,3 +2780,4 @@ export const demoTopContests: RankedContestPlatform[] = [
 
 export const demoTheme: CardThemeConfig = CARD_THEMES.indigo;
 export const demoPublicProfileUrl = `https://orbix.dev/profile/u/${DEMO_USERNAME}`;
+

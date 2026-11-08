@@ -58,6 +58,13 @@ export function RequestCollegeModal({
         }
     }, [isOpen, initialQuery]);
 
+    const { handleBackdropClick } = useModalDismiss({
+        isOpen,
+        onClose: () => {
+            if (!submitting) onClose();
+        },
+    });
+
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
 
@@ -105,13 +112,6 @@ export function RequestCollegeModal({
             setSubmitting(false);
         }
     };
-
-    const { handleBackdropClick } = useModalDismiss({
-        isOpen,
-        onClose: () => {
-            if (!submitting) onClose();
-        },
-    });
 
     return createPortal(
         <div

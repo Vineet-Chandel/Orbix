@@ -68,6 +68,8 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
 
     const searchDebounceRef = useRef<any>(null);
 
+    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
+
     // Debounced search when user types username
     useEffect(() => {
         if (searchDebounceRef.current) {
@@ -125,8 +127,6 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
         }
     }, [isOpen]);
 
-    if (!isOpen) return null;
-
     const handleSendInvitation = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedUser) {
@@ -175,8 +175,6 @@ export const AddMemberModal: React.FC<AddMemberModalProps> = ({
             setIsSubmitting(false);
         }
     };
-
-    const { handleBackdropClick } = useModalDismiss({ isOpen, onClose });
 
     if (!isOpen) return null;
     if (typeof document === "undefined") return null;
