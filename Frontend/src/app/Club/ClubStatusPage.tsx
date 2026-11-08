@@ -15,6 +15,7 @@ import {
     Mail,
     FileText,
     Check,
+    ChevronDown,
     Sparkles,
     Shield,
     Info,
@@ -161,8 +162,16 @@ export default function ClubStatusPage() {
     const [isSubmittingOtp, setIsSubmittingOtp] = useState(false);
     const [otpCooldown, setOtpCooldown] = useState(0);
 
-    // Investigation touchpoints expander
-    const [expandedTouchpoint, setExpandedTouchpoint] = useState<string | null>("college_administrators");
+    // Investigation touchpoints row expander (default to row 2 which holds the active gatekeeper / reviewer touchpoints)
+    const [expandedRows, setExpandedRows] = useState<number[]>([2]);
+
+    const toggleRow = (rowIndex: number) => {
+        setExpandedRows((prev) =>
+            prev.includes(rowIndex)
+                ? prev.filter((r) => r !== rowIndex)
+                : [...prev, rowIndex]
+        );
+    };
 
     // Cooldown countdown
     useEffect(() => {
@@ -556,6 +565,18 @@ export default function ClubStatusPage() {
             },
         ];
     }, [application, verifiedClub, allChecksConfirmedInDb]);
+
+    // Group touchpoints into rows of 2 for synchronized row expansion
+    const touchpointRows = useMemo(() => {
+        const rows: { rowIndex: number; items: typeof dynamicTouchpoints }[] = [];
+        for (let i = 0; i < dynamicTouchpoints.length; i += 2) {
+            rows.push({
+                rowIndex: Math.floor(i / 2),
+                items: dynamicTouchpoints.slice(i, i + 2),
+            });
+        }
+        return rows;
+    }, [dynamicTouchpoints]);
 
     const currentStatus = verifiedClub ? "approved" : (application?.status || "pending");
     const statusConfig = getStatusConfig(currentStatus);
@@ -1096,64 +1117,99 @@ export default function ClubStatusPage() {
                                                 {/* SPECIAL EMBED: 6 INVESTIGATION TOUCHPOINTS BOUND TO DB FOR STAGE 3 */}
                                                 {stage.key === "college_verification" && (
                                                     <div className="mt-4 pt-4 border-t-2 border-black/10 space-y-3">
-                                                        <div className="flex items-center justify-between">
+                                                        <div className="flex items-center justify-between gap-2">
                                                             <span className="text-xs font-black uppercase tracking-wider text-black">
                                                                 6-Pillar Investigation Guidelines & Live DB Status:
                                                             </span>
-                                                            <span className="text-[11px] font-mono font-bold text-neutral-500">
-                                                                {allChecksConfirmedInDb ? "All 4 DB Checks Confirmed" : "Real-Time Verification"}
-                                                            </span>
+                                                            <div className="flex items-center gap-2.5">
+                                                                <span className="text-[11px] font-mono font-bold text-neutral-500 hidden sm:inline">
+                                                                    {allChecksConfirmedInDb ? "All 4 DB Checks Confirmed" : "Real-Time Verification"}
+                                                                </span>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (expandedRows.length === touchpointRows.length) {
+                                                                            setExpandedRows([]);
+                                                                        } else {
+                                                                            setExpandedRows(touchpointRows.map((r) => r.rowIndex));
+                                                                        }
+                                                                    }}
+                                                                    className="text-[10px] font-black uppercase tracking-wider text-black underline hover:text-neutral-600 cursor-pointer"
+                                                                >
+                                                                    {expandedRows.length === touchpointRows.length ? "Collapse all" : "Expand all"}
+                                                                </button>
+                                                            </div>
                                                         </div>
 
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                                            {dynamicTouchpoints.map((tp) => {
-                                                                const TpIcon = tp.icon;
-                                                                const isExpanded = expandedTouchpoint === tp.id;
+                                                        {/* Row-by-row synchronized expansion: opening either opens BOTH in that row */}
+                                                        <div className="space-y-2.5">
+                                                            {touchpointRows.map((row) => {
+                                                                const isRowExpanded = expandedRows.includes(row.rowIndex);
 
                                                                 return (
                                                                     <div
-                                                                        key={tp.id}
-                                                                        onClick={() => setExpandedTouchpoint(isExpanded ? null : tp.id)}
-                                                                        className={`p-3 rounded-xl border-2 border-black text-xs transition-all cursor-pointer shadow-[2px_2px_0px_#000] ${
-                                                                            tp.isConfirmed
-                                                                                ? "bg-[#a2ff86]/20"
-                                                                                : tp.isInProgress
-                                                                                ? "bg-[#70d6ff]/20"
-                                                                                : "bg-white"
-                                                                        }`}
+                                                                        key={row.rowIndex}
+                                                                        className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-stretch"
                                                                     >
-                                                                        <div className="flex items-center justify-between gap-2">
-                                                                            <div className="flex items-center gap-2 truncate">
-                                                                                <div className="w-6 h-6 rounded-lg bg-black text-white flex items-center justify-center shrink-0">
-                                                                                    <TpIcon className="w-3.5 h-3.5" />
+                                                                        {row.items.map((tp) => {
+                                                                            const TpIcon = tp.icon;
+
+                                                                            return (
+                                                                                <div
+                                                                                    key={tp.id}
+                                                                                    onClick={() => toggleRow(row.rowIndex)}
+                                                                                    className={`p-3 rounded-xl border-2 border-black text-xs transition-all cursor-pointer shadow-[2px_2px_0px_#000] flex flex-col justify-between ${
+                                                                                        tp.isConfirmed
+                                                                                            ? "bg-[#a2ff86]/20 hover:bg-[#a2ff86]/30"
+                                                                                            : tp.isInProgress
+                                                                                            ? "bg-[#70d6ff]/20 hover:bg-[#70d6ff]/30"
+                                                                                            : "bg-white hover:bg-neutral-50"
+                                                                                    }`}
+                                                                                >
+                                                                                    <div>
+                                                                                        <div className="flex items-center justify-between gap-2">
+                                                                                            <div className="flex items-center gap-2 truncate">
+                                                                                                <div className="w-6 h-6 rounded-lg bg-black text-white flex items-center justify-center shrink-0">
+                                                                                                    <TpIcon className="w-3.5 h-3.5" />
+                                                                                                </div>
+                                                                                                <span className="font-black text-black truncate">
+                                                                                                    {tp.label}
+                                                                                                </span>
+                                                                                            </div>
+
+                                                                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border border-black ${tp.statusColor}`}>
+                                                                                                    {tp.isConfirmed ? "✓ Confirmed" : (tp.isInProgress ? "● Active" : "○ Queued")}
+                                                                                                </span>
+                                                                                                <ChevronDown className={`w-3.5 h-3.5 text-black transition-transform duration-200 ${isRowExpanded ? "rotate-180" : ""}`} />
+                                                                                            </div>
+                                                                                        </div>
+
+                                                                                        <div className="pt-2 text-[11px] text-neutral-600 font-medium">
+                                                                                            {tp.statusLabel}
+                                                                                        </div>
+                                                                                    </div>
+
+                                                                                    {/* When row is expanded, BOTH items in this row render their details */}
+                                                                                    {isRowExpanded && (
+                                                                                        <motion.div
+                                                                                            initial={{ opacity: 0, height: 0 }}
+                                                                                            animate={{ opacity: 1, height: "auto" }}
+                                                                                            exit={{ opacity: 0, height: 0 }}
+                                                                                            transition={{ duration: 0.2 }}
+                                                                                            className="pt-2 mt-2 border-t border-black/10 space-y-1.5 text-[11px] text-neutral-700 leading-relaxed"
+                                                                                        >
+                                                                                            <div className="font-black text-black">{tp.title}</div>
+                                                                                            <p>{tp.summary}</p>
+                                                                                            <div className="font-mono text-[10px] text-black bg-white p-2 rounded-lg border border-black shadow-[1px_1px_0px_#000] break-words">
+                                                                                                <strong>DB Evidence:</strong> {tp.dbEvidence}
+                                                                                            </div>
+                                                                                        </motion.div>
+                                                                                    )}
                                                                                 </div>
-                                                                                <span className="font-black text-black truncate">
-                                                                                    {tp.label}
-                                                                                </span>
-                                                                            </div>
-
-                                                                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border border-black shrink-0 ${tp.statusColor}`}>
-                                                                                {tp.isConfirmed ? "✓ Confirmed" : (tp.isInProgress ? "● Active" : "○ Queued")}
-                                                                            </span>
-                                                                        </div>
-
-                                                                        <div className="pt-2 text-[11px] text-neutral-600 font-medium">
-                                                                            {tp.statusLabel}
-                                                                        </div>
-
-                                                                        {isExpanded && (
-                                                                            <motion.div
-                                                                                initial={{ opacity: 0, height: 0 }}
-                                                                                animate={{ opacity: 1, height: "auto" }}
-                                                                                className="pt-2 mt-2 border-t border-black/10 space-y-1.5 text-[11px] text-neutral-700 leading-relaxed"
-                                                                            >
-                                                                                <div className="font-black text-black">{tp.title}</div>
-                                                                                <p>{tp.summary}</p>
-                                                                                <div className="font-mono text-[10px] text-black bg-white p-2 rounded-lg border border-black shadow-[1px_1px_0px_#000]">
-                                                                                    <strong>DB Evidence:</strong> {tp.dbEvidence}
-                                                                                </div>
-                                                                            </motion.div>
-                                                                        )}
+                                                                            );
+                                                                        })}
                                                                     </div>
                                                                 );
                                                             })}
