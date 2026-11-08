@@ -125,6 +125,23 @@ export function computeDynamicTimelineEvents(application: any, verifiedClub?: an
     const clubName = application?.club_name || verifiedClub?.name || "your club";
     const collegeName = application?.college_name || verifiedClub?.college_name || "your college";
 
+    const collegeContactStatus = application?.college_contact_status || "not_started";
+    const isContactConfirmed = collegeContactStatus === "confirmed";
+    const allChecksConfirmed = Boolean(
+        isContactConfirmed &&
+        application?.club_existence_confirmed &&
+        application?.college_authorization_confirmed &&
+        application?.representative_authority_confirmed
+    );
+    const anyCheckStarted = Boolean(
+        application?.club_existence_confirmed ||
+        application?.college_authorization_confirmed ||
+        application?.representative_authority_confirmed ||
+        collegeContactStatus !== "not_started" ||
+        application?.reviewed_by ||
+        application?.reviewed_at
+    );
+
     // 1. Stage: application_submitted
     const stage1 = {
         id: "stage-1",
@@ -137,17 +154,22 @@ export function computeDynamicTimelineEvents(application: any, verifiedClub?: an
     };
 
     // 2. Stage: initial_review
-    const isPending = appStatus === "pending";
+    const isInitialReviewDone = Boolean(
+        appStatus !== "pending" ||
+        anyCheckStarted ||
+        allChecksConfirmed ||
+        verifiedClub
+    );
     const stage2 = {
         id: "stage-2",
         stage: "initial_review",
-        status: (isPending ? "in_progress" : "completed") as "completed" | "in_progress",
-        title: isPending ? "Initial review" : "Initial review completed",
-        message: isPending
-            ? "Orbix is reviewing the submitted details and institutional references."
-            : "Orbix initial intake check validated.",
+        status: (isInitialReviewDone ? "completed" : "in_progress") as "completed" | "in_progress",
+        title: isInitialReviewDone ? "Initial review completed" : "Initial review in progress",
+        message: isInitialReviewDone
+            ? "Orbix automated intake check validated. Domain and identity verified."
+            : "Orbix is reviewing the submitted details and institutional references.",
         actionRequired: null,
-        createdAt: isPending ? submittedAt : reviewedAt,
+        createdAt: isInitialReviewDone ? (application?.updated_at || reviewedAt) : submittedAt,
     };
 
     // 3. Stage: college_verification
@@ -156,19 +178,7 @@ export function computeDynamicTimelineEvents(application: any, verifiedClub?: an
     let stage3Message = "The college and representative credentials will be checked.";
     let stage3Action: string | null = null;
 
-    const collegeContactStatus = application?.college_contact_status || "not_started";
-    const isContactConfirmed = collegeContactStatus === "confirmed";
-    const allChecksConfirmed =
-        isContactConfirmed &&
-        application?.club_existence_confirmed &&
-        application?.college_authorization_confirmed &&
-        application?.representative_authority_confirmed;
-
-    if (appStatus === "pending") {
-        stage3Status = "upcoming";
-        stage3Title = "College verification";
-        stage3Message = "The college and representative credentials will be checked.";
-    } else if (["approved", "ready_for_promotion"].includes(appStatus) || verifiedClub || allChecksConfirmed) {
+    if (["approved", "ready_for_promotion"].includes(appStatus) || verifiedClub || allChecksConfirmed) {
         stage3Status = "completed";
         stage3Title = "College verification completed";
         stage3Message = `Institution recognition, club existence, and representative authority confirmed for ${collegeName}.`;
@@ -181,12 +191,16 @@ export function computeDynamicTimelineEvents(application: any, verifiedClub?: an
         stage3Status = "rejected";
         stage3Title = "College verification criteria unmet";
         stage3Message = application?.internal_notes || "Could not verify institutional affiliation or representative credentials.";
-    } else if (appStatus === "under_review") {
+    } else if (anyCheckStarted || appStatus === "under_review") {
         stage3Status = "in_progress";
         stage3Title = "College verification in progress";
         stage3Message = collegeContactStatus === "contacted"
             ? "Outreach initiated with institution administration or faculty advisor."
-            : "Reviewing college directory recognition and campus presence.";
+            : "Active multi-channel investigation in progress with campus leadership.";
+    } else {
+        stage3Status = "upcoming";
+        stage3Title = "College verification";
+        stage3Message = "The college and representative credentials will be checked.";
     }
 
     const stage3 = {
@@ -205,10 +219,14 @@ export function computeDynamicTimelineEvents(application: any, verifiedClub?: an
     let stage4Message = "Approval, additional information, or rejection.";
     let stage4Action: string | null = null;
 
-    if (["approved", "ready_for_promotion"].includes(appStatus) || verifiedClub) {
+    if (["approved"].includes(appStatus) || verifiedClub) {
         stage4Status = "completed";
         stage4Title = "Verification decision: Approved";
         stage4Message = "Application verified and approved by Orbix reviewer.";
+    } else if (appStatus === "ready_for_promotion" || allChecksConfirmed) {
+        stage4Status = "in_progress";
+        stage4Title = "Verification decision: Awaiting Final Promotion";
+        stage4Message = "All institutional checks passed. Awaiting final promotion sign-off and access release.";
     } else if (appStatus === "rejected") {
         stage4Status = "rejected";
         stage4Title = "Verification decision: Not Approved";
@@ -218,6 +236,10 @@ export function computeDynamicTimelineEvents(application: any, verifiedClub?: an
         stage4Title = "Verification decision: Information Required";
         stage4Message = "Reviewer is awaiting clarifying documents or credentials before deciding.";
         stage4Action = "Respond to verification inquiry";
+    } else if (stage3Status === "completed") {
+        stage4Status = "in_progress";
+        stage4Title = "Verification decision: Under Final Review";
+        stage4Message = "Reviewer is reviewing final recommendation.";
     }
 
     const stage4 = {
@@ -239,7 +261,7 @@ export function computeDynamicTimelineEvents(application: any, verifiedClub?: an
         stage5Status = "completed";
         stage5Title = "Club access activated";
         stage5Message = "Your dedicated club dashboard and public profile are now live.";
-    } else if (appStatus === "ready_for_promotion") {
+    } else if (appStatus === "ready_for_promotion" || allChecksConfirmed) {
         stage5Status = "in_progress";
         stage5Title = "Activating club access";
         stage5Message = "Club credentials approved. Activation is in progress.";
@@ -1510,10 +1532,21 @@ clubRouter.get("/application-status", authenticate, async (req: Request, res: Re
                 consent_recorded_at,
                 status,
                 college_contact_status,
+                club_existence_confirmed,
+                college_authorization_confirmed,
+                representative_authority_confirmed,
                 last_college_contacted_at,
+                reviewed_by,
+                reviewed_at,
+                internal_notes,
                 submitted_at,
                 updated_at,
-                verified_club_id
+                verified_club_id,
+                college_id,
+                is_email_verified,
+                is_phone_verified,
+                phone_verified_at,
+                applicant_user_id
             FROM club_verification_requests
             WHERE auth_user_id = $1 OR LOWER(contact_email) = LOWER($2)
             ORDER BY submitted_at DESC
