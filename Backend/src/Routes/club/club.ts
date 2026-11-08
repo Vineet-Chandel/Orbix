@@ -2222,6 +2222,40 @@ clubRouter.get("/events", authenticate, async (req: Request, res: Response) => {
 });
 
 /**
+ * GET /api/club/events/creation-eligibility
+ * Returns real-time event creation eligibility, cooldowns, and score requirements
+ */
+clubRouter.get("/events/creation-eligibility", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
+        const clubRes = await query(
+            `SELECT id FROM verified_clubs WHERE auth_user_id = $1 LIMIT 1;`,
+            [userId]
+        );
+        let clubId = clubRes.rows[0]?.id;
+        if (!clubId) {
+            const staffClub = await getStaffClub(userId);
+            clubId = staffClub?.id;
+        }
+        if (!clubId) {
+            return res.status(404).json({ success: false, message: "Verified club not found." });
+        }
+
+        const eligibility = await ClubCredibilityService.checkEventCreationEligibility(clubId);
+        return res.json({
+            success: true,
+            eligibility,
+        });
+    } catch (err: any) {
+        console.error("GET /events/creation-eligibility error:", err);
+        return res.status(500).json({ success: false, message: "Failed to determine event creation eligibility." });
+    }
+});
+
+/**
  * GET /api/club/events/:eventId
  * Authenticated endpoint for the club to fetch a specific event they own (draft, published, completed, cancelled).
  * Strictly enforces that ONLY the club that owns the event can access it.
@@ -2347,7 +2381,35 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
         } = req.body;
 
         const validScopes = ["CAMPUS", "PAN_INDIA"];
-        const finalScope = validScopes.includes(scope) ? scope : "CAMPUS";
+        const finalScope = (validScopes.includes(scope) ? scope : "CAMPUS") as "CAMPUS" | "PAN_INDIA";
+
+        // Centralized Credibility Engine check & scope-based cooldown enforcement
+        const eligibility = await ClubCredibilityService.checkEventCreationEligibility(clubId);
+        const scopeEligibility = finalScope === "PAN_INDIA" ? eligibility.panIndia : eligibility.campus;
+
+        if (!scopeEligibility.eligible) {
+            if (!scopeEligibility.scorePassed) {
+                return res.status(403).json({
+                    success: false,
+                    code: "CREDIBILITY_SCORE_TOO_LOW",
+                    message: scopeEligibility.reason,
+                    currentScore: eligibility.currentScore,
+                    requiredScore: scopeEligibility.minScore,
+                    scope: finalScope,
+                });
+            }
+            if (scopeEligibility.inCooldown) {
+                return res.status(429).json({
+                    success: false,
+                    code: "EVENT_CREATION_COOLDOWN_ACTIVE",
+                    message: scopeEligibility.reason,
+                    cooldownExpiresAt: scopeEligibility.cooldownExpiresAt,
+                    cooldownRemainingMs: scopeEligibility.cooldownRemainingMs,
+                    cooldownDurationHours: scopeEligibility.cooldownDurationHours,
+                    scope: finalScope,
+                });
+            }
+        }
 
         if (!title || typeof title !== "string" || title.trim().length < 3) {
             return res.status(400).json({ success: false, message: "Event title must be at least 3 characters." });
@@ -2439,6 +2501,9 @@ clubRouter.post("/events", authenticate, async (req: Request, res: Response) => 
         );
 
         const newEvent = insertRes.rows[0];
+
+        // Record immutable event creation for persistent cooldown tracking
+        await ClubCredibilityService.recordEventCreation(clubId, newEvent.id, finalScope);
 
         // Save and publish initial registration form configured during 3-step event creation
         if (initialFormStructure && Array.isArray(initialFormStructure?.sections)) {
@@ -2548,6 +2613,27 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                         success: false,
                         code: "SCOPE_LOCKED",
                         message: "Event scope cannot be altered after participant registrations have been received.",
+                    });
+                }
+
+                // Security guard: Ensure club meets credibility threshold for the new scope
+                const eligibility = await ClubCredibilityService.checkEventCreationEligibility(clubId);
+                if (scope === "PAN_INDIA" && !eligibility.panIndia.scorePassed) {
+                    return res.status(403).json({
+                        success: false,
+                        code: "CREDIBILITY_SCORE_TOO_LOW",
+                        message: `Cannot upgrade event scope to Pan-India. Required Credibility Score >= 50.0 (Current: ${eligibility.currentScore}).`,
+                        currentScore: eligibility.currentScore,
+                        requiredScore: 50,
+                    });
+                }
+                if (scope === "CAMPUS" && !eligibility.campus.scorePassed) {
+                    return res.status(403).json({
+                        success: false,
+                        code: "CREDIBILITY_SCORE_TOO_LOW",
+                        message: `Cannot modify event scope to Campus. Required Credibility Score >= 20.0 (Current: ${eligibility.currentScore}).`,
+                        currentScore: eligibility.currentScore,
+                        requiredScore: 20,
                     });
                 }
             }
@@ -2751,7 +2837,7 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                         baseWeight: 1.5,
                         scope: current.scope,
                         verifiedRegistrations: regsCount,
-                        noticeHours,
+                        noticeHours: hoursNotice,
                         isNegativeOutcome: cancelEval.qualityScore < 50,
                     },
                     factorBreakdown: {
@@ -2789,7 +2875,7 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                             baseWeight: 1.2,
                             scope: current.scope,
                             verifiedRegistrations: regsCount,
-                            noticeHours,
+                            noticeHours: hoursNotice,
                             isNegativeOutcome: cancelEval.qualityScore < 50,
                         },
                         factorBreakdown: {
@@ -2898,7 +2984,7 @@ clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Re
                     baseWeight: 2.0,
                     scope: ev.scope,
                     verifiedRegistrations: ev.registrationsCount,
-                    noticeHours,
+                    noticeHours: hoursNotice,
                     isNegativeOutcome: cancelEval.qualityScore < 50,
                 },
                 factorBreakdown: {

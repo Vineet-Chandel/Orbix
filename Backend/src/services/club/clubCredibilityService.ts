@@ -48,6 +48,30 @@ export interface CredibilityImpactPreview {
     eventVersionToken: string;
 }
 
+export interface ScopeEligibilityStatus {
+    eligible: boolean;
+    minScore: number;
+    currentScore: number;
+    scorePassed: boolean;
+    scoreDeficit: number;
+    inCooldown: boolean;
+    cooldownDurationHours: number;
+    cooldownRemainingMs: number;
+    cooldownExpiresAt: string | null;
+    lastEventCreatedAt: string | null;
+    reason: string;
+}
+
+export interface ClubEventCreationEligibility {
+    clubId: string;
+    currentScore: number;
+    scoreLevel: ScoreLevel;
+    confidenceLevel: ConfidenceLevel;
+    isProvisional: boolean;
+    campus: ScopeEligibilityStatus;
+    panIndia: ScopeEligibilityStatus;
+}
+
 export interface RecordCredibilityEventParams {
     clubId: string;
     eventId?: string | undefined;
@@ -521,7 +545,7 @@ export class ClubCredibilityService {
             verifiedAttendees: attendeesCount,
             successfulStreak: snapshot.successfulEventStreak,
             isNegativeOutcome: isNegative,
-            noticeHours,
+            noticeHours: hoursNotice,
         });
 
         const simulatedItem: CredibilityEvidenceItem = {
@@ -791,6 +815,182 @@ export class ClubCredibilityService {
             missingAttendanceCount,
             warnings,
         };
+    }
+
+    /**
+     * Cooldown constants & Score thresholds
+     */
+    public static readonly MIN_CAMPUS_SCORE = 20.0;
+    public static readonly MIN_PAN_INDIA_SCORE = 50.0;
+    public static readonly CAMPUS_COOLDOWN_MS = 12 * 60 * 60 * 1000; // 12 hours
+    public static readonly PAN_INDIA_COOLDOWN_MS = 3 * 24 * 60 * 60 * 1000; // 3 days (72 hours)
+
+    /**
+     * Check centralized event creation eligibility (Credibility score + scope cooldown)
+     */
+    public static async checkEventCreationEligibility(clubId: string): Promise<ClubEventCreationEligibility> {
+        const snapshot = await this.getSnapshot(clubId);
+        const currentScore = Number(snapshot.currentScore.toFixed(1));
+
+        // Query the most recent creation timestamp for both scopes
+        // Using GREATEST across club_events and immutable club_event_creation_history
+        const campusLastRes = await query(
+            `SELECT GREATEST(
+                (SELECT MAX(created_at) FROM public.club_events WHERE club_id = $1 AND scope = 'CAMPUS'),
+                (SELECT MAX(created_at) FROM public.club_event_creation_history WHERE club_id = $1 AND scope = 'CAMPUS')
+            ) AS "lastCreatedAt";`,
+            [clubId]
+        ).catch(() => {
+            return query(
+                `SELECT MAX(created_at) AS "lastCreatedAt" FROM public.club_events WHERE club_id = $1 AND scope = 'CAMPUS';`,
+                [clubId]
+            );
+        });
+
+        const panIndiaLastRes = await query(
+            `SELECT GREATEST(
+                (SELECT MAX(created_at) FROM public.club_events WHERE club_id = $1 AND scope = 'PAN_INDIA'),
+                (SELECT MAX(created_at) FROM public.club_event_creation_history WHERE club_id = $1 AND scope = 'PAN_INDIA')
+            ) AS "lastCreatedAt";`,
+            [clubId]
+        ).catch(() => {
+            return query(
+                `SELECT MAX(created_at) AS "lastCreatedAt" FROM public.club_events WHERE club_id = $1 AND scope = 'PAN_INDIA';`,
+                [clubId]
+            );
+        });
+
+        const now = Date.now();
+
+        // Calculate Campus status
+        const campusLastCreatedAt = campusLastRes.rows[0]?.lastCreatedAt
+            ? new Date(campusLastRes.rows[0].lastCreatedAt).toISOString()
+            : null;
+        let campusInCooldown = false;
+        let campusRemainingMs = 0;
+        let campusExpiresAt: string | null = null;
+
+        if (campusLastCreatedAt) {
+            const lastMs = new Date(campusLastCreatedAt).getTime();
+            const expiresMs = lastMs + this.CAMPUS_COOLDOWN_MS;
+            if (now < expiresMs) {
+                campusInCooldown = true;
+                campusRemainingMs = expiresMs - now;
+                campusExpiresAt = new Date(expiresMs).toISOString();
+            }
+        }
+
+        const campusScorePassed = currentScore >= this.MIN_CAMPUS_SCORE;
+        const campusScoreDeficit = campusScorePassed ? 0 : Number((this.MIN_CAMPUS_SCORE - currentScore).toFixed(1));
+        const campusEligible = campusScorePassed && !campusInCooldown;
+
+        let campusReason = "Eligible to create Campus events.";
+        if (!campusScorePassed && campusInCooldown) {
+            campusReason = `Credibility score of ${currentScore} is below the required 20.0, and 12-hour creation cooldown is active (${this.formatDuration(campusRemainingMs)} remaining).`;
+        } else if (!campusScorePassed) {
+            campusReason = `Credibility score of ${currentScore} is below the minimum required 20.0. Club operations are restricted due to critical trust standing.`;
+        } else if (campusInCooldown) {
+            campusReason = `12-hour campus event creation cooldown is active. Next event can be created in ${this.formatDuration(campusRemainingMs)}.`;
+        }
+
+        // Calculate Pan India status
+        const panIndiaLastCreatedAt = panIndiaLastRes.rows[0]?.lastCreatedAt
+            ? new Date(panIndiaLastRes.rows[0].lastCreatedAt).toISOString()
+            : null;
+        let panIndiaInCooldown = false;
+        let panIndiaRemainingMs = 0;
+        let panIndiaExpiresAt: string | null = null;
+
+        if (panIndiaLastCreatedAt) {
+            const lastMs = new Date(panIndiaLastCreatedAt).getTime();
+            const expiresMs = lastMs + this.PAN_INDIA_COOLDOWN_MS;
+            if (now < expiresMs) {
+                panIndiaInCooldown = true;
+                panIndiaRemainingMs = expiresMs - now;
+                panIndiaExpiresAt = new Date(expiresMs).toISOString();
+            }
+        }
+
+        const panIndiaScorePassed = currentScore >= this.MIN_PAN_INDIA_SCORE;
+        const panIndiaScoreDeficit = panIndiaScorePassed ? 0 : Number((this.MIN_PAN_INDIA_SCORE - currentScore).toFixed(1));
+        const panIndiaEligible = panIndiaScorePassed && !panIndiaInCooldown;
+
+        let panIndiaReason = "Eligible to create Pan-India events across colleges.";
+        if (!panIndiaScorePassed && panIndiaInCooldown) {
+            panIndiaReason = `Credibility score of ${currentScore} is below the required 50.0, and 3-day Pan-India creation cooldown is active (${this.formatDuration(panIndiaRemainingMs)} remaining).`;
+        } else if (!panIndiaScorePassed) {
+            panIndiaReason = `Credibility score of ${currentScore} is below the required 50.0 for Pan-India events. Deliver successful campus events to raise your score by +${panIndiaScoreDeficit} pts.`;
+        } else if (panIndiaInCooldown) {
+            panIndiaReason = `3-day Pan-India event creation cooldown is active. Next Pan-India event can be created in ${this.formatDuration(panIndiaRemainingMs)}.`;
+        }
+
+        return {
+            clubId,
+            currentScore,
+            scoreLevel: snapshot.scoreLevel,
+            confidenceLevel: snapshot.confidenceLevel,
+            isProvisional: snapshot.isProvisional,
+            campus: {
+                eligible: campusEligible,
+                minScore: this.MIN_CAMPUS_SCORE,
+                currentScore,
+                scorePassed: campusScorePassed,
+                scoreDeficit: campusScoreDeficit,
+                inCooldown: campusInCooldown,
+                cooldownDurationHours: 12,
+                cooldownRemainingMs: campusRemainingMs,
+                cooldownExpiresAt: campusExpiresAt,
+                lastEventCreatedAt: campusLastCreatedAt,
+                reason: campusReason,
+            },
+            panIndia: {
+                eligible: panIndiaEligible,
+                minScore: this.MIN_PAN_INDIA_SCORE,
+                currentScore,
+                scorePassed: panIndiaScorePassed,
+                scoreDeficit: panIndiaScoreDeficit,
+                inCooldown: panIndiaInCooldown,
+                cooldownDurationHours: 72,
+                cooldownRemainingMs: panIndiaRemainingMs,
+                cooldownExpiresAt: panIndiaExpiresAt,
+                lastEventCreatedAt: panIndiaLastCreatedAt,
+                reason: panIndiaReason,
+            },
+        };
+    }
+
+    /**
+     * Record immutable event creation for cooldown enforcement
+     */
+    public static async recordEventCreation(clubId: string, eventId: string, scope: "CAMPUS" | "PAN_INDIA"): Promise<void> {
+        try {
+            await query(
+                `INSERT INTO public.club_event_creation_history (club_id, event_id, scope, created_at)
+                 VALUES ($1, $2, $3, NOW());`,
+                [clubId, eventId, scope]
+            );
+        } catch (err) {
+            console.error("[ClubCredibilityService] recordEventCreation error:", err);
+        }
+    }
+
+    /**
+     * Helper to format millisecond duration into human-readable string
+     */
+    public static formatDuration(ms: number): string {
+        if (ms <= 0) return "0m";
+        const totalSeconds = Math.floor(ms / 1000);
+        const days = Math.floor(totalSeconds / 86400);
+        const hours = Math.floor((totalSeconds % 86400) / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+
+        if (days > 0) {
+            return `${days}d ${hours}h`;
+        }
+        if (hours > 0) {
+            return `${hours}h ${minutes}m`;
+        }
+        return `${Math.max(1, minutes)}m`;
     }
 
     /**

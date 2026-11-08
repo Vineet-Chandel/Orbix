@@ -87,6 +87,38 @@ clubCredibilityRouter.get("/credibility/history", authenticate, async (req: Requ
 });
 
 /**
+ * GET /api/club/credibility/creation-eligibility
+ * GET /api/club/events/creation-eligibility
+ * Returns real-time eligibility, cooldown status, and minimum score requirements for event creation
+ */
+async function handleGetCreationEligibility(req: Request, res: Response) {
+    try {
+        const userId = req.user?.id;
+        if (!userId) {
+            return res.status(401).json({ success: false, message: "Unauthorized." });
+        }
+
+        const clubId = await resolveClubIdForUser(userId);
+        if (!clubId) {
+            return res.status(404).json({ success: false, message: "Verified club profile not found." });
+        }
+
+        const eligibility = await ClubCredibilityService.checkEventCreationEligibility(clubId);
+
+        return res.json({
+            success: true,
+            eligibility,
+        });
+    } catch (err: any) {
+        console.error("GET creation-eligibility error:", err);
+        return res.status(500).json({ success: false, message: "Failed to determine event creation eligibility." });
+    }
+}
+
+clubCredibilityRouter.get("/credibility/creation-eligibility", authenticate, handleGetCreationEligibility);
+clubCredibilityRouter.get("/events/creation-eligibility", authenticate, handleGetCreationEligibility);
+
+/**
  * POST /api/club/credibility/preview-impact
  * Live preview calculation for CredibilityImpactModal
  */

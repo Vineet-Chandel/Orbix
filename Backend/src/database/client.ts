@@ -962,6 +962,17 @@ export const testDatabaseConnection = async () => {
 
                 CREATE INDEX IF NOT EXISTS idx_credibility_appeals_club
                     ON public.club_credibility_appeals(club_id, created_at DESC);
+
+                -- Migration 037: Immutable Event Creation History for Cooldown Rate Limiting
+                CREATE TABLE IF NOT EXISTS public.club_event_creation_history (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    event_id UUID,
+                    scope VARCHAR(32) NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_club_creation_hist_club_scope 
+                    ON public.club_event_creation_history(club_id, scope, created_at DESC);
             END $$;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");

@@ -119,7 +119,7 @@ export const ClubCredibilityWorkspace: React.FC = () => {
     const badge = getScoreBadge(snapshot.currentScore, snapshot.scoreLevel, snapshot.isProvisional);
 
     return (
-        <div className="space-y-6 text-neutral-900 dark:text-neutral-100 max-w-7xl mx-auto">
+        <div className="w-full space-y-6 text-neutral-900 dark:text-neutral-100">
             {/* Header: Title, Score Badge, and Recalculate CTA */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-black/10 dark:border-white/10 pb-5">
                 <div>

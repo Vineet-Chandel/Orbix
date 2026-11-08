@@ -68,6 +68,35 @@ export interface CredibilityImpactPreview {
     eventVersionToken: string;
 }
 
+export interface ScopeEligibilityStatus {
+    eligible: boolean;
+    minScore: number;
+    currentScore: number;
+    scorePassed: boolean;
+    scoreDeficit: number;
+    inCooldown: boolean;
+    cooldownDurationHours: number;
+    cooldownRemainingMs: number;
+    cooldownExpiresAt: string | null;
+    lastEventCreatedAt: string | null;
+    reason: string;
+}
+
+export interface ClubEventCreationEligibility {
+    clubId: string;
+    currentScore: number;
+    scoreLevel: ScoreLevel;
+    confidenceLevel: ConfidenceLevel;
+    isProvisional: boolean;
+    campus: ScopeEligibilityStatus;
+    panIndia: ScopeEligibilityStatus;
+}
+
+export interface CreationEligibilityResponse {
+    success: boolean;
+    eligibility: ClubEventCreationEligibility;
+}
+
 export interface CredibilityOverviewResponse {
     success: boolean;
     snapshot: ClubCredibilitySnapshot;
@@ -157,4 +186,11 @@ export async function recalculateClubCredibility() {
 export async function fetchPublicClubCredibility(clubId: string) {
     const data = await apiFetch<{ success: boolean; credibility: any }>(`/clubs/${clubId}/credibility/public`);
     return data.credibility;
+}
+
+/**
+ * Fetch real-time event creation eligibility (centralized score gating & cooldowns)
+ */
+export async function fetchEventCreationEligibility(): Promise<CreationEligibilityResponse> {
+    return apiFetch<CreationEligibilityResponse>("/club/events/creation-eligibility");
 }

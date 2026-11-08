@@ -23,6 +23,7 @@ import { ClubDetailModal } from "../../../components/ClubDetailModal";
 import { InviteCampusLeadsModal } from "../../../components/InviteCampusLeadsModal";
 import { CollegeEventDetailModal } from "../../../app/Events/CollegeEventDetailModal";
 import { NeoSelect } from "../../../components/NeoSelect";
+import { IndiaMapBackdrop, CampusPillarsBackdrop } from "../../../components/ScopeBackdrops";
 import {
     MOCK_COLLEGES,
     MOCK_CLUBS_DATA,
@@ -730,9 +731,17 @@ export const ClubsShowcase: React.FC = () => {
                                 <div
                                     key={ev.id}
                                     onClick={() => setSelectedEventForModal(ev)}
-                                    className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer group"
+                                    className="relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer group"
                                 >
-                                    <div>
+                                    {/* Architectural Pillars Backdrop */}
+                                    <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+                                        <div className="absolute -right-4 -bottom-6 w-40 sm:w-48 h-40 sm:h-48 opacity-[0.06] group-hover:opacity-[0.14] transition-opacity duration-300 text-neutral-900">
+                                            <CampusPillarsBackdrop className="w-full h-full object-contain" />
+                                        </div>
+                                    </div>
+
+                                    <div className="relative z-10 flex flex-col justify-between h-full">
+                                        <div>
                                         {/* Cover Banner */}
                                         <div className="relative w-full aspect-[2.4/1] rounded-xl border-2 border-black overflow-hidden mb-3.5 bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                             {ev.coverImageUrl ? (
@@ -854,6 +863,7 @@ export const ClubsShowcase: React.FC = () => {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
                             ))}
                         </div>
                     </div>
@@ -887,9 +897,17 @@ export const ClubsShowcase: React.FC = () => {
                                     <div
                                         key={ev.id}
                                         onClick={() => setSelectedEventForModal(ev)}
-                                        className="p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:border-[#FF9933] transition-all cursor-pointer group"
+                                        className="relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:border-[#FF9933] transition-all cursor-pointer group"
                                     >
-                                        <div>
+                                        {/* India Map Backdrop */}
+                                        <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
+                                            <div className="absolute -right-6 -bottom-6 w-48 sm:w-56 h-48 sm:h-56 opacity-[0.05] group-hover:opacity-[0.13] transition-opacity duration-300 text-neutral-950">
+                                                <IndiaMapBackdrop className="w-full h-full object-contain" />
+                                            </div>
+                                        </div>
+
+                                        <div className="relative z-10 flex flex-col justify-between h-full">
+                                            <div>
                                             <div className="relative w-full aspect-[2.4/1] rounded-xl border-2 border-black overflow-hidden mb-3.5 bg-neutral-950 shadow-[2px_2px_0px_#000] flex items-center justify-center">
                                                 {ev.coverImageUrl && (
                                                     <img
@@ -944,7 +962,8 @@ export const ClubsShowcase: React.FC = () => {
                                             </button>
                                         </div>
                                     </div>
-                                ))}
+                                </div>
+                            ))}
                             </div>
                         </div>
                     )}
