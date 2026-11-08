@@ -17,6 +17,7 @@ import {
     Check,
     Lightbulb,
     AlertTriangle,
+    X,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppDispatch, updateUserProfile } from "../../store";
@@ -426,9 +427,9 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                     <button
                                         type="button"
                                         onClick={() => setInputError(null)}
-                                        className="text-rose-700 hover:text-rose-900 font-black cursor-pointer"
+                                        className="text-rose-700 hover:text-rose-900 cursor-pointer"
                                     >
-                                        ✕
+                                        <X className="w-4 h-4" />
                                     </button>
                                 </div>
                             )}

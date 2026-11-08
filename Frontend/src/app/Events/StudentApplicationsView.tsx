@@ -10,6 +10,7 @@ import {
     Search,
     Ban,
     Menu,
+    AlertTriangle,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -509,8 +510,9 @@ export const StudentApplicationsView: React.FC<StudentApplicationsViewProps> = (
                                     <span className="text-neutral-500 font-mono text-[10px] uppercase">Access Ticket:</span>
                                     <span className="font-mono text-black">{withdrawTargetApp.ticketCode}</span>
                                 </div>
-                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200">
-                                    ⚠️ Your pass will be cancelled immediately and cannot be recovered.
+                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200 flex items-center gap-1.5 font-bold">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Your pass will be cancelled immediately and cannot be recovered.</span>
                                 </p>
                             </div>
                         </div>

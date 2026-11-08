@@ -30,6 +30,8 @@ import {
     CheckCheck,
     ChevronDown,
     ChevronUp,
+    Lightbulb,
+    ClipboardList,
 } from "lucide-react";
 import type {
     ClubEventFormRecord,
@@ -1047,13 +1049,15 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                                                         : String(gradedInfo.studentAnswer ?? "(No answer provided)")}
                                                 </div>
                                                 {form.settings?.quiz?.showCorrectAnswers && !isCorrect && q.correctAnswers && q.correctAnswers.length > 0 && (
-                                                    <div className="text-[11px] font-medium text-emerald-800 dark:text-emerald-300">
-                                                        ✓ <strong className="font-semibold">Correct answer:</strong> {q.correctAnswers.join(", ")}
+                                                    <div className="text-[11px] font-medium text-emerald-800 dark:text-emerald-300 flex items-center gap-1">
+                                                        <Check className="w-3.5 h-3.5 text-emerald-600 inline shrink-0" />
+                                                        <span><strong className="font-semibold">Correct answer:</strong> {q.correctAnswers.join(", ")}</span>
                                                     </div>
                                                 )}
                                                 {gradedInfo.feedback && (
-                                                    <div className="text-[11px] font-normal text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 p-2 rounded-lg border border-neutral-200 dark:border-neutral-700">
-                                                        💡 {gradedInfo.feedback}
+                                                    <div className="text-[11px] font-normal text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 p-2 rounded-lg border border-neutral-200 dark:border-neutral-700 flex items-center gap-1.5">
+                                                        <Lightbulb className="w-3.5 h-3.5 text-amber-500 inline shrink-0" />
+                                                        <span>{gradedInfo.feedback}</span>
                                                     </div>
                                                 )}
                                                 {gradedInfo.links && gradedInfo.links.length > 0 && (
@@ -1277,7 +1281,7 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
             {draftRestoredNotice && (
                 <div className="p-3.5 rounded-2xl bg-neutral-900 text-white dark:bg-white dark:text-neutral-900 border border-neutral-800 dark:border-neutral-200 shadow-sm flex items-center justify-between text-xs font-medium animate-in fade-in">
                     <span className="flex items-center gap-2">
-                        <span>📋</span>
+                        <ClipboardList className="w-4 h-4 shrink-0" />
                         <span>{draftRestoredNotice}</span>
                     </span>
                     <button

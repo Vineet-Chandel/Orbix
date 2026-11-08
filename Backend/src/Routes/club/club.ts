@@ -35,6 +35,8 @@ import { ClubProfileService } from "../../services/club/clubProfileService.js";
 import { notifyClubAndCollegeUsers } from "../../services/club/clubEventNotificationService.js";
 import { ClubEventFormService } from "../../services/club/clubEventFormService.js";
 import { sendGuardianConsentEmail } from "../../services/email/resendService.js";
+import { ClubCredibilityService } from "../../services/club/clubCredibilityService.js";
+import { ClubCredibilityEngine } from "../../scoring/clubCredibilityEngine.js";
 
 const clubRouter = express.Router();
 
@@ -2688,6 +2690,119 @@ clubRouter.patch("/events/:eventId", authenticate, async (req: Request, res: Res
                     console.error("[PATCH /events] Notification dispatch error:", err)
                 );
             }
+
+            // Credibility Engine Integration: Lifecycle transitions evaluate outcome evidence
+            if (newStatus === "completed" && current.status !== "completed") {
+                const attendeesCount = refreshedEvent.rows[0]?.attendeesCount || 0;
+                const regsCount = refreshedEvent.rows[0]?.registrationsCount || 0;
+                const compEval = new ClubCredibilityEngine().evaluateCompletedEventQuality({
+                    deliveryAgainstCommitments: 90,
+                    scheduleReliability: 90,
+                    participantCommunication: 85,
+                    verifiedExperience: attendeesCount > 0 ? 85 : 70,
+                    complaintResolution: 95,
+                    certificateAccuracy: 90,
+                });
+
+                ClubCredibilityService.recordCredibilityEvent({
+                    clubId,
+                    eventId: String(eventId),
+                    sourceAction: "event_completed",
+                    reasonCode: "event_delivered_successfully",
+                    outcomeQuality: compEval.qualityScore,
+                    weightInputs: {
+                        baseWeight: 1.0,
+                        scope: current.scope,
+                        verifiedRegistrations: regsCount,
+                        verifiedAttendees: attendeesCount,
+                        isNegativeOutcome: false,
+                    },
+                    factorBreakdown: {
+                        eventTitle: current.title,
+                        scope: current.scope,
+                        attendeesCount,
+                        registrationsCount: regsCount,
+                        dimensionalBreakdown: compEval.dimensionalBreakdown,
+                    },
+                    actorId: userId,
+                    idempotencyKey: `complete_${eventId}_${current.status}`,
+                }).catch((err) => console.error("[Credibility] Record event_completed error:", err));
+            } else if (newStatus === "cancelled" && current.status === "published") {
+                const startsAtMs = new Date(current.starts_at).getTime();
+                const hoursNotice = Math.max(0, (startsAtMs - Date.now()) / (1000 * 60 * 60));
+                const regsCount = refreshedEvent.rows[0]?.registrationsCount || 0;
+                const reasonCat = req.body.reasonCategory || (req.body.emergencyBypass ? "emergency_verified" : "operational_delay");
+
+                const cancelEval = new ClubCredibilityEngine().evaluateCancellationQuality({
+                    hoursNoticeBeforeEvent: hoursNotice,
+                    affectedRegistrationsCount: regsCount,
+                    reasonCategory: reasonCat,
+                    communicatedToAllParticipants: true,
+                    rescheduleOrRemedyOffered: Boolean(req.body.rescheduleOffered),
+                });
+
+                ClubCredibilityService.recordCredibilityEvent({
+                    clubId,
+                    eventId: String(eventId),
+                    sourceAction: "event_cancelled",
+                    reasonCode: `cancellation_${reasonCat}`,
+                    outcomeQuality: cancelEval.qualityScore,
+                    weightInputs: {
+                        baseWeight: 1.5,
+                        scope: current.scope,
+                        verifiedRegistrations: regsCount,
+                        noticeHours,
+                        isNegativeOutcome: cancelEval.qualityScore < 50,
+                    },
+                    factorBreakdown: {
+                        eventTitle: current.title,
+                        scope: current.scope,
+                        hoursNotice,
+                        affectedRegistrations: regsCount,
+                        reasonCategory: reasonCat,
+                        dimensionalBreakdown: cancelEval.dimensionalBreakdown,
+                    },
+                    actorId: userId,
+                    idempotencyKey: `cancel_${eventId}_${Date.now()}`,
+                }).catch((err) => console.error("[Credibility] Record event_cancelled error:", err));
+            } else if (newStatus === "draft" && current.status === "published") {
+                // Unpublishing a live published event with active registrations
+                const regsCount = refreshedEvent.rows[0]?.registrationsCount || 0;
+                if (regsCount > 0) {
+                    const startsAtMs = new Date(current.starts_at).getTime();
+                    const hoursNotice = Math.max(0, (startsAtMs - Date.now()) / (1000 * 60 * 60));
+                    const cancelEval = new ClubCredibilityEngine().evaluateCancellationQuality({
+                        hoursNoticeBeforeEvent: hoursNotice,
+                        affectedRegistrationsCount: regsCount,
+                        reasonCategory: "operational_delay",
+                        communicatedToAllParticipants: true,
+                        rescheduleOrRemedyOffered: false,
+                    });
+
+                    ClubCredibilityService.recordCredibilityEvent({
+                        clubId,
+                        eventId: String(eventId),
+                        sourceAction: "event_postponed",
+                        reasonCode: "unpublish_live_event_to_draft",
+                        outcomeQuality: cancelEval.qualityScore,
+                        weightInputs: {
+                            baseWeight: 1.2,
+                            scope: current.scope,
+                            verifiedRegistrations: regsCount,
+                            noticeHours,
+                            isNegativeOutcome: cancelEval.qualityScore < 50,
+                        },
+                        factorBreakdown: {
+                            eventTitle: current.title,
+                            scope: current.scope,
+                            hoursNotice,
+                            affectedRegistrations: regsCount,
+                        },
+                        actorId: userId,
+                        idempotencyKey: `draft_unpublish_${eventId}_${Date.now()}`,
+                    }).catch((err) => console.error("[Credibility] Record unpublish_to_draft error:", err));
+                }
+            }
         }
 
         return res.json({
@@ -2726,7 +2841,9 @@ clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Re
         }
 
         const existingEvent = await query(
-            `SELECT id, title FROM club_events WHERE id = $1 AND club_id = $2 LIMIT 1;`,
+            `SELECT id, title, status, scope, starts_at,
+                COALESCE((SELECT COUNT(*)::int FROM club_event_registrations r WHERE r.event_id = club_events.id AND r.status IN ('registered', 'attended')), 0) AS "registrationsCount"
+             FROM club_events WHERE id = $1 AND club_id = $2 LIMIT 1;`,
             [eventId, clubRes.rows[0].id]
         );
         if (!existingEvent.rows[0]) {
@@ -2756,6 +2873,43 @@ clubRouter.delete("/events/:eventId", authenticate, async (req: Request, res: Re
         const isMatch = await bcrypt.compare(password, userRes.rows[0].password);
         if (!isMatch) {
             return res.status(401).json({ success: false, message: "Incorrect club account password. Authentication failed." });
+        }
+
+        // Credibility Accountability: If deleting a live published event with student registrations, record evidence
+        const ev = existingEvent.rows[0];
+        if (ev.status === "published" && (ev.registrationsCount || 0) > 0) {
+            const startsAtMs = new Date(ev.starts_at).getTime();
+            const hoursNotice = Math.max(0, (startsAtMs - Date.now()) / (1000 * 60 * 60));
+            const cancelEval = new ClubCredibilityEngine().evaluateCancellationQuality({
+                hoursNoticeBeforeEvent: hoursNotice,
+                affectedRegistrationsCount: ev.registrationsCount,
+                reasonCategory: "operational_delay",
+                communicatedToAllParticipants: false,
+                rescheduleOrRemedyOffered: false,
+            });
+
+            await ClubCredibilityService.recordCredibilityEvent({
+                clubId: clubRes.rows[0].id,
+                eventId: String(eventId),
+                sourceAction: "event_deleted",
+                reasonCode: "published_event_deleted_with_registrations",
+                outcomeQuality: cancelEval.qualityScore,
+                weightInputs: {
+                    baseWeight: 2.0,
+                    scope: ev.scope,
+                    verifiedRegistrations: ev.registrationsCount,
+                    noticeHours,
+                    isNegativeOutcome: cancelEval.qualityScore < 50,
+                },
+                factorBreakdown: {
+                    eventTitle: ev.title,
+                    scope: ev.scope,
+                    hoursNotice,
+                    affectedRegistrations: ev.registrationsCount,
+                },
+                actorId: userId,
+                idempotencyKey: `delete_pub_${eventId}_${Date.now()}`,
+            }).catch((err) => console.error("[Credibility] Record event_deleted error:", err));
         }
 
         const deleteRes = await query(
@@ -5321,6 +5475,29 @@ clubRouter.post("/certificates/issue", authenticate, async (req: Request, res: R
             throw txnErr;
         } finally {
             client.release();
+        }
+
+        // Credibility Engine Integration: Record certificate issuance evidence
+        if (issuedCertificates.length > 0) {
+            ClubCredibilityService.recordCredibilityEvent({
+                clubId: club.id,
+                eventId: eventId ? String(eventId) : undefined,
+                sourceAction: "certificate_issued",
+                reasonCode: "verified_credentials_awarded",
+                outcomeQuality: 90,
+                weightInputs: {
+                    baseWeight: 0.8,
+                    scope: "CAMPUS",
+                    verifiedAttendees: issuedCertificates.length,
+                    isNegativeOutcome: false,
+                },
+                factorBreakdown: {
+                    issuedCount: issuedCertificates.length,
+                    certificateType: certificateType || "participation",
+                },
+                actorId: staffUserId,
+                idempotencyKey: `cert_batch_${club.id}_${Date.now()}`,
+            }).catch((err) => console.error("[Credibility] Record certificate_issued error:", err));
         }
 
         const skippedCount = recipientUserIds.length - eligibleUsers.length;

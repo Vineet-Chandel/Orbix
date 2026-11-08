@@ -896,6 +896,72 @@ export const testDatabaseConnection = async () => {
                     ON public.club_event_registrations(institution_id);
                 CREATE INDEX IF NOT EXISTS idx_club_event_reg_state 
                     ON public.club_event_registrations(institution_state);
+
+                -- Migration 036: Club Credibility Engine Snapshots, Ledger & Appeals
+                CREATE TABLE IF NOT EXISTS public.club_credibility_snapshots (
+                    club_id UUID PRIMARY KEY REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    current_score NUMERIC(5,2) NOT NULL DEFAULT 50.00 CHECK (current_score >= 0 AND current_score <= 100),
+                    lifetime_score NUMERIC(5,2) NOT NULL DEFAULT 50.00 CHECK (lifetime_score >= 0 AND lifetime_score <= 100),
+                    recent_score NUMERIC(5,2) NOT NULL DEFAULT 50.00 CHECK (recent_score >= 0 AND recent_score <= 100),
+                    score_level VARCHAR(20) NOT NULL DEFAULT 'developing',
+                    confidence_level VARCHAR(20) NOT NULL DEFAULT 'low',
+                    is_provisional BOOLEAN NOT NULL DEFAULT true,
+                    total_verified_events INT NOT NULL DEFAULT 0,
+                    total_verified_incidents INT NOT NULL DEFAULT 0,
+                    successful_event_streak INT NOT NULL DEFAULT 0,
+                    total_evidence_weight NUMERIC(8,2) NOT NULL DEFAULT 0,
+                    dimensional_scores JSONB NOT NULL DEFAULT '{"eventDelivery":50,"scheduleReliability":50,"communication":50,"participantExperience":50,"cancellationReliability":50,"certificateIntegrity":50}'::jsonb,
+                    scoring_version VARCHAR(20) NOT NULL DEFAULT 'v1.0',
+                    last_calculated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS public.club_credibility_ledger (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    event_id UUID REFERENCES public.club_events(id) ON DELETE SET NULL,
+                    source_action VARCHAR(50) NOT NULL,
+                    reason_code VARCHAR(60) NOT NULL,
+                    outcome_quality NUMERIC(5,2) NOT NULL CHECK (outcome_quality >= 0 AND outcome_quality <= 100),
+                    evidence_weight NUMERIC(5,2) NOT NULL,
+                    score_before NUMERIC(5,2) NOT NULL,
+                    score_after NUMERIC(5,2) NOT NULL,
+                    score_delta NUMERIC(5,2) NOT NULL,
+                    evidence_confidence NUMERIC(3,2) NOT NULL DEFAULT 1.00,
+                    factor_breakdown JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    evidence_references JSONB DEFAULT '{}'::jsonb,
+                    status VARCHAR(20) NOT NULL DEFAULT 'confirmed',
+                    reversal_reference_id UUID REFERENCES public.club_credibility_ledger(id) ON DELETE SET NULL,
+                    actor_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    actor_type VARCHAR(20) NOT NULL DEFAULT 'club_admin',
+                    idempotency_key VARCHAR(128) UNIQUE,
+                    scoring_version VARCHAR(20) NOT NULL DEFAULT 'v1.0',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    finalised_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_credibility_ledger_club_created
+                    ON public.club_credibility_ledger(club_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_credibility_ledger_event
+                    ON public.club_credibility_ledger(event_id);
+
+                CREATE TABLE IF NOT EXISTS public.club_credibility_appeals (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    club_id UUID NOT NULL REFERENCES public.verified_clubs(id) ON DELETE CASCADE,
+                    ledger_id UUID NOT NULL REFERENCES public.club_credibility_ledger(id) ON DELETE CASCADE,
+                    reason TEXT NOT NULL,
+                    evidence_attachments JSONB DEFAULT '[]'::jsonb,
+                    appeal_status VARCHAR(20) NOT NULL DEFAULT 'pending',
+                    reviewer_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+                    review_decision VARCHAR(20),
+                    reviewer_reason TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    reviewed_at TIMESTAMPTZ
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_credibility_appeals_club
+                    ON public.club_credibility_appeals(club_id, created_at DESC);
             END $$;
         `);
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");

@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { Code2, FolderGit2, Sparkles } from "lucide-react";
+import { Code2, FolderGit2, Sparkles, X, Plus } from "lucide-react";
 import { CARD_THEMES } from "./types";
 import type { CardFormat, CardFace, CardThemeId, SlotShowcaseCategory } from "./types";
 import type { RankedPlatform, RankedContestPlatform } from "../../../utils/cardStatsAggregator";
@@ -529,8 +529,8 @@ export const CardCustomizerToolbar: React.FC<CardCustomizerToolbarProps> = ({
                                                 ({plat.solvedCount})
                                             </span>
                                         ) : null}
-                                        <span className="text-[10px] font-bold">
-                                            {isPresent ? "✕" : "+"}
+                                        <span className="inline-flex items-center">
+                                            {isPresent ? <X className="w-2.5 h-2.5" /> : <Plus className="w-2.5 h-2.5" />}
                                         </span>
                                     </button>
                                 );

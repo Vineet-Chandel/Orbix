@@ -33,6 +33,8 @@ import {
     Clock,
     Settings,
     ShieldAlert,
+    Lightbulb,
+    Sparkles,
 } from "lucide-react";
 import { RelationshipActionButton } from "../../components/RelationshipActionButton";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
@@ -974,8 +976,9 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                         /api/profile/public/{username}
                                     </span>
                                 </div>
-                                <div className="pt-2 border-t border-black/10 text-neutral-500 text-[11px] leading-relaxed">
-                                    💡 <strong>Developer Tip:</strong> If running in development, ensure the backend server is active on <code className="bg-neutral-200/80 px-1 py-0.5 rounded font-mono text-neutral-900">localhost:3000</code>.
+                                <div className="pt-2 border-t border-black/10 text-neutral-500 text-[11px] leading-relaxed flex items-center gap-1.5">
+                                    <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    <span><strong>Developer Tip:</strong> If running in development, ensure the backend server is active on <code className="bg-neutral-200/80 px-1 py-0.5 rounded font-mono text-neutral-900">localhost:3000</code>.</span>
                                 </div>
                             </div>
                         )}
@@ -983,7 +986,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                         {/* Not Found Callout */}
                         {diag.kind === "NOT_FOUND" && (
                             <div className="mb-6 p-3.5 rounded-2xl bg-emerald-50/80 border border-emerald-300 text-left text-xs flex items-center gap-3">
-                                <span className="text-emerald-600 text-lg flex-shrink-0">✨</span>
+                                <Sparkles className="w-5 h-5 text-emerald-600 flex-shrink-0" />
                                 <p className="text-emerald-950 leading-relaxed">
                                     <strong>This handle is unclaimed!</strong> You can register <span className="font-mono font-bold">@{username}</span> and showcase your competitive programming & dev stats.
                                 </p>

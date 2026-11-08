@@ -9,6 +9,7 @@ import PlatformRegistryDocumentary from "./documentaries/PlatformRegistryDocumen
 import ResumeIntelligenceDocumentary from "./documentaries/ResumeIntelligenceDocumentary";
 import ProfilePrivacyDocumentary from "./documentaries/ProfilePrivacyDocumentary";
 import ClubVerificationDocumentary from "./documentaries/ClubVerificationDocumentary";
+import ClubCredibilityDocumentary from "./documentaries/ClubCredibilityDocumentary";
 import {
     ArrowLeft,
     FileText,
@@ -43,7 +44,9 @@ export const DocsViewerPage: React.FC = () => {
                         ? "public-vs-private-profile"
                         : activeSlug === "club" || activeSlug === "club-verification" || activeSlug === "club-verification-protocol" || activeSlug === "club-verification-standard" || activeSlug === "clubs"
                             ? "club-verification-protocol"
-                            : activeSlug;
+                            : activeSlug === "credibility" || activeSlug === "club-credibility" || activeSlug === "club-credibility-algorithm" || activeSlug === "credibility-engine" || activeSlug === "credibility-algorithm"
+                                ? "club-credibility-algorithm"
+                                : activeSlug;
 
     // Check if doc exists in registry
     const doc = getDocBySlug(resolvedSlug);
@@ -56,7 +59,7 @@ export const DocsViewerPage: React.FC = () => {
             {/* Global Navigation */}
             <NavBar activeTab="docs" />
 
-            <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 pb-24 sm:pt-32 sm:pb-32 space-y-16 sm:space-y-20">
+            <main className="w-[95%] max-w-[95vw] mx-auto px-2 sm:px-4 lg:px-6 pt-28 pb-24 sm:pt-32 sm:pb-32 space-y-16 sm:space-y-20">
                 {/* ========================================================================= */}
                 {/* BREADCRUMB NAVIGATION & QUICK SWITCHER                                    */}
                 {/* ========================================================================= */}
@@ -107,6 +110,8 @@ export const DocsViewerPage: React.FC = () => {
                     <ProfilePrivacyDocumentary />
                 ) : resolvedSlug === "club-verification-protocol" ? (
                     <ClubVerificationDocumentary />
+                ) : resolvedSlug === "club-credibility-algorithm" ? (
+                    <ClubCredibilityDocumentary />
                 ) : doc ? (
                     <article className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-8">
                         <header className="space-y-4 pb-6 border-b-2 border-black/15">

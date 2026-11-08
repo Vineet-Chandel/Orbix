@@ -37,7 +37,7 @@ export function formatEventSchedule(
     const isEndValid = endDate && !isNaN(endDate.getTime());
 
     // Status styling
-    let statusLabel = "● LIVE EVENT";
+    let statusLabel = "LIVE EVENT";
     let statusColor = {
         bg: "bg-[#A2FF86]",
         text: "text-black",
@@ -45,28 +45,28 @@ export function formatEventSchedule(
     };
 
     if (status === "completed") {
-        statusLabel = "✓ COMPLETED";
+        statusLabel = "COMPLETED";
         statusColor = {
             bg: "bg-sky-200",
             text: "text-black",
             dot: "#0369A1",
         };
     } else if (status === "draft") {
-        statusLabel = "✎ DRAFT PREVIEW";
+        statusLabel = "DRAFT PREVIEW";
         statusColor = {
             bg: "bg-[#FFE566]",
             text: "text-black",
             dot: "#B45309",
         };
     } else if (status === "cancelled") {
-        statusLabel = "✕ CANCELLED";
+        statusLabel = "CANCELLED";
         statusColor = {
             bg: "bg-rose-200",
             text: "text-black",
             dot: "#BE123C",
         };
     } else if (isStartValid && startDate.getTime() > Date.now()) {
-        statusLabel = "● UPCOMING";
+        statusLabel = "UPCOMING";
         statusColor = {
             bg: "bg-[#A2FF86]",
             text: "text-black",

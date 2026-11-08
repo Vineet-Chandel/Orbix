@@ -13,10 +13,11 @@ import {
     Settings,
     Building2,
     Award,
+    ShieldCheck,
 } from "lucide-react";
 import { OrbixLogo } from "../../components/OrbixLogo";
 
-export type ClubTab = "overview" | "team" | "events" | "analytics" | "certificates" | "profile" | "clubs" | "settings";
+export type ClubTab = "overview" | "team" | "events" | "analytics" | "certificates" | "credibility" | "profile" | "clubs" | "settings";
 
 interface ClubSidebarProps {
     club: {
@@ -415,6 +416,58 @@ export const ClubSidebar = ({
                             <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
                                 <span>Certificates</span>
                                 {activeTab === "certificates" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
+                            </div>
+                        )}
+                    </Link>
+
+                    {/* Item 4.8: Credibility Engine */}
+                    <Link
+                        to="/club/credibility"
+                        onClick={() => {
+                            onTabChange("credibility");
+                            if (onClose) onClose();
+                        }}
+                        className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
+                            activeTab === "credibility"
+                                ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
+                                : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
+                        }`}
+                        title={!isExpanded ? "Credibility Engine" : undefined}
+                    >
+                        <span
+                            className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
+                                activeTab === "credibility" && isExpanded
+                                    ? "bg-black opacity-100"
+                                    : "bg-transparent opacity-0"
+                            }`}
+                        />
+                        <div className="flex items-center w-full">
+                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                <ShieldCheck
+                                    className={`w-5 h-5 flex-shrink-0 transition-colors ${
+                                        activeTab === "credibility"
+                                            ? "text-black"
+                                            : "text-neutral-700 group-hover:text-black"
+                                    }`}
+                                />
+                            </div>
+                            {isExpanded && (
+                                <span
+                                    className={`whitespace-nowrap truncate animate-fadeIn pl-0.5 ${
+                                        activeTab === "credibility"
+                                            ? "text-black font-black"
+                                            : "text-neutral-800 font-bold"
+                                    }`}
+                                >
+                                    Credibility
+                                </span>
+                            )}
+                        </div>
+
+                        {!isExpanded && (
+                            <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
+                                <span>Credibility</span>
+                                {activeTab === "credibility" && <span className="w-1.5 h-1.5 rounded-full bg-[#a2ff86]" />}
                             </div>
                         )}
                     </Link>

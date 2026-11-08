@@ -49,6 +49,9 @@ import { OtherClubsSection } from "./OtherClubsSection";
 import { ClubEventDetailWorkspace } from "./ClubEventDetailPage";
 import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
 import { EventScopeSelectionModal } from "./EventScopeSelectionModal";
+import { ClubCredibilityOverviewCard } from "./Credibility/ClubCredibilityOverviewCard";
+import { ClubCredibilityWorkspace } from "./Credibility/ClubCredibilityWorkspace";
+import { fetchClubCredibility, type ClubCredibilitySnapshot } from "../../api/clubCredibilityApi";
 import { OrbixLoader } from "../../components/ui/loader";
 
 interface VerifiedClub {
@@ -128,6 +131,7 @@ export default function ClubDashboardPage() {
         if (pathname.startsWith("/club/events")) return "events";
         if (pathname.startsWith("/club/analytics") || pathname.startsWith("/club/trends")) return "analytics";
         if (pathname.startsWith("/club/certificates")) return "certificates";
+        if (pathname.startsWith("/club/credibility")) return "credibility";
         if (pathname.startsWith("/club/profile") || pathname.startsWith("/club/manage-profile")) return "profile";
         if (pathname.startsWith("/club/clubs") || pathname.startsWith("/club/campus-clubs") || pathname.startsWith("/club/other-clubs")) return "clubs";
         if (pathname.startsWith("/club/settings")) return "settings";
@@ -140,6 +144,7 @@ export default function ClubDashboardPage() {
         events: "/club/events",
         analytics: "/club/analytics",
         certificates: "/club/certificates",
+        credibility: "/club/credibility",
         profile: "/club/profile",
         clubs: "/club/clubs",
         settings: "/club/settings",
@@ -229,6 +234,19 @@ export default function ClubDashboardPage() {
     const [initialModalStatus, setInitialModalStatus] = useState<ClubEventStatus>("published");
     const [eventFilter, setEventFilter] = useState<ClubEventFilter>("all");
     const [isCertStudioOpen, setIsCertStudioOpen] = useState(false);
+    const [credibilitySnapshot, setCredibilitySnapshot] = useState<ClubCredibilitySnapshot | null>(null);
+
+    // Fetch credibility snapshot for club dashboard
+    const fetchCredibility = async () => {
+        try {
+            const res = await fetchClubCredibility();
+            if (res?.snapshot) {
+                setCredibilitySnapshot(res.snapshot);
+            }
+        } catch {
+            // silent fail for non-blocking credibility preview
+        }
+    };
 
     // In-flight request guards to prevent duplicate concurrent network calls (e.g. StrictMode, rapid switches)
     const isFetchingClubRef = useRef(false);
@@ -302,6 +320,7 @@ export default function ClubDashboardPage() {
     useEffect(() => {
         fetchClubData();
         fetchInboxCounts();
+        fetchCredibility();
 
         const notifInterval = setInterval(fetchInboxCounts, 30000);
         window.addEventListener("focus", fetchInboxCounts);
@@ -599,6 +618,17 @@ export default function ClubDashboardPage() {
                                             </h1>
                                         </div>
                                     )}
+
+                                    {activeTab === "credibility" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Award className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Club Credibility & Accountability
+                                            </h1>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Dynamic Contextual Badges & Subtitle */}
@@ -690,6 +720,17 @@ export default function ClubDashboardPage() {
                                             </span>
                                             <span className="text-xs font-bold text-neutral-700">
                                                 · Organization credentials, collegiate verification & showcase privacy
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "credibility" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Credibility Engine v1.0
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Evidence-based collegiate reliability audit & participant protection system
                                             </span>
                                         </>
                                     )}
@@ -798,6 +839,12 @@ export default function ClubDashboardPage() {
                                         </button>
                                     </div>
                                 </div>
+
+                                {/* Club Credibility Overview Card */}
+                                <ClubCredibilityOverviewCard
+                                    snapshot={credibilitySnapshot}
+                                    onViewDetails={() => handleTabChange("credibility")}
+                                />
 
                                 {/* Overview Metrics Grid */}
                                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -1422,6 +1469,11 @@ export default function ClubDashboardPage() {
                                 user={user}
                                 onSignOut={handleSignOut}
                             />
+                        )}
+
+                        {/* TAB: CLUB CREDIBILITY & ACCOUNTABILITY */}
+                        {activeTab === "credibility" && (
+                            <ClubCredibilityWorkspace />
                         )}
                     </div>
 

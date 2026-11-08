@@ -150,8 +150,9 @@ export const EventScopeSelectionModal: React.FC<EventScopeSelectionModalProps> =
 
                             {/* Badges Matrix */}
                             <div className="mt-4 flex flex-wrap gap-1.5">
-                                <span className="px-2.5 py-0.5 rounded-lg bg-orange-100 border border-black text-[10px] font-black text-orange-950 shadow-[1px_1px_0px_#000]">
-                                    🇮🇳 All India Reach
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-orange-100 border border-black text-[10px] font-black text-orange-950 shadow-[1px_1px_0px_#000]">
+                                    <Globe2 className="w-3 h-3 text-orange-600" />
+                                    <span>All India Reach</span>
                                 </span>
                                 <span className="px-2.5 py-0.5 rounded-lg bg-emerald-100 border border-black text-[10px] font-black text-emerald-950 shadow-[1px_1px_0px_#000]">
                                     Inter-College Participation

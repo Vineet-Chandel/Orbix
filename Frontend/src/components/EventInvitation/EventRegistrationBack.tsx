@@ -114,7 +114,7 @@ export const EventRegistrationBack: React.FC<EventRegistrationBackProps> = ({
                                     <>
                                         <Globe2 className="w-3.5 h-3.5 shrink-0 stroke-[2.5] text-orange-700" />
                                         <span className="truncate">
-                                            🇮🇳 Pan India Event • Open to students from all Indian colleges
+                                            Pan India Event • Open to students from all Indian colleges
                                         </span>
                                     </>
                                 ) : (
@@ -267,7 +267,7 @@ export const EventRegistrationBack: React.FC<EventRegistrationBackProps> = ({
                         <>
                             <Globe2 className="w-4 h-4 shrink-0 stroke-[2.5] text-orange-700" />
                             <span className="truncate">
-                                🇮🇳 Pan India Event • Open to all Indian college students
+                                Pan India Event • Open to all Indian college students
                             </span>
                         </>
                     ) : (

@@ -20,6 +20,8 @@ import {
     ShieldAlert,
     ArrowRight,
     Globe2,
+    GraduationCap,
+    Lock,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import type { CollegeEventItem } from "../../api/collegeEventsApi";
@@ -97,10 +99,20 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                 {/* Modal Top Bar */}
                 <div className="px-5 py-3.5 bg-white border-b-3 border-black flex items-center justify-between gap-3 shrink-0">
                     <div className="flex items-center gap-2 min-w-0">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] shrink-0 ${
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] shrink-0 inline-flex items-center gap-1 ${
                             event.scope === "PAN_INDIA" ? "bg-[#FF9933] text-black" : "bg-[#a2ff86] text-black"
                         }`}>
-                            {event.scope === "PAN_INDIA" ? "🇮🇳 Pan-India Flagship" : "🏛️ Campus Session"}
+                            {event.scope === "PAN_INDIA" ? (
+                                <>
+                                    <Globe2 className="w-3 h-3" />
+                                    <span>Pan-India Flagship</span>
+                                </>
+                            ) : (
+                                <>
+                                    <GraduationCap className="w-3 h-3" />
+                                    <span>Campus Session</span>
+                                </>
+                            )}
                         </span>
                         <span className="text-xs font-bold text-neutral-600 truncate hidden sm:inline">
                             {event.collegeName || "Verified College Event"}
@@ -312,9 +324,17 @@ export const CollegeEventDetailModal: React.FC<CollegeEventDetailModalProps> = (
                                             <span>Pan-India Live Notification Shield</span>
                                         </div>
                                         <p className="text-[11px] text-neutral-600 leading-relaxed font-medium">
-                                            {event.isRegistered || event.registrationStatus === "registered"
-                                                ? "✅ Live tracking active: Start countdown, pass synchronization, and critical organizer updates are enabled for this national event."
-                                                : "🔒 Non-registered students do not receive start reminders or tracking notifications. Register below to activate live entry tracking, deadline alerts, and verified pass sync."}
+                                            {event.isRegistered || event.registrationStatus === "registered" ? (
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 inline" />
+                                                    <span>Live tracking active: Start countdown, pass synchronization, and critical organizer updates are enabled for this national event.</span>
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1.5">
+                                                    <Lock className="w-3.5 h-3.5 text-neutral-500 shrink-0 inline" />
+                                                    <span>Non-registered students do not receive start reminders or tracking notifications. Register below to activate live entry tracking, deadline alerts, and verified pass sync.</span>
+                                                </span>
+                                            )}
                                         </p>
                                     </div>
                                 )}

@@ -31,6 +31,7 @@ import {
     ChevronDown,
     ChevronUp,
     ArrowRight,
+    Lightbulb,
 } from "lucide-react";
 import {
     type ClubEventFormRecord,
@@ -2372,8 +2373,9 @@ export const EventFormBuilderWorkspace: React.FC<EventFormBuilderWorkspaceProps>
 
                         {/* Generate Action Button */}
                         <div className="flex items-center justify-between gap-3 pt-1">
-                            <div className="text-[11px] text-neutral-500 font-normal">
-                                💡 Questions are added to your draft only. You can edit them before publishing.
+                            <div className="text-[11px] text-neutral-500 font-normal flex items-center gap-1.5">
+                                <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                <span>Questions are added to your draft only. You can edit them before publishing.</span>
                             </div>
                             <button
                                 type="button"

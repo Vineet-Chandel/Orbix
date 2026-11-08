@@ -1,5 +1,5 @@
 import React from "react";
-import { Building2, CheckCircle2, ArrowUpRight } from "lucide-react";
+import { Building2, CheckCircle2, ArrowUpRight, Lock } from "lucide-react";
 import { NeoSelect } from "../../../components/NeoSelect";
 import { Link } from "react-router-dom";
 import { VerifiedBadge } from "../../../components/VerifiedBadge";
@@ -156,8 +156,9 @@ export const StepIdentity: React.FC<StepIdentityProps> = ({
                             Primary Category <span className="text-rose-500">*</span>
                         </label>
                         {isLocked ? (
-                            <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-black/30 shadow-[1px_1px_0px_#000]">
-                                🔒 Locked ({timeRemainingStr} remaining)
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-black/30 shadow-[1px_1px_0px_#000]">
+                                <Lock className="w-2.5 h-2.5" />
+                                <span>Locked ({timeRemainingStr} remaining)</span>
                             </span>
                         ) : (
                             <span className="text-[10px] font-bold text-neutral-500">

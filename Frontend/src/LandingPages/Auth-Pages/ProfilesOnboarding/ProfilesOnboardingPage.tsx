@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Check } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../../utils/portalParser";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { PortalProfileInput } from "../PortalProfileInput";
@@ -900,7 +901,9 @@ export default function ProfilesOnboardingPage() {
                                                                         <span className="text-xs font-black text-black uppercase truncate">
                                                                             {portalConf?.name || pId}
                                                                         </span>
-                                                                        <span className="inline-flex items-center justify-center text-[10px] font-black text-black bg-[#a2ff86] border border-black px-1.5 rounded" title="Verified">✓</span>
+                                                                        <span className="inline-flex items-center justify-center p-0.5 text-black bg-[#a2ff86] border border-black rounded" title="Verified">
+                                                                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                                                        </span>
                                                                     </div>
                                                                     <p className="text-[11px] text-neutral-600 font-mono font-bold truncate">
                                                                         @{profile.username}
@@ -1082,7 +1085,9 @@ export default function ProfilesOnboardingPage() {
                                                     <span className="text-xs font-black text-black uppercase truncate">
                                                         {portalConf?.name || pId}
                                                     </span>
-                                                    <span className="text-[10px] text-black font-black bg-[#a2ff86] border border-black px-1 rounded">✓</span>
+                                                    <span className="inline-flex items-center justify-center p-0.5 text-black bg-[#a2ff86] border border-black rounded" title="Verified">
+                                                        <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                                    </span>
                                                 </div>
                                                 <p className="text-xs text-neutral-900 font-bold truncate">
                                                     {profile.name}

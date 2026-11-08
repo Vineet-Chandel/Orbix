@@ -618,13 +618,23 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                             <div>
                                 <div className="flex items-center gap-2">
                                     <span
-                                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] ${
+                                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] inline-flex items-center gap-1 ${
                                             form.scope === "PAN_INDIA"
                                                 ? "bg-[#FF9933] text-black"
                                                 : "bg-[#38BDF8] text-black"
                                         }`}
                                     >
-                                        {form.scope === "PAN_INDIA" ? "🇮🇳 Pan India Reach" : "🏛️ Campus Only"}
+                                        {form.scope === "PAN_INDIA" ? (
+                                            <>
+                                                <Globe2 className="w-3 h-3" />
+                                                <span>Pan India Reach</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <GraduationCap className="w-3 h-3" />
+                                                <span>Campus Only</span>
+                                            </>
+                                        )}
                                     </span>
                                     <span className="text-xs font-black text-black">
                                         {form.scope === "PAN_INDIA"
@@ -1047,9 +1057,10 @@ export const ClubEventModal: React.FC<ClubEventModalProps> = ({
                                             setForm((prev) => ({ ...prev, coverImageUrl: randomBanner.dataUrl }));
                                             toast.info(`Swapped to "${randomBanner.title}" banner!`);
                                         }}
-                                        className="text-[11px] font-black text-sky-700 hover:text-sky-900 underline cursor-pointer shrink-0"
+                                        className="inline-flex items-center gap-1 text-[11px] font-black text-sky-700 hover:text-sky-900 underline cursor-pointer shrink-0"
                                     >
-                                        🎲 Surprise Me
+                                        <Sparkles className="w-3.5 h-3.5" />
+                                        <span>Surprise Me</span>
                                     </button>
                                 </div>
 

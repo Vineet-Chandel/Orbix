@@ -17,6 +17,7 @@ import {
     Building2,
     X,
     Printer,
+    AlertTriangle,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -1048,8 +1049,9 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                                     <span className="text-neutral-500 font-mono text-[10px] uppercase">Access Ticket:</span>
                                     <span className="font-mono text-black">{withdrawTargetApp.ticketCode}</span>
                                 </div>
-                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200">
-                                    ⚠️ Your admission pass will be immediately invalidated and your seat will be released.
+                                <p className="text-[11px] text-rose-700 pt-1 border-t border-rose-200 flex items-center gap-1.5 font-bold">
+                                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Your admission pass will be immediately invalidated and your seat will be released.</span>
                                 </p>
                             </div>
                         </div>

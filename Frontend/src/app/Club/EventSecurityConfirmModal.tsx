@@ -175,7 +175,7 @@ export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps>
                                 <div className="flex items-center gap-2">
                                     <AlertTriangle className="w-4 h-4 text-rose-700 stroke-[2.5]" />
                                     <span className="text-xs font-black uppercase tracking-wider text-rose-950">
-                                        ⚠️ Minimum 4-Hour Cancellation Policy Limit
+                                        Minimum 4-Hour Cancellation Policy Limit
                                     </span>
                                 </div>
                                 <p className="text-xs font-bold text-rose-950 leading-relaxed">

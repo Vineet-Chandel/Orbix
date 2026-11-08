@@ -168,6 +168,34 @@ export const DOCS_FOLDERS: DocFolder[] = [
             },
         ],
     },
+    {
+        id: "club-credibility",
+        name: "Club Credibility & Accountability Engine",
+        badge: "Reputation Architecture",
+        icon: "Award",
+        color: "bg-[#FFE566]",
+        description: "Bayesian reputation algorithm, dynamic evidence weights, 6-dimensional accountability metrics, and dispute resolution standards.",
+        files: [
+            {
+                id: "club-credibility-algorithm",
+                slug: "club-credibility-algorithm",
+                title: "Orbix Club Credibility Engine: Bayesian Reputation & Accountability Algorithm",
+                subtitle: "0 to 100 Bayesian Evidence Model • 6-Dimensional Quality Rubric • Dynamic Weight Multipliers • 70/30 Lifetime vs Recent Blend",
+                folderId: "club-credibility",
+                folderName: "Club Credibility & Accountability Engine",
+                badge: "Algorithm Specification",
+                badgeColor: "bg-[#FFE566]",
+                image: "https://res.cloudinary.com/dj0ivep44/image/upload/v1794112549/The_Complete_Guide_to_Inventory_and_Warehouse_Management_pznkfb.jpg",
+                summary: "Authoritative architectural documentation of the Orbix Club Credibility Engine. Explores Bayesian prior initialization, dynamic evidence weights (scope, reach, notice, streak, repeat multipliers), the 6-dimensional quality rubric, score bands, and complete club management playbooks.",
+                tags: ["Credibility Algorithm", "Bayesian Reputation", "Club Governance", "Dynamic Weights", "Accountability", "Best Practices"],
+                readTime: "15 min read",
+                updatedAt: "November 2026",
+                author: "Orbix Research & Campus Governance",
+                featured: true,
+                hasInteractiveSim: true,
+            },
+        ],
+    },
 ];
 
 export const ALL_DOC_FILES: DocFile[] = DOCS_FOLDERS.flatMap((folder) => folder.files);

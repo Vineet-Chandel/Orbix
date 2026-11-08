@@ -25,6 +25,7 @@ import { privacyRouter } from './Routes/account/privacyRoutes.js';
 import { platformRouter } from './Routes/platform/platformRoutes.js';
 import { sessionRouter } from './Routes/session/sessionRoutes.js';
 import { eventFormRouter } from './Routes/events/eventFormRoutes.js';
+import { clubCredibilityRouter } from './Routes/club/clubCredibilityRoutes.js';
 import { testDatabaseConnection } from './database/client.js';
 import { startAccountPurgeWorker } from './services/account/accountPurgeService.js';
 import redis from './redis/client.js';
@@ -112,6 +113,8 @@ apiRouter.use('/notifications', notificationsRouter);
 apiRouter.use('/institutions', institutionsRouter);
 
 // Clubs (both /api/club and /api/clubs)
+apiRouter.use('/club', clubCredibilityRouter);
+apiRouter.use('/clubs', clubCredibilityRouter);
 apiRouter.use('/club', clubRouter);
 apiRouter.use('/clubs', clubRouter);
 

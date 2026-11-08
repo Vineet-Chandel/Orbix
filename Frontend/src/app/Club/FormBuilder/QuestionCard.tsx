@@ -25,6 +25,7 @@ import {
     Heading,
     GripVertical,
     SlidersHorizontal,
+    Lightbulb,
 } from "lucide-react";
 import { NeoToggle } from "../../../components/NeoToggle";
 import { NeoSelect } from "../../../components/NeoSelect";
@@ -602,8 +603,9 @@ export const QuestionCard: React.FC<QuestionCardProps> = React.memo(({
                             question.type !== "dropdown" &&
                             question.type !== "checkboxes" &&
                             question.type !== "short_answer" && (
-                                <div className="p-3 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 font-medium">
-                                    💡 <strong>Manual evaluation:</strong> This question type does not support automated grading. Points will be assigned by organizers during review.
+                                <div className="p-3 bg-white dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 text-xs text-neutral-600 dark:text-neutral-400 font-medium flex items-center gap-1.5">
+                                    <Lightbulb className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                    <span><strong>Manual evaluation:</strong> This question type does not support automated grading. Points will be assigned by organizers during review.</span>
                                 </div>
                             )}
 

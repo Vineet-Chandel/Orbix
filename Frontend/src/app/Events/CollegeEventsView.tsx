@@ -200,7 +200,7 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
         );
 
         if (updatedLiked) {
-            toast.success("Added your appreciation! ❤️", { title: "Appreciated" });
+            toast.success("Added your appreciation!", { title: "Appreciated" });
         }
 
         // 2. Background API call
@@ -555,7 +555,10 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                                 </span>
                             </span>
                             {isRegistered && (
-                                <span className="text-emerald-700 font-black shrink-0">Synced ✓</span>
+                                <span className="text-emerald-700 font-black shrink-0 inline-flex items-center gap-1">
+                                    <Check className="w-3 h-3 stroke-[2.5]" />
+                                    <span>Synced</span>
+                                </span>
                             )}
                         </div>
                     )}
@@ -919,7 +922,7 @@ export const CollegeEventsView: React.FC<CollegeEventsViewProps> = ({
                             title="Invite club presidents and societies to publish on Orbix"
                         >
                             <Share2 className="w-3.5 h-3.5 stroke-[2.5]" />
-                            <span>Invite Club Leads 📢</span>
+                            <span>Invite Club Leads</span>
                         </button>
                     </div>
                 </div>

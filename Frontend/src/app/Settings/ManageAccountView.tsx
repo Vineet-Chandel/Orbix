@@ -24,6 +24,7 @@ import {
     Eye,
     RefreshCw,
     FileCheck,
+    User,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppDispatch } from "../../store";
@@ -982,7 +983,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] space-y-1">
                             <div className="flex items-center gap-2">
-                                <span className="text-base">👤</span>
+                                <User className="w-4 h-4 text-black stroke-[2.5]" />
                                 <h4 className="text-xs font-black text-black">Identity & Academics</h4>
                             </div>
                             <p className="text-[11px] text-neutral-600 font-medium leading-relaxed">
@@ -1252,10 +1253,15 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                                         {isSubmittingOtp ? (
                                             <span>Verifying code...</span>
                                         ) : (
-                                            <span>
-                                                {emailChangeStep === "verify_old_email"
-                                                    ? "Confirm & Continue →"
-                                                    : "Verify & Complete Change ✓"}
+                                            <span className="inline-flex items-center gap-1.5">
+                                                {emailChangeStep === "verify_old_email" ? (
+                                                    <span>Confirm & Continue →</span>
+                                                ) : (
+                                                    <>
+                                                        <Check className="w-4 h-4 stroke-[3]" />
+                                                        <span>Verify & Complete Change</span>
+                                                    </>
+                                                )}
                                             </span>
                                         )}
                                     </button>
@@ -1351,7 +1357,14 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                                 onClick={() => handleConfirmPrimaryVerification(primaryOtpCode)}
                                 className="w-full h-12 rounded-full bg-black text-sm font-black text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 active:translate-x-[1px] active:translate-y-[1px] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                             >
-                                {isSubmittingPrimaryOtp ? "Verifying..." : "Confirm & Verify Email ✓"}
+                                {isSubmittingPrimaryOtp ? (
+                                    "Verifying..."
+                                ) : (
+                                    <span className="inline-flex items-center gap-1.5">
+                                        <Check className="w-4 h-4 stroke-[3]" />
+                                        <span>Confirm & Verify Email</span>
+                                    </span>
+                                )}
                             </button>
                         </div>
                     </div>
@@ -1504,7 +1517,14 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                                         onClick={() => handleConfirmUsernameChange()}
                                         className="w-full h-12 rounded-full bg-black text-sm font-black text-[#a2ff86] border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                                     >
-                                        {isSubmittingUsernameConfirm ? "Committing update..." : "Confirm Username Change ✓"}
+                                        {isSubmittingUsernameConfirm ? (
+                                            "Committing update..."
+                                        ) : (
+                                            <span className="inline-flex items-center gap-1.5">
+                                                <Check className="w-4 h-4 stroke-[3]" />
+                                                <span>Confirm Username Change</span>
+                                            </span>
+                                        )}
                                     </button>
 
                                     <button

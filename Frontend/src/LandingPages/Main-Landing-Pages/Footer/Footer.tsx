@@ -180,6 +180,11 @@ export const Footer: React.FC = () => {
                                 </Link>
                             </li>
                             <li>
+                                <Link to="/docs/club-credibility-algorithm" className="hover:text-black hover:underline transition-colors">
+                                    Club Credibility Engine
+                                </Link>
+                            </li>
+                            <li>
                                 <Link to="/docs/club-verification-protocol" className="hover:text-black hover:underline transition-colors">
                                     Club Verification Standard
                                 </Link>

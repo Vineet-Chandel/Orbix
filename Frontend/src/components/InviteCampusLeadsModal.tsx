@@ -13,6 +13,8 @@ import {
     Users,
     CheckCircle2,
     Sparkles,
+    Flame,
+    Globe2,
 } from "lucide-react";
 import { useModalDismiss } from "../hooks/useModalDismiss";
 import { useToast } from "../context/ToastContext";
@@ -42,14 +44,14 @@ export function getInviteUrl(collegeName?: string, collegeId?: string | null): s
 export function getInviteMessageTemplates(collegeName: string, inviteUrl: string) {
     const displayCollege = collegeName || "Our College Campus";
     return {
-        wakeUpCall: `🔥 URGENT FOR CLUB LEADS AT ${displayCollege}!
+        wakeUpCall: `URGENT FOR CLUB LEADS AT ${displayCollege}!
 
 Colleges across India (IITs, NITs, and top tech chapters) are publishing live hackathons, workshops, and inter-college competitions on Orbix every week.
 
 Our campus has 0 active sessions right now. Don't let ${displayCollege} fall behind on the national student leaderboard!
 
 If you lead a technical society, coding club, or student organization:
-👉 Register our official campus club in 2 minutes & publish our events:
+• Register our official campus club in 2 minutes & publish our events:
 ${inviteUrl}`,
 
         official: `Respected Faculty Coordinators & Student Club Presidents at ${displayCollege},
@@ -57,14 +59,14 @@ ${inviteUrl}`,
 Students of ${displayCollege} are actively seeking verified technical workshops, guest lectures, and hackathons on the Orbix platform.
 
 Orbix provides our campus chapter with:
-✅ AISHE-verified institutional listing & automated student attendance verification
-✅ Dynamic registration forms with fraud-proof QR check-in passes
-✅ Pan-India event reach & national student rankings
+• AISHE-verified institutional listing & automated student attendance verification
+• Dynamic registration forms with fraud-proof QR check-in passes
+• Pan-India event reach & national student rankings
 
 Please activate our campus chapter portal here:
 ${inviteUrl}`,
 
-        panIndiaChallenge: `🇮🇳 Put ${displayCollege} on India's National Tech Map!
+        panIndiaChallenge: `Put ${displayCollege} on India's National Tech Map!
 
 We challenge our campus clubs to launch a Pan-India flagship hackathon or workshop on Orbix and compete with universities nationwide.
 
@@ -224,7 +226,9 @@ export const InviteCampusLeadsModal: React.FC<InviteCampusLeadsModalProps> = ({
                                 rel="noopener noreferrer"
                                 className="px-3 py-2 rounded-xl bg-black text-white border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] flex items-center justify-center gap-1.5 hover:bg-neutral-900 cursor-pointer transition-transform active:translate-x-[1px] active:translate-y-[1px]"
                             >
-                                <span className="text-sm font-black leading-none">𝕏</span>
+                                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                                </svg>
                                 <span>Post on X</span>
                             </a>
 
@@ -302,35 +306,38 @@ export const InviteCampusLeadsModal: React.FC<InviteCampusLeadsModalProps> = ({
                             <button
                                 type="button"
                                 onClick={() => setActiveTemplate("wakeUpCall")}
-                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer text-center ${
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                     activeTemplate === "wakeUpCall"
                                         ? "bg-black text-[#FFE566] shadow-[1px_1px_0px_#000]"
                                         : "text-neutral-700 hover:bg-neutral-200"
                                 }`}
                             >
-                                🔥 Wake-Up Call (FOMO)
+                                <Flame className="w-3.5 h-3.5 text-amber-500 fill-amber-500 shrink-0" />
+                                <span>Wake-Up Call (FOMO)</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setActiveTemplate("official")}
-                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer text-center ${
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                     activeTemplate === "official"
                                         ? "bg-black text-[#FFE566] shadow-[1px_1px_0px_#000]"
                                         : "text-neutral-700 hover:bg-neutral-200"
                                 }`}
                             >
-                                🏛️ Faculty & Leads
+                                <GraduationCap className="w-3.5 h-3.5 shrink-0" />
+                                <span>Faculty & Leads</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setActiveTemplate("panIndiaChallenge")}
-                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer text-center ${
+                                className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
                                     activeTemplate === "panIndiaChallenge"
                                         ? "bg-black text-[#FFE566] shadow-[1px_1px_0px_#000]"
                                         : "text-neutral-700 hover:bg-neutral-200"
                                 }`}
                             >
-                                🇮🇳 Pan-India Challenge
+                                <Globe2 className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                                <span>Pan-India Challenge</span>
                             </button>
                         </div>
 

@@ -6,6 +6,7 @@ import {
     ExternalLink,
     RefreshCw,
     Clock,
+    Rocket,
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store";
 import {
@@ -77,9 +78,7 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b-2 border-black/10">
                 <div className="flex items-center gap-3">
                     <div className="p-2 rounded-xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000]">
-                        <span className="text-xl leading-none" role="img" aria-label="Rocket">
-                            🚀
-                        </span>
+                        <Rocket className="w-5 h-5 text-black stroke-[2.5]" />
                     </div>
                     <div>
                         <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">

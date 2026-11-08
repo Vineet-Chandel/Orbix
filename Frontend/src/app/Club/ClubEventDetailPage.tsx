@@ -50,6 +50,7 @@ import {
 import { ClubEventModal } from "./ClubEventModal";
 import { EventSecurityConfirmModal } from "./EventSecurityConfirmModal";
 import { ClubCertificateStudioModal } from "./ClubCertificateStudioModal";
+import { CredibilityImpactModal } from "../../components/credibility/CredibilityImpactModal";
 import { EventLiveListingCard } from "../../components/EventLiveListingCard";
 import { ClubEventCheckinTerminal } from "./ClubEventCheckinTerminal";
 import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
@@ -133,6 +134,14 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
     const [securityTarget, setSecurityTarget] = useState<{
         action: "draft" | "cancelled" | "delete";
     } | null>(null);
+    const [credibilityTarget, setCredibilityTarget] = useState<{
+        action: "cancel" | "delete" | "draft" | "complete";
+    } | null>(null);
+    const [credibilityInputs, setCredibilityInputs] = useState<{
+        reasonCategory?: string;
+        communicatedToAll?: boolean;
+        rescheduleOffered?: boolean;
+    }>({});
 
     // Applications & Roster State
     const [appsData, setAppsData] = useState<ClubEventApplicationsResponse | null>(null);
@@ -289,6 +298,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         password,
                         confirmationText,
                         emergencyBypass,
+                        reasonCategory: credibilityInputs.reasonCategory,
+                        rescheduleOffered: credibilityInputs.rescheduleOffered,
                     })
                 ).unwrap();
 
@@ -1255,8 +1266,8 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                                                 {app.institutionName || app.campusName || "Host Campus"}
                                                             </span>
                                                             {app.institutionVerificationStatus === "verified" && (
-                                                                <span className="inline-flex items-center text-[10px] text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded border border-emerald-800 font-black shrink-0" title="AISHE Verified Institution">
-                                                                    ✓
+                                                                <span className="inline-flex items-center text-[10px] text-emerald-700 bg-emerald-100 p-0.5 rounded border border-emerald-800 font-black shrink-0" title="AISHE Verified Institution">
+                                                                    <Check className="w-2.5 h-2.5 stroke-[3]" />
                                                                 </span>
                                                             )}
                                                         </div>
@@ -1684,7 +1695,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                         {event.status === "published" && (
                                             <button
                                                 type="button"
-                                                onClick={handleMarkCompleted}
+                                                onClick={() => setCredibilityTarget({ action: "complete" })}
                                                 className="w-full py-3 px-6 rounded-2xl bg-[#BAE6FD] hover:bg-[#93c5fd] text-sky-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
                                                 title="Mark session as completed with final attendee roster"
                                             >
@@ -1749,7 +1760,13 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                         {event.status !== "draft" ? (
                                             <button
                                                 type="button"
-                                                onClick={() => setSecurityTarget({ action: "draft" })}
+                                                onClick={() => {
+                                                    if (event.status === "published") {
+                                                        setCredibilityTarget({ action: "draft" });
+                                                    } else {
+                                                        setSecurityTarget({ action: "draft" });
+                                                    }
+                                                }}
                                                 className="w-full py-2.5 px-3 rounded-2xl bg-[#FEF3C7] hover:bg-[#fde68a] text-amber-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
                                                 title="Move event to draft status"
                                             >
@@ -1770,7 +1787,7 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                         {event.status !== "cancelled" ? (
                                             <button
                                                 type="button"
-                                                onClick={() => setSecurityTarget({ action: "cancelled" })}
+                                                onClick={() => setCredibilityTarget({ action: "cancel" })}
                                                 className="w-full py-2.5 px-3 rounded-2xl bg-[#FECDD3] hover:bg-[#fca5a5] text-rose-950 text-xs sm:text-sm font-black border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
                                                 title="Cancel event with notification"
                                             >
@@ -1833,7 +1850,13 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                     <div className="w-full md:w-60 shrink-0">
                                         <button
                                             type="button"
-                                            onClick={() => setSecurityTarget({ action: "delete" })}
+                                            onClick={() => {
+                                                if (event.status === "published") {
+                                                    setCredibilityTarget({ action: "delete" });
+                                                } else {
+                                                    setSecurityTarget({ action: "delete" });
+                                                }
+                                            }}
                                             className="w-full py-3 px-6 rounded-2xl bg-[#FFE4E6] hover:bg-[#fecdd3] text-rose-950 text-sm font-black border-2 border-black shadow-[3.5px_3.5px_0px_#000] hover:shadow-[4.5px_4.5px_0px_#000] flex items-center justify-center gap-2.5 cursor-pointer transition-all active:translate-x-[1px] active:translate-y-[1px]"
                                             title="Permanently delete this event from the system"
                                         >
@@ -1846,6 +1869,32 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                         </div>
                     </div>
                 )}
+
+            {/* ATTACHED CREDIBILITY IMPACT WARNING MODAL */}
+            {event && (
+                <CredibilityImpactModal
+                    isOpen={Boolean(credibilityTarget)}
+                    onClose={() => setCredibilityTarget(null)}
+                    eventId={event.id}
+                    eventTitle={event.title}
+                    action={credibilityTarget?.action || "cancel"}
+                    onConfirm={(data) => {
+                        const targetAct = credibilityTarget?.action;
+                        setCredibilityInputs(data);
+                        setCredibilityTarget(null);
+
+                        if (targetAct === "complete") {
+                            handleMarkCompleted();
+                        } else if (targetAct === "cancel") {
+                            setSecurityTarget({ action: "cancelled" });
+                        } else if (targetAct === "draft") {
+                            setSecurityTarget({ action: "draft" });
+                        } else if (targetAct === "delete") {
+                            setSecurityTarget({ action: "delete" });
+                        }
+                    }}
+                />
+            )}
 
             {/* ATTACHED HIGH-SECURITY CONFIRMATION CHALLENGE MODAL */}
             <EventSecurityConfirmModal

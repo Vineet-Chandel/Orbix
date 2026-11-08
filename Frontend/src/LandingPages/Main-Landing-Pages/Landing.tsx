@@ -7,6 +7,7 @@ const Card = lazy(() => import('./Card').then((m) => ({ default: m.Card })));
 const Platform = lazy(() => import('./Platform').then((m) => ({ default: m.Platform })));
 const Events = lazy(() => import('./Events').then((m) => ({ default: m.Events })));
 const Leaderboard = lazy(() => import('./Leaderboard').then((m) => ({ default: m.LeaderboardShowcase })));
+const Clubs = lazy(() => import('./clubs').then((m) => ({ default: m.ClubsShowcase })));
 const Footer = lazy(() => import('./Footer').then((m) => ({ default: m.Footer })));
 
 /**
@@ -107,6 +108,13 @@ export default function MainLanding() {
       <DeferredSection fallbackHeight={640}>
         <section className="w-full">
           <Leaderboard />
+        </section>
+      </DeferredSection>
+
+      {/* Flagship Campus Clubs & National Events Hub Showcase */}
+      <DeferredSection fallbackHeight={640}>
+        <section className="w-full">
+          <Clubs />
         </section>
       </DeferredSection>
 

@@ -51,8 +51,8 @@ const CYBER_HACKATHON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
     <!-- Code Content -->
     <text x="32" y="90" fill="#A2FF86" font-family="monospace" font-size="15" font-weight="bold">> git clone orbix://event/sprint</text>
     <text x="32" y="120" fill="#E2E8F0" font-family="monospace" font-size="13">> Initializing environment...</text>
-    <text x="32" y="145" fill="#38BDF8" font-family="monospace" font-size="13">✓ Neural Engine Linked [200 OK]</text>
-    <text x="32" y="170" fill="#38BDF8" font-family="monospace" font-size="13">✓ Verified Student Pass Armed</text>
+    <text x="32" y="145" fill="#38BDF8" font-family="monospace" font-size="13">[OK] Neural Engine Linked [200 OK]</text>
+    <text x="32" y="170" fill="#38BDF8" font-family="monospace" font-size="13">[OK] Verified Student Pass Armed</text>
     <text x="32" y="200" fill="#FACC15" font-family="monospace" font-size="14" font-weight="bold">STAGE: 36h Code Sprint Active</text>
 
     <!-- Mini Progress Bars -->
@@ -70,7 +70,7 @@ const CYBER_HACKATHON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 
     <g>
       <rect x="4" y="4" width="230" height="44" rx="14" fill="#000000"/>
       <rect x="0" y="0" width="230" height="44" rx="14" fill="#A2FF86" stroke="#000000" stroke-width="2.5"/>
-      <text x="22" y="28" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">⚡ HACK SPRINT '26</text>
+      <text x="22" y="28" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">HACK SPRINT '26</text>
     </g>
 
     <!-- Main Title -->
@@ -160,7 +160,7 @@ const DEV_WORKSHOP_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1
     <g>
       <rect x="4" y="4" width="220" height="42" rx="12" fill="#000000"/>
       <rect x="0" y="0" width="220" height="42" rx="12" fill="#FFE566" stroke="#000000" stroke-width="2.5"/>
-      <text x="20" y="27" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">🛠️ HANDS-ON WORKSHOP</text>
+      <text x="20" y="27" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">HANDS-ON WORKSHOP</text>
     </g>
 
     <text x="0" y="125" fill="#FFFFFF" font-family="system-ui, -apple-system, sans-serif" font-size="62" font-weight="900" letter-spacing="-1.5">
@@ -236,7 +236,7 @@ const CAMPUS_KEYNOTE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
     <g>
       <rect x="4" y="4" width="220" height="44" rx="12" fill="#000000"/>
       <rect x="0" y="0" width="220" height="44" rx="12" fill="#FFFFFF" stroke="#000000" stroke-width="3"/>
-      <text x="20" y="28" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">🎙️ KEYNOTE &amp; SUMMIT</text>
+      <text x="20" y="28" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">KEYNOTE &amp; SUMMIT</text>
     </g>
 
     <text x="0" y="135" fill="#000000" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="900" letter-spacing="-1.5">
@@ -322,7 +322,7 @@ const AI_NEURAL_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200
     <g>
       <rect x="4" y="4" width="230" height="44" rx="12" fill="#000000"/>
       <rect x="0" y="0" width="230" height="44" rx="12" fill="#F43F5E" stroke="#000000" stroke-width="2.5"/>
-      <text x="20" y="28" fill="#FFFFFF" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">🧠 AI &amp; DATA LAB</text>
+      <text x="20" y="28" fill="#FFFFFF" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">AI &amp; DATA LAB</text>
     </g>
 
     <text x="0" y="130" fill="#FFFFFF" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="900" letter-spacing="-1.5">
@@ -369,7 +369,7 @@ const CODE_COFFEE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12
     <!-- Coffee Header -->
     <rect x="0" y="0" width="380" height="55" rx="24" fill="#FB923C" stroke="#000000" stroke-width="4"/>
     <rect x="0" y="35" width="380" height="20" fill="#FB923C"/>
-    <text x="30" y="35" fill="#000000" font-family="sans-serif" font-size="15" font-weight="900" letter-spacing="1">☕ BUILD &amp; CONNECT</text>
+    <text x="30" y="35" fill="#000000" font-family="sans-serif" font-size="15" font-weight="900" letter-spacing="1">BUILD &amp; CONNECT</text>
 
     <!-- Coffee Cup Vector Art -->
     <g transform="translate(130, 95)">
@@ -396,7 +396,7 @@ const CODE_COFFEE_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12
     <g>
       <rect x="4" y="4" width="220" height="44" rx="12" fill="#000000"/>
       <rect x="0" y="0" width="220" height="44" rx="12" fill="#FB923C" stroke="#000000" stroke-width="3"/>
-      <text x="20" y="28" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">☕ CREATIVE JAM</text>
+      <text x="20" y="28" fill="#000000" font-family="sans-serif" font-size="14" font-weight="900" letter-spacing="1">CREATIVE JAM</text>
     </g>
 
     <text x="0" y="130" fill="#0F172A" font-family="system-ui, -apple-system, sans-serif" font-size="64" font-weight="900" letter-spacing="-1.5">
@@ -437,7 +437,7 @@ export const PRESET_EVENT_BANNERS: PresetBanner[] = [
         category: "Hackathon & Code Sprint",
         themeColor: "#090D16",
         accentColor: "#A2FF86",
-        badgeText: "⚡ HACK SPRINT",
+        badgeText: "HACK SPRINT",
         svgString: CYBER_HACKATHON_SVG,
         dataUrl: toDataUrl(CYBER_HACKATHON_SVG),
     },
@@ -447,7 +447,7 @@ export const PRESET_EVENT_BANNERS: PresetBanner[] = [
         category: "Hands-on Workshop",
         themeColor: "#1E3A8A",
         accentColor: "#FFE566",
-        badgeText: "🛠️ DEV WORKSHOP",
+        badgeText: "DEV WORKSHOP",
         svgString: DEV_WORKSHOP_SVG,
         dataUrl: toDataUrl(DEV_WORKSHOP_SVG),
     },
@@ -457,7 +457,7 @@ export const PRESET_EVENT_BANNERS: PresetBanner[] = [
         category: "Keynote & Speaker Session",
         themeColor: "#FFE566",
         accentColor: "#8B5CF6",
-        badgeText: "🎙️ KEYNOTE SUMMIT",
+        badgeText: "KEYNOTE SUMMIT",
         svgString: CAMPUS_KEYNOTE_SVG,
         dataUrl: toDataUrl(CAMPUS_KEYNOTE_SVG),
     },
@@ -467,7 +467,7 @@ export const PRESET_EVENT_BANNERS: PresetBanner[] = [
         category: "AI & Machine Learning",
         themeColor: "#150226",
         accentColor: "#F43F5E",
-        badgeText: "🧠 AI LAB",
+        badgeText: "AI LAB",
         svgString: AI_NEURAL_SVG,
         dataUrl: toDataUrl(AI_NEURAL_SVG),
     },
@@ -477,7 +477,7 @@ export const PRESET_EVENT_BANNERS: PresetBanner[] = [
         category: "Developer Jam & Meetup",
         themeColor: "#FFF7ED",
         accentColor: "#FB923C",
-        badgeText: "☕ CREATIVE JAM",
+        badgeText: "CREATIVE JAM",
         svgString: CODE_COFFEE_SVG,
         dataUrl: toDataUrl(CODE_COFFEE_SVG),
     },
