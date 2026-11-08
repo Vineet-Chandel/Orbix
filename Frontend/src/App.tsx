@@ -135,6 +135,8 @@ const App = () => {
           {/* Auth Pages */}
           <Route path="/auth/signup" element={<SignUpPage />} />
           <Route path="/auth/signin" element={<SignInPage />} />
+          <Route path="/auth/forgot-password" element={<Navigate to="/auth/signin?view=forgot-password" replace />} />
+          <Route path="/forgot-password" element={<Navigate to="/auth/signin?view=forgot-password" replace />} />
           <Route path="/auth/callback" element={<OAuthCallbackPage />} />
           <Route path="/login" element={<Navigate to="/auth/signin" replace />} />
           <Route path="/workspace" element={<WorkspaceRedirect />} />

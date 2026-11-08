@@ -639,6 +639,60 @@ export async function sendSecurityNotificationEmail(options: SendSecurityNotific
   });
 }
 
+export interface SendPasswordResetOtpEmailOptions {
+  to: string;
+  name?: string;
+  otp: string;
+  accountType?: string;
+}
+
+/**
+ * Dispatches a high-security OTP email for password reset verification.
+ */
+export async function sendPasswordResetOtpEmail(options: SendPasswordResetOtpEmailOptions): Promise<SendEmailResult> {
+  const { to, name = "Developer", otp, accountType = "personal" } = options;
+  const isClub = accountType === "club";
+  const entityLabel = isClub ? "Club Account" : "Orbix Account";
+
+  return sendSecurityNotificationEmail({
+    to,
+    name,
+    subject: `Your Orbix Password Reset Code: ${otp}`,
+    badgeText: isClub ? "Club Account Recovery" : "Account Recovery",
+    headline: `Reset your ${entityLabel} password`,
+    message: `We received a request to reset the password for your ${entityLabel}. Use the 6-digit verification code below to verify your identity and set a new secure password.`,
+    otp,
+    otpLabel: "6-Digit Verification Code",
+    isWarning: true,
+    footerNotice: "This verification code will expire in 10 minutes. If you did not make this request, your account is still secure — no password change can occur without this code. You may safely ignore this email.",
+  });
+}
+
+/**
+ * Dispatches an account security confirmation email after successful password change.
+ */
+export async function sendPasswordResetSuccessEmail(options: {
+  to: string;
+  name?: string;
+  accountType?: string;
+  ipAddressMasked?: string;
+}): Promise<SendEmailResult> {
+  const { to, name = "Developer", accountType = "personal", ipAddressMasked = "Unknown IP" } = options;
+  const isClub = accountType === "club";
+  const entityLabel = isClub ? "Club Account" : "Personal Account";
+
+  return sendSecurityNotificationEmail({
+    to,
+    name,
+    subject: `Security Alert: Your Orbix Password Was Changed`,
+    badgeText: "Security Alert",
+    headline: `Password Changed Successfully`,
+    message: `The password for your Orbix ${entityLabel} (${to}) was successfully reset from ${ipAddressMasked}. For your security, all other existing active sessions and devices have been logged out.`,
+    isWarning: false,
+    footerNotice: "If you did not perform this password reset, please contact Orbix security immediately at support@orbix.dev to protect your account.",
+  });
+}
+
 
 export interface SendGuardianConsentEmailOptions {
   to: string;

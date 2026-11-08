@@ -8,16 +8,27 @@ import { getOrCreateDeviceId } from "../../../api/sessionActivityApi";
 import { buildApiUrl } from "../../../api/apiClient";
 import { OrbixLoader } from "../../../components/ui/loader";
 
-export default function SigninForm() {
+export interface SigninFormProps {
+    initialIdentifier?: string;
+    onForgotPassword?: (identifier?: string) => void;
+}
+
+export default function SigninForm({ initialIdentifier = "", onForgotPassword }: SigninFormProps = {}) {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const toast = useToast();
     const dispatch = useAppDispatch();
 
     const [formData, setFormData] = useState({
-        gmail: "",
+        gmail: initialIdentifier || "",
         password: "",
     });
+
+    useEffect(() => {
+        if (initialIdentifier && !formData.gmail) {
+            setFormData((prev) => ({ ...prev, gmail: initialIdentifier }));
+        }
+    }, [initialIdentifier]);
 
     const [errors, setErrors] = useState<{ gmail?: string; password?: string }>({});
     const [loading, setLoading] = useState(false);
@@ -562,16 +573,20 @@ export default function SigninForm() {
 
             {/* Forgot Password Link right-aligned matching user screenshot */}
             <div className="flex justify-end pt-0.5">
-                <a
-                    href="#forgot-password"
+                <button
+                    type="button"
                     onClick={(e) => {
                         e.preventDefault();
-                        toast.info("Password reset instructions will be sent to your registered email.", { title: "Password Reset" });
+                        if (onForgotPassword) {
+                            onForgotPassword(formData.gmail);
+                        } else {
+                            toast.info("Password reset instructions will be sent to your registered email.", { title: "Password Reset" });
+                        }
                     }}
                     className="text-xs font-bold text-neutral-700 hover:text-black underline underline-offset-2 transition-colors cursor-pointer"
                 >
                     Forgot Password?
-                </a>
+                </button>
             </div>
 
             {/* Neo-brutalist Capsule Button matching landing page theme */}

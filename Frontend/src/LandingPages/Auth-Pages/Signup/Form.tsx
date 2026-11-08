@@ -512,10 +512,10 @@ export default function SignupForm() {
                     />
                 </div>
 
-                {/* Separate Versioned Legal Consents & Age Confirmation */}
-                <div className="space-y-3 pt-2">
+                {/* Separate Versioned Legal Consents & Age Confirmation (One by One) */}
+                <div className="flex flex-col gap-3.5 pt-2">
                     {/* 1. Terms & Conditions */}
-                    <div>
+                    <div className="w-full">
                         <NeoCheckbox
                             checked={formData.termsAccepted}
                             onCheckedChange={(checked) => {
@@ -523,6 +523,7 @@ export default function SignupForm() {
                                 if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: undefined });
                             }}
                             size="sm"
+                            className="w-full flex"
                             label={
                                 <span className="leading-snug font-medium text-xs text-neutral-700">
                                     I accept the{" "}
@@ -534,12 +535,12 @@ export default function SignupForm() {
                             }
                         />
                         {errors.termsAccepted && (
-                            <p className="text-xs font-bold text-rose-600 mt-0.5 px-1">{errors.termsAccepted}</p>
+                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
                         )}
                     </div>
 
                     {/* 2. Privacy Policy */}
-                    <div>
+                    <div className="w-full">
                         <NeoCheckbox
                             checked={formData.privacyPolicyAccepted}
                             onCheckedChange={(checked) => {
@@ -547,6 +548,7 @@ export default function SignupForm() {
                                 if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: undefined });
                             }}
                             size="sm"
+                            className="w-full flex"
                             label={
                                 <span className="leading-snug font-medium text-xs text-neutral-700">
                                     I acknowledge and agree to the{" "}
@@ -558,12 +560,12 @@ export default function SignupForm() {
                             }
                         />
                         {errors.privacyPolicyAccepted && (
-                            <p className="text-xs font-bold text-rose-600 mt-0.5 px-1">{errors.privacyPolicyAccepted}</p>
+                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.privacyPolicyAccepted}</p>
                         )}
                     </div>
 
                     {/* 3. Age 18+ Confirmation */}
-                    <div>
+                    <div className="w-full">
                         <NeoCheckbox
                             checked={formData.isAgeConfirmed}
                             onCheckedChange={(checked) => {
@@ -571,6 +573,7 @@ export default function SignupForm() {
                                 if (errors.isAgeConfirmed) setErrors({ ...errors, isAgeConfirmed: undefined });
                             }}
                             size="sm"
+                            className="w-full flex"
                             label={
                                 <span className="leading-snug font-medium text-xs text-neutral-700">
                                     I confirm that I am at least <strong>18 years of age</strong> and legally eligible to create an individual Orbix account.
@@ -578,7 +581,7 @@ export default function SignupForm() {
                             }
                         />
                         {errors.isAgeConfirmed && (
-                            <p className="text-xs font-bold text-rose-600 mt-0.5 px-1">{errors.isAgeConfirmed}</p>
+                            <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.isAgeConfirmed}</p>
                         )}
                     </div>
                 </div>

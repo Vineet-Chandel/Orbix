@@ -2,10 +2,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
-    ArrowRight,
     ShieldCheck,
     CheckCircle2,
-    Laptop,
     Mail,
     Send,
     AlertCircle,
@@ -26,18 +24,17 @@ import {
 } from "lucide-react";
 import type { ClubSettingsViewKey } from "./types";
 import { useToast } from "../../../context/ToastContext";
-import { NeoToggle } from "../../../components/NeoToggle";
 import { NeoSelect } from "../../../components/NeoSelect";
 import OtpSegmentedInput from "../../../LandingPages/Auth-Pages/OtpSegmentedInput";
 import { OrbixLogo } from "../../../components/OrbixLogo";
 import {
-    changeClubPassword,
     sendClubEmailVerificationOtp,
     confirmClubEmailVerificationOtp,
 } from "../../../api/clubSettingsApi";
 import { submitFAQFeedback } from "../../../api/helpApi";
 import { ManageAccountView } from "../../Settings/ManageAccountView";
 import { ClubYourActivityView } from "./ClubYourActivityView";
+import { PasswordSecurityView } from "../../Settings/PasswordSecurityView";
 
 interface ClubSettingDetailViewProps {
     viewKey: ClubSettingsViewKey;
@@ -72,44 +69,7 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
     // -------------------------------------------------------------------------
     // PASSWORD AND SECURITY STATE
     // -------------------------------------------------------------------------
-    const [currentPassword, setCurrentPassword] = useState("");
-    const [newPassword, setNewPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [isSavingPassword, setIsSavingPassword] = useState(false);
     const [twoFactorEnabled, setTwoFactorEnabled] = useState(Boolean(user?.isTwoFactorEnabled));
-
-    const handleSavePassword = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!currentPassword || !newPassword) {
-            toast.error("Please fill in both current and new password.", { title: "Password Error" });
-            return;
-        }
-        if (newPassword.length < 8) {
-            toast.error("New password must be at least 8 characters long.", { title: "Weak Password" });
-            return;
-        }
-        if (newPassword !== confirmPassword) {
-            toast.error("New passwords do not match.", { title: "Mismatch" });
-            return;
-        }
-
-        setIsSavingPassword(true);
-        try {
-            const res = await changeClubPassword({
-                currentPassword,
-                newPassword,
-                confirmPassword,
-            });
-            setCurrentPassword("");
-            setNewPassword("");
-            setConfirmPassword("");
-            toast.success(res?.message || "Password updated successfully.", { title: "Credentials Updated" });
-        } catch (err: any) {
-            toast.error(err?.message || "Failed to update password. Please check your current password.", { title: "Update Failed" });
-        } finally {
-            setIsSavingPassword(false);
-        }
-    };
 
     // -------------------------------------------------------------------------
     // EMAIL VERIFICATION STATE (VERIFY ACCOUNT)
@@ -449,140 +409,16 @@ export const ClubSettingDetailView: React.FC<ClubSettingDetailViewProps> = ({
             // -----------------------------------------------------------------
             case "password-security":
                 return (
-                    <div className="space-y-6">
-                        {/* Change Password Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
-                            <div className="space-y-1">
-                                <h3 className="text-lg font-black text-black">Change Organization Password</h3>
-                                <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                    Ensure your club password uses at least 8 characters with a combination of letters and numbers.
-                                </p>
-                            </div>
-
-                            <form onSubmit={handleSavePassword} className="space-y-3.5 max-w-md">
-                                <div>
-                                    <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Current Password
-                                    </label>
-                                    <input
-                                        type="password"
-                                        value={currentPassword}
-                                        onChange={(e) => setCurrentPassword(e.target.value)}
-                                        placeholder="••••••••••••"
-                                        className="w-full h-10 px-3 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        New Password
-                                    </label>
-                                    <input
-                                        type="password"
-                                        value={newPassword}
-                                        onChange={(e) => setNewPassword(e.target.value)}
-                                        placeholder="••••••••••••"
-                                        className="w-full h-10 px-3 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Confirm New Password
-                                    </label>
-                                    <input
-                                        type="password"
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        placeholder="••••••••••••"
-                                        className="w-full h-10 px-3 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none"
-                                    />
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={isSavingPassword}
-                                    className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-[#8ee673] transition-all cursor-pointer disabled:opacity-50"
-                                >
-                                    {isSavingPassword ? "Updating..." : "Update Password"}
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Two-Factor Authentication Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <ShieldCheck className="w-5 h-5 text-black stroke-[2.5]" />
-                                    <h3 className="text-base font-black text-black">Two-Factor Authentication (2FA)</h3>
-                                    {twoFactorEnabled && (
-                                        <span className="px-2 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black uppercase tracking-wider">
-                                            Active
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-xs text-neutral-600 font-medium max-w-xl leading-relaxed">
-                                    Protect your club administrative access with verified email OTP. Whenever logging in from new devices, a single-use 6-digit code will be delivered to your registered organization email (<span className="font-mono font-bold text-black">{user?.gmail || club.public_email || "club email"}</span>).
-                                </p>
-                            </div>
-
-                            <NeoToggle
-                                checked={twoFactorEnabled}
-                                onChange={(val) => {
-                                    setTwoFactorEnabled(val);
-                                    toast.info("2FA settings updated for organization account.", { title: "2FA" });
-                                }}
-                                onStatusText="2FA: Enabled"
-                                offStatusText="2FA: Disabled"
-                                showStatusText={true}
-                                ariaLabel="Toggle two-factor authentication"
-                            />
-                        </div>
-
-                        {/* Active Sessions & Team Activity Portal Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-9 h-9 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000]">
-                                        <Laptop className="w-5 h-5 text-black stroke-[2.5]" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-base font-black text-black">Active Administrative Sessions & Audit</h3>
-                                        <p className="text-xs text-neutral-600 font-medium">
-                                            Institutional audit trail, active team devices, and club workspace access
-                                        </p>
-                                    </div>
-                                </div>
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black self-start sm:self-auto">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-pulse" />
-                                    <span>Team Audit Active</span>
-                                </span>
-                            </div>
-
-                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="text-xs font-black text-black">Club Governance & Access Logs</p>
-                                        <span className="px-2 py-0.5 rounded-md bg-white border border-black text-[10px] font-bold text-neutral-800">
-                                            Role-Based Audit
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-neutral-600 font-medium">
-                                        Inspect team members currently accessing this club dashboard, their hardware fingerprints, approximate locations, and access times.
-                                    </p>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => onSelectView("your-activity")}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffd93d] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer shrink-0"
-                                >
-                                    <span>Inspect Team Activity</span>
-                                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <PasswordSecurityView
+                        accountType="club"
+                        user={user}
+                        club={club}
+                        twoFactorEnabled={twoFactorEnabled}
+                        onToggleTwoFactor={(val) => {
+                            setTwoFactorEnabled(val);
+                            toast.info("2FA settings updated for organization account.", { title: "2FA" });
+                        }}
+                    />
                 );
 
             // -----------------------------------------------------------------

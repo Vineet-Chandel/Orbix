@@ -8,15 +8,26 @@ import { getOrCreateDeviceId } from "../../../api/sessionActivityApi";
 import { buildApiUrl } from "../../../api/apiClient";
 import { OrbixLoader } from "../../../components/ui/loader";
 
-export default function ClubSigninForm() {
+export interface ClubSigninFormProps {
+    initialIdentifier?: string;
+    onForgotPassword?: (identifier?: string) => void;
+}
+
+export default function ClubSigninForm({ initialIdentifier = "", onForgotPassword }: ClubSigninFormProps = {}) {
     const navigate = useNavigate();
     const toast = useToast();
     const dispatch = useAppDispatch();
 
     const [formData, setFormData] = useState({
-        identity: "",
+        identity: initialIdentifier || "",
         password: "",
     });
+
+    useEffect(() => {
+        if (initialIdentifier && !formData.identity) {
+            setFormData((prev) => ({ ...prev, identity: initialIdentifier }));
+        }
+    }, [initialIdentifier]);
 
     const [errors, setErrors] = useState<{ identity?: string; password?: string }>({});
     const [loading, setLoading] = useState(false);
@@ -548,16 +559,20 @@ export default function ClubSigninForm() {
 
             {/* Forgot Password Link right-aligned */}
             <div className="flex justify-end pt-0.5">
-                <a
-                    href="#forgot-password"
+                <button
+                    type="button"
                     onClick={(e) => {
                         e.preventDefault();
-                        toast.info("Password reset instructions will be sent to your registered club email.", { title: "Password Reset" });
+                        if (onForgotPassword) {
+                            onForgotPassword(formData.identity);
+                        } else {
+                            toast.info("Password reset instructions will be sent to your registered club email.", { title: "Password Reset" });
+                        }
                     }}
                     className="text-xs font-bold text-neutral-700 hover:text-black underline underline-offset-2 transition-colors cursor-pointer"
                 >
                     Forgot password?
-                </a>
+                </button>
             </div>
 
             {/* Neo-brutalist Submit Button */}

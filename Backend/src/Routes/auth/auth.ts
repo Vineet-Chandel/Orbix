@@ -1323,4 +1323,117 @@ const handlePasswordChange = async (req: Request, res: Response) => {
 
 authRouter.post('/password/change', authenticate, handlePasswordChange);
 
+/**
+ * ============================================================================
+ * FORGOT PASSWORD FLOW (Instagram-Style Account Recovery & Verification)
+ * ============================================================================
+ */
+
+// Step 1: Find Account by username or email and dispatch 6-digit OTP
+const handleForgotPasswordFindAccount = async (req: Request, res: Response) => {
+    try {
+        const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+
+        const identifier = req.body?.identifier || req.body?.username || req.body?.email || req.body?.gmail;
+        const accountType = req.body?.accountType === "club" ? "club" : "personal";
+
+        const { PasswordResetService } = await import("../../services/auth/passwordResetService.js");
+        const result = await PasswordResetService.findAccountAndSendOtp({
+            identifier,
+            accountType,
+            ipAddress: clientIp,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to process recovery request.",
+            cooldownRemainingSeconds: err.cooldownRemainingSeconds || 0,
+        });
+    }
+};
+
+// Resend OTP
+const handleForgotPasswordResendOtp = async (req: Request, res: Response) => {
+    try {
+        const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+        const resetSessionToken = req.body?.resetSessionToken;
+
+        const { PasswordResetService } = await import("../../services/auth/passwordResetService.js");
+        const result = await PasswordResetService.resendResetOtp({
+            resetSessionToken,
+            ipAddress: clientIp,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to resend verification code.",
+            cooldownRemainingSeconds: err.cooldownRemainingSeconds || 0,
+        });
+    }
+};
+
+// Step 2: Verify 6-digit OTP
+const handleForgotPasswordVerifyOtp = async (req: Request, res: Response) => {
+    try {
+        const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+        const resetSessionToken = req.body?.resetSessionToken;
+        const otp = req.body?.otp;
+
+        const { PasswordResetService } = await import("../../services/auth/passwordResetService.js");
+        const result = await PasswordResetService.verifyResetOtp({
+            resetSessionToken,
+            otp,
+            ipAddress: clientIp,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to verify code.",
+        });
+    }
+};
+
+// Step 3: Set New Password
+const handleForgotPasswordReset = async (req: Request, res: Response) => {
+    try {
+        const clientIp = (req.headers["x-forwarded-for"] as string) || req.socket.remoteAddress || req.ip || "unknown";
+        const userAgent = (req.headers["user-agent"] as string) || "unknown";
+        const { resetProofToken, newPassword, confirmPassword } = req.body;
+
+        const { PasswordResetService } = await import("../../services/auth/passwordResetService.js");
+        const result = await PasswordResetService.resetPassword({
+            resetProofToken,
+            newPassword,
+            confirmPassword,
+            ipAddress: clientIp,
+            userAgent,
+        });
+
+        return res.status(200).json(result);
+    } catch (err: any) {
+        return res.status(err.statusCode || 400).json({
+            success: false,
+            message: err.message || "Failed to reset password.",
+        });
+    }
+};
+
+authRouter.post('/forgot-password/find-account', handleForgotPasswordFindAccount);
+authRouter.post('/forgot-password/request-otp', handleForgotPasswordFindAccount);
+authRouter.post('/forgot-password/resend-otp', handleForgotPasswordResendOtp);
+authRouter.post('/forgot-password/verify-otp', handleForgotPasswordVerifyOtp);
+authRouter.post('/forgot-password/reset', handleForgotPasswordReset);
+
 export default authRouter;

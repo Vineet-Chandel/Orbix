@@ -4,6 +4,7 @@ import redis from "../../redis/client.js";
 import { deleteUserDetailsCache } from "../../redis/cache/cache-auth.js";
 import { sendSecurityNotificationEmail } from "../email/resendService.js";
 import { ManageAccountsService } from "../account/manageAccountsService.js";
+import { hasWeakPattern } from "../../validators/weakPatterns.js";
 
 export class ClubSettingsService {
     /**
@@ -186,10 +187,24 @@ export class ClubSettingsService {
             throw err;
         }
 
-        const hasLetter = /[a-zA-Z]/.test(newPassword);
-        const hasDigit = /\d/.test(newPassword);
-        if (!hasLetter || !hasDigit) {
-            const err: any = new Error("New password must contain a combination of letters and numbers.");
+        if (newPassword.length > 128) {
+            const err: any = new Error("New password must not exceed 128 characters.");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        const hasUpper = /[A-Z]/.test(newPassword);
+        const hasLower = /[a-z]/.test(newPassword);
+        const hasNumber = /[0-9]/.test(newPassword);
+        const hasSymbol = /[^A-Za-z0-9]/.test(newPassword);
+        if (!hasUpper || !hasLower || !hasNumber || !hasSymbol) {
+            const err: any = new Error("New password must include at least one uppercase letter, one lowercase letter, one number, and one special character.");
+            err.statusCode = 400;
+            throw err;
+        }
+
+        if (hasWeakPattern(newPassword)) {
+            const err: any = new Error("Password contains a common weak pattern. Please satisfy the password security criteria.");
             err.statusCode = 400;
             throw err;
         }

@@ -1375,7 +1375,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                                 </p>
                             </div>
                         ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-start">
+                            <div className="space-y-3.5">
                                 {/* Password Input */}
                                 <div>
                                     <FormInput
@@ -1416,51 +1416,57 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
                         )}
                     </div>
 
-                    {/* SECTION E: LEGAL CONSENT */}
-                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-2.5">
-                        <div className="space-y-3 pt-1">
-                            <NeoCheckbox
-                                checked={formData.termsAccepted}
-                                onCheckedChange={(checked) => {
-                                    setFormData({ ...formData, termsAccepted: checked });
-                                    if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
-                                }}
-                                size="sm"
-                                label={
-                                    <span className="leading-snug font-medium text-xs text-neutral-700">
-                                        I accept the{" "}
-                                        <Link to="/terms" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                            Terms of Service
-                                        </Link>
-                                        .
-                                    </span>
-                                }
-                            />
+                    {/* SECTION E: LEGAL CONSENT (ONE BY ONE, NOT PARALLEL) */}
+                    <div className="p-4 sm:p-5 rounded-3xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
+                        <div className="flex flex-col gap-3.5 pt-1">
+                            <div className="w-full">
+                                <NeoCheckbox
+                                    checked={formData.termsAccepted}
+                                    onCheckedChange={(checked) => {
+                                        setFormData({ ...formData, termsAccepted: checked });
+                                        if (errors.termsAccepted) setErrors({ ...errors, termsAccepted: "" });
+                                    }}
+                                    size="sm"
+                                    className="w-full flex"
+                                    label={
+                                        <span className="leading-snug font-medium text-xs text-neutral-700">
+                                            I accept the{" "}
+                                            <Link to="/terms" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                                Terms of Service
+                                            </Link>
+                                            .
+                                        </span>
+                                    }
+                                />
+                                {errors.termsAccepted && (
+                                    <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.termsAccepted}</p>
+                                )}
+                            </div>
 
-                            <NeoCheckbox
-                                checked={formData.privacyPolicyAccepted}
-                                onCheckedChange={(checked) => {
-                                    setFormData({ ...formData, privacyPolicyAccepted: checked });
-                                    if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
-                                }}
-                                size="sm"
-                                label={
-                                    <span className="leading-snug font-medium text-xs text-neutral-700">
-                                        I accept the{" "}
-                                        <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
-                                            Privacy Policy
-                                        </Link>
-                                        .
-                                    </span>
-                                }
-                            />
+                            <div className="w-full">
+                                <NeoCheckbox
+                                    checked={formData.privacyPolicyAccepted}
+                                    onCheckedChange={(checked) => {
+                                        setFormData({ ...formData, privacyPolicyAccepted: checked });
+                                        if (errors.privacyPolicyAccepted) setErrors({ ...errors, privacyPolicyAccepted: "" });
+                                    }}
+                                    size="sm"
+                                    className="w-full flex"
+                                    label={
+                                        <span className="leading-snug font-medium text-xs text-neutral-700">
+                                            I accept the{" "}
+                                            <Link to="/privacy" target="_blank" rel="noopener noreferrer" className="font-bold text-black underline underline-offset-2 hover:text-emerald-700">
+                                                Privacy Policy
+                                            </Link>
+                                            .
+                                        </span>
+                                    }
+                                />
+                                {errors.privacyPolicyAccepted && (
+                                    <p className="text-xs font-bold text-rose-600 mt-1 px-1">{errors.privacyPolicyAccepted}</p>
+                                )}
+                            </div>
                         </div>
-                        {errors.termsAccepted && (
-                            <p className="text-xs font-bold text-rose-600 px-1">{errors.termsAccepted}</p>
-                        )}
-                        {errors.privacyPolicyAccepted && (
-                            <p className="text-xs font-bold text-rose-600 px-1">{errors.privacyPolicyAccepted}</p>
-                        )}
                     </div>
 
                     {/* Proceed Button */}

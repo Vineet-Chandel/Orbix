@@ -3,7 +3,6 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import {
     ArrowLeft,
-    ArrowRight,
     Bookmark,
     UserX,
     MessageSquare,
@@ -11,7 +10,6 @@ import {
     ExternalLink,
     Copy,
     Lock,
-    Laptop,
     Search,
     UserCheck,
     UserMinus,
@@ -47,6 +45,7 @@ import type { ConnectedUserItem } from "../../api/relationshipApi";
 import { HelpCenterView } from "./HelpCenterView";
 import { ManageAccountView } from "./ManageAccountView";
 import { YourActivityView } from "./YourActivityView";
+import { PasswordSecurityView } from "./PasswordSecurityView";
 import {
     fetchAccountGovernanceStatus,
     fetchPrivacyPreferences,
@@ -437,52 +436,6 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
         }
     };
 
-    // Password fields
-    const [currentPassword, setCurrentPassword] = useState("");
-    const [newPassword, setNewPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [isSavingPassword, setIsSavingPassword] = useState(false);
-
-    const handleSavePassword = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!currentPassword || !newPassword) {
-            toast.error("Please fill in both current and new password.", { title: "Password Error" });
-            return;
-        }
-        if (newPassword.length < 8) {
-            toast.error("New password must be at least 8 characters.", { title: "Weak Password" });
-            return;
-        }
-        if (newPassword !== confirmPassword) {
-            toast.error("New passwords do not match.", { title: "Mismatch" });
-            return;
-        }
-        setIsSavingPassword(true);
-        try {
-            const res = await fetch("/api/settings/manage-account/password/change", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({
-                    currentPassword,
-                    newPassword,
-                    confirmPassword,
-                }),
-            });
-            const data = await res.json().catch(() => null);
-            if (!res.ok) {
-                throw new Error(data?.message || "Failed to update password.");
-            }
-            setCurrentPassword("");
-            setNewPassword("");
-            setConfirmPassword("");
-            toast.success(data?.message || "Password updated successfully.", { title: "Security Updated" });
-        } catch (err: any) {
-            toast.error(err?.message || "Failed to update password. Please check your current password.", { title: "Update Failed" });
-        } finally {
-            setIsSavingPassword(false);
-        }
-    };
 
     const handleCopyInviteLink = () => {
         const link = `${window.location.origin}/signup?ref=${encodeURIComponent(user?.username || "dev")}`;
@@ -542,137 +495,12 @@ export const SettingDetailView: React.FC<SettingDetailViewProps> = ({
 
             case "password-security":
                 return (
-                    <div className="space-y-6">
-                        {/* Change Password Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-5">
-                            <div className="space-y-1">
-                                <h3 className="text-lg font-black text-black">Change Password</h3>
-                                <p className="text-xs sm:text-sm text-neutral-600 font-medium">
-                                    Ensure your password uses at least 8 characters with a mix of numbers and letters.
-                                </p>
-                            </div>
-
-                            <form onSubmit={handleSavePassword} className="space-y-3.5 max-w-md">
-                                <div>
-                                    <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Current Password
-                                    </label>
-                                    <input
-                                        type="password"
-                                        value={currentPassword}
-                                        onChange={(e) => setCurrentPassword(e.target.value)}
-                                        placeholder="••••••••••••"
-                                        className="w-full h-10 px-3 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        New Password
-                                    </label>
-                                    <input
-                                        type="password"
-                                        value={newPassword}
-                                        onChange={(e) => setNewPassword(e.target.value)}
-                                        placeholder="••••••••••••"
-                                        className="w-full h-10 px-3 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none"
-                                    />
-                                </div>
-
-                                <div>
-                                    <label className="block text-[11px] font-black uppercase tracking-wider text-neutral-700 mb-1">
-                                        Confirm New Password
-                                    </label>
-                                    <input
-                                        type="password"
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        placeholder="••••••••••••"
-                                        className="w-full h-10 px-3 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black shadow-[2px_2px_0px_#000] focus:bg-white focus:outline-none"
-                                    />
-                                </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={isSavingPassword}
-                                    className="px-5 py-2.5 rounded-xl bg-black text-[#a2ff86] font-black text-xs uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all cursor-pointer disabled:opacity-50"
-                                >
-                                    {isSavingPassword ? "Updating..." : "Update Password"}
-                                </button>
-                            </form>
-                        </div>
-
-                        {/* Two-Factor Authentication Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <ShieldCheck className="w-5 h-5 text-black stroke-[2.5]" />
-                                    <h3 className="text-base font-black text-black">Two-Factor Authentication (2FA)</h3>
-                                    {twoFactorEnabled && (
-                                        <span className="px-2 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black uppercase tracking-wider">
-                                            Active
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="text-xs text-neutral-600 font-medium max-w-xl leading-relaxed">
-                                    Protect your Orbix account with verified email OTP. Whenever you sign in, a single-use 6-digit code will be sent to your registered email (<span className="font-mono font-bold text-black">{user?.gmail || "account email"}</span>) via Resend.
-                                </p>
-                            </div>
-
-                            <NeoToggle
-                                checked={twoFactorEnabled}
-                                onChange={handleToggleTwoFactor}
-                                onStatusText="2FA: Enabled"
-                                offStatusText="2FA: Disabled"
-                                showStatusText={true}
-                                ariaLabel="Toggle two-factor authentication"
-                            />
-                        </div>
-
-                        {/* Active Sessions & Your Activity Portal Card */}
-                        <div className="p-6 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <div className="flex items-center gap-2.5">
-                                    <div className="w-9 h-9 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000]">
-                                        <Laptop className="w-5 h-5 text-black stroke-[2.5]" />
-                                    </div>
-                                    <div>
-                                        <h3 className="text-base font-black text-black">Where You're Logged In</h3>
-                                        <p className="text-xs text-neutral-600 font-medium">
-                                            Active device sessions, login locations, and remote termination
-                                        </p>
-                                    </div>
-                                </div>
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#a2ff86] text-black text-[10px] font-black border border-black self-start sm:self-auto">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-700 animate-pulse" />
-                                    <span>Real-Time Tracking</span>
-                                </span>
-                            </div>
-
-                            <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="text-xs font-black text-black">Active Device Authentication Pipeline</p>
-                                        <span className="px-2 py-0.5 rounded-md bg-white border border-black text-[10px] font-bold text-neutral-800">
-                                            Canonical SSO & 2FA
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-neutral-600 font-medium">
-                                        Monitor authenticated hardware fingerprints, review security alerts, or log out of all other devices remotely with zero latency.
-                                    </p>
-                                </div>
-
-                                <button
-                                    type="button"
-                                    onClick={() => onSelectView("your-activity")}
-                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FFE566] hover:bg-[#ffd93d] text-black text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] hover:translate-x-0.5 hover:-translate-y-0.5 active:translate-x-[1px] active:translate-y-[1px] transition-all cursor-pointer shrink-0"
-                                >
-                                    <span>Manage All Devices</span>
-                                    <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <PasswordSecurityView
+                        accountType="personal"
+                        user={user}
+                        twoFactorEnabled={twoFactorEnabled}
+                        onToggleTwoFactor={handleToggleTwoFactor}
+                    />
                 );
 
             case "manage-account":
