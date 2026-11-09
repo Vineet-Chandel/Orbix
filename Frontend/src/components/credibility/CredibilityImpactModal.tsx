@@ -16,6 +16,8 @@ import {
     type CredibilityImpactPreview,
 } from "../../api/clubCredibilityApi";
 import { OrbixLoader } from "../ui/loader";
+import { NeoSelect } from "../NeoSelect";
+import { NeoCheckbox } from "../NeoCheckbox";
 
 export interface CredibilityImpactModalProps {
     isOpen: boolean;
@@ -275,38 +277,47 @@ export const CredibilityImpactModal: React.FC<CredibilityImpactModalProps> = ({
                                 <label className="block text-xs font-black uppercase tracking-wider text-black dark:text-white">
                                     Reason for Cancellation / Removal:
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={reasonCategory}
-                                    onChange={(e) => setReasonCategory(e.target.value)}
-                                    className="w-full px-3.5 py-2.5 rounded-xl border-2 border-black bg-white dark:bg-[#1a1a1a] text-xs font-bold text-black dark:text-white shadow-[2px_2px_0px_#000] focus:outline-none cursor-pointer"
-                                >
-                                    {REASON_OPTIONS.map((opt) => (
-                                        <option key={opt.value} value={opt.value}>
-                                            {opt.label}
-                                        </option>
-                                    ))}
-                                </select>
+                                    onChange={(val) => setReasonCategory(val)}
+                                    size="sm"
+                                    options={REASON_OPTIONS.map((opt) => ({
+                                        value: opt.value,
+                                        label: opt.label,
+                                        description: opt.description,
+                                    }))}
+                                />
 
                                 {/* Additional Remedies Checkboxes */}
                                 <div className="space-y-2 pt-2">
-                                    <label className="flex items-center gap-2 cursor-pointer text-xs font-black text-neutral-800 dark:text-neutral-200">
-                                        <input
-                                            type="checkbox"
+                                    <div className="flex items-start gap-2.5">
+                                        <NeoCheckbox
                                             checked={communicatedToAll}
-                                            onChange={(e) => setCommunicatedToAll(e.target.checked)}
-                                            className="w-4 h-4 rounded border-2 border-black text-black focus:ring-0 cursor-pointer"
+                                            onCheckedChange={(checked) => setCommunicatedToAll(checked)}
+                                            size="sm"
+                                            colorScheme="pink"
                                         />
-                                        <span>Dispatch urgent notification email to all {preview.affectedParticipants} registered students</span>
-                                    </label>
-                                    <label className="flex items-center gap-2 cursor-pointer text-xs font-black text-neutral-800 dark:text-neutral-200">
-                                        <input
-                                            type="checkbox"
+                                        <span
+                                            onClick={() => setCommunicatedToAll(!communicatedToAll)}
+                                            className="text-xs font-black text-neutral-800 dark:text-neutral-200 cursor-pointer select-none leading-tight"
+                                        >
+                                            Dispatch urgent notification email to all {preview.affectedParticipants} registered students
+                                        </span>
+                                    </div>
+                                    <div className="flex items-start gap-2.5">
+                                        <NeoCheckbox
                                             checked={rescheduleOffered}
-                                            onChange={(e) => setRescheduleOffered(e.target.checked)}
-                                            className="w-4 h-4 rounded border-2 border-black text-black focus:ring-0 cursor-pointer"
+                                            onCheckedChange={(checked) => setRescheduleOffered(checked)}
+                                            size="sm"
+                                            colorScheme="green"
                                         />
-                                        <span>Offer automatic priority pass rollover when session is rescheduled (+10% remedy credit)</span>
-                                    </label>
+                                        <span
+                                            onClick={() => setRescheduleOffered(!rescheduleOffered)}
+                                            className="text-xs font-black text-neutral-800 dark:text-neutral-200 cursor-pointer select-none leading-tight"
+                                        >
+                                            Offer automatic priority pass rollover when session is rescheduled (+10% remedy credit)
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         )}

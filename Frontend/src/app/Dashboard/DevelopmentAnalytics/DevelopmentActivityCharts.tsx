@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo } from "react";
-import { Calendar, Flame } from "lucide-react";
+import { Calendar, Flame, Star } from "lucide-react";
 import type { DevelopmentChartsData } from "../../../store/developmentSlice";
 import { computeDevelopmentCharts } from "../../../utils/submissionsAggregator";
 import { useAppDispatch, useAppSelector } from "../../../store/index";
@@ -358,8 +358,9 @@ export const DevelopmentActivityCharts: React.FC<DevelopmentActivityChartsProps>
                                     ) : (
                                         mostStarred.name
                                     )}{" "}
-                                    <span className="text-xs font-mono font-black bg-[#FFE566] px-1.5 py-0.5 rounded border border-black ml-1">
-                                        ★ {mostStarred.stars}
+                                    <span className="inline-flex items-center gap-1 text-xs font-mono font-black bg-[#FFE566] px-1.5 py-0.5 rounded border border-black ml-1">
+                                        <Star className="w-3 h-3 fill-black text-black" />
+                                        <span>{mostStarred.stars}</span>
                                     </span>
                                 </span>
                             ) : (

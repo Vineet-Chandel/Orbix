@@ -154,12 +154,16 @@ const App = () => {
           <Route path="/club" element={<Navigate to="/club/dashboard" replace />} />
           <Route path="/club/dashboard" element={<ClubDashboardPage />} />
           <Route path="/club/team" element={<ClubDashboardPage />} />
+          <Route path="/club/team-workspace" element={<ClubDashboardPage />} />
+          <Route path="/club/recruitment" element={<ClubDashboardPage />} />
           <Route path="/club/events" element={<ClubDashboardPage />} />
           <Route path="/club/events/:eventId" element={<ClubDashboardPage />} />
           <Route path="/club/events/:eventId/checkin" element={<ClubDashboardPage />} />
           <Route path="/club/analytics" element={<ClubDashboardPage />} />
           <Route path="/club/trends" element={<Navigate to="/club/analytics" replace />} />
           <Route path="/club/certificates" element={<ClubDashboardPage />} />
+          <Route path="/club/feedback-surveys" element={<ClubDashboardPage />} />
+          <Route path="/club/announcements" element={<ClubDashboardPage />} />
           <Route path="/club/credibility" element={<Navigate to="/club/dashboard" replace />} />
           <Route path="/club/profile" element={<ClubDashboardPage />} />
           <Route path="/club/manage-profile" element={<Navigate to="/club/profile" replace />} />

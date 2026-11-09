@@ -19,6 +19,7 @@ import {
     ChevronUp,
     RefreshCw,
     X,
+    Gift,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import {
@@ -28,6 +29,7 @@ import {
 } from "../../api/certificateStudioApi";
 import { OrbixLoader } from "../../components/ui/loader";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
+import { NeoSelect } from "../../components/NeoSelect";
 
 interface UserCertificateWalletViewProps {
     onOpenMobileSidebar?: () => void;
@@ -215,7 +217,7 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
             setCertificates((prev) =>
                 prev.map((c) => (c.id === cert.id ? { ...c, isRevealed: true, isSpoiler: false } : c))
             );
-            toast.success("🎉 Certificate officially revealed & stamped!");
+            toast.success("Certificate officially revealed & stamped!");
         } catch (err: any) {
             toast.error(err.message || "Failed to reveal certificate.");
         } finally {
@@ -322,18 +324,15 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
                         <label className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
                             Issuing Club
                         </label>
-                        <select
+                        <NeoSelect
                             value={selectedClub}
-                            onChange={(e) => setSelectedClub(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border-2 border-black text-xs font-bold bg-white shadow-[2px_2px_0px_#000]"
-                        >
-                            <option value="all">All Issuing Clubs</option>
-                            {availableClubs.map((club) => (
-                                <option key={club.id} value={club.id}>
-                                    {club.name}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setSelectedClub(val)}
+                            size="sm"
+                            options={[
+                                { value: "all", label: "All Issuing Clubs" },
+                                ...availableClubs.map((club) => ({ value: club.id, label: club.name })),
+                            ]}
+                        />
                     </div>
 
                     {/* Event Filter */}
@@ -341,18 +340,15 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
                         <label className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
                             Event
                         </label>
-                        <select
+                        <NeoSelect
                             value={selectedEvent}
-                            onChange={(e) => setSelectedEvent(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border-2 border-black text-xs font-bold bg-white shadow-[2px_2px_0px_#000]"
-                        >
-                            <option value="all">All Events</option>
-                            {availableEvents.map((ev) => (
-                                <option key={ev.id} value={ev.id}>
-                                    {ev.title}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setSelectedEvent(val)}
+                            size="sm"
+                            options={[
+                                { value: "all", label: "All Events" },
+                                ...availableEvents.map((ev) => ({ value: ev.id, label: ev.title })),
+                            ]}
+                        />
                     </div>
 
                     {/* Category Filter */}
@@ -360,18 +356,15 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
                         <label className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
                             Category
                         </label>
-                        <select
+                        <NeoSelect
                             value={selectedCategory}
-                            onChange={(e) => setSelectedCategory(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border-2 border-black text-xs font-bold bg-white shadow-[2px_2px_0px_#000]"
-                        >
-                            <option value="all">All Categories</option>
-                            {availableCategories.map((cat) => (
-                                <option key={cat} value={cat}>
-                                    {cat}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setSelectedCategory(val)}
+                            size="sm"
+                            options={[
+                                { value: "all", label: "All Categories" },
+                                ...availableCategories.map((cat) => ({ value: cat, label: cat })),
+                            ]}
+                        />
                     </div>
 
                     {/* Validity Status Filter */}
@@ -379,16 +372,17 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
                         <label className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
                             Validity Status
                         </label>
-                        <select
+                        <NeoSelect
                             value={selectedStatus}
-                            onChange={(e) => setSelectedStatus(e.target.value)}
-                            className="w-full px-3 py-2 rounded-lg border-2 border-black text-xs font-bold bg-white shadow-[2px_2px_0px_#000]"
-                        >
-                            <option value="all">All Statuses</option>
-                            <option value="valid">Valid & Active Only</option>
-                            <option value="superseded">Superseded Versions</option>
-                            <option value="revoked">Revoked</option>
-                        </select>
+                            onChange={(val) => setSelectedStatus(val)}
+                            size="sm"
+                            options={[
+                                { value: "all", label: "All Statuses" },
+                                { value: "valid", label: "Valid & Active Only" },
+                                { value: "superseded", label: "Superseded Versions" },
+                                { value: "revoked", label: "Revoked" },
+                            ]}
+                        />
                     </div>
                 </div>
 
@@ -609,8 +603,9 @@ export const UserCertificateWalletView: React.FC<UserCertificateWalletViewProps>
                                     {/* Spoiler / Unrevealed Stamp Alert */}
                                     {(cert.isSpoiler || cert.isRevealed === false) && (
                                         <div className="p-3 rounded-xl bg-[#FFE566] border-2 border-black text-black flex items-center justify-between gap-2">
-                                            <div className="text-xs font-black">
-                                                🎁 Unrevealed Certificate Award!
+                                            <div className="text-xs font-black inline-flex items-center gap-1.5">
+                                                <Gift className="w-4 h-4 text-black shrink-0" />
+                                                <span>Unrevealed Certificate Award!</span>
                                             </div>
                                             <button
                                                 type="button"

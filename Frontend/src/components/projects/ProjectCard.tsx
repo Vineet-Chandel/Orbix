@@ -14,6 +14,7 @@ import {
     Lock,
     RefreshCw,
     FileText,
+    Pin,
 } from "lucide-react";
 import type { ProjectItem } from "../../types/project";
 
@@ -83,8 +84,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                         )}
 
                         {project.isPinned && (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                ★ Pinned
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#FFE566] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                <Pin className="w-2.5 h-2.5 fill-black stroke-[2.5]" />
+                                <span>Pinned</span>
                             </span>
                         )}
                     </div>

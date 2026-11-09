@@ -13,6 +13,10 @@ import {
     Settings,
     TrendingUp,
     Award,
+    Layers,
+    UserPlus,
+    Megaphone,
+    MessageSquareQuote,
 } from "lucide-react";
 import {
     useAppDispatch,
@@ -121,10 +125,14 @@ export default function ClubDashboardPage() {
 
     // Path to Club Tab mapping & clean full route paths
     const getClubTabFromPath = (pathname: string): ClubTab => {
+        if (pathname.startsWith("/club/team-workspace")) return "team-workspace";
+        if (pathname.startsWith("/club/recruitment")) return "recruitment";
         if (pathname.startsWith("/club/team")) return "team";
         if (pathname.startsWith("/club/events")) return "events";
         if (pathname.startsWith("/club/analytics") || pathname.startsWith("/club/trends")) return "analytics";
         if (pathname.startsWith("/club/certificates")) return "certificates";
+        if (pathname.startsWith("/club/feedback-surveys") || pathname.startsWith("/club/feedback")) return "feedback-surveys";
+        if (pathname.startsWith("/club/announcements") || pathname.startsWith("/club/announcement")) return "announcements";
         if (pathname.startsWith("/club/credibility")) return "overview";
         if (pathname.startsWith("/club/profile") || pathname.startsWith("/club/manage-profile")) return "profile";
         if (pathname.startsWith("/club/clubs") || pathname.startsWith("/club/campus-clubs") || pathname.startsWith("/club/other-clubs")) return "clubs";
@@ -135,9 +143,13 @@ export default function ClubDashboardPage() {
     const clubTabToPath: Record<ClubTab, string> = {
         overview: "/club/dashboard",
         team: "/club/team",
+        "team-workspace": "/club/team-workspace",
+        recruitment: "/club/recruitment",
         events: "/club/events",
         analytics: "/club/analytics",
         certificates: "/club/certificates",
+        "feedback-surveys": "/club/feedback-surveys",
+        announcements: "/club/announcements",
         credibility: "/club/dashboard",
         profile: "/club/profile",
         clubs: "/club/clubs",
@@ -523,6 +535,28 @@ export default function ClubDashboardPage() {
                                         </div>
                                     )}
 
+                                    {activeTab === "team-workspace" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Layers className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Team Workspace
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "recruitment" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <UserPlus className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Recruitment & Member Drives
+                                            </h1>
+                                        </div>
+                                    )}
+
                                     {activeTab === "events" && (
                                         <div className="flex items-center gap-2.5">
                                             <div className="w-8 h-8 rounded-lg bg-black text-[#38BDF8] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
@@ -552,6 +586,28 @@ export default function ClubDashboardPage() {
                                             </div>
                                             <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
                                                 Certificates & Credentials
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "feedback-surveys" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#a2ff86] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <MessageSquareQuote className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Feedback & Surveys
+                                            </h1>
+                                        </div>
+                                    )}
+
+                                    {activeTab === "announcements" && (
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="w-8 h-8 rounded-lg bg-black text-[#FFE566] flex items-center justify-center border border-black shadow-[2px_2px_0px_#000]">
+                                                <Megaphone className="w-4 h-4 stroke-[2.5]" />
+                                            </div>
+                                            <h1 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
+                                                Announcement
                                             </h1>
                                         </div>
                                     )}
@@ -610,10 +666,32 @@ export default function ClubDashboardPage() {
                                     {activeTab === "team" && (
                                         <>
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
-                                                Team Workspace
+                                                Team Roster
                                             </span>
                                             <span className="text-xs font-bold text-neutral-700">
-                                                · Build your club's organisation, manage people, and assign departments
+                                                · Overview of all active student club leads and core team members
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "team-workspace" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Workspace Departments
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Build organizational hierarchy, create departments, and appoint team leads
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "recruitment" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Auditions & Drives
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Dispatch invitation links, manage pending invites, and onboard new chapter talent
                                             </span>
                                         </>
                                     )}
@@ -642,6 +720,28 @@ export default function ClubDashboardPage() {
                                             </span>
                                             <span className="text-xs font-bold text-neutral-700">
                                                 · Issue verifiable participation & merit credentials to campus students
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "feedback-surveys" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#a2ff86] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Audience Feedback
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Create surveys, evaluate attendee sentiment, and collect event ratings
+                                            </span>
+                                        </>
+                                    )}
+
+                                    {activeTab === "announcements" && (
+                                        <>
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#FFE566] border-2 border-black text-[11px] font-black text-black uppercase tracking-wider shadow-[1px_1px_0px_#000]">
+                                                Club Broadcasts
+                                            </span>
+                                            <span className="text-xs font-bold text-neutral-700">
+                                                · Broadcast important announcements, club notices, and event highlights to campus
                                             </span>
                                         </>
                                     )}
@@ -889,10 +989,17 @@ export default function ClubDashboardPage() {
                         )}
 
                         {/* TAB: CLUB TEAM & ORGANISATION */}
-                        {activeTab === "team" && (
+                        {(activeTab === "team" || activeTab === "team-workspace" || activeTab === "recruitment") && (
                             <ClubTeamWorkspace
                                 club={club}
                                 hideHeaderTitle={true}
+                                initialTab={
+                                    activeTab === "team-workspace"
+                                        ? "departments"
+                                        : activeTab === "recruitment"
+                                        ? "invitations"
+                                        : "overview"
+                                }
                                 onOpenInbox={() => setIsInboxModalOpen(true)}
                                 onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
                                 onStatsLoaded={(stats: TeamStats) => {
@@ -1055,6 +1162,46 @@ export default function ClubDashboardPage() {
                                 clubLogo={club.logo_url}
                                 onOpenLegacyModal={() => setIsCertStudioOpen(true)}
                             />
+                        )}
+
+                        {/* TAB: FEEDBACK & SURVEYS */}
+                        {activeTab === "feedback-surveys" && (
+                            <div className="p-8 sm:p-12 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
+                                <div className="w-14 h-14 rounded-2xl bg-[#a2ff86] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center mx-auto text-black">
+                                    <MessageSquareQuote className="w-7 h-7 stroke-[2.2]" />
+                                </div>
+                                <div className="space-y-1.5 max-w-md mx-auto">
+                                    <h3 className="font-black text-lg sm:text-xl text-black">
+                                        Feedback & Surveys
+                                    </h3>
+                                    <p className="text-xs sm:text-sm font-medium text-neutral-600">
+                                        Participant feedback collection, post-event surveys, and satisfaction analytics will appear here.
+                                    </p>
+                                </div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-300 text-neutral-600 text-xs font-bold font-mono">
+                                    Module in development
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB: ANNOUNCEMENTS */}
+                        {activeTab === "announcements" && (
+                            <div className="p-8 sm:p-12 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] text-center space-y-4">
+                                <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-center mx-auto text-black">
+                                    <Megaphone className="w-7 h-7 stroke-[2.2]" />
+                                </div>
+                                <div className="space-y-1.5 max-w-md mx-auto">
+                                    <h3 className="font-black text-lg sm:text-xl text-black">
+                                        Campus Announcements
+                                    </h3>
+                                    <p className="text-xs sm:text-sm font-medium text-neutral-600">
+                                        Campus-wide club broadcasts, bulletin updates, and notification feeds will be managed here.
+                                    </p>
+                                </div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-100 border border-neutral-300 text-neutral-600 text-xs font-bold font-mono">
+                                    Module in development
+                                </div>
+                            </div>
                         )}
 
                         {/* TAB: CAMPUS CLUBS & DIRECTORY */}

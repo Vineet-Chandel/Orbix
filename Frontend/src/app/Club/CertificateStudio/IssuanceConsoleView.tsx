@@ -26,6 +26,11 @@ import {
     UploadCloud,
     Zap,
     XCircle,
+    Trophy,
+    Star,
+    User,
+    GraduationCap,
+    Clock,
 } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
 import {
@@ -683,7 +688,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
 
                 if (prog.status === "completed" || prog.status === "partially_failed" || prog.status === "failed") {
                     if (prog.status === "completed") {
-                        toast.success("🎉 Background certificate generation completed successfully!");
+                        toast.success("Background certificate generation completed successfully!");
                         if (onBatchIssued) onBatchIssued(activeBatchProgressId);
                     } else if (prog.status === "partially_failed") {
                         toast.warning("Batch completed with some render errors. You can retry failed items.");
@@ -1048,11 +1053,11 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                 setShowProgressModal(true);
                 setShowOverrideConfirmModal(false);
                 setIssuedBatchId(res.batchId);
-                toast.info(`⚡ Batch queued in worker pool with bounded concurrency.`);
+                toast.info(`Batch queued in worker pool with bounded concurrency.`);
             } else {
                 toast.success(res.message || `Successfully issued ${res.successfulCount} credentials!`);
                 if (res.deduplicatedCount && res.deduplicatedCount > 0) {
-                    toast.info(`⚡ Deduplication: ${res.deduplicatedCount} duplicate recipient overlap(s) consolidated.`);
+                    toast.info(`Deduplication: ${res.deduplicatedCount} duplicate recipient overlap(s) consolidated.`);
                 }
                 setShowOverrideConfirmModal(false);
                 setIssuedBatchId(res.batchId);
@@ -1354,7 +1359,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                     isPassed ? "bg-black text-[#a2ff86]" : isCurrent ? "bg-black text-[#FFE566]" : "bg-white text-black"
                                                 }`}
                                             >
-                                                {isPassed ? "✓" : step.number}
+                                                {isPassed ? <Check className="w-2.5 h-2.5 stroke-[3]" /> : step.number}
                                             </span>
                                             <span>{step.label}</span>
                                         </button>
@@ -1564,8 +1569,9 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                         </div>
 
                                         {eligibilityReport.ineligibleRecipients.length === 0 ? (
-                                            <p className="text-xs text-neutral-500 py-3 text-center font-bold">
-                                                ✓ All registered applicants qualify for &ldquo;{certType}&rdquo; credentials.
+                                            <p className="text-xs text-neutral-500 py-3 text-center font-bold flex items-center justify-center gap-1.5">
+                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                                <span>All registered applicants qualify for &ldquo;{certType}&rdquo; credentials.</span>
                                             </p>
                                         ) : (
                                             <div className="max-h-52 overflow-y-auto divide-y divide-neutral-200 text-xs">
@@ -2445,11 +2451,13 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                         </p>
                                                     </div>
                                                     <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
-                                                        <span className="px-2.5 py-1 rounded-lg bg-neutral-100 border-2 border-black text-[10px] font-black text-neutral-700">
-                                                            🛡️ Formula Injection Neutralization
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-100 border-2 border-black text-[10px] font-black text-neutral-700">
+                                                            <ShieldCheck className="w-3.5 h-3.5 text-black shrink-0" />
+                                                            <span>Formula Injection Neutralization</span>
                                                         </span>
-                                                        <span className="px-2.5 py-1 rounded-lg bg-[#a2ff86]/30 border-2 border-black text-[10px] font-black text-neutral-800">
-                                                            🎓 Direct Campus Matching
+                                                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#a2ff86]/30 border-2 border-black text-[10px] font-black text-neutral-800">
+                                                            <GraduationCap className="w-3.5 h-3.5 text-black shrink-0" />
+                                                            <span>Direct Campus Matching</span>
                                                         </span>
                                                     </div>
                                                 </>
@@ -2539,22 +2547,23 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                             <div className="flex flex-wrap items-center justify-between gap-2">
                                                 <div className="flex flex-wrap items-center gap-1.5">
                                                     {[
-                                                        { id: "all", label: `All (${reconciledCsvResult.rows.length})` },
-                                                        { id: "matched_student", label: `🟢 Students (${reconciledCsvResult.matchedStudentsCount})` },
-                                                        { id: "external_recipient", label: `🟡 External (${reconciledCsvResult.externalCount})` },
-                                                        { id: "invalid", label: `🔴 Invalid (${reconciledCsvResult.invalidCount})` },
+                                                        { id: "all", label: `All (${reconciledCsvResult.rows.length})`, dotColor: null },
+                                                        { id: "matched_student", label: `Students (${reconciledCsvResult.matchedStudentsCount})`, dotColor: "bg-emerald-500" },
+                                                        { id: "external_recipient", label: `External (${reconciledCsvResult.externalCount})`, dotColor: "bg-amber-400" },
+                                                        { id: "invalid", label: `Invalid (${reconciledCsvResult.invalidCount})`, dotColor: "bg-rose-500" },
                                                     ].map((tab) => (
                                                         <button
                                                             key={tab.id}
                                                             type="button"
                                                             onClick={() => setCsvFilterStatus(tab.id as any)}
-                                                            className={`px-3 py-1 rounded-lg text-xs font-black border-2 border-black transition-all cursor-pointer ${
+                                                            className={`px-3 py-1 rounded-lg text-xs font-black border-2 border-black transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                                                                 csvFilterStatus === tab.id
                                                                     ? "bg-black text-[#FFE566] shadow-[2px_2px_0px_#000]"
                                                                     : "bg-white text-black hover:bg-neutral-100"
                                                             }`}
                                                         >
-                                                            {tab.label}
+                                                            {tab.dotColor && <span className={`w-2 h-2 rounded-full ${tab.dotColor} shrink-0 border border-black/20`} />}
+                                                            <span>{tab.label}</span>
                                                         </button>
                                                     ))}
                                                 </div>
@@ -2864,17 +2873,20 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                 {[
                                                     {
                                                         id: "both" as const,
-                                                        label: "🌟 Both Team & Members",
+                                                        label: "Both Team & Members",
+                                                        icon: <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500 inline mr-1" />,
                                                         desc: "1 team cert + 1 cert per member",
                                                     },
                                                     {
                                                         id: "team_only" as const,
-                                                        label: "🏆 Team Certificate Only",
+                                                        label: "Team Certificate Only",
+                                                        icon: <Trophy className="w-3.5 h-3.5 text-amber-500 inline mr-1" />,
                                                         desc: "Single credential for entire team",
                                                     },
                                                     {
                                                         id: "individual_only" as const,
-                                                        label: "👤 Members Only",
+                                                        label: "Members Only",
+                                                        icon: <User className="w-3.5 h-3.5 text-neutral-600 inline mr-1" />,
                                                         desc: "1 cert per individual member",
                                                     },
                                                 ].map((mode) => (
@@ -2888,7 +2900,10 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                                 : "border-black/20 bg-white hover:border-black font-bold"
                                                         }`}
                                                     >
-                                                        <div className="text-xs font-black text-black">{mode.label}</div>
+                                                        <div className="text-xs font-black text-black inline-flex items-center">
+                                                            {mode.icon}
+                                                            <span>{mode.label}</span>
+                                                        </div>
                                                         <div className="text-[10px] text-neutral-600 font-medium leading-tight mt-0.5">
                                                             {mode.desc}
                                                         </div>
@@ -3592,21 +3607,22 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             </div>
                             <div className="grid grid-cols-3 gap-2">
                                 {[
-                                    { id: "both" as const, label: "🌟 Both (Team + Members)" },
-                                    { id: "team_only" as const, label: "🏆 Team Cert Only" },
-                                    { id: "individual_only" as const, label: "👤 Members Only" },
+                                    { id: "both" as const, label: "Both (Team + Members)", icon: <Star className="w-3 h-3 text-amber-500 fill-amber-500 inline mr-1" /> },
+                                    { id: "team_only" as const, label: "Team Cert Only", icon: <Trophy className="w-3 h-3 text-amber-500 inline mr-1" /> },
+                                    { id: "individual_only" as const, label: "Members Only", icon: <User className="w-3 h-3 text-neutral-600 inline mr-1" /> },
                                 ].map((m) => (
                                     <button
                                         key={m.id}
                                         type="button"
                                         onClick={() => setTeamIssuanceMode(m.id)}
-                                        className={`p-2 rounded-xl border-2 text-[11px] font-black transition-all cursor-pointer text-center ${
+                                        className={`p-2 rounded-xl border-2 text-[11px] font-black transition-all cursor-pointer text-center inline-flex items-center justify-center ${
                                             teamIssuanceMode === m.id
                                                 ? "border-black bg-[#FFE566] shadow-[2px_2px_0px_#000]"
                                                 : "border-black/20 bg-white hover:border-black"
                                         }`}
                                     >
-                                        {m.label}
+                                        {m.icon}
+                                        <span>{m.label}</span>
                                     </button>
                                 ))}
                             </div>
@@ -3631,9 +3647,11 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                     }`}
                                 >
                                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
+                                        <NeoCheckbox
+                                            size="sm"
+                                            colorScheme="yellow"
+                                            checked={member.included}
+                                            onCheckedChange={() => {
                                                 setTeamSnapshots((prev) => {
                                                     const cur = prev[reviewingTeamId];
                                                     const updated = [...cur.members];
@@ -3641,12 +3659,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                     return { ...prev, [reviewingTeamId]: { ...cur, members: updated } };
                                                 });
                                             }}
-                                            className={`w-5 h-5 rounded-md border-2 border-black flex items-center justify-center shrink-0 cursor-pointer ${
-                                                member.included ? "bg-[#FFE566]" : "bg-white"
-                                            }`}
-                                        >
-                                            {member.included && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                                        </button>
+                                        />
 
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2">
@@ -3860,15 +3873,32 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                             : "bg-[#FFE566] text-black animate-pulse"
                                     }`}
                                 >
-                                    {batchProgress?.status === "completed"
-                                        ? "🎉 All Certificates Generated"
-                                        : batchProgress?.status === "partially_failed"
-                                        ? "⚠️ Partially Completed with Failures"
-                                        : batchProgress?.status === "failed"
-                                        ? "❌ Batch Processing Failed"
-                                        : batchProgress?.status === "processing"
-                                        ? "⚡ Rendering & Verifying Credentials..."
-                                        : "⏳ Queued in Worker Pool..."}
+                                    {batchProgress?.status === "completed" ? (
+                                        <span className="inline-flex items-center gap-1">
+                                            <CheckCircle2 className="w-3.5 h-3.5 text-black shrink-0" />
+                                            <span>All Certificates Generated</span>
+                                        </span>
+                                    ) : batchProgress?.status === "partially_failed" ? (
+                                        <span className="inline-flex items-center gap-1">
+                                            <AlertTriangle className="w-3.5 h-3.5 text-amber-800 shrink-0" />
+                                            <span>Partially Completed with Failures</span>
+                                        </span>
+                                    ) : batchProgress?.status === "failed" ? (
+                                        <span className="inline-flex items-center gap-1">
+                                            <XCircle className="w-3.5 h-3.5 text-red-800 shrink-0" />
+                                            <span>Batch Processing Failed</span>
+                                        </span>
+                                    ) : batchProgress?.status === "processing" ? (
+                                        <span className="inline-flex items-center gap-1">
+                                            <Zap className="w-3.5 h-3.5 text-black shrink-0 fill-black" />
+                                            <span>Rendering & Verifying Credentials...</span>
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1">
+                                            <Clock className="w-3.5 h-3.5 text-black shrink-0" />
+                                            <span>Queued in Worker Pool...</span>
+                                        </span>
+                                    )}
                                 </strong>
                             </span>
                             <span className="text-xs font-mono font-black text-black">

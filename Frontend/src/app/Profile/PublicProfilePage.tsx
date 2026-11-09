@@ -18,6 +18,7 @@ import {
     X,
     GraduationCap,
     ShieldCheck,
+    Wifi,
     WifiOff,
     ServerCrash,
     AlertTriangle,
@@ -1000,8 +1001,18 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                 </span>
                                 <div className="flex items-center justify-between text-neutral-700">
                                     <span>Browser Internet Status:</span>
-                                    <span className={`font-mono font-bold px-2 py-0.5 rounded-full text-[10px] ${isClientOnline ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-rose-100 text-rose-800 border border-rose-300"}`}>
-                                        {isClientOnline ? "● ONLINE" : "○ OFFLINE"}
+                                    <span className={`inline-flex items-center gap-1 font-mono font-bold px-2 py-0.5 rounded-full text-[10px] ${isClientOnline ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : "bg-rose-100 text-rose-800 border border-rose-300"}`}>
+                                        {isClientOnline ? (
+                                            <>
+                                                <Wifi className="w-2.5 h-2.5 text-emerald-700" />
+                                                <span>ONLINE</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <WifiOff className="w-2.5 h-2.5 text-rose-700" />
+                                                <span>OFFLINE</span>
+                                            </>
+                                        )}
                                     </span>
                                 </div>
                                 <div className="flex items-center justify-between text-neutral-700">

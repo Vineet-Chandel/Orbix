@@ -10,10 +10,9 @@ import {
     ShieldCheck,
     X,
     ChevronDown,
-    CheckSquare,
-    Square,
-    MinusSquare,
     RotateCcw,
+    Trophy,
+    CheckCircle2,
 } from "lucide-react";
 import { NeoSelect } from "../../../components/NeoSelect";
 import { NeoCheckbox } from "../../../components/NeoCheckbox";
@@ -419,30 +418,36 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                 {/* Filter Pills */}
                 <div className="flex flex-wrap items-center gap-1.5 pt-1">
                     {[
-                        { id: "all", label: `All (${recipients.length})` },
+                        { id: "all", label: `All (${recipients.length})`, icon: null },
                         {
                             id: "attended",
-                            label: `✓ Attended Only (${recipients.filter((r) => r.status === "attended" || r.checkedInAt).length})`,
+                            label: `Attended Only (${recipients.filter((r) => r.status === "attended" || r.checkedInAt).length})`,
+                            icon: <Check className="w-3 h-3 text-emerald-600 inline mr-1" />,
                         },
                         {
                             id: "registered",
                             label: `Registered (${recipients.filter((r) => r.status === "registered").length})`,
+                            icon: null,
                         },
                         {
                             id: "eligible",
                             label: `Eligible Only (${recipients.filter(isItemEligible).length})`,
+                            icon: null,
                         },
                         {
                             id: "missing_info",
-                            label: `⚠️ Missing Info (${missingInfoSet.size})`,
+                            label: `Missing Info (${missingInfoSet.size})`,
+                            icon: <AlertTriangle className="w-3 h-3 text-amber-600 inline mr-1" />,
                         },
                         {
                             id: "duplicates",
-                            label: `🔁 Duplicates (${duplicateIdSet.size})`,
+                            label: `Duplicates (${duplicateIdSet.size})`,
+                            icon: <RotateCcw className="w-3 h-3 text-blue-600 inline mr-1" />,
                         },
                         {
                             id: "already_issued",
-                            label: `🏆 Already Issued (${recipients.filter((r) => r.alreadyHasCert).length})`,
+                            label: `Already Issued (${recipients.filter((r) => r.alreadyHasCert).length})`,
+                            icon: <Trophy className="w-3 h-3 text-amber-500 inline mr-1" />,
                         },
                     ].map((pill) => (
                         <button
@@ -452,13 +457,14 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                                 setStatusFilter(pill.id as any);
                                 setCurrentPage(1);
                             }}
-                            className={`px-2.5 py-1 rounded-lg border text-[11px] font-black transition-all cursor-pointer ${
+                            className={`px-2.5 py-1 rounded-lg border text-[11px] font-black transition-all cursor-pointer inline-flex items-center ${
                                 statusFilter === pill.id
                                     ? "bg-black text-[#FFE566] border-black shadow-[1px_1px_0px_#000]"
                                     : "bg-neutral-100 text-neutral-700 border-neutral-300 hover:bg-neutral-200"
                             }`}
                         >
-                            {pill.label}
+                            {pill.icon}
+                            <span>{pill.label}</span>
                         </button>
                     ))}
                 </div>
@@ -471,19 +477,15 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                         <thead>
                             <tr className="bg-[#FAF6EE] border-b-3 border-black text-[11px] font-black text-black uppercase tracking-wider">
                                 <th className="p-3 w-10 text-center">
-                                    <button
-                                        type="button"
-                                        onClick={handleToggleCurrentPage}
-                                        className="w-5 h-5 rounded border-2 border-black flex items-center justify-center bg-white cursor-pointer hover:bg-neutral-100 mx-auto"
-                                    >
-                                        {allCurrentPageSelected ? (
-                                            <CheckSquare className="w-4 h-4 text-black" />
-                                        ) : someCurrentPageSelected ? (
-                                            <MinusSquare className="w-4 h-4 text-black" />
-                                        ) : (
-                                            <Square className="w-4 h-4 text-neutral-300" />
-                                        )}
-                                    </button>
+                                    <div className="flex items-center justify-center">
+                                        <NeoCheckbox
+                                            size="sm"
+                                            colorScheme="yellow"
+                                            checked={allCurrentPageSelected}
+                                            indeterminate={someCurrentPageSelected && !allCurrentPageSelected}
+                                            onCheckedChange={handleToggleCurrentPage}
+                                        />
+                                    </div>
                                 </th>
                                 <th className="p-3">Recipient & Username</th>
                                 <th className="p-3">Team / Affiliation</th>
@@ -567,8 +569,9 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                                             <td className="p-3">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                     {isAttended ? (
-                                                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-[#a2ff86] border border-black text-black">
-                                                            ✓ Verified Check-In
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black bg-[#a2ff86] border border-black text-black">
+                                                            <CheckCircle2 className="w-3 h-3 text-black shrink-0" />
+                                                            <span>Verified Check-In</span>
                                                         </span>
                                                     ) : (
                                                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-100 text-neutral-700 border border-neutral-300">

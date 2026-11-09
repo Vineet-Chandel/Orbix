@@ -389,7 +389,7 @@ export default function SignupForm() {
             setShowOtpModal(false);
 
             toast.success("Account registered and email verified! Welcome to Orbix.", {
-                title: "Welcome to Orbix! ✓",
+                title: "Welcome to Orbix!",
             });
             const redirectParam = searchParams.get("redirect");
             navigate(redirectParam ? `/onboarding?redirect=${encodeURIComponent(redirectParam)}` : "/onboarding");

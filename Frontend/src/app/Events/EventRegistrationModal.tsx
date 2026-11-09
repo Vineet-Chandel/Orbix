@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { OrbixButton } from "../../components/ui/loader";
 import { NeoSelect } from "../../components/NeoSelect";
+import { NeoCheckbox } from "../../components/NeoCheckbox";
 import { useToast } from "../../context/ToastContext";
 import { applyForEvent, type CollegeEventItem } from "../../api/collegeEventsApi";
 import { useAppSelector } from "../../store";
@@ -402,22 +403,25 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
 
                         {/* Minor Attendee & Guardian Verification Section */}
                         <div className="p-3.5 rounded-2xl bg-white border-2 border-black shadow-[2px_2px_0px_#000] space-y-3">
-                            <label className="flex items-start gap-2.5 cursor-pointer">
-                                <input
-                                    type="checkbox"
+                            <div className="flex items-start gap-2.5">
+                                <NeoCheckbox
                                     checked={isAttendeeUnder18}
-                                    onChange={(e) => setIsAttendeeUnder18(e.target.checked)}
-                                    className="mt-0.5 h-4 w-4 rounded border-2 border-black accent-black cursor-pointer"
+                                    onCheckedChange={(checked) => setIsAttendeeUnder18(checked)}
+                                    size="sm"
+                                    colorScheme="yellow"
                                 />
                                 <div>
-                                    <span className="text-xs font-black uppercase tracking-wider text-black block">
+                                    <span
+                                        onClick={() => setIsAttendeeUnder18(!isAttendeeUnder18)}
+                                        className="text-xs font-black uppercase tracking-wider text-black block cursor-pointer select-none"
+                                    >
                                         I am under 18 years of age (e.g. 17-year-old first-year student)
                                     </span>
                                     <span className="text-[11px] text-neutral-600 block leading-tight mt-0.5">
                                         In compliance with minor protection laws, verifiable parental/guardian consent is required before registration can be finalized.
                                     </span>
                                 </div>
-                            </label>
+                            </div>
 
                             {isAttendeeUnder18 && (
                                 <div className="pt-2 border-t-2 border-black/10 space-y-3 animate-in fade-in duration-200">
@@ -440,16 +444,17 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                                             <label className="block text-[11px] font-black uppercase tracking-wider text-black mb-1">
                                                 Relationship *
                                             </label>
-                                            <select
+                                            <NeoSelect
                                                 value={guardianRelationship}
-                                                onChange={(e) => setGuardianRelationship(e.target.value)}
-                                                className="w-full px-2.5 py-1.5 rounded-lg bg-[#FAF6EE] border-2 border-black text-xs font-bold text-black focus:outline-hidden shadow-[1px_1px_0px_#000]"
-                                            >
-                                                <option value="Mother">Mother</option>
-                                                <option value="Father">Father</option>
-                                                <option value="Legal Guardian">Legal Guardian</option>
-                                                <option value="Parent">Parent</option>
-                                            </select>
+                                                onChange={(val) => setGuardianRelationship(val)}
+                                                size="sm"
+                                                options={[
+                                                    { value: "Mother", label: "Mother" },
+                                                    { value: "Father", label: "Father" },
+                                                    { value: "Legal Guardian", label: "Legal Guardian" },
+                                                    { value: "Parent", label: "Parent" },
+                                                ]}
+                                            />
                                         </div>
                                     </div>
 

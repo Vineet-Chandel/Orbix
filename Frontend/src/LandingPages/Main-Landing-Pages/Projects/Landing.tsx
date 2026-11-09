@@ -18,6 +18,8 @@ import {
     Terminal,
     Globe,
     Plus,
+    Pin,
+    Check,
 } from "lucide-react";
 import { ProjectCard } from "../../../components/projects/ProjectCard";
 import { ProjectDetailModal } from "../../../components/projects/ProjectDetailModal";
@@ -318,7 +320,7 @@ export const ProjectsShowcase: React.FC = () => {
                                         </span>
                                     </div>
                                     <div className="w-6 h-6 rounded-lg border border-black bg-white flex items-center justify-center text-xs font-black">
-                                        ✕
+                                        <X className="w-3.5 h-3.5 text-black" />
                                     </div>
                                 </div>
 
@@ -451,9 +453,9 @@ export const ProjectsShowcase: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className="space-y-1 text-[11px] font-bold text-black/80">
-                                            <p>✓ Production README with benchmarks</p>
-                                            <p>✓ High-velocity commit history</p>
-                                            <p>✓ Valid open-source license</p>
+                                            <p className="flex items-center gap-1.5"><Check className="w-3 h-3 text-black stroke-[3] shrink-0" /> Production README with benchmarks</p>
+                                            <p className="flex items-center gap-1.5"><Check className="w-3 h-3 text-black stroke-[3] shrink-0" /> High-velocity commit history</p>
+                                            <p className="flex items-center gap-1.5"><Check className="w-3 h-3 text-black stroke-[3] shrink-0" /> Valid open-source license</p>
                                         </div>
                                         <div className="px-3 py-1.5 rounded-xl bg-black text-[#a2ff86] text-[11px] font-black text-center border border-black">
                                             Ready for Systems Curation
@@ -478,7 +480,7 @@ export const ProjectsShowcase: React.FC = () => {
                                         </span>
                                     </div>
                                     <div className="w-6 h-6 rounded-lg border border-black bg-white flex items-center justify-center text-xs font-black">
-                                        ✕
+                                        <X className="w-3.5 h-3.5 text-black" />
                                     </div>
                                 </div>
 
@@ -586,8 +588,9 @@ export const ProjectsShowcase: React.FC = () => {
                                                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
                                                     Published
                                                 </span>
-                                                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFE566] text-black border border-black">
-                                                    ★ Pinned Top
+                                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-[#FFE566] text-black border border-black">
+                                                    <Pin className="w-2.5 h-2.5 fill-black stroke-[2.5]" />
+                                                    <span>Pinned Top</span>
                                                 </span>
                                             </div>
                                             <h4 className="text-base sm:text-lg font-black text-black">

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, Check, X, AlertCircle } from "lucide-react";
+import { AlertTriangle, Check, X, AlertCircle, ArrowUpRight } from "lucide-react";
 import { PORTALS, DASHBOARD_PLATFORMS_ORDER, judgePortalInput } from "../../utils/portalParser";
 import { getPortalIcon } from "../../utils/portalIcons";
 import { useToast } from "../../context/ToastContext";
@@ -1391,7 +1391,7 @@ export const ConnectedPlatformsSection: React.FC<ConnectedPlatformsSectionProps>
                                     className="text-xs font-semibold text-neutral-600 hover:text-neutral-950 hover:underline flex items-center gap-1 mt-0.5"
                                 >
                                     <span>Visit public profile</span>
-                                    <span>↗</span>
+                                    <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
                                 </a>
                             </div>
                         </div>

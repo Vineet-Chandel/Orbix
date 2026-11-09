@@ -378,8 +378,9 @@ export function PreflightPage({ onNavigate = () => {} }) {
 
           <p className="text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 leading-relaxed pt-3 border-t-2 border-black/10 dark:border-white/10">
             {allChecked ? (
-              <span className="font-bold text-black dark:text-white">
-                ✓ All items verified! You are completely prepared to continue to the hands-on deployment.
+              <span className="font-bold text-black dark:text-white inline-flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>All items verified! You are completely prepared to continue to the hands-on deployment.</span>
               </span>
             ) : (
               <span>

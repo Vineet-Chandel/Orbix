@@ -826,7 +826,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                                                     Start reading guide
                                                 </span>
                                                 <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-black text-[#a2ff86] border-2 border-black text-xs font-black shadow-[2px_2px_0px_#000] group-hover:translate-x-0.5 transition-transform">
-                                                    ↗
+                                                    <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
                                                 </span>
                                             </div>
                                         </Link>

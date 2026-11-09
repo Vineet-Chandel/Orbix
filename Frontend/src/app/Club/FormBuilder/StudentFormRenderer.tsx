@@ -1007,8 +1007,9 @@ export const StudentFormRenderer: React.FC<StudentFormRendererProps> = ({
                         </div>
 
                         {!gradesReleased && (
-                            <p className="text-xs text-neutral-600 dark:text-neutral-400 font-normal bg-white dark:bg-neutral-900 p-3 rounded-xl border border-neutral-200 dark:border-neutral-800">
-                                ⏳ Written and subjective answers are currently being evaluated by event staff. Your final score will be released here once review is complete.
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400 font-normal bg-white dark:bg-neutral-900 p-3 rounded-xl border border-neutral-200 dark:border-neutral-800 flex items-start gap-2">
+                                <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <span>Written and subjective answers are currently being evaluated by event staff. Your final score will be released here once review is complete.</span>
                             </p>
                         )}
 

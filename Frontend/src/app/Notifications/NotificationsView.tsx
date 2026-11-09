@@ -1226,8 +1226,9 @@ export const NotificationsView: React.FC = () => {
                                                 {certTitle}
                                             </h2>
                                             {awardPosition && (
-                                                <div className="inline-block px-3 py-1 bg-amber-100 border-2 border-black rounded-lg text-xs font-black text-black shadow-[2px_2px_0px_#000]">
-                                                    🏆 {awardPosition}
+                                                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 border-2 border-black rounded-lg text-xs font-black text-black shadow-[2px_2px_0px_#000]">
+                                                    <Trophy className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                                    <span>{awardPosition}</span>
                                                 </div>
                                             )}
                                             <p className="text-xs sm:text-sm text-neutral-700 leading-relaxed font-medium">

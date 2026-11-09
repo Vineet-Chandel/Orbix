@@ -56,6 +56,7 @@ import { ClubEventCheckinTerminal } from "./ClubEventCheckinTerminal";
 import { EventFormBuilderWorkspace } from "./FormBuilder/EventFormBuilderWorkspace";
 import { IssuanceConsoleView } from "./CertificateStudio/IssuanceConsoleView";
 import { OrbixLoader } from "../../components/ui/loader";
+import { NeoSelect } from "../../components/NeoSelect";
 
 type EventTab = "roster" | "form" | "checkin" | "certificates" | "analytics" | "pass" | "settings";
 
@@ -1141,31 +1142,29 @@ export const ClubEventDetailWorkspace: React.FC<ClubEventDetailWorkspaceProps> =
                                 </div>
 
                                 {uniqueInstitutions.length > 0 && (
-                                    <select
+                                    <NeoSelect
                                         value={institutionFilter}
-                                        onChange={(e) => setInstitutionFilter(e.target.value)}
-                                        className="px-2.5 py-1.5 rounded-xl bg-[#FAF6EE] border border-black text-[11px] font-bold text-black focus:outline-hidden max-w-[180px] truncate"
-                                        title="Filter by institution"
-                                    >
-                                        <option value="all">All Colleges ({uniqueInstitutions.length})</option>
-                                        {uniqueInstitutions.map((inst) => (
-                                            <option key={inst} value={inst}>{inst}</option>
-                                        ))}
-                                    </select>
+                                        onChange={(val) => setInstitutionFilter(val)}
+                                        size="sm"
+                                        className="max-w-[200px]"
+                                        options={[
+                                            { value: "all", label: `All Colleges (${uniqueInstitutions.length})` },
+                                            ...uniqueInstitutions.map((inst) => ({ value: inst, label: inst })),
+                                        ]}
+                                    />
                                 )}
 
                                 {uniqueStates.length > 0 && (
-                                    <select
+                                    <NeoSelect
                                         value={stateFilter}
-                                        onChange={(e) => setStateFilter(e.target.value)}
-                                        className="px-2.5 py-1.5 rounded-xl bg-[#FAF6EE] border border-black text-[11px] font-bold text-black focus:outline-hidden"
-                                        title="Filter by state"
-                                    >
-                                        <option value="all">All States ({uniqueStates.length})</option>
-                                        {uniqueStates.map((st) => (
-                                            <option key={st} value={st}>{st}</option>
-                                        ))}
-                                    </select>
+                                        onChange={(val) => setStateFilter(val)}
+                                        size="sm"
+                                        className="max-w-[160px]"
+                                        options={[
+                                            { value: "all", label: `All States (${uniqueStates.length})` },
+                                            ...uniqueStates.map((st) => ({ value: st, label: st })),
+                                        ]}
+                                    />
                                 )}
 
                                 <a

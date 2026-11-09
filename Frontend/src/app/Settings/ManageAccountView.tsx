@@ -266,7 +266,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             if (res.devOtp) {
                 setArchiveDevOtp(res.devOtp);
             }
-            toast.success(res.message || "Archive authorization code sent to your email! ✓", {
+            toast.success(res.message || "Archive authorization code sent to your email!", {
                 title: "Code Sent",
             });
         } catch (err: any) {
@@ -316,7 +316,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
             await new Promise((r) => setTimeout(r, 350));
 
             setGeneratedResult(result);
-            setGenerationStage("Archive generated and verified successfully! ✓");
+            setGenerationStage("Archive generated and verified successfully!");
 
             // Automatically trigger file download
             triggerDownload(result.archivePayload, result.filename);
@@ -338,7 +338,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
     const handleCopyChecksum = (checksum: string) => {
         navigator.clipboard.writeText(checksum);
         setIsCopiedChecksum(true);
-        toast.success("SHA-256 Checksum copied to clipboard! ✓", { title: "Copied" });
+        toast.success("SHA-256 Checksum copied to clipboard!", { title: "Copied" });
         setTimeout(() => setIsCopiedChecksum(false), 2000);
     };
 
@@ -524,7 +524,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                 if (result.user) {
                     dispatch(updateUserProfile(result.user));
                 }
-                toast.success("Email address updated and verified successfully! ✓", { title: "Email Changed" });
+                toast.success("Email address updated and verified successfully!", { title: "Email Changed" });
                 await loadStatus(false);
                 if (onRefreshStatus) onRefreshStatus();
             }
@@ -629,7 +629,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                 emailVerifiedAt: new Date().toISOString(),
                 email: statusData?.primaryEmail || user?.email,
             }));
-            toast.success("Your primary email has been cryptographically verified! ✓", { title: "Email Verified" });
+            toast.success("Your primary email has been cryptographically verified!", { title: "Email Verified" });
             await loadStatus(false);
             if (onRefreshStatus) onRefreshStatus();
         } catch (err: any) {
@@ -707,7 +707,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                 dispatch(updateUserProfile(result.user));
             }
 
-            toast.success(`Username updated to @${result.username}! All public routes updated. ✓`, {
+            toast.success(`Username updated to @${result.username}! All public routes updated.`, {
                 title: "Username Changed",
             });
             await loadStatus(false);
@@ -1875,7 +1875,7 @@ export const ManageAccountView: React.FC<ManageAccountViewProps> = ({ user, onBa
                                     type="button"
                                     onClick={() => {
                                         navigator.clipboard.writeText(JSON.stringify(previewPayload, null, 2));
-                                        toast.success("Complete JSON copied to clipboard! ✓");
+                                        toast.success("Complete JSON copied to clipboard!");
                                     }}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-neutral-100 text-black font-black text-xs border border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer"
                                 >

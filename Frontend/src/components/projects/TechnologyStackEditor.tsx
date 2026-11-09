@@ -11,6 +11,7 @@ import {
     Sparkles,
 } from "lucide-react";
 import type { TechnologyItem } from "../../types/project";
+import { NeoSelect } from "../NeoSelect";
 
 export const TECH_CATEGORIES = [
     "Languages",
@@ -140,17 +141,13 @@ export const TechnologyStackEditor: React.FC<TechnologyStackEditorProps> = ({
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-black/10">
-                    <select
+                    <NeoSelect
                         value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value as TechCategoryName)}
-                        className="px-3 py-2 text-xs font-bold border-2 border-black bg-[#FAF6EE] focus:outline-none shrink-0"
-                    >
-                        {TECH_CATEGORIES.map((cat) => (
-                            <option key={cat} value={cat}>
-                                {cat}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={(val) => setSelectedCategory(val as TechCategoryName)}
+                        size="sm"
+                        className="shrink-0 min-w-[160px]"
+                        options={TECH_CATEGORIES.map((cat) => ({ value: cat, label: cat }))}
+                    />
 
                     <input
                         type="text"
@@ -301,20 +298,17 @@ export const TechnologyStackEditor: React.FC<TechnologyStackEditorProps> = ({
                                             )}
 
                                             {/* Inline category switcher */}
-                                            <select
-                                                value={category}
-                                                onChange={(e) =>
-                                                    handleMoveCategory(category, idx, e.target.value)
-                                                }
-                                                className="text-[9px] font-bold text-neutral-500 bg-transparent hover:text-black border-0 p-0 focus:outline-none cursor-pointer"
-                                                title="Change category"
-                                            >
-                                                {TECH_CATEGORIES.map((c) => (
-                                                    <option key={c} value={c}>
-                                                        {c}
-                                                    </option>
-                                                ))}
-                                            </select>
+                                            <div className="inline-block min-w-[95px]">
+                                                <NeoSelect
+                                                    value={category}
+                                                    onChange={(val) =>
+                                                        handleMoveCategory(category, idx, val)
+                                                    }
+                                                    size="sm"
+                                                    triggerClassName="text-[10px] py-0.5 px-1.5 h-6 border font-bold"
+                                                    options={TECH_CATEGORIES.map((c) => ({ value: c, label: c }))}
+                                                />
+                                            </div>
 
                                             {/* Rename button */}
                                             <button

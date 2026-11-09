@@ -10,6 +10,8 @@ import {
     Eye,
     Save,
     Rocket,
+    Zap,
+    Wrench,
 } from "lucide-react";
 import type { RepoAnalysisResult, ExtractionScorecard } from "../../types/project";
 
@@ -68,7 +70,7 @@ export const InitialReviewScreen: React.FC<InitialReviewScreenProps> = ({
                 <div className="bg-white border-2 border-black p-5 shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all">
                     <div>
                         <div className="w-10 h-10 bg-[#FAF6EE] border-2 border-black flex items-center justify-center font-black text-lg mb-3 shadow-[2px_2px_0px_#000]">
-                            ⚡
+                            <Zap className="w-5 h-5 text-black fill-black" />
                         </div>
                         <h3 className="text-base font-black text-black uppercase tracking-wide">
                             Option 1: Use As Is
@@ -113,7 +115,7 @@ export const InitialReviewScreen: React.FC<InitialReviewScreenProps> = ({
                 <div className="bg-[#FAF6EE] border-2 border-black p-5 shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all">
                     <div>
                         <div className="w-10 h-10 bg-white border-2 border-black flex items-center justify-center font-black text-lg mb-3 shadow-[2px_2px_0px_#000]">
-                            🛠️
+                            <Wrench className="w-5 h-5 text-black" />
                         </div>
                         <h3 className="text-base font-black text-black uppercase tracking-wide">
                             Option 2: Review & Edit

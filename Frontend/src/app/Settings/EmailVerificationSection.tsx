@@ -214,7 +214,7 @@ export const EmailVerificationSection: React.FC<EmailVerificationSectionProps> =
                 })
             );
 
-            toast.success("✓ Your email has been successfully verified!", {
+            toast.success("Your email has been successfully verified!", {
                 title: "Account Verified",
             });
         } catch (err: any) {

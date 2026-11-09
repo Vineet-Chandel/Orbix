@@ -104,8 +104,8 @@ export const PracticeActivityOverview: React.FC<PracticeActivityOverviewProps> =
 
         const formatDelta = (current: number, prev: number) => {
             const diff = current - prev;
-            if (diff > 0) return `↗ ${diff} more than last month`;
-            if (diff < 0) return `↘ ${Math.abs(diff)} less than last month`;
+            if (diff > 0) return `+${diff} more than last month`;
+            if (diff < 0) return `-${Math.abs(diff)} less than last month`;
             return "same as last month";
         };
 

@@ -1118,7 +1118,10 @@ export const FormResponsesAnalyticsView: React.FC<FormResponsesAnalyticsViewProp
                                                 const pct = activeQuestion.distributionPercentages?.[Number(point)] || 0;
                                                 return (
                                                     <div key={point} className="p-3 bg-neutral-50 dark:bg-neutral-900 rounded-xl border border-neutral-200 dark:border-neutral-800 text-center space-y-1">
-                                                        <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100">{point} ★</span>
+                                                        <span className="text-xs font-semibold text-neutral-900 dark:text-neutral-100 inline-flex items-center justify-center gap-0.5">
+                                                            <span>{point}</span>
+                                                            <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                                                        </span>
                                                         <div className="text-lg font-bold text-neutral-800 dark:text-neutral-200">{count}</div>
                                                         <span className="text-[10px] text-neutral-400 font-medium">{pct}%</span>
                                                     </div>

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Check } from "lucide-react";
+import { Check, ChevronUp } from "lucide-react";
 import { PORTALS, judgePortalInput, type JudgmentResult } from "../../../utils/portalParser";
 import { getPortalIcon } from "../../../utils/portalIcons";
 import { PortalProfileInput } from "../PortalProfileInput";
@@ -1019,7 +1019,7 @@ export default function ProfilesOnboardingPage() {
                             ))}
                         </div>
                         <span>Bucket ({connectedCount})</span>
-                        <span className="text-black text-[10px]">▴</span>
+                        <ChevronUp className="w-3.5 h-3.5 text-black stroke-[2.5]" />
                     </button>
                 </div>
             )}

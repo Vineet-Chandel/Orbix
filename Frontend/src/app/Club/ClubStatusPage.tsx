@@ -1179,8 +1179,17 @@ export default function ClubStatusPage() {
                                                                                             </div>
 
                                                                                             <div className="flex items-center gap-1.5 shrink-0">
-                                                                                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-black border border-black ${tp.statusColor}`}>
-                                                                                                    {tp.isConfirmed ? "✓ Confirmed" : (tp.isInProgress ? "● Active" : "○ Queued")}
+                                                                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black border border-black ${tp.statusColor}`}>
+                                                                                                    {tp.isConfirmed ? (
+                                                                                                        <>
+                                                                                                            <Check className="w-2.5 h-2.5 stroke-[3]" />
+                                                                                                            <span>Confirmed</span>
+                                                                                                        </>
+                                                                                                    ) : tp.isInProgress ? (
+                                                                                                        <span>Active</span>
+                                                                                                    ) : (
+                                                                                                        <span>Queued</span>
+                                                                                                    )}
                                                                                                 </span>
                                                                                                 <ChevronDown className={`w-3.5 h-3.5 text-black transition-transform duration-200 ${isRowExpanded ? "rotate-180" : ""}`} />
                                                                                             </div>

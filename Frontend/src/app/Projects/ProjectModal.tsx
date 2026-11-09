@@ -51,6 +51,8 @@ import { MediaUploadDropzone } from "../../components/projects/MediaUploadDropzo
 import { TechnologyStackEditor } from "../../components/projects/TechnologyStackEditor";
 import { ProjectSyncDiffModal } from "../../components/projects/ProjectSyncDiffModal";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
+import { NeoSelect } from "../../components/NeoSelect";
+import { NeoCheckbox } from "../../components/NeoCheckbox";
 import { useToast } from "../../context/ToastContext";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 
@@ -1514,54 +1516,39 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                                                     </label>
                                                     {renderFieldProvenanceBadge("category", "Category")}
                                                 </div>
-                                                <select
+                                                <NeoSelect
                                                     value={category}
-                                                    onChange={(e) => {
-                                                        setCategory(e.target.value);
+                                                    onChange={(val) => {
+                                                        setCategory(val);
                                                         markFieldOverridden("category");
                                                     }}
-                                                    className="w-full px-3 py-2 bg-[#FAF6EE] text-xs font-bold text-black border-2 border-black focus:outline-none"
-                                                >
-                                                    {CATEGORIES.map((c) => (
-                                                        <option key={c} value={c}>
-                                                            {c}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                    size="sm"
+                                                    options={CATEGORIES.map((c) => ({ value: c, label: c }))}
+                                                />
                                             </div>
 
                                             <div>
                                                 <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
                                                     Project Type
                                                 </label>
-                                                <select
+                                                <NeoSelect
                                                     value={projectType}
-                                                    onChange={(e) => setProjectType(e.target.value as ProjectType)}
-                                                    className="w-full px-3 py-2 bg-[#FAF6EE] text-xs font-bold text-black border-2 border-black focus:outline-none"
-                                                >
-                                                    {PROJECT_TYPES.map((pt) => (
-                                                        <option key={pt} value={pt}>
-                                                            {pt}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                    onChange={(val) => setProjectType(val as ProjectType)}
+                                                    size="sm"
+                                                    options={PROJECT_TYPES.map((pt) => ({ value: pt, label: pt }))}
+                                                />
                                             </div>
 
                                             <div>
                                                 <label className="block text-xs font-black uppercase tracking-wider text-black mb-1">
                                                     Development Status
                                                 </label>
-                                                <select
+                                                <NeoSelect
                                                     value={developmentStatus}
-                                                    onChange={(e) => setDevelopmentStatus(e.target.value as DevelopmentStatus)}
-                                                    className="w-full px-3 py-2 bg-[#FAF6EE] text-xs font-bold text-black border-2 border-black focus:outline-none"
-                                                >
-                                                    {DEV_STATUSES.map((ds) => (
-                                                        <option key={ds} value={ds}>
-                                                            {ds}
-                                                        </option>
-                                                    ))}
-                                                </select>
+                                                    onChange={(val) => setDevelopmentStatus(val as DevelopmentStatus)}
+                                                    size="sm"
+                                                    options={DEV_STATUSES.map((ds) => ({ value: ds, label: ds }))}
+                                                />
                                             </div>
                                         </div>
 
@@ -1612,11 +1599,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                                                     Featured at the very top of your public portfolio.
                                                 </p>
                                             </div>
-                                            <input
-                                                type="checkbox"
+                                            <NeoCheckbox
                                                 checked={isPinned}
-                                                onChange={(e) => setIsPinned(e.target.checked)}
-                                                className="w-5 h-5 accent-black rounded border-2 border-black cursor-pointer"
+                                                onCheckedChange={(checked) => setIsPinned(checked)}
+                                                size="md"
+                                                colorScheme="yellow"
                                             />
                                         </div>
 
@@ -1629,11 +1616,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                                                     When enabled, recruiters and visitors can discover this project on your profile.
                                                 </p>
                                             </div>
-                                            <input
-                                                type="checkbox"
+                                            <NeoCheckbox
                                                 checked={showOnProfile}
-                                                onChange={(e) => setShowOnProfile(e.target.checked)}
-                                                className="w-5 h-5 accent-black rounded border-2 border-black cursor-pointer"
+                                                onCheckedChange={(checked) => setShowOnProfile(checked)}
+                                                size="md"
+                                                colorScheme="green"
                                             />
                                         </div>
                                     </div>
@@ -2478,11 +2465,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                                                     Flags this project as a proprietary codebase with a lock badge.
                                                 </p>
                                             </div>
-                                            <input
-                                                type="checkbox"
+                                            <NeoCheckbox
                                                 checked={isRepoPrivate}
-                                                onChange={(e) => setIsRepoPrivate(e.target.checked)}
-                                                className="w-5 h-5 accent-black rounded border-2 border-black cursor-pointer"
+                                                onCheckedChange={(checked) => setIsRepoPrivate(checked)}
+                                                size="md"
+                                                colorScheme="pink"
                                             />
                                         </div>
 
@@ -2495,11 +2482,11 @@ export const ProjectModal: React.FC<ProjectModalProps> = ({
                                                     Conceals the GitHub URL on public profiles while showcasing features & stack.
                                                 </p>
                                             </div>
-                                            <input
-                                                type="checkbox"
+                                            <NeoCheckbox
                                                 checked={hideRepoUrl}
-                                                onChange={(e) => setHideRepoUrl(e.target.checked)}
-                                                className="w-5 h-5 accent-black rounded border-2 border-black cursor-pointer"
+                                                onCheckedChange={(checked) => setHideRepoUrl(checked)}
+                                                size="md"
+                                                colorScheme="yellow"
                                             />
                                         </div>
 

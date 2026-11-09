@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { ClubEvent } from "../../store/clubEventsSlice";
 import { OrbixLoader } from "../../components/ui/loader";
+import { NeoCheckbox } from "../../components/NeoCheckbox";
 
 export interface EventSecurityConfirmModalProps {
     isOpen: boolean;
@@ -185,15 +186,20 @@ export const EventSecurityConfirmModal: React.FC<EventSecurityConfirmModalProps>
                                     </span>
                                     . Orbix requires a minimum 4-hour advance cancellation limit to prevent disruption to registered students.
                                 </p>
-                                <label className="flex items-start gap-2 pt-1 text-xs font-black text-rose-950 cursor-pointer select-none">
-                                    <input
-                                        type="checkbox"
+                                <div className="flex items-start gap-2 pt-1">
+                                    <NeoCheckbox
                                         checked={emergencyBypass}
-                                        onChange={(e) => setEmergencyBypass(e.target.checked)}
-                                        className="mt-0.5 w-4 h-4 rounded border-2 border-black accent-black cursor-pointer"
+                                        onCheckedChange={(checked) => setEmergencyBypass(checked)}
+                                        size="sm"
+                                        colorScheme="pink"
                                     />
-                                    <span>I confirm this is an urgent emergency cancellation. Please alert all registered students immediately.</span>
-                                </label>
+                                    <span
+                                        onClick={() => setEmergencyBypass(!emergencyBypass)}
+                                        className="text-xs font-black text-rose-950 cursor-pointer select-none leading-tight"
+                                    >
+                                        I confirm this is an urgent emergency cancellation. Please alert all registered students immediately.
+                                    </span>
+                                </div>
                             </div>
                         )}
                     </div>

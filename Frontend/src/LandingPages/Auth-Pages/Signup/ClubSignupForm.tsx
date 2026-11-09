@@ -754,7 +754,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             setEmailVerified(true);
             setEmailVerificationToken(data.token);
             setVerifiedEmailAddress(formData.contactEmail.trim().toLowerCase());
-            toast.success("Primary email verified successfully!", { title: "Email Verified ✓" });
+            toast.success("Primary email verified successfully!", { title: "Email Verified" });
         } catch (err: any) {
             toast.error(err.message || "Email verification failed");
         } finally {
@@ -810,7 +810,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             setVerifiedPhoneNumber(parsed.e164);
             clearRecaptchaVerifier(recaptchaVerifierRef.current, "firebase-recaptcha-wrapper");
             recaptchaVerifierRef.current = null;
-            toast.success("Primary phone number verified successfully!", { title: "Phone Verified ✓" });
+            toast.success("Primary phone number verified successfully!", { title: "Phone Verified" });
         } catch (err: any) {
             toast.error(err.message || "Phone verification failed");
         } finally {
@@ -909,7 +909,7 @@ export default function ClubSignupForm({ onSwitchToPersonal: _onSwitchToPersonal
             dispatch(setUser(clubUser));
 
             toast.success("Contact verified & club application received successfully!", {
-                title: "Application Received ✓",
+                title: "Application Received",
             });
 
             // Redirect immediately to standalone club application-status page

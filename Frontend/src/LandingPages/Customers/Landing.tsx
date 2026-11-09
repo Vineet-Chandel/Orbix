@@ -1,4 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
+import { Star } from 'lucide-react';
 import NavBar from '../NavBar/Landing';
 
 export default function CustomersPage() {
@@ -130,8 +131,10 @@ export default function CustomersPage() {
                                         <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
                                             {card.tag}
                                         </span>
-                                        <div className="flex text-amber-400 text-xs">
-                                            {'★'.repeat(5)}
+                                        <div className="flex text-amber-400 gap-0.5">
+                                            {[...Array(5)].map((_, i) => (
+                                                <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                                            ))}
                                         </div>
                                     </div>
                                     <h3 className="text-lg font-bold text-slate-900 tracking-tight">

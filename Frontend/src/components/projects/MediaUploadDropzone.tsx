@@ -14,6 +14,7 @@ import {
     uploadProjectMediaToCloudinary,
 } from "../../api/projectApi";
 import type { ProjectGalleryImage, ExtractedScreenshot } from "../../types/project";
+import { NeoSelect } from "../NeoSelect";
 
 interface MediaUploadDropzoneProps {
     coverImageUrl: string;
@@ -375,15 +376,16 @@ export const MediaUploadDropzone: React.FC<MediaUploadDropzoneProps> = ({
                             placeholder="Image URL https://..."
                             className="px-2.5 py-1.5 text-xs font-mono border border-black bg-white focus:outline-none sm:col-span-2"
                         />
-                        <select
+                        <NeoSelect
                             value={newGalleryType}
-                            onChange={(e) => setNewGalleryType(e.target.value as any)}
-                            className="px-2 py-1.5 text-xs font-bold border border-black bg-white focus:outline-none"
-                        >
-                            <option value="screenshot">Screenshot</option>
-                            <option value="architecture">Architecture Diagram</option>
-                            <option value="supporting">Supporting Image</option>
-                        </select>
+                            onChange={(val) => setNewGalleryType(val as any)}
+                            size="sm"
+                            options={[
+                                { value: "screenshot", label: "Screenshot" },
+                                { value: "architecture", label: "Architecture Diagram" },
+                                { value: "supporting", label: "Supporting Image" },
+                            ]}
+                        />
                     </div>
                     <div className="flex gap-2">
                         <input

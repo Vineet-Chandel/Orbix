@@ -13,6 +13,10 @@ import {
     AlertCircle,
     Clock,
     HelpCircle,
+    Zap,
+    Ticket,
+    FileSpreadsheet,
+    QrCode,
 } from "lucide-react";
 import { OrbixLogo } from "../../../components/OrbixLogo";
 import { NeoSelect } from "../../../components/NeoSelect";
@@ -247,7 +251,7 @@ export const CollegeChaptersDocumentary: React.FC = () => {
                         {/* Hub Node */}
                         <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
                             <div className="w-10 h-10 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center font-black">
-                                🏛️
+                                <Building2 className="w-5 h-5 text-black stroke-[2.5]" />
                             </div>
                             <h4 className="font-black text-base text-black">Institutional Campus Hub</h4>
                             <p className="text-xs text-neutral-600 font-medium leading-relaxed">
@@ -261,7 +265,7 @@ export const CollegeChaptersDocumentary: React.FC = () => {
                         {/* Chapter Node */}
                         <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
                             <div className="w-10 h-10 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center font-black">
-                                ⚡
+                                <Zap className="w-5 h-5 text-black fill-black" />
                             </div>
                             <h4 className="font-black text-base text-black">Federated Chapters</h4>
                             <p className="text-xs text-neutral-600 font-medium leading-relaxed">
@@ -275,7 +279,7 @@ export const CollegeChaptersDocumentary: React.FC = () => {
                         {/* Student / Pass Node */}
                         <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-3">
                             <div className="w-10 h-10 rounded-xl bg-[#FF9933] border-2 border-black flex items-center justify-center font-black">
-                                🎟️
+                                <Ticket className="w-5 h-5 text-black stroke-[2.5]" />
                             </div>
                             <h4 className="font-black text-base text-black">Student Verification Pass</h4>
                             <p className="text-xs text-neutral-600 font-medium leading-relaxed">
@@ -723,8 +727,9 @@ export const CollegeChaptersDocumentary: React.FC = () => {
                                 <span className="text-2xl sm:text-3xl font-black text-neutral-900">
                                     ~{simulationResults.qrPassLatencyMs}ms
                                 </span>
-                                <span className="text-[10px] font-mono font-bold text-emerald-700 block mt-1">
-                                    ⚡ Real-time QR Verification
+                                <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 mt-1">
+                                    <Zap className="w-3 h-3 fill-emerald-600 text-emerald-600 shrink-0" />
+                                    <span>Real-time QR Verification</span>
                                 </span>
                             </div>
                         </div>
@@ -775,7 +780,7 @@ export const CollegeChaptersDocumentary: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                     <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2.5">
                         <div className="w-10 h-10 rounded-xl bg-[#a2ff86] border-2 border-black flex items-center justify-center font-black">
-                            🖨️
+                            <FileSpreadsheet className="w-5 h-5 text-black stroke-[2.5]" />
                         </div>
                         <h4 className="font-black text-base text-black">CSV Bulk Ingestion</h4>
                         <p className="text-xs text-neutral-600 font-medium leading-relaxed">
@@ -785,7 +790,7 @@ export const CollegeChaptersDocumentary: React.FC = () => {
 
                     <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2.5">
                         <div className="w-10 h-10 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center font-black">
-                            🔐
+                            <Lock className="w-5 h-5 text-black stroke-[2.5]" />
                         </div>
                         <h4 className="font-black text-base text-black">Cryptographic SHA-256 Hash</h4>
                         <p className="text-xs text-neutral-600 font-medium leading-relaxed">
@@ -795,7 +800,7 @@ export const CollegeChaptersDocumentary: React.FC = () => {
 
                     <div className="p-5 rounded-2xl bg-white border-2 border-black shadow-[3px_3px_0px_#000] space-y-2.5">
                         <div className="w-10 h-10 rounded-xl bg-[#FF9933] border-2 border-black flex items-center justify-center font-black">
-                            📲
+                            <QrCode className="w-5 h-5 text-black stroke-[2.5]" />
                         </div>
                         <h4 className="font-black text-base text-black">Public Verification URL &amp; QR</h4>
                         <p className="text-xs text-neutral-600 font-medium leading-relaxed">

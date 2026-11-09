@@ -180,8 +180,9 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
                                     <Star className="w-3.5 h-3.5 fill-black text-black stroke-[2.5]" />
                                     <span>Most Starred Project</span>
                                 </span>
-                                <span className="text-xs font-mono font-black text-black bg-[#FAF6EE] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
-                                    ★ {data.mostStarred.stars} stars
+                                <span className="inline-flex items-center gap-1 text-xs font-mono font-black text-black bg-[#FAF6EE] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
+                                    <Star className="w-3 h-3 fill-amber-400 text-amber-500" />
+                                    <span>{data.mostStarred.stars} stars</span>
                                 </span>
                             </div>
                             <div>
@@ -312,8 +313,9 @@ export const DevelopmentTrendsSection: React.FC<DevelopmentTrendsSectionProps> =
                                             <span>{repo.name}</span>
                                             <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
                                         </a>
-                                        <span className="text-xs font-mono font-black text-black bg-[#FFE566] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
-                                            ★ {repo.stars}
+                                        <span className="inline-flex items-center gap-1 text-xs font-mono font-black text-black bg-[#FFE566] px-2 py-0.5 rounded border border-black shadow-[1px_1px_0px_#000]">
+                                            <Star className="w-3 h-3 fill-black text-black" />
+                                            <span>{repo.stars}</span>
                                         </span>
                                     </div>
                                     <p className="text-xs font-medium text-neutral-700 leading-relaxed line-clamp-2">
