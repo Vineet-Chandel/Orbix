@@ -371,11 +371,80 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
 
 export const OPPORTUNITIES: OPPORTUNITIES[] = [
     {
+        id: "clubs",
+        name: "Clubs",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <path
+                    d="M12 2L4 5.5V11.5C4 16.5 7.5 21 12 22C16.5 21 20 16.5 20 11.5V5.5L12 2Z"
+                    fill="#FFE566"
+                    stroke="black"
+                    strokeWidth="1.8"
+                    strokeLinejoin="round"
+                />
+                <path
+                    d="M12 6.5L13.5 9.5H16.8L14.1 11.4L15.1 14.5L12 12.6L8.9 14.5L9.9 11.4L7.2 9.5H10.5L12 6.5Z"
+                    fill="black"
+                />
+                <path
+                    d="M8.5 16.5C10 17.5 14 17.5 15.5 16.5"
+                    stroke="black"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                />
+            </svg>
+        ),
+    },
+    {
+        id: "events",
+        name: "Events",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
+                <rect
+                    x="3"
+                    y="4"
+                    width="18"
+                    height="16"
+                    rx="3.5"
+                    fill="#a2ff86"
+                    stroke="black"
+                    strokeWidth="1.8"
+                />
+                <path
+                    d="M3 11C4.5 11 5.5 10 5.5 8.5C5.5 7 4.5 6 3 6"
+                    fill="#FAF6EE"
+                    stroke="black"
+                    strokeWidth="1.5"
+                />
+                <path
+                    d="M21 11C19.5 11 18.5 10 18.5 8.5C18.5 7 19.5 6 21 6"
+                    fill="#FAF6EE"
+                    stroke="black"
+                    strokeWidth="1.5"
+                />
+                <path
+                    d="M12 7.5L13.2 10.3L16 11.5L13.2 12.7L12 15.5L10.8 12.7L8 11.5L10.8 10.3L12 7.5Z"
+                    fill="black"
+                />
+                <line x1="8" y1="16.5" x2="16" y2="16.5" stroke="black" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+        ),
+    },
+    {
         id: "hackathons",
         name: "Hackathons",
         renderIcon: (className = "w-8 h-8") => (
             <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24">
-                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5.91 7.46L4.16 8.93C2.46 10.35 1.6 11.06 1.6 12s.85 1.64 2.56 3.07l1.75 1.47m12.18-9.08l1.75 1.47c1.7 1.42 2.56 2.13 2.56 3.07s-.85 1.64-2.56 3.07l-1.75 1.47M14.4 3.07L9.6 20.93"></path>
+                <path fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5.91 7.46L4.16 8.93C2.46 10.35 1.6 11.06 1.6 12s.85 1.64 2.56 3.07l1.75 1.47m12.18-9.08l1.75 1.47c1.7 1.42 2.56 2.13 2.56 3.07s-.85 1.64-2.56 3.07l-1.75 1.47M14.4 3.07L9.6 20.93"></path>
+            </svg>
+        ),
+    },
+    {
+        id: "contests",
+        name: "Contests",
+        renderIcon: (className = "w-8 h-8") => (
+            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24">
+                <path fill="#FFA116" d="M21 4h-3V3c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v1H3c-.55 0-1 .45-1 1v3c0 4.29 1.79 6.88 4.81 6.99A6 6 0 0 0 11 17.91V20H8v2h8v-2h-3v-2.09a5.98 5.98 0 0 0 4.19-2.92C20.2 14.88 22 12.29 22 8V5c0-.55-.45-1-1-1M4 8V6h2v6c0 .28.03.56.06.83C4.22 12.12 4 9.31 4 8m12 4c0 2.21-1.79 4-4 4s-4-1.79-4-4V4h8zm4-4c0 1.31-.22 4.12-2.06 4.83c.04-.27.06-.55.06-.83V6h2z"></path>
             </svg>
         ),
     },
@@ -418,30 +487,6 @@ export const OPPORTUNITIES: OPPORTUNITIES[] = [
                         </radialGradient>
                     </defs>
                 </g>
-            </svg>
-        ),
-    },
-    {
-        id: "contest",
-        name: "Contest",
-        renderIcon: (className = "w-8 h-8") => (
-            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24">
-                <path fill="orange" d="M21 4h-3V3c0-.55-.45-1-1-1H7c-.55 0-1 .45-1 1v1H3c-.55 0-1 .45-1 1v3c0 4.29 1.79 6.88 4.81 6.99A6 6 0 0 0 11 17.91V20H8v2h8v-2h-3v-2.09a5.98 5.98 0 0 0 4.19-2.92C20.2 14.88 22 12.29 22 8V5c0-.55-.45-1-1-1M4 8V6h2v6c0 .28.03.56.06.83C4.22 12.12 4 9.31 4 8m12 4c0 2.21-1.79 4-4 4s-4-1.79-4-4V4h8zm4-4c0 1.31-.22 4.12-2.06 4.83c.04-.27.06-.55.06-.83V6h2z"></path>
-            </svg>
-        ),
-    },
-    {
-        id: "collabrations",
-        name: "Collabrations",
-        renderIcon: (className = "w-8 h-8") => (
-            <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 48 48">
-                <circle cx={12} cy={21} r={5} fill="#FFA726"></circle>
-                <path fill="#455A64" d="M2 34.7s2.8-6.3 10-6.3s10 6.3 10 6.3V38H2zm44 0s-2.8-6.3-10-6.3s-10 6.3-10 6.3V38h20z"></path>
-                <circle cx={24} cy={17} r={6} fill="#FFB74D"></circle>
-                <path fill="#607D8B" d="M36 34.1s-3.3-7.5-12-7.5s-12 7.5-12 7.5V38h24z"></path>
-                <circle cx={36} cy={21} r={5} fill="#FFA726"></circle>
-                <circle cx={12} cy={21} r={5} fill="#FFA726"></circle>
-                <circle cx={36} cy={21} r={5} fill="#FFA726"></circle>
             </svg>
         ),
     },

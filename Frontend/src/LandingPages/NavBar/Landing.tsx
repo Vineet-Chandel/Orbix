@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-    MoreHorizontal,
+    MoreVertical,
     BookOpen,
     Newspaper,
     Bell,
@@ -442,7 +442,7 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         }`}
                         title="Open menu (Docs, Blogs, Notifications)"
                     >
-                        <MoreHorizontal className="w-4 h-4 stroke-[2.5]" />
+                        <MoreVertical className="w-4 h-4 stroke-[2.5]" />
                         {isLoggedIn && unreadCount > 0 && (
                             <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
