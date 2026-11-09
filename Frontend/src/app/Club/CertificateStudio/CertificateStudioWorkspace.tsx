@@ -3,11 +3,9 @@ import {
     Award,
     Sparkles,
     Palette,
-    Send,
     RefreshCw,
     ShieldCheck,
     CalendarDays,
-    ChevronRight,
     Clock,
     AlertCircle,
     UploadCloud,
@@ -22,10 +20,8 @@ import {
 } from "lucide-react";
 import type {
     CertificateDesign,
-    CertificateTemplateRecord,
 } from "../../../types/certificateStudio";
 import {
-    fetchCertificateTemplates,
     fetchCertificateStats,
     createCertificateTemplate,
     verifyCertificatePublic,
@@ -185,12 +181,8 @@ const defaultDesign: CertificateDesign = {
 export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProps> = ({
     clubId,
     clubName,
-    clubLogo,
-    onOpenLegacyModal,
 }) => {
     const [activeTab, setActiveTab] = useState<StudioWorkspaceTab>("overview");
-    const [templates, setTemplates] = useState<CertificateTemplateRecord[]>([]);
-    const [systemTemplates, setSystemTemplates] = useState<CertificateTemplateRecord[]>([]);
     const [loadingData, setLoadingData] = useState(false);
 
     // Active design document and template reference
@@ -219,18 +211,9 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
     const loadWorkspaceData = useCallback(async () => {
         setLoadingData(true);
         try {
-            const [tplRes, statsRes] = await Promise.allSettled([
-                fetchCertificateTemplates(),
-                fetchCertificateStats(),
-            ]);
-
-            if (tplRes.status === "fulfilled") {
-                setSystemTemplates(tplRes.value.systemTemplates || []);
-                setTemplates(tplRes.value.clubTemplates || []);
-            }
-
-            if (statsRes.status === "fulfilled") {
-                setMetrics(statsRes.value);
+            const stats = await fetchCertificateStats();
+            if (stats) {
+                setMetrics(stats);
             }
         } catch (err) {
             console.error("Failed to load certificate workspace data:", err);
@@ -242,14 +225,6 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
     useEffect(() => {
         loadWorkspaceData();
     }, [loadWorkspaceData]);
-
-    // Handle template picked from library
-    const handleTemplateSelected = (tpl: any) => {
-        setActiveTemplateId(tpl.id || null);
-        setActiveDesign(tpl.design || defaultDesign);
-        setTemplateName(tpl.name || "Custom Certificate");
-        setActiveTab("studio");
-    };
 
     // Quick Action: Create Certificate Design -> Opens professional template selection experience
     const handleActionCreateDesign = () => {
@@ -299,8 +274,6 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
         }
     };
 
-    const allAvailableTemplates = [...systemTemplates, ...templates];
-
     // Navigation Tab Items Definition
     const navItems: Array<{ id: StudioWorkspaceTab; label: string; icon: any }> = [
         { id: "overview", label: "Overview", icon: Award },
@@ -319,6 +292,146 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
 
     return (
         <div className="space-y-6">
+            {/* DASHBOARD METRICS: Issuance & Credential Ledger Metrics moved above the workspace navigation bar */}
+            <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                    <div className="text-xs font-black uppercase tracking-wider text-neutral-500">
+                        Issuance & Credential Ledger Metrics
+                    </div>
+                    <button
+                        type="button"
+                        onClick={loadWorkspaceData}
+                        disabled={loadingData}
+                        className="px-2.5 py-1 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-bold text-black flex items-center gap-1.5 shadow-[1.5px_1.5px_0px_#000] cursor-pointer"
+                        title="Refresh metrics"
+                    >
+                        <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? "animate-spin" : ""}`} />
+                        <span>Refresh</span>
+                    </button>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {/* 1. Total Certificates Issued */}
+                    <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#a2ff86] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                            <Award className="w-5 h-5 text-black stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <div className="text-xl sm:text-2xl font-black text-black leading-none">
+                                {metrics.totalCertificatesIssued}
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
+                                Total Issued
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2. Event Certificates */}
+                    <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                            <CalendarDays className="w-5 h-5 text-black stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <div className="text-xl sm:text-2xl font-black text-black leading-none">
+                                {metrics.eventCertificates}
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
+                                Event Certificates
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. Manual Certificates */}
+                    <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#70D6FF] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                            <UserCheck className="w-5 h-5 text-black stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <div className="text-xl sm:text-2xl font-black text-black leading-none">
+                                {metrics.manualCertificates}
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
+                                Manual Certificates
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4. Individual Certificates */}
+                    <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#FF90E8] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                            <Sparkles className="w-5 h-5 text-black stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <div className="text-xl sm:text-2xl font-black text-black leading-none">
+                                {metrics.individualCertificates}
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
+                                Individual Certs
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 5. Team Certificates */}
+                    <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-[#FFDE59] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                            <Users className="w-5 h-5 text-black stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <div className="text-xl sm:text-2xl font-black text-black leading-none">
+                                {metrics.teamCertificates}
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
+                                Team Certificates
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 6. Pending Issuance */}
+                    <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-neutral-100 border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                            <Clock className="w-5 h-5 text-neutral-700 stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <div className="text-xl sm:text-2xl font-black text-black leading-none">
+                                {metrics.pendingIssuance}
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
+                                Pending Issuance
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 7. Failed Generations */}
+                    <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-rose-100 border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                            <AlertCircle className="w-5 h-5 text-rose-700 stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <div className="text-xl sm:text-2xl font-black text-black leading-none">
+                                {metrics.failedGenerations}
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
+                                Failed Generations
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 8. Revoked Certificates */}
+                    <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-neutral-200 border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
+                            <Ban className="w-5 h-5 text-neutral-700 stroke-[2.5]" />
+                        </div>
+                        <div>
+                            <div className="text-xl sm:text-2xl font-black text-black leading-none">
+                                {metrics.revokedCertificates}
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
+                                Revoked Certs
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {/* Top Minimal Neo-brutalist Workspace Navigation Bar */}
             <div className="p-3 bg-white rounded-2xl border-3 border-black shadow-[4px_4px_0px_#000] overflow-x-auto">
                 <nav className="flex items-center gap-1.5 min-w-max">
@@ -347,65 +460,6 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
             {/* TAB: OVERVIEW */}
             {activeTab === "overview" && (
                 <div className="space-y-6">
-                    {/* Workspace Header Banner */}
-                    <div className="p-6 sm:p-7 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] relative overflow-hidden">
-                        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 relative z-10">
-                            <div className="space-y-2 max-w-3xl">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    {clubLogo && (
-                                        <img
-                                            src={clubLogo}
-                                            alt={clubName || "Club"}
-                                            className="w-6 h-6 rounded-md border border-black object-cover"
-                                        />
-                                    )}
-                                    {clubName && (
-                                        <span className="text-xs font-black text-black">
-                                            {clubName}
-                                        </span>
-                                    )}
-                                    <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1">
-                                        <Sparkles className="w-3 h-3" />
-                                        <span>Phase 1 · Credential Hub</span>
-                                    </span>
-                                    <span className="text-xs font-bold text-neutral-500 bg-neutral-100 border border-neutral-300 px-2 py-0.5 rounded-full">
-                                        SHA-256 Verifiable
-                                    </span>
-                                </div>
-
-                                <h2 className="text-2xl sm:text-3xl font-black text-black tracking-tight">
-                                    Digital Credential Studio & Issuance
-                                </h2>
-
-                                <p className="text-xs sm:text-sm font-semibold text-neutral-600 leading-relaxed max-w-2xl">
-                                    Create visual certificates, enforce verified turnout eligibility, issue individual and team awards, and maintain a tamper-proof credential registry.
-                                </p>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                                {onOpenLegacyModal && (
-                                    <button
-                                        type="button"
-                                        onClick={onOpenLegacyModal}
-                                        className="px-3 py-1.5 rounded-xl border border-neutral-300 bg-white hover:bg-neutral-50 text-xs font-bold text-neutral-600"
-                                    >
-                                        Quick Modal
-                                    </button>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={loadWorkspaceData}
-                                    disabled={loadingData}
-                                    className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-bold text-black flex items-center gap-1.5 shadow-[2px_2px_0px_#000]"
-                                    title="Refresh metrics"
-                                >
-                                    <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? "animate-spin" : ""}`} />
-                                    <span>Refresh</span>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* PROMINENT MAIN ACTIONS BAR (The 5 requested main actions) */}
                     <div className="space-y-3">
                         <div className="text-xs font-black uppercase tracking-wider text-neutral-500">
@@ -516,212 +570,6 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
                                     <span>Search Students</span> &rarr;
                                 </div>
                             </button>
-                        </div>
-                    </div>
-
-                    {/* DASHBOARD METRICS: The 8 Requested Metrics in 4x2 Grid */}
-                    <div className="space-y-3">
-                        <div className="text-xs font-black uppercase tracking-wider text-neutral-500">
-                            Issuance & Credential Ledger Metrics
-                        </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            {/* 1. Total Certificates Issued */}
-                            <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-[#a2ff86] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
-                                    <Award className="w-5 h-5 text-black stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <div className="text-xl sm:text-2xl font-black text-black leading-none">
-                                        {metrics.totalCertificatesIssued}
-                                    </div>
-                                    <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
-                                        Total Issued
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 2. Event Certificates */}
-                            <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-[#FFE566] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
-                                    <CalendarDays className="w-5 h-5 text-black stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <div className="text-xl sm:text-2xl font-black text-black leading-none">
-                                        {metrics.eventCertificates}
-                                    </div>
-                                    <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
-                                        Event Certificates
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 3. Manual Certificates */}
-                            <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-[#70D6FF] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
-                                    <UserCheck className="w-5 h-5 text-black stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <div className="text-xl sm:text-2xl font-black text-black leading-none">
-                                        {metrics.manualCertificates}
-                                    </div>
-                                    <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
-                                        Manual Certificates
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 4. Individual Certificates */}
-                            <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-[#FF90E8] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
-                                    <Sparkles className="w-5 h-5 text-black stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <div className="text-xl sm:text-2xl font-black text-black leading-none">
-                                        {metrics.individualCertificates}
-                                    </div>
-                                    <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
-                                        Individual Certs
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 5. Team Certificates */}
-                            <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-[#FFDE59] border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
-                                    <Users className="w-5 h-5 text-black stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <div className="text-xl sm:text-2xl font-black text-black leading-none">
-                                        {metrics.teamCertificates}
-                                    </div>
-                                    <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
-                                        Team Certificates
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 6. Pending Issuance */}
-                            <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-neutral-100 border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
-                                    <Clock className="w-5 h-5 text-neutral-700 stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <div className="text-xl sm:text-2xl font-black text-black leading-none">
-                                        {metrics.pendingIssuance}
-                                    </div>
-                                    <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
-                                        Pending Issuance
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 7. Failed Generations */}
-                            <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-rose-100 border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
-                                    <AlertCircle className="w-5 h-5 text-rose-700 stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <div className="text-xl sm:text-2xl font-black text-black leading-none">
-                                        {metrics.failedGenerations}
-                                    </div>
-                                    <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
-                                        Failed Generations
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* 8. Revoked Certificates */}
-                            <div className="p-4 rounded-xl bg-white border-3 border-black shadow-[3px_3px_0px_#000] flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-neutral-200 border-2 border-black flex items-center justify-center shrink-0 shadow-[1.5px_1.5px_0px_#000]">
-                                    <Ban className="w-5 h-5 text-neutral-700 stroke-[2.5]" />
-                                </div>
-                                <div>
-                                    <div className="text-xl sm:text-2xl font-black text-black leading-none">
-                                        {metrics.revokedCertificates}
-                                    </div>
-                                    <div className="text-[10px] sm:text-[11px] font-bold text-neutral-500 uppercase tracking-wider mt-1">
-                                        Revoked Certs
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Featured Templates Showcase */}
-                    <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="text-base sm:text-lg font-black text-black">
-                                    Master Templates & Club Designs
-                                </h3>
-                                <p className="text-xs font-semibold text-neutral-600">
-                                    Pick any template to customize in the studio, or directly issue credentials with it.
-                                </p>
-                            </div>
-
-                            <button
-                                type="button"
-                                onClick={() => setActiveTab("templates")}
-                                className="text-xs font-black text-black flex items-center gap-1 hover:underline cursor-pointer"
-                            >
-                                <span>View All ({allAvailableTemplates.length})</span>
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {allAvailableTemplates.slice(0, 3).map((tpl) => (
-                                <div
-                                    key={tpl.id}
-                                    className="p-4 rounded-xl border-2 border-black bg-[#FAF6EE] shadow-[3px_3px_0px_#000] flex flex-col justify-between"
-                                >
-                                    <div className="space-y-1.5">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-white border border-black shadow-[1px_1px_0px_#000]">
-                                                {tpl.category}
-                                            </span>
-                                            {tpl.isSystem || tpl.is_system ? (
-                                                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded">
-                                                    Orbix System
-                                                </span>
-                                            ) : (
-                                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded">
-                                                    Club Custom
-                                                </span>
-                                            )}
-                                        </div>
-                                        <h4 className="text-sm font-black text-black">{tpl.name}</h4>
-                                        <p className="text-xs text-neutral-600 line-clamp-2">
-                                            {tpl.description || "Official cryptographically signed credential layout."}
-                                        </p>
-                                    </div>
-
-                                    <div className="mt-4 pt-3 border-t border-black/10 flex items-center justify-between gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => handleTemplateSelected(tpl)}
-                                            className="text-xs font-black text-black px-2.5 py-1.5 rounded-lg border border-black bg-white hover:bg-neutral-100 flex items-center gap-1 shadow-[1px_1px_0px_#000]"
-                                        >
-                                            <Palette className="w-3.5 h-3.5" />
-                                            <span>Customize</span>
-                                        </button>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                setActiveTemplateId(tpl.id);
-                                                setActiveDesign(tpl.design || defaultDesign);
-                                                setTemplateName(tpl.name || "Custom Certificate");
-                                                setActiveTab("event-issuance");
-                                            }}
-                                            className="text-xs font-black text-black px-3 py-1.5 rounded-lg border border-black bg-[#a2ff86] hover:bg-[#8ee673] flex items-center gap-1 shadow-[1px_1px_0px_#000]"
-                                        >
-                                            <Send className="w-3.5 h-3.5" />
-                                            <span>Issue With This</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
                         </div>
                     </div>
                 </div>
