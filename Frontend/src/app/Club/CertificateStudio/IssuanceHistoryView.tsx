@@ -12,8 +12,6 @@ import {
     RefreshCw,
     X,
     ExternalLink,
-    Filter,
-    ArrowUpDown,
 } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
 import {

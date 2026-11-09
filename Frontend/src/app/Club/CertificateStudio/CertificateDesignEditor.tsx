@@ -2691,57 +2691,20 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                                 {"{{"}{selectedElement.fieldKey}{"}}"}
                                             </span>
                                         </div>
-                                        <select
+                                        <NeoSelect
                                             value={selectedElement.fieldKey || "recipient.name"}
-                                            onChange={(e) => {
-                                                const key = e.target.value;
-                                                const def = allDynamicFields.find((f) => f.key === key);
+                                            options={tokenSelectOptions}
+                                            onChange={(val) => {
+                                                const def = allDynamicFields.find((f) => f.key === val);
                                                 updateElement(selectedElement.id, {
-                                                    fieldKey: key,
+                                                    fieldKey: val,
                                                     fallbackValue: def?.sampleValue || "Sample",
                                                     dataType: def?.dataType || "text",
                                                 });
                                             }}
-                                            className="w-full p-2 text-xs font-bold border-2 border-black rounded-lg bg-white"
-                                        >
-                                            <optgroup label="Recipient Data">
-                                                {allDynamicFields.filter((f) => f.category === "recipient").map((f) => (
-                                                    <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
-                                                ))}
-                                            </optgroup>
-                                            <optgroup label="Event Data">
-                                                {allDynamicFields.filter((f) => f.category === "event").map((f) => (
-                                                    <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
-                                                ))}
-                                            </optgroup>
-                                            <optgroup label="Achievement & Award">
-                                                {allDynamicFields.filter((f) => f.category === "achievement").map((f) => (
-                                                    <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
-                                                ))}
-                                            </optgroup>
-                                            <optgroup label="Team Data">
-                                                {allDynamicFields.filter((f) => f.category === "team").map((f) => (
-                                                    <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
-                                                ))}
-                                            </optgroup>
-                                            <optgroup label="Issuance & Credentials">
-                                                {allDynamicFields.filter((f) => f.category === "issuance").map((f) => (
-                                                    <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
-                                                ))}
-                                            </optgroup>
-                                            <optgroup label="Club Data">
-                                                {allDynamicFields.filter((f) => f.category === "club").map((f) => (
-                                                    <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
-                                                ))}
-                                            </optgroup>
-                                            {(design.customAttributes || []).length > 0 && (
-                                                <optgroup label="Club Custom Attributes">
-                                                    {(design.customAttributes || []).map((f) => (
-                                                        <option key={f.key} value={f.key}>{f.label} ({f.key})</option>
-                                                    ))}
-                                                </optgroup>
-                                            )}
-                                        </select>
+                                            size="sm"
+                                            className="w-full"
+                                        />
                                     </div>
 
                                     {/* Fallback Preview Value */}
