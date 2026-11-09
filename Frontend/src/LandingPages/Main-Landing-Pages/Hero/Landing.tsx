@@ -383,13 +383,19 @@ export const OPPORTUNITIES: OPPORTUNITIES[] = [
                     strokeLinejoin="round"
                 />
                 <path
-                    d="M12 6.5L13.5 9.5H16.8L14.1 11.4L15.1 14.5L12 12.6L8.9 14.5L9.9 11.4L7.2 9.5H10.5L12 6.5Z"
+                    d="M12 6.2L6.8 9L12 11.8L17.2 9L12 6.2Z"
                     fill="black"
                 />
                 <path
-                    d="M8.5 16.5C10 17.5 14 17.5 15.5 16.5"
+                    d="M8.8 10.3V13.5C8.8 14.8 10.2 15.8 12 15.8C13.8 15.8 15.2 14.8 15.2 13.5V10.3"
                     stroke="black"
-                    strokeWidth="1.6"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                />
+                <path
+                    d="M17 9.5V13"
+                    stroke="black"
+                    strokeWidth="1.5"
                     strokeLinecap="round"
                 />
             </svg>
@@ -400,33 +406,17 @@ export const OPPORTUNITIES: OPPORTUNITIES[] = [
         name: "Events",
         renderIcon: (className = "w-8 h-8") => (
             <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none">
-                <rect
-                    x="3"
-                    y="4"
-                    width="18"
-                    height="16"
-                    rx="3.5"
-                    fill="#a2ff86"
-                    stroke="black"
-                    strokeWidth="1.8"
-                />
-                <path
-                    d="M3 11C4.5 11 5.5 10 5.5 8.5C5.5 7 4.5 6 3 6"
-                    fill="#FAF6EE"
-                    stroke="black"
-                    strokeWidth="1.5"
-                />
-                <path
-                    d="M21 11C19.5 11 18.5 10 18.5 8.5C18.5 7 19.5 6 21 6"
-                    fill="#FAF6EE"
-                    stroke="black"
-                    strokeWidth="1.5"
-                />
-                <path
-                    d="M12 7.5L13.2 10.3L16 11.5L13.2 12.7L12 15.5L10.8 12.7L8 11.5L10.8 10.3L12 7.5Z"
-                    fill="black"
-                />
-                <line x1="8" y1="16.5" x2="16" y2="16.5" stroke="black" strokeWidth="1.8" strokeLinecap="round" />
+                <rect x="3" y="4" width="18" height="17" rx="3.5" fill="#FFFFFF" stroke="black" strokeWidth="1.8" />
+                <path d="M3 9H21" stroke="black" strokeWidth="1.8" />
+                <path d="M3 7.5C3 5.567 4.567 4 6.5 4H17.5C19.433 4 21 5.567 21 7.5V9H3V7.5Z" fill="#FF5C5C" stroke="black" strokeWidth="1.8" />
+                <line x1="8" y1="2" x2="8" y2="5" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <line x1="16" y1="2" x2="16" y2="5" stroke="black" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="8" cy="13" r="1.3" fill="black" />
+                <circle cx="12" cy="13" r="1.3" fill="black" />
+                <circle cx="16" cy="13" r="1.3" fill="black" />
+                <circle cx="8" cy="17" r="1.3" fill="black" />
+                <circle cx="12" cy="17" r="1.3" fill="#FF5C5C" />
+                <circle cx="16" cy="17" r="1.3" fill="black" />
             </svg>
         ),
     },
@@ -540,9 +530,9 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
     const currentOpp = OPPORTUNITIES[oppIndex];
 
     return (
-        <div className="w-full flex flex-col items-center justify-center gap-2 sm:gap-3.5 md:gap-5 lg:gap-6 text-[clamp(1.1rem,3.4vw,4.25rem)] text-black font-MyCustomFont3 pt-[100px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-2 sm:px-4 md:px-6 max-w-full text-center leading-[1.2] sm:leading-[1.18] md:leading-[1.15] select-none">
+        <div className="w-full flex flex-col items-center justify-center gap-1.5 sm:gap-3.5 md:gap-5 lg:gap-6 text-[clamp(0.62rem,3.15vw,1.05rem)] sm:text-[clamp(1.1rem,3.4vw,4.25rem)] text-black font-MyCustomFont3 pt-[95px] sm:pt-[130px] md:pt-[150px] lg:pt-[170px] px-1.5 sm:px-4 md:px-6 max-w-full text-center leading-[1.25] sm:leading-[1.18] md:leading-[1.15] select-none">
             {/* Line 1: Strictly single line, never wraps */}
-            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-2 sm:gap-x-3 text-center max-w-full'>
+            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                 <span>A developer tool to connect</span>
 
                 <motion.div
@@ -573,7 +563,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
                     onMouseLeave={() => setIsPaused(false)}
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.94 }}
-                    className="relative bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-2.5 sm:px-3.5 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1.5 sm:gap-2.5 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
+                    className="relative bg-white border-[1.5px] sm:border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-1.5 sm:px-3 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1 sm:gap-2 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
                     title="Click to switch platform"
                 >
                     {/* Flashing light sweep effect as it bounces out of the underground */}
@@ -637,7 +627,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
             </div>
 
             {/* Line 2: Strictly single line, never wraps regardless of text changes */}
-            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-2 sm:gap-x-3 text-center max-w-full'>
+            <div className='flex flex-nowrap whitespace-nowrap items-center justify-center gap-x-1 sm:gap-x-2.5 md:gap-x-3 text-center max-w-full'>
                 <span>and redirecting</span>
                 <motion.div
                     layout
@@ -667,7 +657,7 @@ const HeroHeadlines = React.memo(function HeroHeadlines() {
                     onMouseLeave={() => setIsOppPaused(false)}
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.94 }}
-                    className="relative bg-white border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-2.5 sm:px-3.5 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1.5 sm:gap-2.5 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
+                    className="relative bg-white border-[1.5px] sm:border-2 border-black shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:shadow-[5px_5px_0px_#000] rounded-full px-1.5 sm:px-3 md:px-4 py-0.5 sm:py-1 inline-flex items-center gap-1 sm:gap-2 md:gap-3 cursor-pointer select-none shrink-0 transition-all overflow-hidden focus:outline-none"
                     title="Click to switch opportunity"
                 >
                     {/* Flashing light sweep effect as it bounces out of the underground */}
