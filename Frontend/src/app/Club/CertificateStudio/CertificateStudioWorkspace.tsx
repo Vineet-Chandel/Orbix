@@ -286,8 +286,7 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
         { id: "manual-issuance", label: "Manual Issuance", icon: UserCheck },
         { id: "batches", label: "Certificate Batches", icon: Clock },
         { id: "history", label: "Issuance History", icon: History },
-        { id: "verification", label: "Verification", icon: ShieldCheck },
-        { id: "settings", label: "Settings", icon: Settings },
+        { id: "settings", label: "Settings & Verification", icon: Settings },
     ];
 
     return (
@@ -437,7 +436,9 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
                 <nav className="flex items-center gap-1.5 min-w-max">
                     {navItems.map((item) => {
                         const Icon = item.icon;
-                        const isActive = activeTab === item.id;
+                        const isActive =
+                            activeTab === item.id ||
+                            (item.id === "settings" && activeTab === "verification");
                         return (
                             <button
                                 key={item.id}
@@ -757,109 +758,131 @@ export const CertificateStudioWorkspace: React.FC<CertificateStudioWorkspaceProp
                 </div>
             )}
 
-            {/* TAB: VERIFICATION TOOL */}
-            {activeTab === "verification" && (
-                <div className="space-y-6 max-w-3xl">
-                    <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-3">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border-2 border-black text-xs font-black">
-                            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                            <span>Credential Verification Tester</span>
-                        </div>
-                        <h3 className="text-xl font-black text-black">
-                            Look Up & Test Credential Authenticity
-                        </h3>
-                        <p className="text-xs font-semibold text-neutral-600 leading-relaxed">
-                            Test any credential code issued by your club or campus chapters. Validates cryptographic signatures, issue dates, and revocation statuses.
-                        </p>
-
-                        <form onSubmit={handleTestVerification} className="pt-2 flex items-center gap-2">
-                            <input
-                                type="text"
-                                placeholder="Enter Credential Code (e.g. ORB-2026-X89J)"
-                                value={verifyTestCode}
-                                onChange={(e) => setVerifyTestCode(e.target.value)}
-                                className="flex-1 p-2.5 text-xs sm:text-sm font-mono font-bold border-2 border-black rounded-xl bg-[#FAF6EE] focus:bg-white focus:outline-none"
-                            />
-                            <button
-                                type="submit"
-                                disabled={verifying || !verifyTestCode.trim()}
-                                className="px-5 py-2.5 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] disabled:opacity-50"
-                            >
-                                {verifying ? "Checking..." : "Verify Code"}
-                            </button>
-                        </form>
+            {/* TAB: SETTINGS & VERIFICATION */}
+            {(activeTab === "settings" || activeTab === "verification") && (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+                    {/* LEFT COLUMN: Club Credential & Issuance Defaults */}
+                    <div className="lg:col-span-7">
+                        <CertificateSettingsView clubId={clubId} />
                     </div>
 
-                    {verifyResult && (
-                        <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
-                            {verifyResult.verified && verifyResult.certificate ? (
-                                <div className="space-y-3">
-                                    <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-8 h-8 rounded-lg bg-emerald-100 border border-emerald-400 flex items-center justify-center text-emerald-800">
-                                                <ShieldCheck className="w-5 h-5 stroke-[2.5]" />
-                                            </span>
+                    {/* RIGHT COLUMN: Credential Verification Tester */}
+                    <div className="lg:col-span-5 space-y-6">
+                        <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-3">
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF6EE] border-2 border-black text-xs font-black">
+                                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                                <span>Credential Verification Tester</span>
+                            </div>
+                            <h3 className="text-lg sm:text-xl font-black text-black">
+                                Look Up & Test Credential Authenticity
+                            </h3>
+                            <p className="text-xs font-semibold text-neutral-600 leading-relaxed">
+                                Test any credential code issued by your club or campus chapters. Validates cryptographic signatures, issue dates, and revocation statuses.
+                            </p>
+
+                            <form onSubmit={handleTestVerification} className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Enter Credential Code (e.g. ORB-2026-X89J)"
+                                    value={verifyTestCode}
+                                    onChange={(e) => setVerifyTestCode(e.target.value)}
+                                    className="flex-1 p-2.5 text-xs sm:text-sm font-mono font-bold border-2 border-black rounded-xl bg-[#FAF6EE] focus:bg-white focus:outline-none"
+                                />
+                                <button
+                                    type="submit"
+                                    disabled={verifying || !verifyTestCode.trim()}
+                                    className="px-5 py-2.5 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black border-2 border-black font-black text-xs shadow-[2px_2px_0px_#000] disabled:opacity-50 cursor-pointer shrink-0"
+                                >
+                                    {verifying ? "Checking..." : "Verify Code"}
+                                </button>
+                            </form>
+                        </div>
+
+                        {verifyResult && (
+                            <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-4">
+                                {verifyResult.verified && verifyResult.certificate ? (
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between pb-3 border-b-2 border-black/10">
+                                            <div className="flex items-center gap-2">
+                                                <span className="w-8 h-8 rounded-lg bg-emerald-100 border border-emerald-400 flex items-center justify-center text-emerald-800">
+                                                    <ShieldCheck className="w-5 h-5 stroke-[2.5]" />
+                                                </span>
+                                                <div>
+                                                    <div className="text-xs font-black text-emerald-800 uppercase tracking-wider">
+                                                        Authentic Credential Verified
+                                                    </div>
+                                                    <div className="text-[11px] font-mono text-neutral-500">
+                                                        ID: {verifyResult.certificate.credentialCode}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <a
+                                                href={`/verify/certificate/${encodeURIComponent(verifyResult.certificate.credentialCode)}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-xs font-black text-blue-700 hover:underline flex items-center gap-1"
+                                            >
+                                                <span>Open Public View</span>
+                                                <ExternalLink className="w-3.5 h-3.5" />
+                                            </a>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3 text-xs">
                                             <div>
-                                                <div className="text-xs font-black text-emerald-800 uppercase tracking-wider">
-                                                    Authentic Credential Verified
-                                                </div>
-                                                <div className="text-[11px] font-mono text-neutral-500">
-                                                    ID: {verifyResult.certificate.credentialCode}
-                                                </div>
+                                                <span className="text-neutral-500 font-bold block">Recipient:</span>
+                                                <span className="font-black text-black">{verifyResult.certificate.recipientName}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-neutral-500 font-bold block">Title:</span>
+                                                <span className="font-bold text-black">{verifyResult.certificate.title}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-neutral-500 font-bold block">Authority:</span>
+                                                <span className="font-bold text-black">{verifyResult.certificate.clubName}</span>
+                                            </div>
+                                            <div>
+                                                <span className="text-neutral-500 font-bold block">Verifications:</span>
+                                                <span className="font-black text-black">{verifyResult.certificate.verificationCount} lookups</span>
                                             </div>
                                         </div>
 
-                                        <a
-                                            href={`/verify/certificate/${encodeURIComponent(verifyResult.certificate.credentialCode)}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-xs font-black text-blue-700 hover:underline flex items-center gap-1"
-                                        >
-                                            <span>Open Public View</span>
-                                            <ExternalLink className="w-3.5 h-3.5" />
-                                        </a>
+                                        {verifyResult.certificate.sha256Hash && (
+                                            <div className="p-3 bg-neutral-900 text-[#a2ff86] font-mono text-[10px] rounded-lg break-all">
+                                                SHA-256: {verifyResult.certificate.sha256Hash}
+                                            </div>
+                                        )}
                                     </div>
-
-                                    <div className="grid grid-cols-2 gap-3 text-xs">
-                                        <div>
-                                            <span className="text-neutral-500 font-bold block">Recipient:</span>
-                                            <span className="font-black text-black">{verifyResult.certificate.recipientName}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-neutral-500 font-bold block">Title:</span>
-                                            <span className="font-bold text-black">{verifyResult.certificate.title}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-neutral-500 font-bold block">Authority:</span>
-                                            <span className="font-bold text-black">{verifyResult.certificate.clubName}</span>
-                                        </div>
-                                        <div>
-                                            <span className="text-neutral-500 font-bold block">Verifications:</span>
-                                            <span className="font-black text-black">{verifyResult.certificate.verificationCount} lookups</span>
-                                        </div>
+                                ) : (
+                                    <div className="p-4 rounded-xl bg-red-50 border-2 border-red-300 text-red-900 text-xs font-bold flex items-center gap-2">
+                                        <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+                                        <span>{verifyResult.message || "Invalid or unrecognized credential code."}</span>
                                     </div>
+                                )}
+                            </div>
+                        )}
 
-                                    {verifyResult.certificate.sha256Hash && (
-                                        <div className="p-3 bg-neutral-900 text-[#a2ff86] font-mono text-[10px] rounded-lg break-all">
-                                            SHA-256: {verifyResult.certificate.sha256Hash}
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="p-4 rounded-xl bg-red-50 border-2 border-red-300 text-red-900 text-xs font-bold flex items-center gap-2">
-                                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
-                                    <span>{verifyResult.message || "Invalid or unrecognized credential code."}</span>
-                                </div>
-                            )}
+                        <div className="p-5 rounded-2xl bg-[#FAF6EE] border-3 border-black shadow-[3px_3px_0px_#000] space-y-3">
+                            <div className="flex items-center gap-2">
+                                <span className="w-7 h-7 rounded-lg bg-black text-[#FFE566] flex items-center justify-center">
+                                    <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
+                                </span>
+                                <h4 className="text-xs font-black uppercase tracking-wider text-black">
+                                    Public Verification Architecture
+                                </h4>
+                            </div>
+                            <p className="text-xs text-neutral-600 font-semibold leading-relaxed">
+                                Every issued certificate is cryptographically anchored with an immutable SHA-256 fingerprint. External institutions and LinkedIn recruiters can verify validity instantly without requiring student login.
+                            </p>
+                            <div className="pt-1 flex items-center justify-between text-[11px] font-bold text-neutral-500 border-t border-black/10">
+                                <span>Status: Registry Online</span>
+                                <span className="text-emerald-700 font-black flex items-center gap-1">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                                    Tamper-Proof Protected
+                                </span>
+                            </div>
                         </div>
-                    )}
-                </div>
-            )}
-
-            {/* TAB: SETTINGS */}
-            {activeTab === "settings" && (
-                <div className="space-y-4">
-                    <CertificateSettingsView clubId={clubId} />
+                    </div>
                 </div>
             )}
         </div>

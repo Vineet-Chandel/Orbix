@@ -68,7 +68,7 @@ export const CertificateSettingsView: React.FC<CertificateSettingsViewProps> = (
     }
 
     return (
-        <form onSubmit={handleSave} className="space-y-6 max-w-3xl">
+        <form onSubmit={handleSave} className="space-y-6 w-full">
             {/* Header info */}
             <div className="p-6 rounded-2xl bg-white border-3 border-black shadow-[4px_4px_0px_#000] space-y-1">
                 <h3 className="text-lg font-black text-black">
