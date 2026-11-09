@@ -5,7 +5,6 @@ import { Card } from './Card';
 import { Platform } from './Platform';
 import { Events } from './Events';
 import { LeaderboardShowcase as Leaderboard } from './Leaderboard';
-import { ProjectsShowcase as Projects } from './Projects';
 import { ClubsShowcase as Clubs } from './clubs';
 import { Footer } from './Footer';
 
@@ -60,13 +59,6 @@ export default function MainLanding() {
       <ShowcaseSection fallbackHeight={640}>
         <section className="w-full">
           <Leaderboard />
-        </section>
-      </ShowcaseSection>
-
-      {/* Flagship Projects Showcase: Curate Your Top 4 Engineering Architectures */}
-      <ShowcaseSection fallbackHeight={680}>
-        <section className="w-full">
-          <Projects />
         </section>
       </ShowcaseSection>
 
