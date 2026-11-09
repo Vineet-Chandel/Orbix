@@ -16,6 +16,7 @@ import {
     type BatchIssuancePayload,
 } from "../../../api/certificateStudioApi";
 import type { CertificateDesign } from "../../../types/certificateStudio";
+import { NeoSelect } from "../../../components/NeoSelect";
 
 interface ManualIssuanceViewProps {
     clubId: string;
@@ -206,16 +207,17 @@ export const ManualIssuanceView: React.FC<ManualIssuanceViewProps> = ({
                                 />
                             </div>
 
-                            <select
+                            <NeoSelect
                                 value={credibilityFilter}
-                                onChange={(e) => setCredibilityFilter(e.target.value)}
-                                className="p-2 text-xs font-black border-2 border-black rounded-xl bg-white shadow-[1px_1px_0px_#000]"
+                                onChange={(val) => setCredibilityFilter(val)}
+                                size="sm"
+                                triggerClassName="bg-white text-xs font-black shadow-[1px_1px_0px_#000]"
                             >
                                 <option value="all">All Campus Students</option>
                                 <option value="event_attendee">Attended Events</option>
                                 <option value="team_member">Team / Staff</option>
                                 <option value="event_registered">Registered</option>
-                            </select>
+                            </NeoSelect>
                         </div>
 
                         <div className="flex items-center justify-between text-xs font-bold text-neutral-600 pt-1">
@@ -322,10 +324,11 @@ export const ManualIssuanceView: React.FC<ManualIssuanceViewProps> = ({
                         <label className="text-xs font-black text-black block">
                             Recognition Category
                         </label>
-                        <select
+                        <NeoSelect
                             value={certType}
-                            onChange={(e) => setCertType(e.target.value as any)}
-                            className="w-full p-2.5 text-xs font-bold border-2 border-black rounded-xl bg-[#FAF6EE] focus:bg-white focus:outline-none cursor-pointer"
+                            onChange={(val) => setCertType(val as any)}
+                            className="w-full"
+                            triggerClassName="bg-[#FAF6EE] text-xs font-bold"
                         >
                             <option value="appreciation">Appreciation</option>
                             <option value="excellence">Excellence</option>
@@ -333,7 +336,7 @@ export const ManualIssuanceView: React.FC<ManualIssuanceViewProps> = ({
                             <option value="contributor">Core Contributor</option>
                             <option value="organizer">Lead / Organizer</option>
                             <option value="participation">Participation</option>
-                        </select>
+                        </NeoSelect>
                     </div>
 
                     <div className="space-y-1">

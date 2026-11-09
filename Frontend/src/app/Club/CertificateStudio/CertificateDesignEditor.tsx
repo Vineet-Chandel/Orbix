@@ -52,6 +52,8 @@ import {
     AVAILABLE_DYNAMIC_FIELDS,
 } from "../../../types/certificateStudio";
 import { previewSampleCertificate } from "../../../api/certificateStudioApi";
+import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 
 interface CertificateDesignEditorProps {
     initialDesign: CertificateDesign;
@@ -203,6 +205,14 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
         }));
         return [...AVAILABLE_DYNAMIC_FIELDS, ...customFields];
     }, [design.customAttributes]);
+
+    const tokenSelectOptions = useMemo(() => {
+        return allDynamicFields.map((f) => ({
+            value: f.key,
+            label: `${f.label} (${f.key})`,
+            description: f.category.toUpperCase(),
+        }));
+    }, [allDynamicFields]);
 
     // Filtered fields based on search & category pill
     const filteredDynamicFields = useMemo(() => {
@@ -1841,7 +1851,7 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                     <label className="text-xs font-bold text-neutral-700 block mb-1">
                                         Paper Size Preset
                                     </label>
-                                    <select
+                                    <NeoSelect
                                         value={
                                             canvasWidth === 842 && canvasHeight === 595
                                                 ? "a4-landscape"
@@ -1855,8 +1865,7 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                                 ? "square"
                                                 : "custom"
                                         }
-                                        onChange={(e) => {
-                                            const val = e.target.value;
+                                        onChange={(val) => {
                                             if (val === "a4-landscape") {
                                                 updateDesignWithHistory({ ...design, page: { width: 842, height: 595, orientation: "landscape", unit: "pt" } });
                                             } else if (val === "a4-portrait") {
@@ -1869,15 +1878,16 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                                 updateDesignWithHistory({ ...design, page: { width: 600, height: 600, orientation: "landscape", unit: "pt" } });
                                             }
                                         }}
-                                        className="w-full p-2 text-xs font-bold border-2 border-black rounded-lg bg-white"
+                                        size="sm"
+                                        className="w-full"
                                     >
-                                        <option value="a4-landscape">A4 Landscape (842 &times; 595 pt)</option>
-                                        <option value="a4-portrait">A4 Portrait (595 &times; 842 pt)</option>
-                                        <option value="letter-landscape">US Letter Landscape (792 &times; 612 pt)</option>
-                                        <option value="letter-portrait">US Letter Portrait (612 &times; 792 pt)</option>
-                                        <option value="square">Square Credential (600 &times; 600 pt)</option>
+                                        <option value="a4-landscape">A4 Landscape (842 × 595 pt)</option>
+                                        <option value="a4-portrait">A4 Portrait (595 × 842 pt)</option>
+                                        <option value="letter-landscape">US Letter Landscape (792 × 612 pt)</option>
+                                        <option value="letter-portrait">US Letter Portrait (612 × 792 pt)</option>
+                                        <option value="square">Square Credential (600 × 600 pt)</option>
                                         <option value="custom">Custom Dimensions</option>
-                                    </select>
+                                    </NeoSelect>
                                 </div>
 
                                 {/* Custom width/height */}
@@ -1987,15 +1997,16 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                         <label className="text-xs font-bold text-neutral-700 block mb-1">
                                             Decorative Border Style
                                         </label>
-                                        <select
+                                        <NeoSelect
                                             value={design.background.borderStyle || "double"}
-                                            onChange={(e) =>
+                                            onChange={(val) =>
                                                 updateDesignWithHistory({
                                                     ...design,
-                                                    background: { ...design.background, borderStyle: e.target.value as any },
+                                                    background: { ...design.background, borderStyle: val as any },
                                                 })
                                             }
-                                            className="w-full p-2 text-xs font-bold border-2 border-black rounded-lg bg-white"
+                                            size="sm"
+                                            className="w-full"
                                         >
                                             <option value="double">Classic Double Frame</option>
                                             <option value="solid">Bold Solid Frame</option>
@@ -2003,7 +2014,7 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                             <option value="modern">Modern Top Accent Bar</option>
                                             <option value="neo-brutalist">Neo-Brutalist High-Contrast</option>
                                             <option value="none">No Border (Full Bleed)</option>
-                                        </select>
+                                        </NeoSelect>
                                     </div>
 
                                     {/* Border Width Slider */}
@@ -2762,18 +2773,16 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                     </div>
 
                                     {/* Required Field Checkbox (Phase 6.4) */}
-                                    <label className="flex items-center gap-2 p-2 rounded-lg border border-black/20 bg-[#FAF6EE] cursor-pointer">
-                                        <input
-                                            type="checkbox"
+                                    <div className="p-2.5 rounded-xl border-2 border-black bg-[#FAF6EE]">
+                                        <NeoCheckbox
                                             checked={!!selectedElement.isRequired}
-                                            onChange={(e) => updateElement(selectedElement.id, { isRequired: e.target.checked })}
-                                            className="accent-black w-4 h-4 cursor-pointer rounded"
+                                            onCheckedChange={(checked) => updateElement(selectedElement.id, { isRequired: checked })}
+                                            size="sm"
+                                            colorScheme="yellow"
+                                            label="Required for Issuance"
+                                            description="Flag error if recipient record lacks this field"
                                         />
-                                        <div>
-                                            <div className="text-xs font-black text-black">Required for Issuance</div>
-                                            <div className="text-[10px] text-neutral-600">Flag error if recipient record lacks this field</div>
-                                        </div>
-                                    </label>
+                                    </div>
 
                                     {/* Auto-fit and Overflow Policy (Phase 6.3) */}
                                     <div>
@@ -2880,20 +2889,21 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                         <label className="text-[11px] font-bold text-neutral-600 block mb-1">
                                             Font Family
                                         </label>
-                                        <select
+                                        <NeoSelect
                                             value={selectedElement.style?.fontFamily || "Inter"}
-                                            onChange={(e) =>
+                                            onChange={(val) =>
                                                 updateElement(selectedElement.id, {
-                                                    style: { ...selectedElement.style, fontFamily: e.target.value },
+                                                    style: { ...selectedElement.style, fontFamily: val },
                                                 })
                                             }
-                                            className="w-full p-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white"
+                                            size="sm"
+                                            className="w-full"
                                         >
                                             <option value="Inter">Inter (Clean Sans)</option>
                                             <option value="Playfair Display">Playfair Display (Formal Serif)</option>
                                             <option value="Space Grotesk">Space Grotesk (Neo-Brutalist Display)</option>
                                             <option value="Courier Prime">Courier Prime (Monospace)</option>
-                                        </select>
+                                        </NeoSelect>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-2">
@@ -2919,19 +2929,20 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                             <label className="text-[11px] font-bold text-neutral-600 block mb-1">
                                                 Weight
                                             </label>
-                                            <select
+                                            <NeoSelect
                                                 value={selectedElement.style?.fontWeight || "normal"}
-                                                onChange={(e) =>
+                                                onChange={(val) =>
                                                     updateElement(selectedElement.id, {
-                                                        style: { ...selectedElement.style, fontWeight: e.target.value as any },
+                                                        style: { ...selectedElement.style, fontWeight: val as any },
                                                     })
                                                 }
-                                                className="w-full p-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white"
+                                                size="sm"
+                                                className="w-full"
                                             >
                                                 <option value="normal">Normal (400)</option>
                                                 <option value="bold">Bold (700)</option>
                                                 <option value="black">Black (900)</option>
-                                            </select>
+                                            </NeoSelect>
                                         </div>
                                     </div>
 
@@ -3626,31 +3637,33 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                     <label className="font-bold text-neutral-700 block mb-1">
                                         Data Type
                                     </label>
-                                    <select
+                                    <NeoSelect
                                         value={customDataType}
-                                        onChange={(e) => setCustomDataType(e.target.value as any)}
-                                        className="w-full p-2 font-bold border-2 border-black rounded-lg bg-white"
+                                        onChange={(val) => setCustomDataType(val as any)}
+                                        size="sm"
+                                        className="w-full"
                                     >
                                         <option value="text">Text / String</option>
                                         <option value="number">Number</option>
                                         <option value="date">Date</option>
                                         <option value="url">URL Link</option>
-                                    </select>
+                                    </NeoSelect>
                                 </div>
 
                                 <div>
                                     <label className="font-bold text-neutral-700 block mb-1">
                                         Recipient Scope
                                     </label>
-                                    <select
+                                    <NeoSelect
                                         value={customScope}
-                                        onChange={(e) => setCustomScope(e.target.value as any)}
-                                        className="w-full p-2 font-bold border-2 border-black rounded-lg bg-white"
+                                        onChange={(val) => setCustomScope(val as any)}
+                                        size="sm"
+                                        className="w-full"
                                     >
                                         <option value="all">All Recipients</option>
                                         <option value="individual">Individual Only</option>
                                         <option value="team">Team Only</option>
-                                    </select>
+                                    </NeoSelect>
                                 </div>
                             </div>
 
@@ -3667,18 +3680,16 @@ export const CertificateDesignEditor: React.FC<CertificateDesignEditorProps> = (
                                 />
                             </div>
 
-                            <label className="flex items-center gap-2 p-2 rounded-lg border border-black/20 bg-[#FAF6EE] cursor-pointer">
-                                <input
-                                    type="checkbox"
+                            <div className="p-2.5 rounded-xl border-2 border-black bg-[#FAF6EE]">
+                                <NeoCheckbox
                                     checked={customRequired}
-                                    onChange={(e) => setCustomRequired(e.target.checked)}
-                                    className="accent-black w-4 h-4 cursor-pointer rounded"
+                                    onCheckedChange={(checked) => setCustomRequired(checked)}
+                                    size="sm"
+                                    colorScheme="yellow"
+                                    label="Required for Issuance"
+                                    description="Block certificate generation if missing for recipient"
                                 />
-                                <div>
-                                    <div className="font-black text-black">Required for Issuance</div>
-                                    <div className="text-[10px] text-neutral-600">Block certificate generation if missing for recipient</div>
-                                </div>
-                            </label>
+                            </div>
                         </div>
 
                         <div className="flex items-center justify-end gap-2 border-t border-black/10 pt-3">

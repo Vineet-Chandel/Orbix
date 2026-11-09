@@ -36,6 +36,9 @@ import {
     uploadCertificateBackground,
 } from "../../../api/certificateStudioApi";
 import type { CertificateDesign, CertificateTemplateRecord } from "../../../types/certificateStudio";
+import { ConfirmationModal } from "../../../components/ConfirmationModal";
+import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 
 // ============================================================================
 // AUTHENTIC MINIATURE CERTIFICATE THUMBNAIL RENDERER
@@ -1340,15 +1343,26 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
         }
     };
 
-    // Archive action for Club Templates
-    const handleArchiveClubTemplate = async (tmplId: string) => {
-        if (!confirm("Are you sure you want to archive this template?")) return;
+    // Archive action for Club Templates (Screen Modal)
+    const [templateToArchive, setTemplateToArchive] = useState<CertificateTemplateRecord | null>(null);
+    const [isArchiving, setIsArchiving] = useState(false);
+
+    const handleArchiveClubTemplate = (tmpl: CertificateTemplateRecord) => {
+        setTemplateToArchive(tmpl);
+    };
+
+    const handleConfirmArchive = async () => {
+        if (!templateToArchive) return;
+        setIsArchiving(true);
         try {
-            await archiveCertificateTemplate(tmplId);
-            toast.success("Template archived.");
+            await archiveCertificateTemplate(templateToArchive.id);
+            toast.success(`Template "${templateToArchive.name}" archived.`);
             await loadTemplates();
+            setTemplateToArchive(null);
         } catch (err: any) {
             toast.error(err.message || "Failed to archive template.");
+        } finally {
+            setIsArchiving(false);
         }
     };
 
@@ -2247,17 +2261,16 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                         </div>
 
                         {/* Checkbox for auto-placing a masking patch */}
-                        <label className="flex items-center gap-2 pt-1 cursor-pointer select-none">
-                            <input
-                                type="checkbox"
+                        <div className="pt-1">
+                            <NeoCheckbox
                                 checked={hasFlattenedText}
-                                onChange={(e) => setHasFlattenedText(e.target.checked)}
-                                className="w-4 h-4 rounded border-2 border-black text-black focus:ring-0 cursor-pointer"
+                                onCheckedChange={(checked) => setHasFlattenedText(checked)}
+                                colorScheme="yellow"
+                                size="sm"
+                                label="My background has flattened names/dates — automatically add a Masking Patch over the recipient name line"
+                                labelClassName="text-xs font-bold text-black"
                             />
-                            <span className="text-xs font-bold text-black">
-                                My background has flattened names/dates — automatically add a Masking Patch over the recipient name line
-                            </span>
-                        </label>
+                        </div>
                     </div>
 
                     {/* Submit and Action Buttons */}
@@ -2640,10 +2653,11 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                                             <label className="block text-xs font-bold text-neutral-700 mb-1">
                                                 Decorative Border Style
                                             </label>
-                                            <select
+                                            <NeoSelect
                                                 value={customBorderStyle}
-                                                onChange={(e) => setCustomBorderStyle(e.target.value as any)}
-                                                className="w-full p-2.5 text-xs font-bold border-2 border-black rounded-xl bg-white"
+                                                onChange={(val) => setCustomBorderStyle(val as any)}
+                                                className="w-full"
+                                                size="sm"
                                             >
                                                 <option value="double">Classic Double Frame</option>
                                                 <option value="solid">Bold Solid Frame</option>
@@ -2651,7 +2665,7 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                                                 <option value="modern">Modern Top Accent Bar</option>
                                                 <option value="neo-brutalist">Neo-Brutalist High-Contrast</option>
                                                 <option value="none">No Border (Full Bleed)</option>
-                                            </select>
+                                            </NeoSelect>
                                         </div>
 
                                         <div>
@@ -2802,10 +2816,11 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                             {/* Filters & Sort Controls */}
                             <div className="flex flex-wrap items-center gap-2">
                                 {/* Category Filter */}
-                                <select
+                                <NeoSelect
                                     value={myTemplatesCategory}
-                                    onChange={(e) => setMyTemplatesCategory(e.target.value)}
-                                    className="px-3 py-2 rounded-xl border-2 border-black bg-white text-xs font-bold shadow-[2px_2px_0px_#000] focus:outline-none"
+                                    onChange={(val) => setMyTemplatesCategory(val)}
+                                    size="sm"
+                                    triggerClassName="px-3 py-2 rounded-xl text-xs font-bold shadow-[2px_2px_0px_#000]"
                                 >
                                     <option value="all">All Categories</option>
                                     <option value="event">Event</option>
@@ -2815,30 +2830,32 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                                     <option value="academic">Academic</option>
                                     <option value="workshop">Workshop</option>
                                     <option value="custom">Custom</option>
-                                </select>
+                                </NeoSelect>
 
                                 {/* Status Filter */}
-                                <select
+                                <NeoSelect
                                     value={myTemplatesStatus}
-                                    onChange={(e) => setMyTemplatesStatus(e.target.value)}
-                                    className="px-3 py-2 rounded-xl border-2 border-black bg-white text-xs font-bold shadow-[2px_2px_0px_#000] focus:outline-none"
+                                    onChange={(val) => setMyTemplatesStatus(val)}
+                                    size="sm"
+                                    triggerClassName="px-3 py-2 rounded-xl text-xs font-bold shadow-[2px_2px_0px_#000]"
                                 >
                                     <option value="all">All Statuses</option>
                                     <option value="draft">Draft</option>
                                     <option value="published">Published</option>
                                     <option value="archived">Archived</option>
-                                </select>
+                                </NeoSelect>
 
                                 {/* Sort Order */}
-                                <select
+                                <NeoSelect
                                     value={myTemplatesSort}
-                                    onChange={(e) => setMyTemplatesSort(e.target.value as any)}
-                                    className="px-3 py-2 rounded-xl border-2 border-black bg-[#FAF6EE] text-xs font-bold shadow-[2px_2px_0px_#000] focus:outline-none"
+                                    onChange={(val) => setMyTemplatesSort(val as any)}
+                                    size="sm"
+                                    triggerClassName="px-3 py-2 rounded-xl text-xs font-bold bg-[#FAF6EE] shadow-[2px_2px_0px_#000]"
                                 >
                                     <option value="updated">Recently Edited</option>
                                     <option value="usage">Most Issued</option>
                                     <option value="name">Alphabetical (A-Z)</option>
-                                </select>
+                                </NeoSelect>
 
                                 {/* Quick Creation Shortcuts */}
                                 <button
@@ -3088,8 +3105,8 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
 
                                         <button
                                             type="button"
-                                            onClick={() => handleArchiveClubTemplate(tmpl.id)}
-                                            className="p-2 rounded-xl border-2 border-black bg-white hover:bg-red-50 text-red-600 shadow-[2px_2px_0px_#000]"
+                                            onClick={() => handleArchiveClubTemplate(tmpl)}
+                                            className="p-2 rounded-xl border-2 border-black bg-white hover:bg-red-50 text-red-600 shadow-[2px_2px_0px_#000] cursor-pointer"
                                             title="Archive template"
                                         >
                                             <Trash2 className="w-3.5 h-3.5" />
@@ -3402,6 +3419,19 @@ export const TemplateSelectionView: React.FC<TemplateSelectionViewProps> = ({
                     </div>
                 </div>
             )}
+
+            {/* Archive Template Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={Boolean(templateToArchive)}
+                onClose={() => setTemplateToArchive(null)}
+                onConfirm={handleConfirmArchive}
+                title="Archive Certificate Template"
+                description={`Are you sure you want to archive "${templateToArchive?.name || "this template"}"? It will no longer appear in your active template library.`}
+                confirmText="Archive Template"
+                confirmLabel="Archive"
+                variant="danger"
+                isLoading={isArchiving}
+            />
         </div>
     );
 };

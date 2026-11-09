@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-
-const PublicProfilePage = lazy(() => import('../../../app/Profile/PublicProfilePage'));
+import PublicProfilePage from '../../../app/Profile/PublicProfilePage';
 
 export interface PlatformItem {
     id: string;
@@ -754,11 +753,11 @@ const Landing = () => {
                 ref={trackRef}
                 className="relative w-full h-[360vh] sm:h-[440vh] mt-4 sm:mt-8 lg:mt-10 font-sans"
             >
-                {/* Sticky Centered Device Container */}
-                <div className="sticky top-[4vh] sm:top-[6vh] lg:top-[7vh] w-[96%] sm:w-[94%] max-w-[1550px] mx-auto z-20">
+                {/* Sticky Centered Device Container: Pinned cleanly below the floating navbar with comfortable breathing room */}
+                <div className="sticky top-[80px] sm:top-[100px] w-[96%] sm:w-[94%] max-w-[1550px] mx-auto z-20">
                     <div className="w-full">
                         <div
-                            className="embedded-showcase-container relative w-full h-[78vh] sm:h-[84vh] lg:h-[89vh] max-h-[1200px] min-h-[360px] sm:min-h-[480px] md:min-h-[580px] lg:min-h-[640px] rounded-[18px] sm:rounded-[24px] lg:rounded-[30px] overflow-hidden border-2 border-black bg-[#FAF6EE] shadow-[8px_8px_0px_#000] flex flex-col font-sans text-base font-normal normal-case tracking-normal text-slate-900 select-auto"
+                            className="embedded-showcase-container relative w-full h-[calc(100vh-96px)] sm:h-[calc(100vh-120px)] [@supports(height:100dvh)]:h-[calc(100dvh-96px)] [@supports(height:100dvh)]:sm:h-[calc(100dvh-120px)] min-h-[360px] rounded-[18px] sm:rounded-[24px] lg:rounded-[30px] overflow-hidden border-2 border-black bg-[#FAF6EE] shadow-[8px_8px_0px_#000] flex flex-col font-sans text-base font-normal normal-case tracking-normal text-slate-900 select-auto"
                         >
                             {/* Browser Mockup Header Bar */}
                             <div className="w-full bg-[#FAF6EE] border-b-2 border-black px-3 sm:px-4 py-2 sm:py-2.5 flex items-center justify-between shrink-0 select-none z-10">
@@ -786,14 +785,7 @@ const Landing = () => {
                                     style={{ y: contentY }}
                                     className="embedded-showcase-container w-full will-change-transform transform-gpu"
                                 >
-                                    <Suspense fallback={
-                                        <div className="w-full min-h-[460px] flex flex-col items-center justify-center gap-3 p-8">
-                                            <div className="w-8 h-8 rounded-full border-2 border-black/20 border-t-black animate-spin" />
-                                            <span className="text-xs font-mono font-bold text-neutral-500">Loading showcase preview...</span>
-                                        </div>
-                                    }>
-                                        <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
-                                    </Suspense>
+                                    <PublicProfilePage overrideUsername="Vineet-Chandel" isEmbedded={true} />
                                 </motion.div>
                             </div>
                         </div>

@@ -92,9 +92,9 @@ export const ProjectDetailModal: React.FC<ProjectDetailModalProps> = ({
 
                 {/* Modal Body - Scrollable */}
                 <div className="p-5 sm:p-7 overflow-y-auto space-y-6">
-                    {/* Cover Hero Banner (if available) */}
+                    {/* Cover Hero Banner (if available) - Full 16:9 Banner Display */}
                     {coverImg && (
-                        <div className="rounded-2xl border-2 border-black overflow-hidden shadow-[4px_4px_0px_#000] bg-neutral-100 aspect-video w-full max-h-72">
+                        <div className="rounded-2xl border-2 border-black overflow-hidden shadow-[4px_4px_0px_#000] bg-[#FAF6EE] aspect-video w-full">
                             <img
                                 src={coverImg}
                                 alt={project.title}

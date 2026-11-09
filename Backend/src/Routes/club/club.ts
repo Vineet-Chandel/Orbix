@@ -5270,7 +5270,7 @@ clubRouter.get("/certificates/eligible-recipients", authenticate, async (req: Re
                 COALESCE(cert_count.total_certs, 0) AS "existingCertsCount"
             FROM users u
             CROSS JOIN club_info ci
-            LEFT JOIN colleges c ON u.college_id = c.id
+            LEFT JOIN institutions c ON u.college_id = c.id
             LEFT JOIN (
                 SELECT user_id, COUNT(*)::int AS attended_count
                 FROM club_event_registrations

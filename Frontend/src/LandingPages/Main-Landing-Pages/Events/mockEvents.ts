@@ -605,7 +605,7 @@ export const fetchLandingEventsApi = async (): Promise<EventItem[] | null> => {
     for (const ep of endpoints) {
         try {
             const res = await fetch(ep, {
-                signal: AbortSignal.timeout(5000),
+                signal: AbortSignal.timeout(800),
                 headers: { Accept: "application/json" },
             });
             if (res.ok) {

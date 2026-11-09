@@ -21,6 +21,7 @@ import {
     revokeCertificate,
     type CertificateHistoryItem,
 } from "../../../api/certificateStudioApi";
+import { NeoSelect } from "../../../components/NeoSelect";
 
 interface IssuanceHistoryViewProps {
     clubId: string;
@@ -130,45 +131,41 @@ export const IssuanceHistoryView: React.FC<IssuanceHistoryViewProps> = ({
 
                     {/* Filter and Sort Controls */}
                     <div className="flex flex-wrap items-center gap-2.5">
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border-2 border-black bg-white text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
-                            <Filter className="w-3.5 h-3.5 text-neutral-500" />
-                            <select
-                                value={filterType}
-                                onChange={(e) => {
-                                    setFilterType(e.target.value);
-                                    setPage(1);
-                                }}
-                                className="bg-transparent font-black text-xs text-black focus:outline-none cursor-pointer"
-                            >
-                                <option value="all">All Sources & Types</option>
-                                <option value="event">Event Turnout Only</option>
-                                <option value="manual">Manual Issuance Only</option>
-                                <option value="team">Team Awards Only</option>
-                                <option value="revoked">Revoked Only</option>
-                                <option value="participation">Participation</option>
-                                <option value="excellence">Excellence</option>
-                                <option value="merit">Merit</option>
-                                <option value="appreciation">Appreciation</option>
-                            </select>
-                        </div>
+                        <NeoSelect
+                            value={filterType}
+                            onChange={(val) => {
+                                setFilterType(val);
+                                setPage(1);
+                            }}
+                            size="sm"
+                            triggerClassName="bg-white text-xs font-black shadow-[1.5px_1.5px_0px_#000]"
+                        >
+                            <option value="all">All Sources & Types</option>
+                            <option value="event">Event Turnout Only</option>
+                            <option value="manual">Manual Issuance Only</option>
+                            <option value="team">Team Awards Only</option>
+                            <option value="revoked">Revoked Only</option>
+                            <option value="participation">Participation</option>
+                            <option value="excellence">Excellence</option>
+                            <option value="merit">Merit</option>
+                            <option value="appreciation">Appreciation</option>
+                        </NeoSelect>
 
-                        <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border-2 border-black bg-white text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
-                            <ArrowUpDown className="w-3.5 h-3.5 text-neutral-500" />
-                            <select
-                                value={sortBy}
-                                onChange={(e) => {
-                                    setSortBy(e.target.value);
-                                    setPage(1);
-                                }}
-                                className="bg-transparent font-black text-xs text-black focus:outline-none cursor-pointer"
-                            >
-                                <option value="newest">Newest First</option>
-                                <option value="oldest">Oldest First</option>
-                                <option value="name_asc">Recipient (A &rarr; Z)</option>
-                                <option value="name_desc">Recipient (Z &rarr; A)</option>
-                                <option value="verifications">Most Verified</option>
-                            </select>
-                        </div>
+                        <NeoSelect
+                            value={sortBy}
+                            onChange={(val) => {
+                                setSortBy(val);
+                                setPage(1);
+                            }}
+                            size="sm"
+                            triggerClassName="bg-white text-xs font-black shadow-[1.5px_1.5px_0px_#000]"
+                        >
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
+                            <option value="name_asc">Recipient (A → Z)</option>
+                            <option value="name_desc">Recipient (Z → A)</option>
+                            <option value="verifications">Most Verified</option>
+                        </NeoSelect>
 
                         <button
                             type="button"
@@ -376,19 +373,20 @@ export const IssuanceHistoryView: React.FC<IssuanceHistoryViewProps> = ({
                 <div className="p-4 bg-[#FAF6EE] border-t-2 border-black flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-black">
                     <div className="flex items-center gap-2">
                         <span>Rows per page:</span>
-                        <select
-                            value={limit}
-                            onChange={(e) => {
-                                setLimit(Number(e.target.value));
+                        <NeoSelect
+                            value={String(limit)}
+                            onChange={(val) => {
+                                setLimit(Number(val));
                                 setPage(1);
                             }}
-                            className="p-1 rounded-lg border-2 border-black bg-white font-black text-xs cursor-pointer"
+                            size="sm"
+                            triggerClassName="bg-white font-black text-xs py-1 px-2"
                         >
-                            <option value={10}>10</option>
-                            <option value={15}>15</option>
-                            <option value={25}>25</option>
-                            <option value={50}>50</option>
-                        </select>
+                            <option value="10">10</option>
+                            <option value="15">15</option>
+                            <option value="25">25</option>
+                            <option value="50">50</option>
+                        </NeoSelect>
                         <span className="text-neutral-500 font-semibold ml-2">
                             Page {page} of {totalPages}
                         </span>

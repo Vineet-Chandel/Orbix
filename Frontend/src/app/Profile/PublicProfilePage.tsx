@@ -554,7 +554,12 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
     });
     const [cardFace, setCardFace] = useState<"front" | "back">("front");
     const [activeField, setActiveField] = useState<"practice" | "development" | "projects">("practice");
-    const [userProjects, setUserProjects] = useState<ProjectItem[]>([]);
+    const [userProjects, setUserProjects] = useState<ProjectItem[]>(() => {
+        if (isDemoProfileUsername(username)) {
+            return demoProjects;
+        }
+        return [];
+    });
     const [viewingProject, setViewingProject] = useState<ProjectItem | null>(null);
 
     // Conditional showcase source of truth: only published & visible projects are eligible
@@ -1864,7 +1869,7 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
 
                         {/* Projects Field: Flagship Architecture Showcase & GitHub Intelligence */}
                         {activeField === "projects" && publishedProjects.length > 0 && (
-                            <div className="w-full animate-fadeIn space-y-6">
+                            <div className="w-full animate-fadeIn space-y-6 mt-4 sm:mt-6">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
                                     {publishedProjects.map((project) => (
                                         <ProjectCard
@@ -1884,7 +1889,10 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                 {/* FLAGSHIP PROJECTS SHOWCASE (AT BOTTOM OF PROFILE FOR PRACTICE & DEV TABS) */}
                 {/* ========================================================================= */}
                 {publishedProjects.length > 0 && activeField !== "projects" && (
-                    <section aria-label="Flagship Projects Showcase" className="w-full max-w-[1600px] mx-auto space-y-6">
+                    <section
+                        aria-label="Flagship Projects Showcase"
+                        className="w-full max-w-[1600px] mx-auto space-y-6 mt-14 sm:mt-20 pt-2"
+                    >
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
                             <div>
                                 <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">

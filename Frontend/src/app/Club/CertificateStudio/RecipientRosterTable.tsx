@@ -15,6 +15,8 @@ import {
     MinusSquare,
     RotateCcw,
 } from "lucide-react";
+import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 
 export interface RosterRecipientItem {
     id: string; // unique key (registrationId, userId, or csv index)
@@ -394,13 +396,15 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
 
                     {/* Team Filter Dropdown */}
                     {uniqueTeams.length > 0 && (
-                        <select
+                        <NeoSelect
                             value={selectedTeamFilter}
-                            onChange={(e) => {
-                                setSelectedTeamFilter(e.target.value);
+                            onChange={(val) => {
+                                setSelectedTeamFilter(val);
                                 setCurrentPage(1);
                             }}
-                            className="p-2 text-xs font-bold border-2 border-black rounded-xl bg-[#FAF6EE] max-w-[200px]"
+                            size="sm"
+                            className="max-w-[200px]"
+                            triggerClassName="bg-[#FAF6EE] text-xs font-bold"
                         >
                             <option value="all">All Teams ({uniqueTeams.length})</option>
                             {uniqueTeams.map((tm) => (
@@ -408,7 +412,7 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                                     {tm.name} ({tm.count})
                                 </option>
                             ))}
-                        </select>
+                        </NeoSelect>
                     )}
                 </div>
 
@@ -515,12 +519,14 @@ export const RecipientRosterTable: React.FC<RecipientRosterTableProps> = ({
                                         >
                                             {/* Checkbox Cell */}
                                             <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={isSelected}
-                                                    onChange={() => onToggleSelect(rec.id)}
-                                                    className="w-4 h-4 rounded border-2 border-black accent-black cursor-pointer"
-                                                />
+                                                <div className="flex items-center justify-center">
+                                                    <NeoCheckbox
+                                                        size="sm"
+                                                        colorScheme="yellow"
+                                                        checked={isSelected}
+                                                        onCheckedChange={() => onToggleSelect(rec.id)}
+                                                    />
+                                                </div>
                                             </td>
 
                                             {/* Recipient Details */}

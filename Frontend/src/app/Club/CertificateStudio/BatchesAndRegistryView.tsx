@@ -27,6 +27,7 @@ import {
     type CertificateBatchRecord,
 } from "../../../api/certificateStudioApi";
 import { CertificateModal } from "../../common/CertificateModal";
+import { ConfirmationModal } from "../../../components/ConfirmationModal";
 
 export const BatchesAndRegistryView: React.FC = () => {
     const toast = useToast();
@@ -92,14 +93,25 @@ export const BatchesAndRegistryView: React.FC = () => {
         }
     };
 
-    const handleCancelBatch = async (batchId: string) => {
-        if (!confirm("Are you sure you want to cancel this batch? Unprocessed items will be aborted.")) return;
+    const [batchToCancel, setBatchToCancel] = useState<string | null>(null);
+    const [isCancellingBatch, setIsCancellingBatch] = useState(false);
+
+    const handleCancelBatch = (batchId: string) => {
+        setBatchToCancel(batchId);
+    };
+
+    const handleConfirmCancelBatch = async () => {
+        if (!batchToCancel) return;
+        setIsCancellingBatch(true);
         try {
-            const res = await cancelBatch(batchId);
+            const res = await cancelBatch(batchToCancel);
             toast.warning(res.message);
             await loadData();
+            setBatchToCancel(null);
         } catch (err: any) {
             toast.error(err.message || "Failed to cancel batch.");
+        } finally {
+            setIsCancellingBatch(false);
         }
     };
 
@@ -542,6 +554,18 @@ export const BatchesAndRegistryView: React.FC = () => {
                     </div>
                 </div>
             )}
+            {/* Cancel Batch Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={Boolean(batchToCancel)}
+                onClose={() => setBatchToCancel(null)}
+                onConfirm={handleConfirmCancelBatch}
+                title="Cancel Generation Batch"
+                description="Are you sure you want to cancel this certificate issuance batch? Any pending or unprocessed certificates in this batch will be aborted."
+                confirmText="Cancel Batch"
+                confirmLabel="Abort Batch"
+                variant="danger"
+                isLoading={isCancellingBatch}
+            />
         </div>
     );
 };

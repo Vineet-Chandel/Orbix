@@ -124,14 +124,14 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
                     )}
                 </div>
 
-                {/* Cover Image Thumbnail (if available) */}
+                {/* Cover Image Thumbnail (if available) - Full 16:9 Banner Display */}
                 {(project.coverImageUrl || project.imageUrl) && (
-                    <div className="mb-3.5 rounded-xl border-2 border-black overflow-hidden shadow-[2px_2px_0px_#000] bg-neutral-100 aspect-video w-full max-h-44">
+                    <div className="mb-4 rounded-xl border-2 border-black overflow-hidden shadow-[2px_2px_0px_#000] bg-[#FAF6EE] aspect-video w-full">
                         <img
                             src={project.coverImageUrl || project.imageUrl}
                             alt={project.title}
                             loading="lazy"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
                         />
                     </div>
                 )}

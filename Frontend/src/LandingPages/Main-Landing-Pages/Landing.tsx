@@ -1,76 +1,34 @@
-import React, { Suspense, lazy, useState, useEffect, useRef } from 'react';
+import React from 'react';
 import NavBar from '../NavBar/Landing';
 import Hero from './Hero/Landing';
-
-// Defer heavy below-the-fold showcases for fast initial page load and silky-smooth scrolling
-const Card = lazy(() => import('./Card').then((m) => ({ default: m.Card })));
-const Platform = lazy(() => import('./Platform').then((m) => ({ default: m.Platform })));
-const Events = lazy(() => import('./Events').then((m) => ({ default: m.Events })));
-const Leaderboard = lazy(() => import('./Leaderboard').then((m) => ({ default: m.LeaderboardShowcase })));
-const Clubs = lazy(() => import('./clubs').then((m) => ({ default: m.ClubsShowcase })));
-const Footer = lazy(() => import('./Footer').then((m) => ({ default: m.Footer })));
+import { Card } from './Card';
+import { Platform } from './Platform';
+import { Events } from './Events';
+import { LeaderboardShowcase as Leaderboard } from './Leaderboard';
+import { ClubsShowcase as Clubs } from './clubs';
+import { Footer } from './Footer';
 
 /**
- * DeferredSection:
- * Conforms to modern-web-guidance defer-rendering-heavy-content.
- * Delays mounting and downloading heavy below-the-fold component chunks
- * until the user scrolls within 600px of them, and leverages
- * CSS content-visibility: auto with contain-intrinsic-size for 60fps scrolling.
+ * Optimized Showcase Section:
+ * Renders immediately with dummy data for instantaneous UX with zero spinner delays.
+ * Uses CSS content-visibility: auto with contain-intrinsic-size for smooth 60fps scrolling.
  */
-function DeferredSection({
+function ShowcaseSection({
   children,
   fallbackHeight = 600,
 }: {
   children: React.ReactNode;
   fallbackHeight?: number;
 }) {
-  const [isVisible, setIsVisible] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (isVisible) return;
-    const el = containerRef.current;
-    if (!el) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '600px 0px' }
-    );
-
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [isVisible]);
-
   return (
     <div
-      ref={containerRef}
       style={{
         contentVisibility: 'auto',
         containIntrinsicSize: `auto none auto ${fallbackHeight}px`,
       }}
       className="w-full"
     >
-      {isVisible ? (
-        <Suspense
-          fallback={
-            <div
-              style={{ minHeight: `${fallbackHeight}px` }}
-              className="flex items-center justify-center py-16"
-            >
-              <div className="w-7 h-7 rounded-full border-2 border-black/20 border-t-black animate-spin" />
-            </div>
-          }
-        >
-          {children}
-        </Suspense>
-      ) : (
-        <div style={{ height: `${fallbackHeight}px` }} className="w-full" />
-      )}
+      {children}
     </div>
   );
 }
@@ -85,43 +43,43 @@ export default function MainLanding() {
 
       <Hero />
 
-      <DeferredSection fallbackHeight={520}>
+      <ShowcaseSection fallbackHeight={520}>
         <section className="w-full">
           <Card />
         </section>
-      </DeferredSection>
+      </ShowcaseSection>
 
-      <DeferredSection fallbackHeight={580}>
+      <ShowcaseSection fallbackHeight={580}>
         <section className="w-full">
           <Platform />
         </section>
-      </DeferredSection>
+      </ShowcaseSection>
 
       {/* Flagship Event Tracker Showcase: Every Contest, One Calendar */}
-      <DeferredSection fallbackHeight={620}>
+      <ShowcaseSection fallbackHeight={620}>
         <section className="w-full">
           <Events />
         </section>
-      </DeferredSection>
+      </ShowcaseSection>
 
       {/* Flagship Leaderboard Showcase: See Where You Really Stand */}
-      <DeferredSection fallbackHeight={640}>
+      <ShowcaseSection fallbackHeight={640}>
         <section className="w-full">
           <Leaderboard />
         </section>
-      </DeferredSection>
+      </ShowcaseSection>
 
       {/* Flagship Campus Clubs & National Events Hub Showcase */}
-      <DeferredSection fallbackHeight={640}>
+      <ShowcaseSection fallbackHeight={640}>
         <section className="w-full">
           <Clubs />
         </section>
-      </DeferredSection>
+      </ShowcaseSection>
 
       {/* Flagship Footer with CTA Banner and Full Width Desk Image */}
-      <DeferredSection fallbackHeight={340}>
+      <ShowcaseSection fallbackHeight={340}>
         <Footer />
-      </DeferredSection>
+      </ShowcaseSection>
     </div>
   );
 }

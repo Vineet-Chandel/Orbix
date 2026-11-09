@@ -5,6 +5,7 @@ import {
     RefreshCw,
     UserCheck,
 } from "lucide-react";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
 import { useToast } from "../../../context/ToastContext";
 import {
     fetchCertificateSettings,
@@ -142,39 +143,35 @@ export const CertificateSettingsView: React.FC<CertificateSettingsViewProps> = (
                 </div>
 
                 <div className="space-y-3">
-                    <label className="flex items-start gap-3 p-3.5 rounded-xl border-2 border-black bg-[#FAF6EE] cursor-pointer">
-                        <input
-                            type="checkbox"
+                    <div className="p-3.5 rounded-xl border-2 border-black bg-[#FAF6EE]">
+                        <NeoCheckbox
                             checked={settings.requireAttendance}
-                            onChange={(e) => setSettings({ ...settings, requireAttendance: e.target.checked })}
-                            className="w-4 h-4 mt-0.5 accent-black rounded border-2 border-black"
+                            onCheckedChange={(checked) => setSettings({ ...settings, requireAttendance: checked })}
+                            colorScheme="green"
+                            size="md"
+                            label={<span className="font-black text-black text-xs">Enforce Strict Attendance Verification</span>}
+                            description={
+                                <span className="text-neutral-600 font-medium leading-relaxed text-xs block mt-0.5">
+                                    Requires confirmed check-in timestamps before event turnout certificates can be generated. Prevents false accreditation for absent registrants.
+                                </span>
+                            }
                         />
-                        <div className="text-xs">
-                            <span className="font-black text-black block">
-                                Enforce Strict Attendance Verification
-                            </span>
-                            <span className="text-neutral-600 font-medium leading-relaxed">
-                                Requires confirmed check-in timestamps before event turnout certificates can be generated. Prevents false accreditation for absent registrants.
-                            </span>
-                        </div>
-                    </label>
+                    </div>
 
-                    <label className="flex items-start gap-3 p-3.5 rounded-xl border-2 border-black bg-[#FAF6EE] cursor-pointer">
-                        <input
-                            type="checkbox"
+                    <div className="p-3.5 rounded-xl border-2 border-black bg-[#FAF6EE]">
+                        <NeoCheckbox
                             checked={settings.verificationPublic}
-                            onChange={(e) => setSettings({ ...settings, verificationPublic: e.target.checked })}
-                            className="w-4 h-4 mt-0.5 accent-black rounded border-2 border-black"
+                            onCheckedChange={(checked) => setSettings({ ...settings, verificationPublic: checked })}
+                            colorScheme="green"
+                            size="md"
+                            label={<span className="font-black text-black text-xs">Enable Public Verification Registry</span>}
+                            description={
+                                <span className="text-neutral-600 font-medium leading-relaxed text-xs block mt-0.5">
+                                    Permits external employers and institutions to verify credentials directly via <code className="font-mono text-[11px] bg-neutral-200 px-1 py-0.5 rounded">/verify/certificate/:code</code>.
+                                </span>
+                            }
                         />
-                        <div className="text-xs">
-                            <span className="font-black text-black block">
-                                Enable Public Verification Registry
-                            </span>
-                            <span className="text-neutral-600 font-medium leading-relaxed">
-                                Permits external employers and institutions to verify credentials directly via <code className="font-mono text-[11px] bg-neutral-200 px-1 py-0.5 rounded">/verify/certificate/:code</code>.
-                            </span>
-                        </div>
-                    </label>
+                    </div>
                 </div>
             </div>
 

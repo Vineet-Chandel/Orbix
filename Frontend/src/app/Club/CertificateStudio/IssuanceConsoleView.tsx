@@ -57,6 +57,10 @@ import {
 import type { CertificateDesign } from "../../../types/certificateStudio";
 import { CertificateThumbnailPreview } from "./TemplateSelectionView";
 import { RecipientRosterTable, type RosterRecipientItem } from "./RecipientRosterTable";
+import { NeoSelect } from "../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../components/NeoCheckbox";
+import { NeoDateTimePicker } from "../../../components/NeoDateTimePicker";
+import { ConfirmationModal } from "../../../components/ConfirmationModal";
 
 // ============================================================================
 // THE 16 STANDARD RECOGNIZED AWARD CATEGORIES (PHASE 10)
@@ -718,14 +722,21 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
 
     // Phase 14: Cancel in-progress or queued batch
     const [isCancellingBatch, setIsCancellingBatch] = useState(false);
-    const handleCancelBatch = async () => {
+    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+
+    const handleCancelBatch = () => {
         if (!activeBatchProgressId) return;
-        if (!confirm("Are you sure you want to cancel this batch? Unprocessed recipients will be aborted.")) return;
+        setIsCancelModalOpen(true);
+    };
+
+    const handleConfirmCancelBatch = async () => {
+        if (!activeBatchProgressId) return;
         setIsCancellingBatch(true);
         try {
             const res = await cancelBatch(activeBatchProgressId);
             toast.warning(res.message);
             setBatchProgress((prev) => (prev ? { ...prev, status: "cancelled" } : null));
+            setIsCancelModalOpen(false);
         } catch (err: any) {
             toast.error(err.message || "Failed to cancel batch.");
         } finally {
@@ -1058,6 +1069,17 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
     const activeEventObj = useMemo(() => {
         return events.find((e) => e.id === selectedEventId);
     }, [events, selectedEventId]);
+
+    // Step 4 Template Priority Sorting: Always place the currently selected template first (index 0)
+    const sortedTemplatesForStep4 = useMemo(() => {
+        return [...availableTemplates].sort((a, b) => {
+            const aSelected = a.id === activeTemplateId || a.name === activeTemplateName;
+            const bSelected = b.id === activeTemplateId || b.name === activeTemplateName;
+            if (aSelected && !bSelected) return -1;
+            if (!aSelected && bSelected) return 1;
+            return 0;
+        });
+    }, [availableTemplates, activeTemplateId, activeTemplateName]);
 
     const activeEventTitle = preselectedEventTitle || activeEventObj?.title || eligibilityReport?.eventTitle || "Selected Event";
 
@@ -1658,10 +1680,10 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                 </span>
                             </div>
 
-                            {/* Template Grid */}
+                            {/* Template Grid (Selected template prioritized at first position) */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {availableTemplates.map((tmpl) => {
-                                    const isSelected = activeTemplateId === tmpl.id;
+                                {sortedTemplatesForStep4.map((tmpl, idx) => {
+                                    const isSelected = activeTemplateId === tmpl.id || activeTemplateName === tmpl.name;
                                     return (
                                         <div
                                             key={tmpl.id}
@@ -1671,12 +1693,20 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                 setActiveTemplateName(tmpl.name);
                                                 toast.success(`Selected template: "${tmpl.name}".`);
                                             }}
-                                            className={`p-3.5 rounded-2xl border-3 transition-all cursor-pointer flex flex-col justify-between space-y-3 ${
+                                            className={`p-3.5 rounded-2xl border-3 transition-all cursor-pointer flex flex-col justify-between space-y-3 relative ${
                                                 isSelected
                                                     ? "border-black bg-[#FFE566]/20 shadow-[4px_4px_0px_#000]"
                                                     : "border-black/20 hover:border-black bg-white hover:shadow-[3px_3px_0px_#000]"
                                             }`}
                                         >
+                                            {/* Priority Badge for Currently Selected Template */}
+                                            {isSelected && idx === 0 && (
+                                                <div className="absolute -top-3 left-4 z-10 px-2.5 py-0.5 rounded-full bg-black text-[#FFE566] text-[10px] font-black uppercase tracking-wider border border-black shadow-[1px_1px_0px_#000] flex items-center gap-1">
+                                                    <Check className="w-3 h-3 stroke-[3]" />
+                                                    <span>Currently Selected</span>
+                                                </div>
+                                            )}
+
                                             <div className="w-full rounded-xl overflow-hidden border-2 border-black/20 bg-white">
                                                 <CertificateThumbnailPreview
                                                     design={tmpl.design}
@@ -2152,17 +2182,18 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             <label className="text-xs font-black text-black block mb-1">
                                 Award Category <span className="text-red-500">*</span>
                             </label>
-                            <select
+                            <NeoSelect
                                 value={certType}
-                                onChange={(e) => setCertType(e.target.value)}
-                                className="w-full p-2.5 text-xs font-bold border-2 border-black rounded-xl bg-[#FAF6EE] focus:outline-none"
+                                onChange={(val) => setCertType(val)}
+                                className="w-full"
+                                triggerClassName="bg-[#FAF6EE] text-xs font-bold"
                             >
                                 {CERTIFICATE_CATEGORIES.map((cat) => (
                                     <option key={cat.value} value={cat.value}>
                                         {cat.label}
                                     </option>
                                 ))}
-                            </select>
+                            </NeoSelect>
                             <p className="text-[11px] text-neutral-500 mt-1 leading-snug">
                                 {CERTIFICATE_CATEGORIES.find((c) => c.value === certType)?.description}
                             </p>
@@ -2211,11 +2242,11 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             <label className="text-xs font-black text-black block mb-1">
                                 Issue Date
                             </label>
-                            <input
-                                type="date"
+                            <NeoDateTimePicker
+                                mode="date"
                                 value={issueDateOverride}
-                                onChange={(e) => setIssueDateOverride(e.target.value)}
-                                className="w-full p-2.5 text-xs font-bold border-2 border-black rounded-xl bg-[#FAF6EE] focus:outline-none font-mono"
+                                onChange={(val) => setIssueDateOverride(val)}
+                                placeholder="Select issue date"
                             />
                         </div>
 
@@ -2307,17 +2338,18 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                 <span>Loading events...</span>
                                             </div>
                                         ) : (
-                                            <select
+                                            <NeoSelect
                                                 value={selectedEventId}
-                                                onChange={(e) => setSelectedEventId(e.target.value)}
-                                                className="w-full p-2.5 text-xs font-bold border-2 border-black rounded-xl bg-[#FAF6EE]"
+                                                onChange={(val) => setSelectedEventId(val)}
+                                                className="w-full"
+                                                triggerClassName="bg-[#FAF6EE] text-xs font-bold"
                                             >
                                                 {events.map((ev) => (
                                                     <option key={ev.id} value={ev.id}>
                                                         {ev.title} ({ev.attendeesCount} Attended)
                                                     </option>
                                                 ))}
-                                            </select>
+                                            </NeoSelect>
                                         )}
                                     </div>
                                 </div>
@@ -2565,20 +2597,22 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                     <thead className="sticky top-0 bg-[#FAF6EE] border-b-2 border-black z-10">
                                                         <tr className="font-black text-[11px] text-neutral-700">
                                                             <th className="p-2.5 w-10 text-center">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={
-                                                                        filteredCsvRows.length > 0 &&
-                                                                        filteredCsvRows
-                                                                            .filter((r) => r.status !== "invalid")
-                                                                            .every((r) => selectedCsvIndices.has(r.index))
-                                                                    }
-                                                                    onChange={(e) => {
-                                                                        if (e.target.checked) selectAllValidCsv();
-                                                                        else deselectAllCsv();
-                                                                    }}
-                                                                    className="w-3.5 h-3.5 accent-black rounded cursor-pointer"
-                                                                />
+                                                                <div className="flex items-center justify-center">
+                                                                    <NeoCheckbox
+                                                                        size="sm"
+                                                                        colorScheme="yellow"
+                                                                        checked={
+                                                                            filteredCsvRows.length > 0 &&
+                                                                            filteredCsvRows
+                                                                                .filter((r) => r.status !== "invalid")
+                                                                                .every((r) => selectedCsvIndices.has(r.index))
+                                                                        }
+                                                                        onCheckedChange={(checked) => {
+                                                                            if (checked) selectAllValidCsv();
+                                                                            else deselectAllCsv();
+                                                                        }}
+                                                                    />
+                                                                </div>
                                                             </th>
                                                             <th className="p-2.5 w-12 text-center">#</th>
                                                             <th className="p-2.5">Recipient Name</th>
@@ -2603,13 +2637,15 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                                     }`}
                                                                 >
                                                                     <td className="p-2.5 text-center" onClick={(e) => e.stopPropagation()}>
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            disabled={isInvalid}
-                                                                            checked={isSelected}
-                                                                            onChange={() => toggleCsvIndex(row.index)}
-                                                                            className="w-3.5 h-3.5 accent-black rounded cursor-pointer disabled:opacity-30"
-                                                                        />
+                                                                        <div className="flex items-center justify-center">
+                                                                            <NeoCheckbox
+                                                                                size="sm"
+                                                                                colorScheme="yellow"
+                                                                                disabled={isInvalid}
+                                                                                checked={isSelected}
+                                                                                onCheckedChange={() => toggleCsvIndex(row.index)}
+                                                                            />
+                                                                        </div>
                                                                     </td>
                                                                     <td className="p-2.5 text-center font-mono text-[10px] text-neutral-500">
                                                                         {row.index}
@@ -3965,6 +4001,18 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                     </div>
                 </div>
             )}
+            {/* Cancel Batch Confirmation Modal */}
+            <ConfirmationModal
+                isOpen={isCancelModalOpen}
+                onClose={() => setIsCancelModalOpen(false)}
+                onConfirm={handleConfirmCancelBatch}
+                title="Cancel Issuance Batch"
+                description="Are you sure you want to cancel this certificate issuance batch? Any pending or unprocessed recipients will be immediately aborted."
+                confirmText="Cancel Batch"
+                confirmLabel="Abort Batch"
+                variant="danger"
+                isLoading={isCancellingBatch}
+            />
         </div>
     );
 };
