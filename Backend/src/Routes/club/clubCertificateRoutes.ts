@@ -8,6 +8,8 @@ import { CertificateIssuanceService } from "../../services/club/certificateIssua
 import { CertificatePdfService } from "../../services/club/certificatePdfService.js";
 import { CertificateQueueService } from "../../services/club/certificateQueueService.js";
 import { CertificateCsvService } from "../../services/club/certificateCsvService.js";
+import { CertificatePreviewService } from "../../services/club/certificatePreviewService.js";
+import { CertificateVerificationService } from "../../services/club/certificateVerificationService.js";
 import type { DynamicDataSnapshot } from "../../types/certificateStudio.js";
 
 const certificateRouter = Router();
@@ -19,17 +21,20 @@ const upload = multer({
 
 /**
  * Helper to fetch club where user is owner or authorized staff
+ * Optionally enforces specific targetClubId to prevent IDOR
  */
-async function getStaffClub(userId: string) {
-    const res = await query(
-        `SELECT vc.id, vc.name, vc.slug, vc.college_name, vc.college_id, vc.logo_url
+async function getStaffClub(userId: string, targetClubId?: string) {
+    let sql = `SELECT vc.id, vc.name, vc.slug, vc.college_name, vc.college_id, vc.logo_url
          FROM verified_clubs vc
          LEFT JOIN club_memberships cm ON cm.club_id = vc.id AND cm.user_id = $1 AND cm.status = 'active'
-         WHERE vc.auth_user_id = $1
-            OR cm.access_role IN ('owner', 'admin', 'team_lead', 'advisor')
-         LIMIT 1;`,
-        [userId]
-    );
+         WHERE (vc.auth_user_id = $1 OR cm.access_role IN ('owner', 'admin', 'team_lead', 'advisor'))`;
+    const params: any[] = [userId];
+    if (targetClubId) {
+        sql += ` AND vc.id = $2`;
+        params.push(targetClubId);
+    }
+    sql += ` LIMIT 1;`;
+    const res = await query(sql, params);
     return res.rows[0] || null;
 }
 
@@ -315,7 +320,7 @@ certificateRouter.get("/recipient-directory", authenticate, async (req: Request,
  */
 certificateRouter.post("/issue-batch", authenticate, async (req: Request, res: Response) => {
     try {
-        const club = await getStaffClub(req.user!.id);
+        const club = await getStaffClub(req.user!.id, req.body.clubId);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
         const {
@@ -402,6 +407,15 @@ certificateRouter.get("/batches", authenticate, async (req: Request, res: Respon
         const club = await getStaffClub(req.user!.id);
         if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit as string, 10) || 50));
+        const offset = Math.max(0, parseInt(req.query.offset as string, 10) || 0);
+
+        const countRes = await query(
+            `SELECT COUNT(*)::int AS total FROM certificate_batches WHERE club_id = $1;`,
+            [club.id]
+        );
+        const total = countRes.rows[0]?.total || 0;
+
         const batchesRes = await query(
             `SELECT
                 b.id,
@@ -424,14 +438,40 @@ certificateRouter.get("/batches", authenticate, async (req: Request, res: Respon
              LEFT JOIN certificate_templates t ON t.id = b.template_id
              WHERE b.club_id = $1
              ORDER BY b.created_at DESC
-             LIMIT 50;`,
-            [club.id]
+             LIMIT $2 OFFSET $3;`,
+            [club.id, limit, offset]
         );
 
-        return res.json({ success: true, batches: batchesRes.rows });
+        return res.json({
+            success: true,
+            batches: batchesRes.rows,
+            pagination: {
+                total,
+                limit,
+                offset,
+                hasMore: (offset + batchesRes.rows.length) < total,
+            },
+        });
     } catch (err: any) {
         console.error("Fetch certificate batches error:", err);
         return res.status(500).json({ success: false, message: "Failed to load batches." });
+    }
+});
+
+/**
+ * GET /api/club/certificates/queue/metrics
+ * Returns real-time telemetry metrics for asynchronous certificate generation (Phase 19)
+ */
+certificateRouter.get("/queue/metrics", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const metrics = CertificateQueueService.getQueueMetrics(club.id);
+        return res.json({ success: true, metrics });
+    } catch (err: any) {
+        console.error("Fetch queue metrics error:", err);
+        return res.status(500).json({ success: false, message: "Failed to retrieve queue metrics." });
     }
 });
 
@@ -482,6 +522,122 @@ certificateRouter.post("/batches/:batchId/retry-failed", authenticate, async (re
 });
 
 /**
+ * POST /api/club/certificates/batches/:batchId/cancel
+ * Aborts an active or queued batch, preventing unprocessed recipients from issuing (Phase 14)
+ */
+certificateRouter.post("/batches/:batchId/cancel", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const batchId = String(req.params.batchId);
+        const result = await CertificateQueueService.cancelBatch(batchId, club.id, req.user!.id);
+
+        return res.json({
+            success: result.success,
+            message: result.message,
+            cancelledUnprocessedCount: result.cancelledUnprocessedCount,
+        });
+    } catch (err: any) {
+        console.error("Cancel batch error:", err);
+        return res.status(400).json({ success: false, message: err.message || "Failed to cancel batch." });
+    }
+});
+
+/**
+ * GET /api/club/certificates/batches/:batchId/errors
+ * Returns detailed item-level error logs for a failed or partially completed batch (Phase 14)
+ */
+certificateRouter.get("/batches/:batchId/errors", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const batchId = String(req.params.batchId);
+        const errorDetails = await CertificateQueueService.getBatchErrors(batchId, club.id);
+
+        return res.json({ success: true, ...errorDetails });
+    } catch (err: any) {
+        console.error("Fetch batch errors error:", err);
+        return res.status(400).json({ success: false, message: err.message || "Failed to load error details." });
+    }
+});
+
+/**
+ * GET /api/club/certificates/batches/:batchId/report
+ * Exports comprehensive generation audit report (JSON or CSV download) (Phase 14)
+ */
+certificateRouter.get("/batches/:batchId/report", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const batchId = String(req.params.batchId);
+        const report = await CertificateQueueService.generateBatchReport(batchId, club.id);
+
+        if (req.query.format === "csv") {
+            res.setHeader("Content-Type", "text/csv; charset=utf-8");
+            res.setHeader("Content-Disposition", `attachment; filename="batch-${batchId}-audit-report.csv"`);
+            return res.send(report.csvString);
+        }
+
+        return res.json({
+            success: true,
+            summary: report.summary,
+            records: report.records,
+        });
+    } catch (err: any) {
+        console.error("Generate batch report error:", err);
+        return res.status(400).json({ success: false, message: err.message || "Failed to generate report." });
+    }
+});
+
+/**
+ * POST /api/club/certificates/batches/:batchId/resume
+ * Resumes an interrupted batch after worker or server interruption (Phase 14)
+ */
+certificateRouter.post("/batches/:batchId/resume", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const batchId = String(req.params.batchId);
+        const result = await CertificateQueueService.retryFailedBatch(batchId, club.id, req.user!.id);
+
+        return res.json({
+            success: true,
+            message: `Batch resumed. ${result.retriedCount} remaining recipients enqueued for processing.`,
+            retriedCount: result.retriedCount,
+        });
+    } catch (err: any) {
+        console.error("Resume batch error:", err);
+        return res.status(400).json({ success: false, message: err.message || "Failed to resume batch." });
+    }
+});
+
+/**
+ * POST /api/club/certificates/batches/resume-stalled
+ * System audit: Scans and resumes any stalled batches for the club (Phase 14)
+ */
+certificateRouter.post("/batches/resume-stalled", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const result = await CertificateQueueService.resumeWorkerProcessing(club.id);
+
+        return res.json({
+            success: true,
+            message: `Scanned active batches. Resumed ${result.resumedCount} stalled jobs.`,
+            resumedBatchIds: result.batchIds,
+        });
+    } catch (err: any) {
+        console.error("Resume stalled batches error:", err);
+        return res.status(500).json({ success: false, message: "Failed to resume stalled batches." });
+    }
+});
+
+/**
  * POST /api/club/certificates/csv/reconcile
  * Parses, sanitizes against formula injection, and reconciles CSV recipients with campus directory (Phase 14)
  */
@@ -494,15 +650,11 @@ certificateRouter.post(
             const club = await getStaffClub(req.user!.id);
             if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
 
-            let csvContent = "";
+            let csvContent: string | undefined = req.body?.csvText ? String(req.body.csvText) : undefined;
+            let fileBuffer: Buffer | undefined = req.file?.buffer;
+            let filename: string | undefined = req.file?.originalname;
             let eventId: string | undefined = req.body?.eventId;
             let customColumnMapping: Record<string, string> | undefined;
-
-            if (req.file) {
-                csvContent = req.file.buffer.toString("utf-8");
-            } else if (req.body?.csvText) {
-                csvContent = String(req.body.csvText);
-            }
 
             if (req.body?.customColumnMapping) {
                 try {
@@ -514,38 +666,48 @@ certificateRouter.post(
                 }
             }
 
-            if (!csvContent || csvContent.trim().length === 0) {
-                return res.status(400).json({ success: false, message: "No CSV content or file provided." });
+            if (!fileBuffer && (!csvContent || csvContent.trim().length === 0)) {
+                return res.status(400).json({ success: false, message: "No CSV/XLSX content or file provided." });
             }
 
             const result = await CertificateCsvService.reconcileCsv({
                 clubId: club.id,
                 csvContent,
+                fileBuffer,
+                filename,
                 eventId,
                 customColumnMapping,
             });
 
             return res.json({ success: true, reconciliation: result });
         } catch (err: any) {
-            console.error("CSV reconcile error:", err);
-            return res.status(400).json({ success: false, message: err.message || "Failed to reconcile CSV." });
+            console.error("CSV/XLSX reconcile error:", err);
+            return res.status(400).json({ success: false, message: err.message || "Failed to reconcile spreadsheet." });
         }
     }
 );
 
 /**
  * GET /api/club/certificates/csv/sample-template
- * Downloads an official sanitized CSV recipient template (Phase 14)
+ * Downloads an official sanitized CSV or XLSX recipient template (Phase 13 & 14)
  */
-certificateRouter.get("/csv/sample-template", authenticate, async (_req: Request, res: Response) => {
+certificateRouter.get("/csv/sample-template", authenticate, async (req: Request, res: Response) => {
     try {
+        const format = String(req.query.format || "csv").toLowerCase();
+        if (format === "xlsx" || format === "excel") {
+            const xlsxBuffer = CertificateCsvService.generateSampleXlsx();
+            res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            res.setHeader("Content-Disposition", 'attachment; filename="orbix_recipient_template.xlsx"');
+            return res.send(xlsxBuffer);
+        }
+
         const sampleCsv = CertificateCsvService.generateSampleCsv();
         res.setHeader("Content-Type", "text/csv; charset=utf-8");
         res.setHeader("Content-Disposition", 'attachment; filename="orbix_recipient_template.csv"');
         return res.send(sampleCsv);
     } catch (err: any) {
-        console.error("Sample CSV download error:", err);
-        return res.status(500).json({ success: false, message: "Failed to generate CSV template." });
+        console.error("Sample template download error:", err);
+        return res.status(500).json({ success: false, message: "Failed to generate recipient template." });
     }
 });
 
@@ -884,6 +1046,81 @@ certificateRouter.post("/preview-sample", authenticate, async (req: Request, res
 });
 
 /**
+ * GET /api/club/certificates/:certificateId/preview
+ * Returns authorized low-resolution vector SVG preview (Phase 15)
+ * Supports ?blurred=true for spoiler preview without full PDF download.
+ * Eliminates full PDF download overhead and sandbox memory strain.
+ */
+certificateRouter.get("/:certificateId/preview", optionalAuthenticate, async (req: Request, res: Response) => {
+    try {
+        const certificateId = String(req.params.certificateId || "");
+        const blurred = req.query.blurred === "true" || req.query.blurred === "1";
+
+        const previewData = await CertificatePreviewService.getCertificatePreview(certificateId, blurred);
+        if (!previewData) {
+            return res.status(404).json({ success: false, message: "Certificate not found." });
+        }
+
+        // Strict CSP header for SVG to prevent SVG script execution (CWE-79)
+        res.setHeader("Content-Type", "image/svg+xml; charset=utf-8");
+        res.setHeader("Cache-Control", "private, max-age=1800");
+        res.setHeader(
+            "Content-Security-Policy",
+            "default-src 'none'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com"
+        );
+        res.setHeader("X-Content-Type-Options", "nosniff");
+
+        return res.send(previewData.svg);
+    } catch (err: any) {
+        console.error("Certificate SVG preview error:", err);
+        return res.status(500).json({ success: false, message: "Failed to render certificate preview." });
+    }
+});
+
+/**
+ * GET /api/club/certificates/:certificateId/preview-data
+ * Returns structured metadata and vector preview SVG string for interactive reveal card (Phase 15)
+ */
+certificateRouter.get("/:certificateId/preview-data", optionalAuthenticate, async (req: Request, res: Response) => {
+    try {
+        const certificateId = String(req.params.certificateId || "");
+        const blurred = req.query.blurred === "true" || req.query.blurred === "1";
+
+        const previewData = await CertificatePreviewService.getCertificatePreview(certificateId, blurred);
+        if (!previewData) {
+            return res.status(404).json({ success: false, message: "Certificate not found." });
+        }
+
+        const cert = previewData.cert;
+        return res.json({
+            success: true,
+            certificate: {
+                id: cert.id,
+                credentialCode: cert.credential_code,
+                title: cert.title,
+                certificateType: cert.certificate_type,
+                recipientName: cert.recipient_name,
+                issueDate: cert.issue_date,
+                clubName: cert.clubName,
+                clubSlug: cert.clubSlug,
+                clubLogoUrl: cert.clubLogoUrl,
+                eventTitle: cert.eventTitle,
+                sha256Hash: cert.sha256_hash,
+                isRevoked: Boolean(cert.is_revoked),
+                verificationUrl: `https://orbix.dev/verify/certificate/${cert.credential_code}`,
+                downloadUrl: `/api/club/certificates/${cert.credential_code}/download`,
+                previewUrl: `/api/club/certificates/${cert.credential_code}/preview`,
+                previewBlurredUrl: `/api/club/certificates/${cert.credential_code}/preview?blurred=true`,
+            },
+            previewSvg: previewData.svg,
+        });
+    } catch (err: any) {
+        console.error("Certificate preview-data error:", err);
+        return res.status(500).json({ success: false, message: "Failed to load certificate preview data." });
+    }
+});
+
+/**
  * GET /api/club/certificates/:certificateId/download
  * Renders or streams the authoritative high-resolution PDF for any issued certificate
  */
@@ -984,95 +1221,62 @@ certificateRouter.get("/:certificateId/download", optionalAuthenticate, async (r
  * GET /api/club/certificates/verify/:credentialCode
  * Enhanced public verification endpoint with audit count & SHA-256 digest
  */
+/**
+ * GET /api/club/certificates/verify/:credentialCode
+ * Public verification endpoint with validity status (valid, revoked, superseded),
+ * SHA-256 digest fingerprint, zero PII exposure, and version traceability.
+ */
 certificateRouter.get("/verify/:credentialCode", optionalAuthenticate, async (req: Request, res: Response) => {
     try {
         const { credentialCode } = req.params;
+        const result = await CertificateVerificationService.verifyPublic(String(credentialCode));
 
-        const certRes = await query(
-            `UPDATE club_certificates
-             SET verification_count = verification_count + 1, last_verified_at = NOW()
-             WHERE LOWER(credential_code) = LOWER($1)
-             RETURNING
-                id, title, certificate_type AS "certificateType",
-                recipient_name AS "recipientName", credential_code AS "credentialCode",
-                issue_date AS "issueDate", signer_name AS "signerName",
-                signer_role AS "signerRole", description, sha256_hash AS "sha256Hash",
-                is_revoked AS "isRevoked", revoked_at AS "revokedAt",
-                revocation_reason AS "revocationReason",
-                verification_count AS "verificationCount",
-                club_id AS "clubId", event_id AS "eventId", team_id AS "teamId",
-                user_id AS "userId", recipient_snapshot AS "recipientSnapshot";`,
-            [credentialCode]
-        );
-
-        if (!certRes.rows[0]) {
+        if (!result.verified || !result.certificate) {
             return res.status(404).json({
                 success: false,
                 verified: false,
-                message: "Certificate not found. The credential code may be invalid or does not exist.",
+                status: result.status,
+                message: result.message,
             });
         }
 
-        const cert = certRes.rows[0];
-
-        // Fetch club and event metadata
-        const clubRes = await query(
-            `SELECT name, slug, college_name, logo_url FROM verified_clubs WHERE id = $1 LIMIT 1;`,
-            [cert.clubId]
-        );
-        const club = clubRes.rows[0];
-
-        let eventTitle = null;
-        if (cert.eventId) {
-            const ev = await query(`SELECT title FROM club_events WHERE id = $1 LIMIT 1;`, [cert.eventId]);
-            eventTitle = ev.rows[0]?.title || null;
-        }
-
-        let teamName = null;
-        if (cert.teamId) {
-            const tm = await query(`SELECT name FROM club_teams WHERE id = $1 LIMIT 1;`, [cert.teamId]);
-            teamName = tm.rows[0]?.name || null;
-        }
-
-        // Phase 12: Expose team members snapshot safely without PII (no emails/user IDs)
-        let teamMembers: Array<{ name: string; role?: string; customPosition?: string }> | undefined = undefined;
-        let memberCount: number | undefined = undefined;
-        if (cert.recipientSnapshot?.team?.memberSnapshot && Array.isArray(cert.recipientSnapshot.team.memberSnapshot)) {
-            teamMembers = cert.recipientSnapshot.team.memberSnapshot.map((m: any) => ({
-                name: m.name,
-                role: m.role || "Member",
-                customPosition: m.customPosition || undefined,
-            }));
-            memberCount = cert.recipientSnapshot.team.memberCount || teamMembers.length;
-        }
+        const cert = result.certificate;
 
         return res.json({
             success: true,
-            verified: !cert.isRevoked,
+            verified: cert.status === "valid",
+            status: cert.status,
+            message: result.message,
             certificate: {
-                id: cert.id,
                 credentialCode: cert.credentialCode,
                 title: cert.title,
                 certificateType: cert.certificateType,
                 recipientName: cert.recipientName,
-                issueDate: cert.issueDate,
-                signerName: cert.signerName,
-                signerRole: cert.signerRole,
+                achievement: cert.achievement,
                 description: cert.description,
+                issueDate: cert.issueDate,
+                status: cert.status,
+                version: cert.version,
                 sha256Hash: cert.sha256Hash,
-                isRevoked: cert.isRevoked,
+                isRevoked: cert.status === "revoked",
                 revokedAt: cert.revokedAt,
                 revocationReason: cert.revocationReason,
+                supersededBy: cert.supersededBy,
+                reissuedFrom: cert.reissuedFrom,
+                signerName: cert.signerName,
+                signerRole: cert.signerRole,
                 verificationCount: cert.verificationCount,
-                clubName: club?.name,
-                clubSlug: club?.slug,
-                collegeName: club?.college_name,
-                clubLogoUrl: club?.logo_url,
-                eventTitle,
-                teamName,
-                isTeam: !cert.userId && Boolean(cert.teamId),
-                teamMembers,
-                memberCount,
+                lastVerifiedAt: cert.lastVerifiedAt,
+                signingMetadata: cert.signingMetadata,
+                clubName: cert.issuingClub.name,
+                clubSlug: cert.issuingClub.slug,
+                collegeName: cert.issuingClub.collegeName,
+                clubLogoUrl: cert.issuingClub.logoUrl,
+                eventTitle: cert.event?.title || null,
+                isTeam: cert.isTeam,
+                teamName: cert.teamSnapshot?.teamName || null,
+                teamMembers: cert.teamSnapshot?.members,
+                memberCount: cert.teamSnapshot?.memberCount,
             },
         });
     } catch (err: any) {
@@ -1082,8 +1286,28 @@ certificateRouter.get("/verify/:credentialCode", optionalAuthenticate, async (re
 });
 
 /**
+ * GET /api/club/certificates/public/verify/:identifier
+ * Canonical Phase 16 public verification route (supports opaque-id or credential-code)
+ */
+certificateRouter.get("/public/verify/:identifier", optionalAuthenticate, async (req: Request, res: Response) => {
+    try {
+        const { identifier } = req.params;
+        const result = await CertificateVerificationService.verifyPublic(String(identifier));
+
+        if (!result.verified) {
+            return res.status(404).json(result);
+        }
+
+        return res.json({ success: true, ...result });
+    } catch (err: any) {
+        console.error("Public verification error:", err);
+        return res.status(500).json({ success: false, message: "Verification failed." });
+    }
+});
+
+/**
  * POST /api/club/certificates/:certificateId/revoke
- * Revokes a certificate with reason
+ * Officially revokes an issued certificate with mandatory reason and immutable audit log (Phase 16)
  */
 certificateRouter.post("/:certificateId/revoke", authenticate, async (req: Request, res: Response) => {
     try {
@@ -1093,38 +1317,104 @@ certificateRouter.post("/:certificateId/revoke", authenticate, async (req: Reque
         const { certificateId } = req.params;
         const { reason } = req.body;
 
-        const updateRes = await query(
-            `UPDATE club_certificates
-             SET is_revoked = true, revoked_at = NOW(), revocation_reason = $1, revoked_by_user_id = $2
-             WHERE id = $3 AND club_id = $4
-             RETURNING id, credential_code;`,
-            [reason?.trim() || "Administrative revocation", req.user!.id, certificateId, club.id]
-        );
+        const result = await CertificateVerificationService.revokeCertificate({
+            certificateId: String(certificateId),
+            clubId: club.id,
+            staffUserId: req.user!.id,
+            reason: reason || "Administrative revocation",
+        });
 
-        if (!updateRes.rows[0]) {
-            return res.status(404).json({ success: false, message: "Certificate not found." });
-        }
-
-        // Phase 17 & 18: Record audit log for revocation
-        await query(
-            `INSERT INTO certificate_audit_logs (
-                club_id, actor_user_id, action, entity_type, entity_id, metadata
-            ) VALUES ($1, $2, 'certificate_revoked', 'club_certificate', $3, $4::jsonb);`,
-            [
-                club.id,
-                req.user!.id,
-                certificateId,
-                JSON.stringify({
-                    reason: reason?.trim() || "Administrative revocation",
-                    credentialCode: updateRes.rows[0].credential_code,
-                }),
-            ]
-        );
-
-        return res.json({ success: true, message: "Certificate revoked successfully." });
+        return res.json({
+            message: "Certificate successfully revoked and recorded in audit ledger.",
+            ...result,
+        });
     } catch (err: any) {
         console.error("Revocation error:", err);
-        return res.status(500).json({ success: false, message: "Failed to revoke certificate." });
+        return res.status(400).json({ success: false, message: err.message || "Failed to revoke certificate." });
+    }
+});
+
+/**
+ * POST /api/club/certificates/:certificateId/reissue
+ * Reissues a certificate: creates version N+1 and supersedes old record (Phase 16)
+ */
+certificateRouter.post("/:certificateId/reissue", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { certificateId } = req.params;
+        const { recipientName, awardPosition, description, signerName, signerRole, reissueReason } = req.body;
+
+        const result = await CertificateVerificationService.reissueCertificate({
+            certificateId: String(certificateId),
+            clubId: club.id,
+            staffUserId: req.user!.id,
+            updates: {
+                recipientName,
+                awardPosition,
+                description,
+                signerName,
+                signerRole,
+                reissueReason,
+            },
+        });
+
+        return res.json({
+            message: `Certificate successfully reissued to version ${result.newVersion}.`,
+            ...result,
+        });
+    } catch (err: any) {
+        console.error("Reissue error:", err);
+        return res.status(400).json({ success: false, message: err.message || "Failed to reissue certificate." });
+    }
+});
+
+/**
+ * GET /api/club/certificates/:certificateId/audit-history
+ * Retrieves immutable audit history for an individual certificate
+ */
+certificateRouter.get("/:certificateId/audit-history", authenticate, async (req: Request, res: Response) => {
+    try {
+        const club = await getStaffClub(req.user!.id);
+        if (!club) return res.status(403).json({ success: false, message: "Access forbidden." });
+
+        const { certificateId } = req.params;
+        const history = await CertificateVerificationService.getAuditHistory(String(certificateId), club.id);
+
+        return res.json({ success: true, auditHistory: history });
+    } catch (err: any) {
+        console.error("Fetch certificate audit history error:", err);
+        return res.status(500).json({ success: false, message: "Failed to retrieve audit history." });
+    }
+});
+
+/**
+ * GET /api/club/user/wallet
+ * Returns student's Certificate Wallet collection (individual + authorized team credentials)
+ */
+certificateRouter.get("/user/wallet", authenticate, async (req: Request, res: Response) => {
+    try {
+        const userId = req.user!.id;
+        const { clubId, eventId, status, category, query: searchQuery, isTeam, limit, offset } = req.query;
+
+        const filterOpts: any = {};
+        if (typeof clubId === "string") filterOpts.clubId = clubId;
+        if (typeof eventId === "string") filterOpts.eventId = eventId;
+        if (typeof status === "string") filterOpts.status = status;
+        if (typeof category === "string") filterOpts.category = category;
+        if (typeof searchQuery === "string") filterOpts.query = searchQuery;
+        if (isTeam === "true") filterOpts.isTeam = true;
+        if (isTeam === "false") filterOpts.isTeam = false;
+        if (limit) filterOpts.limit = parseInt(limit as string, 10);
+        if (offset) filterOpts.offset = parseInt(offset as string, 10);
+
+        const walletData = await CertificateVerificationService.getUserWallet(userId, filterOpts);
+
+        return res.json({ success: true, ...walletData });
+    } catch (err: any) {
+        console.error("Fetch student wallet error:", err);
+        return res.status(500).json({ success: false, message: "Failed to load certificate wallet." });
     }
 });
 
@@ -1160,21 +1450,120 @@ certificateRouter.get("/audit-logs", authenticate, async (req: Request, res: Res
 
 /**
  * POST /api/club/user/certificates/:certificateId/reveal
- * Marks certificate as revealed in student's notification
+ * Marks certificate as revealed in student's notification (Phase 15)
+ * Supports both single certificates and grouped batch notifications.
+ * Records immutable reveal audit log in certificate_audit_logs.
  */
 certificateRouter.post("/user/:certificateId/reveal", authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user!.id;
-        const { certificateId } = req.params;
+        const certificateId = String(req.params.certificateId || "");
 
-        await query(
-            `UPDATE user_notifications
-             SET metadata = jsonb_set(metadata, '{isRevealed}', 'true'::jsonb), is_read = true, read_at = NOW()
-             WHERE user_id = $1 AND (metadata->>'certificateId' = $2 OR idempotency_key = $3);`,
+        // Find matching notification: by direct certId, credentialCode, batchId, or inside grouped certificates array
+        const notifRes = await query(
+            `SELECT id, metadata, notification_type FROM user_notifications
+             WHERE (user_id = $1 OR recipient_id = $1) AND (
+                 metadata->>'certificateId' = $2 OR
+                 LOWER(metadata->>'credentialCode') = LOWER($2) OR
+                 idempotency_key = $3 OR
+                 metadata->>'batchId' = $2 OR
+                 idempotency_key LIKE 'cert-batch-' || $2 || '%' OR
+                 metadata->'certificates' @> jsonb_build_array(jsonb_build_object('certificateId', $2::text)) OR
+                 metadata->'certificates' @> jsonb_build_array(jsonb_build_object('credentialCode', $2::text))
+             )
+             ORDER BY created_at DESC
+             LIMIT 1;`,
             [userId, certificateId, `cert-${certificateId}`]
         );
 
-        return res.json({ success: true, message: "Certificate revealed." });
+        const notif = notifRes.rows[0];
+        let clubId: string | null = null;
+        let revealedCertificate: any = null;
+
+        if (notif) {
+            const meta = notif.metadata || {};
+            clubId = meta.clubId || null;
+
+            if (meta.isGrouped && Array.isArray(meta.certificates)) {
+                // Grouped batch notification: update status for matching certificate or all
+                const updatedCerts = meta.certificates.map((c: any) => {
+                    if (
+                        certificateId === "all" ||
+                        c.certificateId === certificateId ||
+                        (c.credentialCode && c.credentialCode.toLowerCase() === certificateId.toLowerCase())
+                    ) {
+                        revealedCertificate = c;
+                        return { ...c, isRevealed: true };
+                    }
+                    return c;
+                });
+                const allRevealed = updatedCerts.every((c: any) => c.isRevealed);
+                await query(
+                    `UPDATE user_notifications
+                     SET metadata = jsonb_set(
+                         jsonb_set(metadata, '{certificates}', $1::jsonb),
+                         '{isRevealed}',
+                         $2::jsonb
+                     ), is_read = true, read_at = NOW()
+                     WHERE id = $3;`,
+                    [JSON.stringify(updatedCerts), JSON.stringify(allRevealed), notif.id]
+                );
+            } else {
+                revealedCertificate = meta;
+                await query(
+                    `UPDATE user_notifications
+                     SET metadata = jsonb_set(metadata, '{isRevealed}', 'true'::jsonb), is_read = true, read_at = NOW()
+                     WHERE id = $1;`,
+                    [notif.id]
+                );
+            }
+        } else {
+            // Fallback direct update by certificateId / idempotency key
+            await query(
+                `UPDATE user_notifications
+                 SET metadata = jsonb_set(metadata, '{isRevealed}', 'true'::jsonb), is_read = true, read_at = NOW()
+                 WHERE (user_id = $1 OR recipient_id = $1) AND (metadata->>'certificateId' = $2 OR idempotency_key = $3);`,
+                [userId, certificateId, `cert-${certificateId}`]
+            );
+        }
+
+        // Fetch certificate details for audit log and response if available
+        const certDetailRes = await query(
+            `SELECT c.id, c.club_id, c.credential_code, c.title, c.certificate_type, c.recipient_name, c.issue_date
+             FROM club_certificates c
+             WHERE c.id::text = $1 OR LOWER(c.credential_code) = LOWER($1)
+             LIMIT 1;`,
+            [certificateId]
+        );
+        if (certDetailRes.rows[0]) {
+            const c = certDetailRes.rows[0];
+            clubId = clubId || c.club_id;
+            revealedCertificate = {
+                id: c.id,
+                credentialCode: c.credential_code,
+                title: c.title,
+                certificateType: c.certificate_type,
+                recipientName: c.recipient_name,
+                issueDate: c.issue_date,
+            };
+        }
+
+        // Record audit log entry (Phase 17)
+        if (clubId) {
+            await query(
+                `INSERT INTO certificate_audit_logs (
+                    club_id, actor_user_id, action, entity_type, entity_id, metadata
+                ) VALUES ($1, $2, 'certificate_revealed', 'certificate', $3, $4::jsonb);`,
+                [clubId, userId, certificateId, JSON.stringify({ revealedAt: new Date().toISOString() })]
+            );
+        }
+
+        return res.json({
+            success: true,
+            message: "Certificate revealed.",
+            revealedId: certificateId,
+            certificate: revealedCertificate,
+        });
     } catch (err: any) {
         console.error("Reveal certificate error:", err);
         return res.status(500).json({ success: false, message: "Failed to reveal certificate." });

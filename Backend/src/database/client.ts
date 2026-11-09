@@ -732,6 +732,13 @@ export const testDatabaseConnection = async () => {
                     ADD COLUMN IF NOT EXISTS verification_count INT NOT NULL DEFAULT 0,
                     ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ;
 
+                -- Performance and Scalability composite indexes (Phase 19)
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_batch ON public.club_certificates(batch_id);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_team ON public.club_certificates(team_id);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_code_lower ON public.club_certificates(LOWER(credential_code));
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_user_issue ON public.club_certificates(user_id, issue_date DESC);
+                CREATE INDEX IF NOT EXISTS idx_club_certificates_club_issue ON public.club_certificates(club_id, issue_date DESC);
+
                 -- Legal Consent & Minor Protection (Migration 030)
                 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS terms_version VARCHAR(32) DEFAULT 'v1.0';
                 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS terms_accepted_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP;

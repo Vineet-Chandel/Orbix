@@ -196,6 +196,34 @@ export const DOCS_FOLDERS: DocFolder[] = [
             },
         ],
     },
+    {
+        id: "college-chapters",
+        name: "College Chapters & Campus Ecosystem",
+        badge: "Campus Blueprint",
+        icon: "Building2",
+        color: "bg-[#FFE566]",
+        description: "Official architectural blueprint, AISHE campus hub topology, sovereign coordinator keys, dual-scope event arenas, and verified chapter lifecycle.",
+        files: [
+            {
+                id: "college-chapters",
+                slug: "college-chapters",
+                title: "Orbix College Chapters: Campus Hub Architecture & Operations Standard",
+                subtitle: "AISHE National Directory • Dual-Scope Event Arenas • Coordinator Sovereign Governance • Certificate Studio • Campus Score Acceleration",
+                folderId: "college-chapters",
+                folderName: "College Chapters & Campus Ecosystem",
+                badge: "Campus Blueprint",
+                badgeColor: "bg-[#FFE566]",
+                image: "/assets/college-chapters-banner.svg",
+                summary: "Authoritative architectural documentation and operational playbook for Orbix College Chapters. Explores AISHE institutional mapping, lead eligibility, campus workshops vs Pan-India hackathons, live RSVP pass synchronization, Certificate Studio integration, and Inter-College Leaderboard mechanics.",
+                tags: ["College Chapters", "AISHE Campus Hub", "Event Management", "Pan-India Hackathons", "Certificate Studio", "Student Leadership", "Governance"],
+                readTime: "14 min read",
+                updatedAt: "November 2026",
+                author: "Orbix Campus Architecture & Ecosystem Group",
+                featured: true,
+                hasInteractiveSim: true,
+            },
+        ],
+    },
 ];
 
 export const ALL_DOC_FILES: DocFile[] = DOCS_FOLDERS.flatMap((folder) => folder.files);

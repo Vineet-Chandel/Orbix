@@ -5737,7 +5737,20 @@ clubRouter.get("/user/certificates", authenticate, async (req: Request, res: Res
              FROM club_certificates c
              JOIN verified_clubs vc ON vc.id = c.club_id
              LEFT JOIN club_events e ON e.id = c.event_id
-             WHERE c.user_id = $1
+             WHERE (
+                 c.user_id = $1
+                 OR (
+                     c.team_id IS NOT NULL
+                     AND c.user_id IS NULL
+                     AND (
+                         c.recipient_snapshot->'team'->'memberSnapshot' @> jsonb_build_array(jsonb_build_object('userId', $1::text))
+                         OR EXISTS (
+                             SELECT 1 FROM club_team_members ctm
+                             WHERE ctm.team_id = c.team_id AND ctm.user_id = $1
+                         )
+                     )
+                 )
+             )
              ORDER BY c.issue_date DESC;`,
             [userId]
         );

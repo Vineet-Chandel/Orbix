@@ -24,14 +24,8 @@ import {
     ExternalLink,
     Building2,
     UploadCloud,
-    FileText,
-    CheckCircle,
-    XCircle,
-    Info,
-    Activity,
-    Clock,
     Zap,
-    BarChart2,
+    XCircle,
 } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
 import {
@@ -48,6 +42,8 @@ import {
     fetchTeamRosterForReview,
     fetchBatchProgress,
     retryFailedBatch,
+    cancelBatch,
+    downloadBatchReportCsv,
     reconcileCsvRoster,
     downloadSampleCsvTemplate,
     type BatchIssuancePayload,
@@ -57,10 +53,10 @@ import {
     type ClubTeamDirectoryItem,
     type BatchProgressInfo,
     type CsvReconciliationResult,
-    type ReconciledCsvRow,
 } from "../../../api/certificateStudioApi";
 import type { CertificateDesign } from "../../../types/certificateStudio";
 import { CertificateThumbnailPreview } from "./TemplateSelectionView";
+import { RecipientRosterTable, type RosterRecipientItem } from "./RecipientRosterTable";
 
 // ============================================================================
 // THE 16 STANDARD RECOGNIZED AWARD CATEGORIES (PHASE 10)
@@ -231,7 +227,6 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
     // Events State
     const [events, setEvents] = useState<CertificateEventItem[]>([]);
     const [selectedEventId, setSelectedEventId] = useState<string>(preselectedEventId || "");
-    const [eventFilter, setEventFilter] = useState<"all" | "attended" | "registered">("attended");
 
     // Phase 10: Event Eligibility Engine State
     const [eligibilityReport, setEligibilityReport] = useState<EventEligibilityReport | null>(null);
@@ -246,7 +241,9 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
 
     // Network / Manual State
     const [eligibleRecipients, setEligibleRecipients] = useState<EligibleRecipient[]>([]);
-    const [searchQuery, setSearchQuery] = useState("");
+    const [customOverrides, setCustomOverrides] = useState<
+        Record<string, { customPosition?: string; customName?: string }>
+    >({});
 
     // Selected Recipient User IDs
     const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
@@ -423,14 +420,14 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
         if (sourceTab !== "manual") return;
         const loadNetwork = async () => {
             try {
-                const list = await fetchClubEligibleRecipients("all", searchQuery);
+                const list = await fetchClubEligibleRecipients("all", "");
                 setEligibleRecipients(list);
             } catch (err: any) {
                 toast.error(err.message || "Failed to load campus students.");
             }
         };
         loadNetwork();
-    }, [sourceTab, searchQuery]);
+    }, [sourceTab]);
 
     // Phase 11: Load Recipient Directory for Manual / Team issuance
     useEffect(() => {
@@ -463,23 +460,74 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
     // Filtered event recipients list
     const displayedRecipients = useMemo(() => {
         if (!eligibilityReport) return [];
-        let list = eligibilityReport.eligibleRecipients;
-        if (eventFilter === "attended") {
-            list = list.filter((r) => r.status === "attended" && r.checkedInAt != null);
-        } else if (eventFilter === "registered") {
-            list = list.filter((r) => r.status === "registered");
-        }
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase();
-            list = list.filter(
-                (r) =>
-                    r.name.toLowerCase().includes(q) ||
-                    r.email.toLowerCase().includes(q) ||
-                    r.username.toLowerCase().includes(q)
-            );
-        }
-        return list;
-    }, [eligibilityReport, eventFilter, searchQuery]);
+        return eligibilityReport.eligibleRecipients || [];
+    }, [eligibilityReport]);
+
+    // Phase 13: Full Roster Items for Modern Multi-Select Table
+    const eventRosterItems = useMemo<RosterRecipientItem[]>(() => {
+        if (!eligibilityReport) return [];
+
+        const eligibleList: RosterRecipientItem[] = (eligibilityReport.eligibleRecipients || []).map((r) => ({
+            id: r.userId || r.registrationId,
+            userId: r.userId,
+            name: r.name,
+            username: r.username,
+            email: r.email,
+            collegeName: r.collegeName,
+            department: r.department,
+            teamName: r.teamName,
+            status: r.status,
+            checkedInAt: r.checkedInAt,
+            alreadyHasCert: r.alreadyHasCert,
+            isEligible: true,
+            customPosition: customOverrides[r.userId]?.customPosition,
+            customName: customOverrides[r.userId]?.customName,
+        }));
+
+        const ineligibleList: RosterRecipientItem[] = (eligibilityReport.ineligibleRecipients || []).map((r: any) => ({
+            id: r.userId || r.registrationId,
+            userId: r.userId,
+            name: r.name,
+            username: r.username,
+            email: r.email,
+            collegeName: r.collegeName || "",
+            department: r.department || "",
+            teamName: r.teamName || "",
+            status: r.status,
+            checkedInAt: r.checkedInAt,
+            alreadyHasCert: false,
+            isEligible: false,
+            exclusionReason: r.exclusionReason,
+        }));
+
+        return [...eligibleList, ...ineligibleList];
+    }, [eligibilityReport, customOverrides]);
+
+    const handleSelectMultipleUserIds = (ids: string[]) => {
+        setSelectedUserIds((prev) => {
+            const next = new Set(prev);
+            ids.forEach((id) => next.add(id));
+            return next;
+        });
+    };
+
+    const handleDeselectMultipleUserIds = (ids: string[]) => {
+        setSelectedUserIds((prev) => {
+            const next = new Set(prev);
+            ids.forEach((id) => next.delete(id));
+            return next;
+        });
+    };
+
+    const handleUpdateCustomPosition = (id: string, position: string) => {
+        setCustomOverrides((prev) => ({
+            ...prev,
+            [id]: {
+                ...(prev[id] || {}),
+                customPosition: position.trim() || undefined,
+            },
+        }));
+    };
 
     // Phase 14: Filtered CSV rows based on search and status tabs
     const filteredCsvRows = useMemo(() => {
@@ -556,35 +604,21 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
 
     const deselectAll = () => setSelectedUserIds(new Set());
 
-    // Phase 14: Sample CSV Download with formula injection protection
-    const handleDownloadSampleCsv = async () => {
+    // Phase 13 & 14: Sample CSV / XLSX Template Download
+    const handleDownloadSampleFormat = async (format: "csv" | "xlsx" = "csv") => {
         try {
-            const blob = await downloadSampleCsvTemplate();
+            const blob = await downloadSampleCsvTemplate(format);
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `orbix_recipients_template.csv`;
+            a.download = `orbix_recipients_template.${format}`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
-            toast.success("Downloaded official sanitized CSV template.");
+            toast.success(`Downloaded official sanitized ${format.toUpperCase()} template.`);
         } catch {
-            const headers = ["full_name", "email", "role", "position", "team", "notes"];
-            const rows = [
-                ["Aarav Sharma", "aarav.sharma@campus.edu", "Participant", "First Place", "Orbix AI", "Top score"],
-                ["Priya Patel", "priya.patel@campus.edu", "Volunteer", "Best Lead", "Core", "Excellent work"],
-            ];
-            const csvContent =
-                "data:text/csv;charset=utf-8," +
-                [headers.join(","), ...rows.map((e) => e.map((x) => `"${x.replace(/"/g, '""')}"`).join(","))].join("\n");
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `orbix_recipients_template.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            toast.error(`Failed to download ${format.toUpperCase()} template.`);
         }
     };
 
@@ -667,7 +701,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
         };
     }, [activeBatchProgressId, showProgressModal, onBatchIssued]);
 
-    // Phase 13: Retry failed items in batch
+    // Phase 13 & 14: Retry failed items in batch
     const handleRetryFailedBatch = async () => {
         if (!activeBatchProgressId) return;
         setIsRetryingBatch(true);
@@ -681,13 +715,33 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
             setIsRetryingBatch(false);
         }
     };
-                setSelectedUserIds((prev) => new Set([...prev, ...matchedIds]));
-                toast.success(`Imported ${parsedRows.length} rows (${matchedIds.length} matched to campus accounts).`);
-            } else {
-                toast.info(`Imported ${parsedRows.length} recipient rows.`);
-            }
-        };
-        reader.readAsText(file);
+
+    // Phase 14: Cancel in-progress or queued batch
+    const [isCancellingBatch, setIsCancellingBatch] = useState(false);
+    const handleCancelBatch = async () => {
+        if (!activeBatchProgressId) return;
+        if (!confirm("Are you sure you want to cancel this batch? Unprocessed recipients will be aborted.")) return;
+        setIsCancellingBatch(true);
+        try {
+            const res = await cancelBatch(activeBatchProgressId);
+            toast.warning(res.message);
+            setBatchProgress((prev) => (prev ? { ...prev, status: "cancelled" } : null));
+        } catch (err: any) {
+            toast.error(err.message || "Failed to cancel batch.");
+        } finally {
+            setIsCancellingBatch(false);
+        }
+    };
+
+    // Phase 14: Download generation audit report (CSV)
+    const handleDownloadReport = async () => {
+        if (!activeBatchProgressId) return;
+        try {
+            await downloadBatchReportCsv(activeBatchProgressId);
+            toast.success("Generation audit report downloaded!");
+        } catch (err: any) {
+            toast.error(err.message || "Failed to download report.");
+        }
     };
 
     // Phase 12: Open Team Roster Review & initialize frozen membership snapshot
@@ -1534,132 +1588,33 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                         </div>
                     )}
 
-                    {/* STEP 3: SELECT RECIPIENTS */}
+                    {/* STEP 3: SELECT RECIPIENTS (PHASE 13 BULK RECIPIENT MANAGEMENT) */}
                     {wizardStep === "recipients" && (
                         <div className="p-6 bg-white rounded-3xl border-3 border-black shadow-[5px_5px_0px_#000] space-y-6">
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-black/10 pb-4">
-                                <div>
-                                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566]">
-                                        STEP 3 OF 7
-                                    </span>
-                                    <h4 className="text-lg font-black text-black mt-1">
-                                        Select Verified Recipients
-                                    </h4>
-                                    <p className="text-xs text-neutral-600 font-medium">
-                                        Choose students to receive credentials. Only confirmed attendees receive automated verified attendance badges.
-                                    </p>
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={selectAllCurrent}
-                                        className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black cursor-pointer"
-                                    >
-                                        Select All Eligible
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={deselectAll}
-                                        className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black cursor-pointer"
-                                    >
-                                        Deselect All
-                                    </button>
-                                </div>
+                            <div className="border-b-2 border-black/10 pb-4">
+                                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-black text-[#FFE566]">
+                                    STEP 3 OF 7 · PHASE 13
+                                </span>
+                                <h4 className="text-lg font-black text-black mt-1">
+                                    Multi-Select Recipient Management
+                                </h4>
+                                <p className="text-xs text-neutral-600 font-medium">
+                                    Filter by attendance, select by team, detect duplicates, inspect missing data, and bulk-select candidates for &ldquo;{certType}&rdquo; credentials.
+                                </p>
                             </div>
 
-                            {/* Filter Bar & Search */}
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
-                                <div className="relative flex-1 w-full max-w-md">
-                                    <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                                    <input
-                                        type="text"
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        placeholder="Search by student name, username, email..."
-                                        className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-bold focus:outline-none"
-                                    />
-                                </div>
-
-                                <div className="flex items-center gap-2 w-full sm:w-auto">
-                                    {(["attended", "registered", "all"] as const).map((f) => (
-                                        <button
-                                            key={f}
-                                            type="button"
-                                            onClick={() => setEventFilter(f)}
-                                            className={`px-3 py-1.5 rounded-xl border-2 border-black text-xs font-black capitalize transition-all cursor-pointer ${
-                                                eventFilter === f
-                                                    ? "bg-[#a2ff86] text-black shadow-[1.5px_1.5px_0px_#000]"
-                                                    : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
-                                            }`}
-                                        >
-                                            {f === "attended" ? "✓ Attended Only" : f}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            {/* Recipient Roster Grid */}
-                            <div className="max-h-96 overflow-y-auto space-y-2 pr-1 border-2 border-black/10 rounded-2xl p-2 bg-[#FAF6EE]">
-                                {displayedRecipients.length === 0 ? (
-                                    <p className="text-xs text-neutral-500 py-8 text-center font-bold">
-                                        No matching recipients found in the current filter.
-                                    </p>
-                                ) : (
-                                    displayedRecipients.map((rec) => {
-                                        const isSelected = selectedUserIds.has(rec.userId);
-                                        const isAttended = rec.status === "attended" && rec.checkedInAt != null;
-
-                                        return (
-                                            <div
-                                                key={rec.registrationId}
-                                                onClick={() => toggleUserId(rec.userId)}
-                                                className={`p-3.5 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                                                    isSelected
-                                                        ? "border-black bg-white shadow-[2px_2px_0px_#000]"
-                                                        : "border-black/20 bg-neutral-50/70 opacity-75 hover:opacity-100"
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div
-                                                        className={`w-5 h-5 rounded-md border-2 border-black flex items-center justify-center shrink-0 ${
-                                                            isSelected ? "bg-[#FFE566]" : "bg-white"
-                                                        }`}
-                                                    >
-                                                        {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-black text-xs text-black">{rec.name}</span>
-                                                            <span className="text-[10px] font-mono text-neutral-500">@{rec.username}</span>
-                                                            {rec.alreadyHasCert && (
-                                                                <span className="text-[9px] font-black bg-amber-200 border border-black/30 px-1.5 py-0.2 rounded">
-                                                                    Already Issued
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-[11px] text-neutral-600 font-medium">
-                                                            {rec.email} · {rec.collegeName || "Institution Student"} {rec.department ? `· ${rec.department}` : ""}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center gap-2">
-                                                    {isAttended ? (
-                                                        <span className="px-2 py-0.5 rounded text-[10px] font-black bg-[#a2ff86] border border-black text-black">
-                                                            ✓ Verified Check-In
-                                                        </span>
-                                                    ) : (
-                                                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-neutral-200 text-neutral-700 border border-neutral-400">
-                                                            Unverified
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
-                            </div>
+                            <RecipientRosterTable
+                                recipients={eventRosterItems}
+                                selectedIds={selectedUserIds}
+                                onToggleSelect={toggleUserId}
+                                onSelectMultiple={handleSelectMultipleUserIds}
+                                onDeselectMultiple={handleDeselectMultipleUserIds}
+                                onDeselectAll={deselectAll}
+                                certType={certType}
+                                requireAttendance={certType === "attendance"}
+                                onUpdateCustomPosition={handleUpdateCustomPosition}
+                                title={activeEventTitle ? `Event Roster: ${activeEventTitle}` : "Event Roster"}
+                            />
 
                             <div className="pt-4 border-t-2 border-black/10 flex items-center justify-between">
                                 <button
@@ -1676,7 +1631,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                     onClick={() => setWizardStep("template")}
                                     className="px-6 py-2.5 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs sm:text-sm font-black shadow-[3px_3px_0px_#000] flex items-center gap-2 cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                 >
-                                    <span>Select Certificate Template</span>
+                                    <span>Select Certificate Template ({selectedUserIds.size} Selected)</span>
                                     <ArrowRight className="w-4 h-4 stroke-[3]" />
                                 </button>
                             </div>
@@ -2365,57 +2320,20 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                             </select>
                                         )}
                                     </div>
-
-                                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                                        <button
-                                            type="button"
-                                            onClick={selectAllCurrent}
-                                            className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black"
-                                        >
-                                            Select All
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={deselectAll}
-                                            className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black"
-                                        >
-                                            Deselect
-                                        </button>
-                                    </div>
                                 </div>
 
-                                {/* Recipient List */}
-                                <div className="max-h-80 overflow-y-auto space-y-2 pr-1">
-                                    {displayedRecipients.map((rec) => {
-                                        const isSelected = selectedUserIds.has(rec.userId);
-                                        return (
-                                            <div
-                                                key={rec.registrationId}
-                                                onClick={() => toggleUserId(rec.userId)}
-                                                className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between ${
-                                                    isSelected ? "border-black bg-[#FFE566]/20 shadow-[2px_2px_0px_#000]" : "border-neutral-200 bg-white"
-                                                }`}
-                                            >
-                                                <div className="flex items-center gap-2.5">
-                                                    <div
-                                                        className={`w-4 h-4 rounded border-2 border-black flex items-center justify-center ${
-                                                            isSelected ? "bg-black" : "bg-white"
-                                                        }`}
-                                                    >
-                                                        {isSelected && <Check className="w-3 h-3 text-[#FFE566]" />}
-                                                    </div>
-                                                    <div>
-                                                        <div className="text-xs font-black text-black">{rec.name}</div>
-                                                        <div className="text-[10px] text-neutral-500 font-mono">@{rec.username} · {rec.email}</div>
-                                                    </div>
-                                                </div>
-                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-neutral-100 border border-neutral-300">
-                                                    {rec.status}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
+                                <RecipientRosterTable
+                                    recipients={eventRosterItems}
+                                    selectedIds={selectedUserIds}
+                                    onToggleSelect={toggleUserId}
+                                    onSelectMultiple={handleSelectMultipleUserIds}
+                                    onDeselectMultiple={handleDeselectMultipleUserIds}
+                                    onDeselectAll={deselectAll}
+                                    certType={certType}
+                                    requireAttendance={certType === "attendance"}
+                                    onUpdateCustomPosition={handleUpdateCustomPosition}
+                                    title={activeEventTitle ? `Event Roster: ${activeEventTitle}` : "Event Roster"}
+                                />
                             </div>
                         )}
 
@@ -2438,22 +2356,32 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                             and authoritative matching against campus student profiles.
                                         </p>
                                     </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleDownloadSampleCsv}
-                                        className="px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black flex items-center gap-2 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
-                                    >
-                                        <Download className="w-4 h-4 text-black" />
-                                        <span>Download Template (.csv)</span>
-                                    </button>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDownloadSampleFormat("csv")}
+                                            className="px-3.5 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black flex items-center gap-1.5 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                                        >
+                                            <Download className="w-3.5 h-3.5 text-black" />
+                                            <span>Template (.csv)</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDownloadSampleFormat("xlsx")}
+                                            className="px-3.5 py-2 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8ee673] text-black text-xs font-black flex items-center gap-1.5 shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer"
+                                        >
+                                            <FileSpreadsheet className="w-3.5 h-3.5 text-black" />
+                                            <span>Excel (.xlsx)</span>
+                                        </button>
+                                    </div>
                                 </div>
 
-                                {/* Drag & Drop CSV Dropzone */}
+                                {/* Drag & Drop CSV/XLSX Dropzone */}
                                 {!reconciledCsvResult ? (
                                     <label className="block cursor-pointer">
                                         <input
                                             type="file"
-                                            accept=".csv,.tsv"
+                                            accept=".csv,.tsv,.xlsx,.xls"
                                             disabled={isReconcilingCsv}
                                             onChange={(e) => {
                                                 if (e.target.files?.[0]) handleCsvUpload(e.target.files[0]);
@@ -2468,7 +2396,7 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                         Reconciling recipients with campus registry...
                                                     </span>
                                                     <span className="text-xs text-neutral-500">
-                                                        Sanitizing formulas and matching student emails
+                                                        Sanitizing formulas (CWE-1236) and matching student profiles
                                                     </span>
                                                 </div>
                                             ) : (
@@ -2478,10 +2406,10 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                                                     </div>
                                                     <div>
                                                         <h4 className="text-sm font-black text-black">
-                                                            Drag & Drop CSV / TSV File Here
+                                                            Drag & Drop CSV, TSV, or Excel (.xlsx) Here
                                                         </h4>
                                                         <p className="text-xs text-neutral-500 mt-0.5">
-                                                            or click to browse from your computer (max 5 MB)
+                                                            or click to browse from your computer (max 10 MB)
                                                         </p>
                                                     </div>
                                                     <div className="flex flex-wrap items-center justify-center gap-2 mt-2">
@@ -3834,6 +3762,205 @@ export const IssuanceConsoleView: React.FC<IssuanceConsoleViewProps> = ({
                             >
                                 Done & Confirm Roster
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Phase 13: Live Asynchronous Batch Generation & Progress Monitor Modal */}
+            {showProgressModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div
+                        className="fixed inset-0"
+                        onClick={() => {
+                            if (batchProgress?.status === "completed" || batchProgress?.status === "failed" || batchProgress?.status === "partially_failed") {
+                                setShowProgressModal(false);
+                            }
+                        }}
+                    />
+                    <div className="relative w-full max-w-xl bg-white border-4 border-black rounded-3xl p-6 shadow-[8px_8px_0px_#000] space-y-5 z-10 animate-in zoom-in-95">
+                        {/* Header */}
+                        <div className="flex items-start justify-between gap-3 pb-3 border-b-2 border-black/10">
+                            <div>
+                                <div className="flex items-center gap-2">
+                                    <span className="px-2 py-0.5 rounded-md bg-[#FFE566] border-2 border-black font-black text-[10px] uppercase tracking-wider">
+                                        Phase 13
+                                    </span>
+                                    <h4 className="text-base font-black text-black flex items-center gap-1.5">
+                                        <Zap className="w-5 h-5 text-black" />
+                                        Async Batch Issuance Engine
+                                    </h4>
+                                </div>
+                                <p className="text-xs text-neutral-600 mt-1 font-medium">
+                                    Generating authoritative PDF credentials with bounded worker concurrency and cryptographic SHA-256 digests.
+                                </p>
+                            </div>
+
+                            {(batchProgress?.status === "completed" ||
+                                batchProgress?.status === "failed" ||
+                                batchProgress?.status === "partially_failed") && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowProgressModal(false)}
+                                    className="p-1 rounded-lg border-2 border-black hover:bg-neutral-100 cursor-pointer"
+                                >
+                                    <X className="w-4 h-4 text-black" />
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Status Indicator */}
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-black">
+                                Status:{" "}
+                                <strong
+                                    className={`px-2 py-0.5 rounded-md border-2 border-black ${
+                                        batchProgress?.status === "completed"
+                                            ? "bg-[#a2ff86] text-black"
+                                            : batchProgress?.status === "partially_failed"
+                                            ? "bg-amber-200 text-black"
+                                            : batchProgress?.status === "failed"
+                                            ? "bg-red-200 text-red-900"
+                                            : "bg-[#FFE566] text-black animate-pulse"
+                                    }`}
+                                >
+                                    {batchProgress?.status === "completed"
+                                        ? "🎉 All Certificates Generated"
+                                        : batchProgress?.status === "partially_failed"
+                                        ? "⚠️ Partially Completed with Failures"
+                                        : batchProgress?.status === "failed"
+                                        ? "❌ Batch Processing Failed"
+                                        : batchProgress?.status === "processing"
+                                        ? "⚡ Rendering & Verifying Credentials..."
+                                        : "⏳ Queued in Worker Pool..."}
+                                </strong>
+                            </span>
+                            <span className="text-xs font-mono font-black text-black">
+                                {batchProgress?.progressPercentage || 0}%
+                            </span>
+                        </div>
+
+                        {/* Animated Neo-Brutalist Progress Bar */}
+                        <div className="w-full h-8 bg-neutral-100 border-3 border-black rounded-xl p-1 shadow-[2px_2px_0px_#000] overflow-hidden">
+                            <div
+                                style={{ width: `${Math.max(5, batchProgress?.progressPercentage || 0)}%` }}
+                                className={`h-full border-r-2 border-black rounded-lg transition-all duration-500 font-black text-[11px] flex items-center justify-end pr-2 text-black ${
+                                    batchProgress?.status === "completed"
+                                        ? "bg-[#a2ff86]"
+                                        : batchProgress?.status === "partially_failed"
+                                        ? "bg-amber-300"
+                                        : batchProgress?.status === "failed"
+                                        ? "bg-red-300"
+                                        : "bg-[#FFE566]"
+                                }`}
+                            >
+                                {(batchProgress?.progressPercentage || 0) > 15 && `${batchProgress?.progressPercentage || 0}%`}
+                            </div>
+                        </div>
+
+                        {/* Metrics Grid */}
+                        <div className="grid grid-cols-4 gap-2 text-center">
+                            <div className="p-2.5 bg-[#FAF6EE] border-2 border-black rounded-xl">
+                                <div className="text-[10px] font-black text-neutral-500 uppercase">Total</div>
+                                <div className="text-base font-black text-black">{batchProgress?.totalRecipients || 0}</div>
+                            </div>
+                            <div className="p-2.5 bg-[#a2ff86]/30 border-2 border-black rounded-xl">
+                                <div className="text-[10px] font-black text-emerald-900 uppercase">Success</div>
+                                <div className="text-base font-black text-emerald-900">{batchProgress?.successfulCount || 0}</div>
+                            </div>
+                            <div className="p-2.5 bg-red-50 border-2 border-black rounded-xl">
+                                <div className="text-[10px] font-black text-red-800 uppercase">Failed</div>
+                                <div className="text-base font-black text-red-700">{batchProgress?.failedCount || 0}</div>
+                            </div>
+                            <div className="p-2.5 bg-white border-2 border-black rounded-xl">
+                                <div className="text-[10px] font-black text-neutral-500 uppercase">Throughput</div>
+                                <div className="text-base font-black text-black">
+                                    {batchProgress?.currentThroughput || 0} <span className="text-[9px]">c/s</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Error Log Drawer (if failed items exist) */}
+                        {batchProgress && (batchProgress.failedCount > 0 || batchProgress.errorLog.length > 0) && (
+                            <div className="p-3 bg-red-50 rounded-xl border-2 border-black space-y-2">
+                                <div className="flex items-center justify-between text-xs font-black text-red-900">
+                                    <span className="flex items-center gap-1.5">
+                                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                                        <span>Render & Issuance Failures ({batchProgress.errorLog.length})</span>
+                                    </span>
+                                    {batchProgress.canRetry && (
+                                        <button
+                                            type="button"
+                                            disabled={isRetryingBatch}
+                                            onClick={handleRetryFailedBatch}
+                                            className="px-3 py-1 bg-[#FFE566] text-black border-2 border-black rounded-lg text-xs font-black shadow-[2px_2px_0px_#000] hover:bg-[#ebd04e] active:translate-x-[1px] active:translate-y-[1px] active:shadow-none cursor-pointer flex items-center gap-1"
+                                        >
+                                            <RefreshCw className={`w-3.5 h-3.5 ${isRetryingBatch ? "animate-spin" : ""}`} />
+                                            <span>Retry Failed Recipients</span>
+                                        </button>
+                                    )}
+                                </div>
+                                <div className="max-h-32 overflow-y-auto space-y-1 text-[11px] font-mono text-red-800 divide-y divide-red-200">
+                                    {batchProgress.errorLog.map((err, i) => (
+                                        <div key={i} className="pt-1 flex items-start justify-between gap-2">
+                                            <span>{err.recipientName || err.email || "Unknown"}: {err.error}</span>
+                                            <span className="text-[9px] text-neutral-500 flex-shrink-0">
+                                                {new Date(err.timestamp).toLocaleTimeString()}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Modal Footer */}
+                        <div className="flex items-center justify-between pt-3 border-t-2 border-black/10">
+                            <span className="text-[11px] font-bold text-neutral-500">
+                                {batchProgress?.status === "completed"
+                                    ? "All credentials conferred and notifications dispatched."
+                                    : "You can safely close this modal; generation runs in the background."}
+                            </span>
+                            <div className="flex items-center gap-2">
+                                {(batchProgress?.status === "processing" || batchProgress?.status === "queued") && (
+                                    <button
+                                        type="button"
+                                        disabled={isCancellingBatch}
+                                        onClick={handleCancelBatch}
+                                        className="px-3 py-2 rounded-xl border-2 border-black bg-red-100 hover:bg-red-200 text-red-900 text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <XCircle className="w-3.5 h-3.5 text-red-700" />
+                                        <span>{isCancellingBatch ? "Cancelling..." : "Cancel Batch"}</span>
+                                    </button>
+                                )}
+                                {batchProgress && (batchProgress.status === "completed" || batchProgress.status === "partially_failed" || batchProgress.status === "failed" || batchProgress.status === "cancelled") && (
+                                    <button
+                                        type="button"
+                                        onClick={handleDownloadReport}
+                                        className="px-3 py-2 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8ee875] text-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <Download className="w-3.5 h-3.5 text-black" />
+                                        <span>Report (CSV)</span>
+                                    </button>
+                                )}
+                                {batchProgress?.isRecoverable && batchProgress.canRetry && (
+                                    <button
+                                        type="button"
+                                        disabled={isRetryingBatch}
+                                        onClick={handleRetryFailedBatch}
+                                        className="px-4 py-2 rounded-xl border-2 border-black bg-[#FFE566] hover:bg-[#ebd04e] text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer flex items-center gap-1.5"
+                                    >
+                                        <Zap className="w-3.5 h-3.5 text-black" />
+                                        <span>Retry Failed</span>
+                                    </button>
+                                )}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowProgressModal(false)}
+                                    className="px-5 py-2 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                                >
+                                    Close Monitor
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

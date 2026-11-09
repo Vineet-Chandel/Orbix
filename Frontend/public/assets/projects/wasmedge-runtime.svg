@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675" style="background:#FAF6EE;">
+  <defs>
+    <pattern id="wasmDots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1.5" fill="#D3CBBE" />
+    </pattern>
+    <filter id="shadowWasm" x="-5%" y="-5%" width="120%" height="120%">
+      <feDropShadow dx="5" dy="5" stdDeviation="0" flood-color="#000000" flood-opacity="1" />
+    </filter>
+  </defs>
+
+  <rect width="1200" height="675" fill="#FAF6EE" />
+  <rect width="1200" height="675" fill="url(#wasmDots)" />
+  <rect width="1200" height="675" fill="none" stroke="#000000" stroke-width="8" />
+
+  <!-- Top Bar -->
+  <g transform="translate(40, 36)">
+    <rect x="0" y="0" width="1120" height="54" rx="14" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadowWasm)" />
+    <circle cx="28" cy="27" r="6" fill="#FF5F56" stroke="#000000" stroke-width="2" />
+    <circle cx="48" cy="27" r="6" fill="#FFBD2E" stroke="#000000" stroke-width="2" />
+    <circle cx="68" cy="27" r="6" fill="#27C93F" stroke="#000000" stroke-width="2" />
+
+    <rect x="96" y="12" width="220" height="30" rx="8" fill="#000000" />
+    <text x="206" y="32" font-family="ui-monospace, monospace" font-size="12" font-weight="900" fill="#FF9933" text-anchor="middle" letter-spacing="1">WASMEDGE // SERVERLESS</text>
+
+    <text x="330" y="33" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#000000">ZERO-COLD-START EDGE MICROSERVICES</text>
+
+    <rect x="940" y="11" width="165" height="32" rx="16" fill="#FF9933" stroke="#000000" stroke-width="2" />
+    <text x="1022" y="32" font-family="system-ui, sans-serif" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">&lt; 1.8ms COLD START</text>
+  </g>
+
+  <!-- Main Body -->
+  <g transform="translate(40, 116)">
+    <!-- Left Hero Card -->
+    <rect x="0" y="0" width="560" height="500" rx="24" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadowWasm)" />
+
+    <g transform="translate(36, 44)">
+      <rect x="0" y="0" width="140" height="28" rx="8" fill="#FF9933" stroke="#000000" stroke-width="2" />
+      <text x="70" y="19" font-family="system-ui, sans-serif" font-size="11" font-weight="950" fill="#000000" text-anchor="middle" letter-spacing="1">CLOUD &amp; DEVOPS</text>
+
+      <text x="0" y="78" font-family="system-ui, sans-serif" font-size="44" font-weight="950" fill="#000000" letter-spacing="-1">WasmEdge</text>
+      <text x="0" y="114" font-family="system-ui, sans-serif" font-size="18" font-weight="700" fill="#555555">Serverless WASM Microservice Runtime</text>
+
+      <g transform="translate(0, 140)">
+        <rect x="0" y="0" width="488" height="155" rx="14" fill="#FAF6EE" stroke="#000000" stroke-width="2" />
+        <g transform="translate(20, 24)">
+          <text x="0" y="16" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#777777">COLD START LATENCY</text>
+          <text x="0" y="44" font-family="system-ui, sans-serif" font-size="28" font-weight="950" fill="#E65100">1.8 ms</text>
+
+          <text x="240" y="16" font-family="ui-monospace, monospace" font-size="12" font-weight="800" fill="#777777">MEMORY PER SANDBOX</text>
+          <text x="240" y="44" font-family="system-ui, sans-serif" font-size="28" font-weight="950" fill="#000000">320 KB</text>
+
+          <text x="0" y="90" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#000000">✓ Kernel-Bypass Packet Dispatch via eBPF XDP</text>
+          <text x="240" y="90" font-family="ui-monospace, monospace" font-size="11" font-weight="700" fill="#000000">✓ Native POSIX WASI Support</text>
+        </g>
+      </g>
+
+      <!-- Tech Pills -->
+      <g transform="translate(0, 330)">
+        <rect x="0" y="0" width="60" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="30" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">Rust</text>
+
+        <rect x="70" y="0" width="70" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="105" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">WASM</text>
+
+        <rect x="150" y="0" width="70" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="185" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">Tokio</text>
+
+        <rect x="230" y="0" width="70" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="265" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">eBPF</text>
+
+        <rect x="310" y="0" width="75" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="347" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">Linux</text>
+
+        <rect x="395" y="0" width="93" height="28" rx="6" fill="#FAF6EE" stroke="#000000" stroke-width="1.5" />
+        <text x="441" y="19" font-family="ui-monospace, monospace" font-size="11" font-weight="900" fill="#000000" text-anchor="middle">Wasmtime</text>
+      </g>
+    </g>
+
+    <!-- Right Pipeline Card -->
+    <g transform="translate(590, 0)">
+      <rect x="0" y="0" width="530" height="500" rx="24" fill="#FFFFFF" stroke="#000000" stroke-width="3" filter="url(#shadowWasm)" />
+
+      <g transform="translate(30, 30)">
+        <text x="0" y="20" font-family="ui-monospace, monospace" font-size="13" font-weight="900" fill="#000000">SANDBOX ISOLATION &amp; EXECUTION PIPELINE</text>
+
+        <!-- Pipeline Stage 1 -->
+        <g transform="translate(0, 45)">
+          <rect x="0" y="0" width="470" height="85" rx="14" fill="#FAF6EE" stroke="#000000" stroke-width="2" />
+          <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#000000">1. EDGE INGRESS &amp; ROUTE LOOKUP</text>
+          <text x="20" y="52" font-family="ui-monospace, monospace" font-size="11" font-weight="600" fill="#666666">Incoming HTTP request filtered via eBPF XDP hook (&lt; 0.3ms)</text>
+          <rect x="20" y="60" width="115" height="18" rx="4" fill="#FF9933" />
+          <text x="77" y="73" font-family="ui-monospace, monospace" font-size="9" font-weight="900" fill="#000000" text-anchor="middle">ZERO USERSPACE</text>
+        </g>
+
+        <!-- Arrow -->
+        <path d="M 235 130 L 235 155" stroke="#000000" stroke-width="2.5" />
+        <polygon points="230,155 240,155 235,165" fill="#000000" />
+
+        <!-- Pipeline Stage 2 -->
+        <g transform="translate(0, 170)">
+          <rect x="0" y="0" width="470" height="85" rx="14" fill="#FAF6EE" stroke="#000000" stroke-width="2" />
+          <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#000000">2. WASMTIME MICRO-SANDBOX INSTANTIATION</text>
+          <text x="20" y="52" font-family="ui-monospace, monospace" font-size="11" font-weight="600" fill="#666666">AOT precompiled .wasm binary loaded into memory-isolated cell</text>
+          <rect x="20" y="60" width="125" height="18" rx="4" fill="#a2ff86" />
+          <text x="82" y="73" font-family="ui-monospace, monospace" font-size="9" font-weight="900" fill="#000000" text-anchor="middle">MEMORY SAFE // RUST</text>
+        </g>
+
+        <!-- Arrow -->
+        <path d="M 235 255 L 235 280" stroke="#000000" stroke-width="2.5" />
+        <polygon points="230,280 240,280 235,290" fill="#000000" />
+
+        <!-- Pipeline Stage 3 -->
+        <g transform="translate(0, 295)">
+          <rect x="0" y="0" width="470" height="85" rx="14" fill="#000000" stroke="#000000" stroke-width="2" />
+          <text x="20" y="30" font-family="system-ui, sans-serif" font-size="13" font-weight="900" fill="#FFE566">3. RESPONSE EMISSION &amp; INSTANCE DISPOSAL</text>
+          <text x="20" y="52" font-family="ui-monospace, monospace" font-size="11" font-weight="600" fill="#CCCCCC">Linear memory torn down in &lt; 50μs. State written to raft kv.</text>
+          <rect x="20" y="60" width="115" height="18" rx="4" fill="#FFE566" />
+          <text x="77" y="73" font-family="ui-monospace, monospace" font-size="9" font-weight="900" fill="#000000" text-anchor="middle">INSTANT CLEANUP</text>
+        </g>
+      </g>
+    </g>
+  </g>
+</svg>

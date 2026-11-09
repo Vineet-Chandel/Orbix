@@ -17,6 +17,7 @@ import { StudentCampusClubsView } from "../Club/CollegeClubs/StudentCampusClubsV
 import { CollegeEventsView } from "../Events/CollegeEventsView";
 import { StudentActivityView } from "../Events/StudentActivityView";
 import { ProjectsManagementView } from "../Projects/ProjectsManagementView";
+import { UserCertificateWalletView } from "../Certificates/UserCertificateWalletView";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 
 export default function Dashboard() {
@@ -30,6 +31,7 @@ export default function Dashboard() {
         if (path === "/clubs" || path.startsWith("/clubs")) return "clubs";
         if (path.includes("/college-events") || path.includes("/college-event")) return "college-events";
         if (path.includes("/activity") || path.includes("/applications") || path.includes("/application")) return "activity";
+        if (path.includes("/wallet") || path.includes("/certificates") || path.includes("/certificate")) return "wallet";
         if (path.includes("/explore")) return "explore";
         if (path.includes("/trends") || path.includes("/reports")) return "trends";
         if (path.includes("/notifications") || path.includes("/inbox")) return "notifications";
@@ -204,6 +206,10 @@ export default function Dashboard() {
                 ) : activeTab === "projects" ? (
                     <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
                         <ProjectsManagementView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                    </div>
+                ) : activeTab === "wallet" || activeTab === "certificates" ? (
+                    <div className="flex-1 w-full min-h-0 bg-[#FAF6EE] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between animate-in fade-in duration-200">
+                        <UserCertificateWalletView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
                     </div>
                 ) : (
                     /* Default Dashboard View (Practice vs Development) */

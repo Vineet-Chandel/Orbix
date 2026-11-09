@@ -193,7 +193,7 @@ export interface BatchProgressInfo {
     id: string;
     clubId: string;
     title: string;
-    status: "queued" | "processing" | "completed" | "partially_completed" | "partially_failed" | "failed";
+    status: "draft" | "validating" | "queued" | "processing" | "completed" | "partially_completed" | "partially_failed" | "failed" | "cancelled";
     totalRecipients: number;
     processedCount: number;
     successfulCount: number;
@@ -208,6 +208,7 @@ export interface BatchProgressInfo {
     }>;
     isRecoverable: boolean;
     canRetry: boolean;
+    canCancel?: boolean;
     createdAt: string;
     updatedAt: string;
 }

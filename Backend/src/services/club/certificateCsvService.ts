@@ -1,4 +1,5 @@
 import { query } from "../../database/client.js";
+import XLSX from "xlsx";
 
 export interface ReconciledCsvRow {
     index: number;
@@ -154,6 +155,45 @@ export class CertificateCsvService {
     }
 
     /**
+     * Parses spreadsheet content from either a CSV string, TSV string, or XLSX/XLS buffer.
+     * Automatically extracts the first active sheet from workbooks and runs CSV sanitation.
+     */
+    static parseSpreadsheet(
+        contentOrBuffer: string | Buffer,
+        filename?: string
+    ): { headers: string[]; rows: Record<string, string>[] } {
+        if (!contentOrBuffer) {
+            return { headers: [], rows: [] };
+        }
+
+        if (Buffer.isBuffer(contentOrBuffer)) {
+            const isXlsx =
+                (filename && /\.(xlsx|xls)$/i.test(filename)) ||
+                (contentOrBuffer.length > 4 &&
+                    ((contentOrBuffer[0] === 0x50 && contentOrBuffer[1] === 0x4b) || // ZIP/XLSX
+                        (contentOrBuffer[0] === 0xd0 && contentOrBuffer[1] === 0xcf))); // OLE/XLS
+
+            if (isXlsx) {
+                try {
+                    const workbook = XLSX.read(contentOrBuffer, { type: "buffer" });
+                    const sheetName = workbook.SheetNames[0];
+                    if (!sheetName) return { headers: [], rows: [] };
+                    const sheet = workbook.Sheets[sheetName];
+                    if (!sheet) return { headers: [], rows: [] };
+                    const csvText = XLSX.utils.sheet_to_csv(sheet);
+                    return this.parseCsv(csvText);
+                } catch (err) {
+                    console.error("XLSX parsing error, falling back to text:", err);
+                    return this.parseCsv(contentOrBuffer.toString("utf-8"));
+                }
+            }
+            return this.parseCsv(contentOrBuffer.toString("utf-8"));
+        }
+
+        return this.parseCsv(String(contentOrBuffer));
+    }
+
+    /**
      * Intelligently detects and maps standard column names from CSV headers
      */
     static detectColumns(headers: string[]): {
@@ -213,17 +253,19 @@ export class CertificateCsvService {
     }
 
     /**
-     * Reconciles CSV recipient rows against Orbix database and event registrations
+     * Reconciles CSV/XLSX recipient rows against Orbix database and event registrations
      */
     static async reconcileCsv(params: {
         clubId: string;
-        csvContent: string;
+        csvContent?: string | undefined;
+        fileBuffer?: Buffer | undefined;
+        filename?: string | undefined;
         eventId?: string | undefined;
         customColumnMapping?: Record<string, string> | undefined;
     }): Promise<CsvReconciliationResult> {
-        const { csvContent, eventId, customColumnMapping = {} } = params;
+        const { csvContent, fileBuffer, filename, eventId, customColumnMapping = {} } = params;
 
-        const { headers, rows } = this.parseCsv(csvContent);
+        const { headers, rows } = this.parseSpreadsheet(fileBuffer || csvContent || "", filename);
         if (rows.length === 0) {
             return {
                 totalRows: 0,
@@ -465,5 +507,22 @@ export class CertificateCsvService {
         ];
 
         return lines.join("\n");
+    }
+
+    /**
+     * Generates a sample XLSX workbook template for organizers to download (Phase 13)
+     */
+    static generateSampleXlsx(): Buffer {
+        const wb = XLSX.utils.book_new();
+        const data = [
+            ["full_name", "email", "role", "position", "team", "notes"],
+            ["Aarav Sharma", "aarav.sharma@campus.edu", "Participant", "First Place", "Orbix AI Labs", "Outstanding performance"],
+            ["Priya Patel", "priya.patel@campus.edu", "Volunteer", "Best Organizer", "Core Logistics", "Flawless stage coordination"],
+            ["Rohan Gupta", "rohan.gupta@external.org", "Speaker", "Keynote Speaker", "", "Guest session on Distributed Systems"],
+            ["Ananya Verma", "ananya.verma@campus.edu", "Contender", "Runner Up", "Orbix AI Labs", "High impact hackathon build"],
+        ];
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        XLSX.utils.book_append_sheet(wb, ws, "Recipients");
+        return XLSX.write(wb, { type: "buffer", bookType: "xlsx" }) as Buffer;
     }
 }

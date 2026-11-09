@@ -3,6 +3,7 @@
  * Phase 2, Phase 4 & Phase 8 Implementation
  */
 import { query } from "../../database/client.js";
+import redis from "../../redis/client.js";
 import { SYSTEM_CERTIFICATE_TEMPLATES } from "./systemCertificateTemplates.js";
 import type { CertificateDesign, CertificateTemplateRecord } from "../../types/certificateStudio.js";
 
@@ -57,6 +58,18 @@ export class CertificateTemplateService {
                 );
             }
         }
+
+        // Invalidate Redis system templates cache (Phase 19 non-sensitive caching)
+        if (redis && redis.status === "ready") {
+            try {
+                const keys = await redis.keys("orbix:cert:system_templates:*");
+                if (keys.length > 0) {
+                    await redis.del(...keys);
+                }
+            } catch (err) {
+                // Ignore cache invalidation error
+            }
+        }
     }
 
     /**
@@ -66,25 +79,51 @@ export class CertificateTemplateService {
         systemTemplates: CertificateTemplateRecord[];
         clubTemplates: CertificateTemplateRecord[];
     }> {
-        // Ensure system templates exist
-        await this.seedSystemTemplates();
+        const sysCacheKey = `orbix:cert:system_templates:${filterCategory || "all"}`;
+        let sysRows: any[] | null = null;
 
-        let sysQuery = `
-            SELECT
-                t.*,
-                'Orbix Official' AS owner_club_name,
-                'Orbix Design Senate' AS creator_name,
-                COALESCE((SELECT COUNT(*)::int FROM club_certificates cc WHERE cc.template_id = t.id), 0) AS usage_count
-            FROM certificate_templates t
-            WHERE t.is_system = true AND t.status = 'published'`;
-        const sysParams: any[] = [];
-        if (filterCategory && filterCategory !== "all") {
-            sysParams.push(filterCategory);
-            sysQuery += ` AND t.category = $1`;
+        // Check Redis non-sensitive system templates cache (Phase 19)
+        if (redis && redis.status === "ready") {
+            try {
+                const cached = await redis.get(sysCacheKey);
+                if (cached) {
+                    sysRows = JSON.parse(cached);
+                }
+            } catch (err) {
+                // Ignore Redis errors gracefully
+            }
         }
-        sysQuery += ` ORDER BY t.created_at ASC;`;
 
-        const sysRes = await query(sysQuery, sysParams);
+        if (!sysRows) {
+            // Ensure system templates exist
+            await this.seedSystemTemplates();
+
+            let sysQuery = `
+                SELECT
+                    t.*,
+                    'Orbix Official' AS owner_club_name,
+                    'Orbix Design Senate' AS creator_name,
+                    COALESCE((SELECT COUNT(*)::int FROM club_certificates cc WHERE cc.template_id = t.id), 0) AS usage_count
+                FROM certificate_templates t
+                WHERE t.is_system = true AND t.status = 'published'`;
+            const sysParams: any[] = [];
+            if (filterCategory && filterCategory !== "all") {
+                sysParams.push(filterCategory);
+                sysQuery += ` AND t.category = $1`;
+            }
+            sysQuery += ` ORDER BY t.created_at ASC;`;
+
+            const sysRes = await query(sysQuery, sysParams);
+            sysRows = sysRes.rows;
+
+            if (redis && redis.status === "ready") {
+                try {
+                    await redis.setex(sysCacheKey, 3600, JSON.stringify(sysRows)); // 1 hour TTL
+                } catch (err) {
+                    // Ignore cache set error
+                }
+            }
+        }
 
         let clubQuery = `
             SELECT
@@ -141,7 +180,7 @@ export class CertificateTemplateService {
         };
 
         return {
-            systemTemplates: sysRes.rows.map(formatRow),
+            systemTemplates: sysRows.map(formatRow),
             clubTemplates: clubRes.rows.map(formatRow),
         };
     }
@@ -216,18 +255,20 @@ export class CertificateTemplateService {
             pageWidth?: number | undefined;
             pageHeight?: number | undefined;
             sourceTemplateId?: string | undefined;
+            status?: "draft" | "published" | "archived" | undefined;
         }
     ): Promise<CertificateTemplateRecord> {
         const orientation = data.orientation || data.design?.page?.orientation || "landscape";
         const pageWidth = data.pageWidth || (orientation === "portrait" ? 595 : 842);
         const pageHeight = data.pageHeight || (orientation === "portrait" ? 842 : 595);
+        const status = data.status || "published";
 
         const insertRes = await query(
             `INSERT INTO certificate_templates (
                 club_id, is_system, name, category, design, background_asset_url,
                 background_fit, orientation, page_width, page_height, version, status, created_by
             ) VALUES (
-                $1, false, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, 1, 'published', $10
+                $1, false, $2, $3, $4::jsonb, $5, $6, $7, $8, $9, 1, $10, $11
             ) RETURNING *;`,
             [
                 clubId,
@@ -239,6 +280,7 @@ export class CertificateTemplateService {
                 orientation,
                 pageWidth,
                 pageHeight,
+                status,
                 userId,
             ]
         );

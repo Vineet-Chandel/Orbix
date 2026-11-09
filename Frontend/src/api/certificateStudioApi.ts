@@ -181,14 +181,18 @@ export interface BatchIssuanceResult {
 export interface PublicVerificationResult {
     success: boolean;
     verified: boolean;
+    status?: "valid" | "revoked" | "superseded" | "not_found";
     message?: string;
     certificate?: {
-        id: string;
+        id?: string;
         credentialCode: string;
         title: string;
         certificateType: string;
         recipientName: string;
+        achievement?: string;
         issueDate: string;
+        status?: "valid" | "revoked" | "superseded";
+        version?: number;
         signerName?: string;
         signerRole?: string;
         description?: string;
@@ -197,6 +201,23 @@ export interface PublicVerificationResult {
         revokedAt?: string;
         revocationReason?: string;
         verificationCount: number;
+        lastVerifiedAt?: string;
+        signingMetadata?: {
+            algorithm: string;
+            infrastructure: string;
+            isAsymmetricKms: boolean;
+            kmsKeyId?: string;
+        };
+        supersededBy?: {
+            credentialCode: string;
+            issueDate: string;
+            version: number;
+        } | null;
+        reissuedFrom?: {
+            credentialCode: string;
+            issueDate: string;
+            version: number;
+        } | null;
         clubName?: string;
         clubSlug?: string;
         collegeName?: string;
@@ -204,8 +225,56 @@ export interface PublicVerificationResult {
         eventTitle?: string;
         teamName?: string;
         isTeam?: boolean;
-        teamMembers?: Array<{ name: string; role?: string; customPosition?: string }>;
+        teamMembers?: Array<{ name: string; role?: string; customPosition?: string; isCaptain?: boolean }>;
         memberCount?: number;
+    };
+}
+
+export interface UserWalletItem {
+    id: string;
+    credentialCode: string;
+    title: string;
+    certificateType: string;
+    recipientName: string;
+    description: string;
+    issueDate: string;
+    status: "valid" | "revoked" | "superseded";
+    version: number;
+    sha256Hash: string;
+    pdfUrl: string | null;
+    previewUrl: string | null;
+    isTeam: boolean;
+    teamId: string | null;
+    teamName?: string | null;
+    teamSnapshot?: any;
+    clubId: string;
+    clubName: string;
+    clubSlug: string;
+    clubLogoUrl: string;
+    collegeName: string;
+    eventId: string | null;
+    eventTitle?: string | null;
+    signerName: string;
+    signerRole: string;
+    verificationUrl: string;
+    isRevealed?: boolean;
+    isSpoiler?: boolean;
+    supersededBy?: {
+        id: string;
+        credentialCode: string;
+    } | null;
+    revocationReason?: string | null;
+    revokedAt?: string | null;
+}
+
+export interface UserWalletResponse {
+    success: boolean;
+    certificates: UserWalletItem[];
+    stats: {
+        total: number;
+        valid: number;
+        teamAwards: number;
+        uniqueClubs: number;
     };
 }
 
@@ -448,7 +517,7 @@ export async function fetchBatchProgress(batchId: string): Promise<BatchProgress
 /**
  * Partial batch recovery: retries failed recipients in a batch (Phase 13)
  */
-export async function retryFailedBatch(batchId: string): Promise<{ success: boolean; retriedCount: number }> {
+export async function retryFailedBatch(batchId: string): Promise<{ success: boolean; retriedCount: number; message?: string }> {
     const res = await fetch(`/api/club/certificates/batches/${batchId}/retry-failed`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -456,6 +525,74 @@ export async function retryFailedBatch(batchId: string): Promise<{ success: bool
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data?.message || "Failed to retry batch.");
+    return data;
+}
+
+/**
+ * Aborts an active or queued batch, preventing unprocessed recipients from issuing (Phase 14)
+ */
+export async function cancelBatch(batchId: string): Promise<{ success: boolean; message: string; cancelledUnprocessedCount: number }> {
+    const res = await fetch(`/api/club/certificates/batches/${batchId}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || "Failed to cancel batch.");
+    return data;
+}
+
+/**
+ * Fetches item-level error details for a batch (Phase 14)
+ */
+export async function fetchBatchErrors(batchId: string): Promise<{
+    batchId: string;
+    title: string;
+    status: string;
+    totalRecipients: number;
+    successfulCount: number;
+    failedCount: number;
+    errors: Array<{ recipientName?: string; email?: string; error: string; timestamp: string }>;
+}> {
+    const res = await fetch(`/api/club/certificates/batches/${batchId}/errors`, {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || "Failed to fetch batch errors.");
+    return data;
+}
+
+/**
+ * Downloads comprehensive generation audit report as CSV (Phase 14)
+ */
+export async function downloadBatchReportCsv(batchId: string): Promise<void> {
+    const res = await fetch(`/api/club/certificates/batches/${batchId}/report?format=csv`, {
+        credentials: "include",
+    });
+    if (!res.ok) throw new Error("Failed to download batch report.");
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `batch-${batchId}-audit-report.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
+}
+
+/**
+ * Resumes an interrupted batch after worker failure (Phase 14)
+ */
+export async function resumeBatch(batchId: string): Promise<{ success: boolean; message: string; retriedCount: number }> {
+    const res = await fetch(`/api/club/certificates/batches/${batchId}/resume`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || "Failed to resume batch.");
     return data;
 }
 
@@ -500,13 +637,13 @@ export async function reconcileCsvRoster(params: {
 }
 
 /**
- * Downloads the official sanitized recipient CSV template (Phase 14)
+ * Downloads the official sanitized recipient CSV or XLSX template (Phase 13 & 14)
  */
-export async function downloadSampleCsvTemplate(): Promise<Blob> {
-    const res = await fetch("/api/club/certificates/csv/sample-template", {
+export async function downloadSampleCsvTemplate(format: "csv" | "xlsx" = "csv"): Promise<Blob> {
+    const res = await fetch(`/api/club/certificates/csv/sample-template?format=${format}`, {
         credentials: "include",
     });
-    if (!res.ok) throw new Error("Failed to download CSV template.");
+    if (!res.ok) throw new Error(`Failed to download ${format.toUpperCase()} template.`);
     return await res.blob();
 }
 
@@ -773,4 +910,77 @@ export async function claimCertificate(claimToken: string): Promise<{
     const data = await res.json();
     if (!res.ok) throw new Error(data?.message || "Failed to claim certificate.");
     return data;
+}
+
+/**
+ * Phase 16: User Certificate Wallet Fetcher
+ */
+export async function fetchUserCertificateWallet(params?: {
+    clubId?: string;
+    eventId?: string;
+    status?: string;
+    category?: string;
+    query?: string;
+    isTeam?: boolean;
+}): Promise<UserWalletResponse> {
+    const sp = new URLSearchParams();
+    if (params?.clubId) sp.append("clubId", params.clubId);
+    if (params?.eventId) sp.append("eventId", params.eventId);
+    if (params?.status && params.status !== "all") sp.append("status", params.status);
+    if (params?.category && params.category !== "all") sp.append("category", params.category);
+    if (params?.query) sp.append("query", params.query);
+    if (params?.isTeam !== undefined) sp.append("isTeam", String(params.isTeam));
+
+    const res = await fetch(`/api/club/certificates/user/wallet?${sp.toString()}`, {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || "Failed to load certificate wallet.");
+    return data;
+}
+
+/**
+ * Phase 16: Administrative Certificate Reissue (creates version N+1)
+ */
+export async function reissueCertificate(
+    certificateId: string,
+    updates: {
+        recipientName?: string;
+        awardPosition?: string;
+        description?: string;
+        signerName?: string;
+        signerRole?: string;
+        reissueReason?: string;
+    }
+): Promise<{
+    success: boolean;
+    previousCertificateId: string;
+    newCertificateId: string;
+    newCredentialCode: string;
+    newVersion: number;
+    message: string;
+}> {
+    const res = await fetch(`/api/club/certificates/${encodeURIComponent(certificateId)}/reissue`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(updates),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || "Failed to reissue certificate.");
+    return data;
+}
+
+/**
+ * Phase 16: Certificate Audit History Trail
+ */
+export async function fetchCertificateAuditHistory(certificateId: string): Promise<any[]> {
+    const res = await fetch(`/api/club/certificates/${encodeURIComponent(certificateId)}/audit-history`, {
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || "Failed to load audit history.");
+    return data.auditHistory || [];
 }

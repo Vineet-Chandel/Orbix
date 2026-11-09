@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass } from "lucide-react";
+import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass, Award } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
@@ -20,6 +20,8 @@ export type SidebarTab =
     | "college-events"
     | "applications"
     | "activity"
+    | "wallet"
+    | "certificates"
     | "connect-platform"
     | "profile"
     | "resume"
@@ -364,6 +366,15 @@ export const Sidebar = ({
                 </svg>
             ),
             path: "/activity",
+            isComingSoon: false,
+        },
+        {
+            id: "wallet" as SidebarTab,
+            label: "Certificates",
+            icon: (
+                <Award className="w-5 h-5 flex-shrink-0" />
+            ),
+            path: "/wallet",
             isComingSoon: false,
         },
     ];

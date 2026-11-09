@@ -4,7 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"No tests specified\" && exit 0",
+    "test": "tsx scripts/test_certificate_studio_complete.ts && tsx scripts/test_phase_20_acceptance.ts",
+    "test:complete": "tsx scripts/test_certificate_studio_complete.ts",
+    "test:acceptance": "tsx scripts/test_phase_20_acceptance.ts",
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
     "migrate:institutions": "tsx src/database/run_migration.ts",
@@ -31,7 +33,8 @@
     "pg": "^8.23.1",
     "qrcode": "^1.5.4",
     "resend": "^6.35.0",
-    "validator": "^13.15.35"
+    "validator": "^13.15.35",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

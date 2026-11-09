@@ -10,6 +10,7 @@ import ResumeIntelligenceDocumentary from "./documentaries/ResumeIntelligenceDoc
 import ProfilePrivacyDocumentary from "./documentaries/ProfilePrivacyDocumentary";
 import ClubVerificationDocumentary from "./documentaries/ClubVerificationDocumentary";
 import ClubCredibilityDocumentary from "./documentaries/ClubCredibilityDocumentary";
+import CollegeChaptersDocumentary from "./documentaries/CollegeChaptersDocumentary";
 import {
     ArrowLeft,
     FileText,
@@ -46,7 +47,9 @@ export const DocsViewerPage: React.FC = () => {
                             ? "club-verification-protocol"
                             : activeSlug === "credibility" || activeSlug === "club-credibility" || activeSlug === "club-credibility-algorithm" || activeSlug === "credibility-engine" || activeSlug === "credibility-algorithm"
                                 ? "club-credibility-algorithm"
-                                : activeSlug;
+                                : activeSlug === "college-chapters" || activeSlug === "college-chapter-docs" || activeSlug === "chapters" || activeSlug === "campus-chapters" || activeSlug === "college-docs" || activeSlug === "chapter-docs"
+                                    ? "college-chapters"
+                                    : activeSlug;
 
     // Check if doc exists in registry
     const doc = getDocBySlug(resolvedSlug);
@@ -112,6 +115,8 @@ export const DocsViewerPage: React.FC = () => {
                     <ClubVerificationDocumentary />
                 ) : resolvedSlug === "club-credibility-algorithm" ? (
                     <ClubCredibilityDocumentary />
+                ) : resolvedSlug === "college-chapters" ? (
+                    <CollegeChaptersDocumentary />
                 ) : doc ? (
                     <article className="rounded-3xl bg-white border-2 sm:border-[3px] border-black p-6 sm:p-10 shadow-[6px_6px_0px_#000] space-y-8">
                         <header className="space-y-4 pb-6 border-b-2 border-black/15">

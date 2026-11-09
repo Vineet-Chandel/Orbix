@@ -207,7 +207,7 @@ export const PublicCertificateVerifyPage: React.FC = () => {
                 {!loading && cert && (
                     <div className="space-y-5">
                         {/* Revocation Warning Alert if revoked */}
-                        {cert.isRevoked && (
+                        {(cert.isRevoked || cert.status === "revoked") && (
                             <div className="p-5 rounded-2xl bg-red-500 text-white border-3 border-black shadow-[5px_5px_0px_#000] space-y-1">
                                 <div className="flex items-center gap-2">
                                     <AlertTriangle className="w-6 h-6 shrink-0 stroke-[3]" />
@@ -227,28 +227,68 @@ export const PublicCertificateVerifyPage: React.FC = () => {
                             </div>
                         )}
 
+                        {/* Superseded Warning Notice if superseded by newer version */}
+                        {cert.status === "superseded" && (
+                            <div className="p-5 rounded-2xl bg-amber-400 text-black border-3 border-black shadow-[5px_5px_0px_#000] space-y-2">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <AlertTriangle className="w-6 h-6 shrink-0 stroke-[3]" />
+                                        <h3 className="text-base sm:text-lg font-black uppercase tracking-wide">
+                                            Notice: Certificate Superseded by Newer Version
+                                        </h3>
+                                    </div>
+                                    {cert.supersededBy && (
+                                        <button
+                                            type="button"
+                                            onClick={() => navigate(`/verify/certificate/${encodeURIComponent(cert.supersededBy!.credentialCode)}`)}
+                                            className="px-3.5 py-1.5 rounded-xl bg-black text-[#FFE566] text-xs font-black border-2 border-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 hover:bg-neutral-800 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                                        >
+                                            <span>View Version {cert.supersededBy.version || (cert.version ? cert.version + 1 : 2)}</span>
+                                            <ExternalLink className="w-3.5 h-3.5" />
+                                        </button>
+                                    )}
+                                </div>
+                                <p className="text-xs sm:text-sm font-bold text-neutral-900 pl-8">
+                                    An updated credential was reissued by {cert.clubName || "the issuing club"}. This historical record is preserved for immutable verification auditing.
+                                </p>
+                            </div>
+                        )}
+
                         {/* Verified Credential Dossier */}
                         <div className="rounded-2xl bg-white border-3 border-black shadow-[7px_7px_0px_#000] overflow-hidden">
                             {/* Verification Banner */}
                             <div className={`p-5 sm:p-6 border-b-3 border-black flex flex-wrap items-center justify-between gap-4 ${
-                                cert.isRevoked ? "bg-red-50" : "bg-[#a2ff86]"
+                                cert.isRevoked || cert.status === "revoked"
+                                    ? "bg-red-50"
+                                    : cert.status === "superseded"
+                                    ? "bg-amber-100"
+                                    : "bg-[#a2ff86]"
                             }`}>
                                 <div className="flex items-center gap-3">
                                     <div className="w-12 h-12 rounded-xl bg-white border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_#000]">
-                                        {cert.isRevoked ? (
+                                        {cert.isRevoked || cert.status === "revoked" ? (
                                             <AlertTriangle className="w-6 h-6 text-red-600 stroke-[2.5]" />
+                                        ) : cert.status === "superseded" ? (
+                                            <AlertTriangle className="w-6 h-6 text-amber-600 stroke-[2.5]" />
                                         ) : (
                                             <ShieldCheck className="w-7 h-7 text-emerald-600 stroke-[2.5]" />
                                         )}
                                     </div>
                                     <div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <span className="text-xs sm:text-sm font-black uppercase tracking-wider text-black">
-                                                {cert.isRevoked ? "Status: Revoked" : "Authentic Verified Credential"}
+                                                {cert.isRevoked || cert.status === "revoked"
+                                                    ? "Status: Revoked"
+                                                    : cert.status === "superseded"
+                                                    ? "Status: Superseded"
+                                                    : "Authentic Verified Credential"}
                                             </span>
-                                            {!cert.isRevoked && (
-                                                <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-white border border-black rounded shadow-[1px_1px_0px_#000]">
-                                                    Live
+                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-white border border-black rounded shadow-[1px_1px_0px_#000]">
+                                                v{cert.version || 1}
+                                            </span>
+                                            {cert.reissuedFrom && (
+                                                <span className="text-[10px] font-mono font-bold text-neutral-600">
+                                                    (Reissued from v{cert.reissuedFrom.version})
                                                 </span>
                                             )}
                                         </div>
@@ -403,13 +443,27 @@ export const PublicCertificateVerifyPage: React.FC = () => {
                                     </div>
                                 )}
 
-                                {/* Action Buttons */}
+                                {/* Signing Infrastructure & Authority Seal */}
+                                <div className="p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000] flex items-center justify-between text-xs flex-wrap gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span className="font-bold text-neutral-700">Digital Seal:</span>
+                                        <span className="font-black text-black">
+                                            {cert.signingMetadata?.infrastructure || "Orbix SHA-256 Authoritative Cryptographic Seal"}
+                                        </span>
+                                    </div>
+                                    <span className="font-mono text-[10px] text-neutral-600 font-bold">
+                                        Algorithm: {cert.signingMetadata?.algorithm || "SHA-256"}
+                                    </span>
+                                </div>
+
+                                {/* Action Buttons & Social Sharing */}
                                 <div className="pt-2 flex flex-wrap items-center gap-3">
                                     <button
                                         type="button"
                                         onClick={handleDownloadPdf}
                                         disabled={downloading}
-                                        className="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black border-3 border-black font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                        className="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-[#a2ff86] hover:bg-[#8ee673] text-black border-3 border-black font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
                                     >
                                         <Download className="w-4 h-4 stroke-[2.5]" />
                                         <span>{downloading ? "Preparing PDF..." : "Download Official PDF"}</span>
@@ -418,7 +472,7 @@ export const PublicCertificateVerifyPage: React.FC = () => {
                                     <button
                                         type="button"
                                         onClick={copyShareUrl}
-                                        className="px-5 py-3 rounded-xl bg-white hover:bg-neutral-50 text-black border-3 border-black font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                        className="px-5 py-3 rounded-xl bg-white hover:bg-neutral-50 text-black border-3 border-black font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] flex items-center justify-center gap-2 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
                                     >
                                         {copiedLink ? (
                                             <>
@@ -428,10 +482,30 @@ export const PublicCertificateVerifyPage: React.FC = () => {
                                         ) : (
                                             <>
                                                 <Share2 className="w-4 h-4 stroke-[2.5]" />
-                                                <span>Share Credential</span>
+                                                <span>Share Link</span>
                                             </>
                                         )}
                                     </button>
+
+                                    <a
+                                        href={`https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=${encodeURIComponent(cert.title)}&organizationName=${encodeURIComponent(cert.clubName || "Orbix Campus")}&issueYear=${cert.issueDate ? new Date(cert.issueDate).getFullYear() : new Date().getFullYear()}&issueMonth=${cert.issueDate ? new Date(cert.issueDate).getMonth() + 1 : 1}&certUrl=${encodeURIComponent(window.location.href)}&certId=${encodeURIComponent(cert.credentialCode)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-4 py-3 rounded-xl bg-[#0077B5] hover:bg-[#006097] text-white border-3 border-black font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                        title="Add to LinkedIn Profile"
+                                    >
+                                        <span>Add to LinkedIn</span>
+                                    </a>
+
+                                    <a
+                                        href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`I earned a verified "${cert.title}" certificate from ${cert.clubName || "campus club"} on @Orbix! Verify authenticity:`)}&url=${encodeURIComponent(window.location.href)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-4 py-3 rounded-xl bg-black hover:bg-neutral-800 text-white border-3 border-black font-black text-xs sm:text-sm shadow-[4px_4px_0px_#000] flex items-center justify-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                        title="Post on X"
+                                    >
+                                        <span>Post on X</span>
+                                    </a>
                                 </div>
                             </div>
                         </div>

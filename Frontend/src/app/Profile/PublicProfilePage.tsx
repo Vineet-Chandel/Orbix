@@ -1749,39 +1749,6 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                 </div>
 
                 {/* ========================================================================= */}
-                {/* FLAGSHIP PROJECTS SHOWCASE SECTION (CONDITIONAL: ONLY WHEN > 0 PUBLISHED) */}
-                {/* ========================================================================= */}
-                {publishedProjects.length > 0 && (
-                    <section aria-label="Flagship Projects Showcase" className="w-full max-w-[1600px] mx-auto space-y-6">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
-                            <div>
-                                <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
-                                    <FolderKanban className="w-6 h-6 text-black stroke-[2.5]" />
-                                    <span>Flagship Projects</span>
-                                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                        {publishedProjects.length} / 4 Showcased
-                                    </span>
-                                </h2>
-                                <p className="text-xs text-neutral-500 font-medium">
-                                    Curated engineering architectures, open-source repositories, and production systems.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-                            {publishedProjects.map((project) => (
-                                <ProjectCard
-                                    key={project.id}
-                                    project={project}
-                                    isManageMode={false}
-                                    onViewDetails={(p) => setViewingProject(p)}
-                                />
-                            ))}
-                        </div>
-                    </section>
-                )}
-
-                {/* ========================================================================= */}
                 {/* PRACTICE & DEVELOPMENT ACTIVITY & PERFORMANCE SECTION */}
                 {/* ========================================================================= */}
                 {profile.isPublic === false && !profile.isOwner ? (
@@ -1910,6 +1877,39 @@ export default function PublicProfilePage({ overrideUsername, isEmbedded = false
                                 </div>
                             </div>
                         )}
+                    </section>
+                )}
+
+                {/* ========================================================================= */}
+                {/* FLAGSHIP PROJECTS SHOWCASE (AT BOTTOM OF PROFILE FOR PRACTICE & DEV TABS) */}
+                {/* ========================================================================= */}
+                {publishedProjects.length > 0 && activeField !== "projects" && (
+                    <section aria-label="Flagship Projects Showcase" className="w-full max-w-[1600px] mx-auto space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
+                            <div>
+                                <h2 className="text-xl sm:text-2xl font-black text-neutral-900 tracking-tight flex items-center gap-2">
+                                    <FolderKanban className="w-6 h-6 text-black stroke-[2.5]" />
+                                    <span>Flagship Projects</span>
+                                    <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#a2ff86] text-black border border-black shadow-[1px_1px_0px_#000]">
+                                        {publishedProjects.length} / 4 Showcased
+                                    </span>
+                                </h2>
+                                <p className="text-xs text-neutral-500 font-medium">
+                                    Curated engineering architectures, open-source repositories, and production systems.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                            {publishedProjects.map((project) => (
+                                <ProjectCard
+                                    key={project.id}
+                                    project={project}
+                                    isManageMode={false}
+                                    onViewDetails={(p) => setViewingProject(p)}
+                                />
+                            ))}
+                        </div>
                     </section>
                 )}
             </main>

@@ -8,6 +8,9 @@ import {
     AlertTriangle,
     RefreshCw,
     X,
+    FileText,
+    XCircle,
+    RotateCcw,
 } from "lucide-react";
 import { useToast } from "../../../context/ToastContext";
 import {
@@ -17,6 +20,10 @@ import {
 import {
     fetchCertificateBatches,
     revokeCertificate,
+    retryFailedBatch,
+    cancelBatch,
+    fetchBatchErrors,
+    downloadBatchReportCsv,
     type CertificateBatchRecord,
 } from "../../../api/certificateStudioApi";
 import { CertificateModal } from "../../common/CertificateModal";
@@ -41,6 +48,60 @@ export const BatchesAndRegistryView: React.FC = () => {
     const [revokingCert, setRevokingCert] = useState<CertificateItem | null>(null);
     const [revocationReason, setRevocationReason] = useState("");
     const [isRevoking, setIsRevoking] = useState(false);
+
+    // Error inspection modal (Phase 14)
+    const [inspectingErrorsBatch, setInspectingErrorsBatch] = useState<{
+        batchId: string;
+        title: string;
+        errors: any[];
+    } | null>(null);
+    const [loadingErrorsBatchId, setLoadingErrorsBatchId] = useState<string | null>(null);
+
+    const handleDownloadReport = async (batchId: string) => {
+        try {
+            await downloadBatchReportCsv(batchId);
+            toast.success("Generation audit report downloaded!");
+        } catch (err: any) {
+            toast.error(err.message || "Failed to download batch report.");
+        }
+    };
+
+    const handleInspectErrors = async (batchId: string, title: string) => {
+        setLoadingErrorsBatchId(batchId);
+        try {
+            const data = await fetchBatchErrors(batchId);
+            setInspectingErrorsBatch({
+                batchId,
+                title,
+                errors: data.errors || [],
+            });
+        } catch (err: any) {
+            toast.error(err.message || "Failed to load error details.");
+        } finally {
+            setLoadingErrorsBatchId(null);
+        }
+    };
+
+    const handleRetryBatch = async (batchId: string) => {
+        try {
+            const res = await retryFailedBatch(batchId);
+            toast.success(res.message || "Retrying failed recipients in background queue.");
+            await loadData();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to retry batch.");
+        }
+    };
+
+    const handleCancelBatch = async (batchId: string) => {
+        if (!confirm("Are you sure you want to cancel this batch? Unprocessed items will be aborted.")) return;
+        try {
+            const res = await cancelBatch(batchId);
+            toast.warning(res.message);
+            await loadData();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to cancel batch.");
+        }
+    };
 
     const loadData = async () => {
         setLoadingCerts(true);
@@ -261,6 +322,7 @@ export const BatchesAndRegistryView: React.FC = () => {
                                         <th className="p-3 font-black">Recipients</th>
                                         <th className="p-3 font-black">Status</th>
                                         <th className="p-3 font-black">Date</th>
+                                        <th className="p-3 font-black text-right">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-neutral-200">
@@ -285,6 +347,8 @@ export const BatchesAndRegistryView: React.FC = () => {
                                                             ? "bg-[#a2ff86] border-emerald-800 text-black"
                                                             : b.status === "processing"
                                                             ? "bg-blue-100 border-blue-400 text-blue-800"
+                                                            : b.status === "cancelled"
+                                                            ? "bg-neutral-200 border-neutral-400 text-neutral-700"
                                                             : "bg-red-100 border-red-400 text-red-800"
                                                     }`}
                                                 >
@@ -293,6 +357,56 @@ export const BatchesAndRegistryView: React.FC = () => {
                                             </td>
                                             <td className="p-3 text-neutral-500 whitespace-nowrap">
                                                 {new Date(b.createdAt).toLocaleDateString()}
+                                            </td>
+                                            <td className="p-3 text-right">
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    {/* Download CSV Generation Report */}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDownloadReport(b.id)}
+                                                        className="p-1.5 rounded-lg border border-black bg-white hover:bg-neutral-100 text-neutral-800 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                        title="Download Audit Report (CSV)"
+                                                    >
+                                                        <Download className="w-3.5 h-3.5" />
+                                                    </button>
+
+                                                    {/* View Item Errors */}
+                                                    {b.failedCount > 0 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleInspectErrors(b.id, b.title)}
+                                                            disabled={loadingErrorsBatchId === b.id}
+                                                            className="p-1.5 rounded-lg border border-black bg-red-50 hover:bg-red-100 text-red-700 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                            title="Inspect Generation Errors"
+                                                        >
+                                                            <FileText className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+
+                                                    {/* Retry Failed */}
+                                                    {b.failedCount > 0 && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRetryBatch(b.id)}
+                                                            className="p-1.5 rounded-lg border border-black bg-[#FFE566] hover:bg-[#ebd04e] text-black shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                            title="Retry Failed Recipients"
+                                                        >
+                                                            <RotateCcw className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+
+                                                    {/* Cancel active batch */}
+                                                    {(b.status === "processing" || b.status === "queued") && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleCancelBatch(b.id)}
+                                                            className="p-1.5 rounded-lg border border-black bg-red-100 hover:bg-red-200 text-red-800 shadow-[1px_1px_0px_#000] cursor-pointer"
+                                                            title="Cancel Batch Processing"
+                                                        >
+                                                            <XCircle className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -360,6 +474,69 @@ export const BatchesAndRegistryView: React.FC = () => {
                                 className="px-4 py-1.5 rounded-xl border-2 border-black bg-red-500 hover:bg-red-600 text-white text-xs font-black shadow-[2px_2px_0px_#000]"
                             >
                                 {isRevoking ? "Revoking..." : "Confirm Revocation"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Phase 14: Inspect Batch Errors Modal */}
+            {inspectingErrorsBatch && (
+                <div className="fixed inset-0 z-[130] flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+                    <div className="w-full max-w-lg bg-white border-3 border-black rounded-2xl shadow-[6px_6px_0px_#000] p-6 space-y-4">
+                        <div className="flex items-center justify-between border-b-2 border-black/10 pb-3">
+                            <div className="flex items-center gap-2 text-red-600 font-black">
+                                <AlertTriangle className="w-5 h-5" />
+                                <span>Batch Generation Errors ({inspectingErrorsBatch.errors.length})</span>
+                            </div>
+                            <button
+                                onClick={() => setInspectingErrorsBatch(null)}
+                                className="p-1 hover:bg-neutral-100 rounded-lg cursor-pointer"
+                            >
+                                <X className="w-4 h-4 text-black" />
+                            </button>
+                        </div>
+
+                        <div>
+                            <p className="text-xs font-black text-black">
+                                Batch: <span className="font-bold text-neutral-600">{inspectingErrorsBatch.title}</span>
+                            </p>
+                        </div>
+
+                        <div className="max-h-60 overflow-y-auto space-y-2 divide-y divide-neutral-200">
+                            {inspectingErrorsBatch.errors.length === 0 ? (
+                                <p className="text-xs text-neutral-500 font-medium py-4 text-center">No individual error details recorded.</p>
+                            ) : (
+                                inspectingErrorsBatch.errors.map((err, idx) => (
+                                    <div key={idx} className="pt-2 text-xs">
+                                        <div className="flex items-center justify-between font-black text-black">
+                                            <span>{err.recipientName || "Recipient"}</span>
+                                            {err.email && <span className="text-[10px] text-neutral-500 font-mono">{err.email}</span>}
+                                        </div>
+                                        <p className="text-red-600 font-mono text-[11px] mt-0.5">{err.error || "Unknown render error"}</p>
+                                        {err.timestamp && (
+                                            <p className="text-[9px] text-neutral-400 mt-0.5">{new Date(err.timestamp).toLocaleString()}</p>
+                                        )}
+                                    </div>
+                                ))
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-between pt-3 border-t-2 border-black/10">
+                            <button
+                                type="button"
+                                onClick={() => handleDownloadReport(inspectingErrorsBatch.batchId)}
+                                className="px-3 py-1.5 rounded-xl border-2 border-black bg-white hover:bg-neutral-100 text-xs font-black flex items-center gap-1.5 shadow-[1px_1px_0px_#000] cursor-pointer"
+                            >
+                                <Download className="w-3.5 h-3.5" />
+                                <span>Download CSV Report</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setInspectingErrorsBatch(null)}
+                                className="px-4 py-1.5 rounded-xl border-2 border-black bg-[#FFE566] text-black text-xs font-black shadow-[2px_2px_0px_#000] cursor-pointer"
+                            >
+                                Close
                             </button>
                         </div>
                     </div>

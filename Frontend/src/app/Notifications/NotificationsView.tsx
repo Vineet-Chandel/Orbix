@@ -40,6 +40,7 @@ import {
     Award,
     Sparkles,
     Download,
+    Share2,
 } from "lucide-react";
 import { revealCertificateNotification } from "../../api/certificateStudioApi";
 import { useToast } from "../../context/ToastContext";
@@ -110,6 +111,24 @@ export const NotificationsView: React.FC = () => {
     const [isTerminatingSession, setIsTerminatingSession] = useState<string | null>(null);
     const [isMarkingAllRead, setIsMarkingAllRead] = useState<boolean>(false);
     const [revealedCertificates, setRevealedCertificates] = useState<Record<string, boolean>>({});
+    const [selectedGroupCertIndex, setSelectedGroupCertIndex] = useState<number>(0);
+
+    const handleShareCertificate = (code: string, title: string) => {
+        const verifyUrl = `${window.location.origin}/verify/certificate/${encodeURIComponent(code)}`;
+        if (navigator.share) {
+            navigator.share({
+                title: `${title} - Verified Credential`,
+                text: `I've been awarded ${title}! Check out my verified credential on Orbix:`,
+                url: verifyUrl,
+            }).catch(() => {
+                navigator.clipboard.writeText(verifyUrl);
+                toast.success("Verification link copied to clipboard!");
+            });
+        } else {
+            navigator.clipboard.writeText(verifyUrl);
+            toast.success("Verification link copied to clipboard!");
+        }
+    };
 
     // Load notifications with automatic read marking
     const loadNotifications = useCallback(
@@ -1075,24 +1094,44 @@ export const NotificationsView: React.FC = () => {
                                 senderUsername;
 
                             // -------------------------------------------------------------
-                            // CASE CERT: CERTIFICATE AWARD WITH SPOILER PREVIEW & REVEAL
+                            // CASE CERT: CERTIFICATE AWARD WITH SPOILER PREVIEW & REVEAL (Phase 15)
                             // -------------------------------------------------------------
                             if (isCertificateAward(activeItem)) {
-                                const certId = meta.certificateId || "";
-                                const credentialCode = meta.credentialCode || "";
+                                const isGrouped = Boolean(meta.isGrouped && Array.isArray(meta.certificates) && meta.certificates.length > 0);
+                                const certList: any[] = isGrouped ? meta.certificates : [meta];
+                                const safeIdx = Math.min(selectedGroupCertIndex, certList.length - 1);
+                                const currentCert = certList[safeIdx] || meta;
+
+                                const certId = currentCert.certificateId || meta.certificateId || "";
+                                const credentialCode = currentCert.credentialCode || meta.credentialCode || "";
                                 const clubName = meta.clubName || "Campus Club";
                                 const clubSlug = meta.clubSlug || "";
                                 const clubLogo = meta.clubLogo || null;
-                                const certTitle = meta.certificateTitle || activeItem.title || "Certificate of Recognition";
-                                const certType = meta.certificateType || "participation";
-                                const awardPosition = meta.awardPosition || null;
-                                const isRevealed = Boolean(meta.spoilerRevealed || revealedCertificates[activeItem.id]);
+                                const certTitle = currentCert.title || currentCert.certificateTitle || meta.certificateTitle || activeItem.title || "Certificate of Recognition";
+                                const certType = currentCert.certificateType || meta.certificateType || "participation";
+                                const awardPosition = currentCert.awardPosition || meta.awardPosition || null;
+                                const recipientDisplayName = currentCert.recipientName || meta.recipientName || (user ? `${user.firstName} ${user.lastName}`.trim() : "Recipient");
+                                const issueDate = currentCert.issueDate || meta.issueDate || activeItem.createdAt;
+                                const sha256Digest = currentCert.sha256Hash || meta.sha256Hash || null;
+                                const previewUrl = currentCert.previewUrl || (credentialCode ? `/api/club/certificates/${encodeURIComponent(credentialCode)}/preview` : "");
+                                const previewBlurredUrl = currentCert.previewBlurredUrl || (credentialCode ? `/api/club/certificates/${encodeURIComponent(credentialCode)}/preview?blurred=true` : "");
+
+                                const isRevealed = Boolean(
+                                    currentCert.isRevealed ||
+                                    meta.isRevealed ||
+                                    revealedCertificates[`${activeItem.id}-${credentialCode}`] ||
+                                    revealedCertificates[activeItem.id]
+                                );
 
                                 const handleReveal = async () => {
-                                    setRevealedCertificates((prev) => ({ ...prev, [activeItem.id]: true }));
+                                    setRevealedCertificates((prev) => ({
+                                        ...prev,
+                                        [activeItem.id]: true,
+                                        [`${activeItem.id}-${credentialCode}`]: true,
+                                    }));
                                     try {
-                                        if (certId) {
-                                            await revealCertificateNotification(certId);
+                                        if (certId || credentialCode) {
+                                            await revealCertificateNotification(certId || credentialCode);
                                         }
                                     } catch (err) {
                                         console.error("Failed to mark reveal on server:", err);
@@ -1141,8 +1180,48 @@ export const NotificationsView: React.FC = () => {
                                             )}
                                         </div>
 
+                                        {/* Bulk Grouping Tabs Selector (if user received multiple certificates in batch) */}
+                                        {isGrouped && certList.length > 1 && (
+                                            <div className="space-y-2 p-3.5 rounded-2xl bg-[#FAF6EE] border-2 border-black shadow-[3px_3px_0px_#000]">
+                                                <div className="flex items-center justify-between text-xs font-black text-black">
+                                                    <span>Batch Certificates Awarded ({certList.length}):</span>
+                                                    <span className="text-[10px] text-neutral-500 font-bold">Select credential to inspect</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {certList.map((c: any, cIdx: number) => {
+                                                        const isSelected = cIdx === safeIdx;
+                                                        const cCode = c.credentialCode || `cert-${cIdx}`;
+                                                        const cRev = Boolean(
+                                                            c.isRevealed ||
+                                                            revealedCertificates[`${activeItem.id}-${cCode}`] ||
+                                                            revealedCertificates[activeItem.id]
+                                                        );
+                                                        return (
+                                                            <button
+                                                                key={cIdx}
+                                                                type="button"
+                                                                onClick={() => setSelectedGroupCertIndex(cIdx)}
+                                                                className={`px-3 py-1.5 rounded-xl border-2 border-black font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                                                                    isSelected
+                                                                        ? "bg-[#FFE566] text-black shadow-[2px_2px_0px_#000] translate-x-[-1px] translate-y-[-1px]"
+                                                                        : "bg-white text-neutral-700 hover:bg-neutral-100 shadow-[1px_1px_0px_#000]"
+                                                                }`}
+                                                            >
+                                                                <span>{c.certificateType ? String(c.certificateType).toUpperCase() : `Award #${cIdx + 1}`}</span>
+                                                                {cRev ? (
+                                                                    <Check className="w-3.5 h-3.5 text-emerald-700 stroke-[3]" />
+                                                                ) : (
+                                                                    <Sparkles className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+                                                                )}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* Award Message Content */}
-                                        <div className="space-y-3">
+                                        <div className="space-y-2">
                                             <h2 className="text-xl sm:text-2xl font-black text-black tracking-tight">
                                                 {certTitle}
                                             </h2>
@@ -1157,51 +1236,88 @@ export const NotificationsView: React.FC = () => {
                                         </div>
 
                                         {/* SPOILER CARD / REVEALED CERTIFICATE */}
-                                        <div className="relative rounded-2xl border-3 border-black overflow-hidden shadow-[5px_5px_0px_#000] bg-neutral-900 text-white min-h-[260px] flex flex-col justify-center items-center p-6 text-center">
+                                        <div className="relative rounded-2xl border-3 border-black overflow-hidden shadow-[5px_5px_0px_#000] bg-neutral-900 text-white min-h-[300px] flex flex-col justify-center items-center p-6 text-center">
                                             {!isRevealed ? (
-                                                <div className="space-y-4 max-w-md">
-                                                    <div className="w-16 h-16 rounded-2xl bg-[#FFE566] text-black border-2 border-black flex items-center justify-center mx-auto shadow-[3px_3px_0px_#000] animate-bounce">
-                                                        <Sparkles className="w-8 h-8 stroke-[2.5]" />
+                                                <div className="w-full relative flex flex-col items-center justify-center py-6">
+                                                    {/* Obscured blurred preview backdrop */}
+                                                    {previewBlurredUrl && (
+                                                        <div className="absolute inset-0 overflow-hidden pointer-events-none select-none opacity-30">
+                                                            <img
+                                                                src={previewBlurredUrl}
+                                                                alt="Obscured Certificate Preview"
+                                                                className="w-full h-full object-cover filter blur-md scale-105"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {/* Central Spoiler Reveal Dialog */}
+                                                    <div className="relative z-10 space-y-4 max-w-md bg-black/60 backdrop-blur-md p-6 rounded-2xl border-2 border-neutral-700 shadow-[4px_4px_0px_#000]">
+                                                        <div className="w-16 h-16 rounded-2xl bg-[#FFE566] text-black border-2 border-black flex items-center justify-center mx-auto shadow-[3px_3px_0px_#000] animate-bounce">
+                                                            <Sparkles className="w-8 h-8 stroke-[2.5]" />
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 bg-black/80 border border-neutral-600 rounded-full text-[#a2ff86]">
+                                                                Digital Credential Locked
+                                                            </span>
+                                                            <h4 className="text-lg sm:text-xl font-black text-white">
+                                                                You've received an official certificate!
+                                                            </h4>
+                                                            <p className="text-xs text-neutral-300 font-medium">
+                                                                "Your certificate is ready. Tap to reveal your achievement."
+                                                            </p>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleReveal}
+                                                            className="px-6 py-3 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs sm:text-sm shadow-[3px_3px_0px_#000] flex items-center gap-2 mx-auto transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                                                        >
+                                                            <Sparkles className="w-4 h-4 stroke-[2.5]" />
+                                                            <span>Reveal Certificate</span>
+                                                        </button>
                                                     </div>
-                                                    <div className="space-y-1">
-                                                        <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-0.5 bg-black/60 border border-neutral-700 rounded-full text-[#a2ff86]">
-                                                            Digital Credential Unlocked
-                                                        </span>
-                                                        <h4 className="text-lg sm:text-xl font-black text-white">
-                                                            You received an official certificate!
-                                                        </h4>
-                                                        <p className="text-xs text-neutral-300">
-                                                            Tap below to unseal your personalized certificate and download the cryptographically signed PDF.
-                                                        </p>
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={handleReveal}
-                                                        className="px-6 py-3 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs sm:text-sm shadow-[3px_3px_0px_#000] flex items-center gap-2 mx-auto transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
-                                                    >
-                                                        <Sparkles className="w-4 h-4 stroke-[2.5]" />
-                                                        <span>Tap to Reveal Certificate</span>
-                                                    </button>
                                                 </div>
                                             ) : (
                                                 <div className="w-full space-y-5">
-                                                    <div className="p-4 rounded-xl bg-neutral-800/90 border-2 border-neutral-700 space-y-2">
-                                                        <div className="flex items-center justify-between text-xs">
+                                                    {/* Original Low-Resolution Vector Preview */}
+                                                    {previewUrl && (
+                                                        <div className="rounded-xl border-2 border-black bg-white overflow-hidden shadow-[3px_3px_0px_#000]">
+                                                            <img
+                                                                src={previewUrl}
+                                                                alt={certTitle}
+                                                                className="w-full max-h-[360px] object-contain mx-auto"
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {/* Certificate Details Strip */}
+                                                    <div className="p-4 rounded-xl bg-neutral-800/90 border-2 border-neutral-700 space-y-2 text-left">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                                                             <span className="font-mono text-[#a2ff86] font-bold">
                                                                 ID: {credentialCode}
                                                             </span>
-                                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-[#a2ff86] text-black rounded">
-                                                                Verified
+                                                            <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-[#a2ff86] text-black rounded border border-black">
+                                                                Valid & Verified
                                                             </span>
                                                         </div>
-                                                        <h4 className="text-lg sm:text-xl font-black text-white tracking-tight">
+                                                        <h4 className="text-lg font-black text-white tracking-tight">
                                                             {certTitle}
                                                         </h4>
                                                         <div className="text-xs text-neutral-300">
-                                                            Issued to <strong className="text-white">{user ? `${user.firstName} ${user.lastName}`.trim() : "Recipient"}</strong> by {clubName}
+                                                            Conferred to <strong className="text-white">{recipientDisplayName}</strong> by {clubName}
                                                         </div>
+                                                        {issueDate && (
+                                                            <div className="text-[11px] text-neutral-400">
+                                                                Issued on {new Date(issueDate).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                                                            </div>
+                                                        )}
+                                                        {sha256Digest && (
+                                                            <div className="text-[10px] font-mono text-neutral-400 truncate pt-1 border-t border-neutral-700/60">
+                                                                SHA-256: {sha256Digest}
+                                                            </div>
+                                                        )}
                                                     </div>
 
+                                                    {/* Action Buttons: Download PDF, Share, Verify Certificate */}
                                                     <div className="flex flex-wrap items-center justify-center gap-3">
                                                         {credentialCode && (
                                                             <a
@@ -1211,8 +1327,19 @@ export const NotificationsView: React.FC = () => {
                                                                 className="px-5 py-2.5 rounded-xl bg-[#a2ff86] text-black hover:bg-[#8ee673] border-2 border-black font-black text-xs shadow-[3px_3px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                                             >
                                                                 <Download className="w-4 h-4 stroke-[2.5]" />
-                                                                <span>Download Signed PDF</span>
+                                                                <span>Download PDF</span>
                                                             </a>
+                                                        )}
+
+                                                        {credentialCode && (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleShareCertificate(credentialCode, certTitle)}
+                                                                className="px-5 py-2.5 rounded-xl bg-[#FFE566] text-black hover:bg-[#ebd04e] border-2 border-black font-black text-xs shadow-[3px_3px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5 cursor-pointer"
+                                                            >
+                                                                <Share2 className="w-4 h-4 stroke-[2.5]" />
+                                                                <span>Share</span>
+                                                            </button>
                                                         )}
 
                                                         {credentialCode && (
@@ -1221,8 +1348,8 @@ export const NotificationsView: React.FC = () => {
                                                                 target="_blank"
                                                                 className="px-5 py-2.5 rounded-xl bg-white text-black hover:bg-neutral-100 border-2 border-black font-black text-xs shadow-[3px_3px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
                                                             >
-                                                                <ExternalLink className="w-4 h-4" />
-                                                                <span>Public Verification Link</span>
+                                                                <ShieldCheck className="w-4 h-4 text-emerald-600 stroke-[2.5]" />
+                                                                <span>Verify Certificate</span>
                                                             </Link>
                                                         )}
                                                     </div>

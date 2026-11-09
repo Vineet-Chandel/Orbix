@@ -192,6 +192,8 @@ const App = () => {
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="/resume" element={<Dashboard />} />
             <Route path="/projects" element={<Dashboard />} />
+            <Route path="/wallet" element={<Dashboard />} />
+            <Route path="/certificates" element={<Dashboard />} />
           </Route>
         </Routes>
           </Suspense>

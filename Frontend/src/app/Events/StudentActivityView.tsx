@@ -11,10 +11,7 @@ import {
     Menu,
     Award,
     Sparkles,
-    Eye,
     QrCode,
-    Share2,
-    Building2,
     X,
     Printer,
     AlertTriangle,
@@ -29,12 +26,12 @@ import {
     fetchStudentCertificates,
     type CertificateItem,
 } from "../../api/clubCertificatesApi";
-import { CertificateModal } from "../common/CertificateModal";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 import { OrbixLoader } from "../../components/ui/loader";
 import { ConfirmationModal } from "../../components/ConfirmationModal";
 import { useModalDismiss } from "../../hooks/useModalDismiss";
 import { OrbixCardQR } from "../Profile/CardStudio/OrbixCardQR";
+import { UserCertificateWalletView } from "../Certificates/UserCertificateWalletView";
 
 interface StudentActivityViewProps {
     onOpenMobileSidebar?: () => void;
@@ -63,8 +60,6 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
 
     // Certificates data
     const [certificates, setCertificates] = useState<CertificateItem[]>([]);
-    const [loadingCerts, setLoadingCerts] = useState(false);
-    const [selectedCert, setSelectedCert] = useState<CertificateItem | null>(null);
 
     // QR Pass Modal state
     const [activePassApp, setActivePassApp] = useState<StudentApplicationItem | null>(null);
@@ -90,15 +85,11 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
 
     // Load Certificates
     const loadCertificates = async () => {
-        setLoadingCerts(true);
         try {
             const certs = await fetchStudentCertificates();
             setCertificates(certs);
         } catch (err: any) {
             console.error("Failed to load certificates:", err);
-            toast.error(err.message || "Failed to load certificates.");
-        } finally {
-            setLoadingCerts(false);
         }
     };
 
@@ -726,118 +717,15 @@ export const StudentActivityView: React.FC<StudentActivityViewProps> = ({
                 )}
 
                 {/* ========================================================================= */}
-                {/* SEGMENT 3: CERTIFICATES */}
+                {/* SEGMENT 3: CERTIFICATES & CREDENTIAL WALLET */}
                 {/* ========================================================================= */}
                 {activeSegment === "certificates" && (
-                    <div className="space-y-6">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="font-black text-base text-black">Awarded Certificates & Credentials</h3>
-                                <p className="text-xs font-bold text-neutral-600">
-                                    Official verified achievement certificates issued to you by verified campus clubs.
-                                </p>
-                            </div>
-                            <span className="px-2.5 py-1 rounded-lg border border-black bg-white text-xs font-black shadow-[1.5px_1.5px_0px_#000]">
-                                Total Earned: {certificates.length}
-                            </span>
-                        </div>
-
-                        {loadingCerts ? (
-                            <div className="p-16 text-center space-y-3">
-                                <OrbixLoader size="md" />
-                                <span className="text-xs font-black text-black">Loading your verified certificates...</span>
-                            </div>
-                        ) : certificates.length === 0 ? (
-                            <div className="p-12 text-center rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] space-y-3">
-                                <Award className="w-12 h-12 text-neutral-400 mx-auto" />
-                                <h4 className="font-black text-base text-black">No certificates awarded yet</h4>
-                                <p className="text-xs font-bold text-neutral-600 max-w-md mx-auto">
-                                    When you participate in club events, contribute to campus chapters, or earn distinctions, verified certificates issued by clubs will appear right here.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                {certificates.map((cert) => {
-                                    const issueDateStr = new Date(cert.issueDate).toLocaleDateString("en-US", {
-                                        month: "short",
-                                        day: "numeric",
-                                        year: "numeric",
-                                    });
-
-                                    return (
-                                        <div
-                                            key={cert.id}
-                                            className="p-5 rounded-2xl bg-white border-3 border-black shadow-[5px_5px_0px_#000] flex flex-col justify-between space-y-4"
-                                        >
-                                            <div className="space-y-3">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-[#FFDE59] text-black border border-black shadow-[1px_1px_0px_#000]">
-                                                        {cert.certificateType}
-                                                    </span>
-                                                    <span className="text-[11px] font-mono font-bold text-neutral-500">
-                                                        {issueDateStr}
-                                                    </span>
-                                                </div>
-
-                                                <div>
-                                                    <h4 className="font-black text-lg text-black leading-tight">
-                                                        {cert.title}
-                                                    </h4>
-                                                    <p className="text-xs font-bold text-neutral-600 flex items-center gap-1.5 mt-1">
-                                                        <Building2 className="w-3.5 h-3.5" />
-                                                        {cert.clubName} · {cert.collegeName || "Campus Club"}
-                                                    </p>
-                                                </div>
-
-                                                <p className="text-xs font-medium text-neutral-700 line-clamp-2">
-                                                    {cert.description}
-                                                </p>
-
-                                                <div className="p-2.5 rounded-xl bg-neutral-100 border border-black/20 flex items-center justify-between text-xs font-mono">
-                                                    <span className="font-bold text-neutral-600">Credential ID:</span>
-                                                    <span className="font-black text-black">{cert.credentialCode}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center justify-between pt-2 border-t border-black/10">
-                                                <button
-                                                    onClick={() => setSelectedCert(cert)}
-                                                    className="px-3.5 py-1.5 rounded-xl border-2 border-black bg-[#a2ff86] hover:bg-[#8cee70] text-black text-xs font-black shadow-[2px_2px_0px_#000] flex items-center gap-1.5 transition-transform active:translate-x-0.5 active:translate-y-0.5"
-                                                >
-                                                    <Eye className="w-3.5 h-3.5" />
-                                                    View Certificate
-                                                </button>
-
-                                                <button
-                                                    onClick={() => {
-                                                        const url = `${window.location.origin}/verify-cert/${encodeURIComponent(cert.credentialCode)}`;
-                                                        navigator.clipboard.writeText(url);
-                                                        toast.success("Verification link copied!");
-                                                    }}
-                                                    className="p-1.5 rounded-lg border border-black bg-white hover:bg-neutral-100 text-xs font-black shadow-[1px_1px_0px_#000]"
-                                                    title="Share Verification Link"
-                                                >
-                                                    <Share2 className="w-3.5 h-3.5" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
+                    <UserCertificateWalletView compact={true} />
                 )}
             </div>
 
             {/* Bottom Illustration */}
             <SectionBottomIllustration />
-
-            {/* Official Certificate Full View Modal */}
-            <CertificateModal
-                certificate={selectedCert}
-                isOpen={!!selectedCert}
-                onClose={() => setSelectedCert(null)}
-            />
 
             {/* QR Pass Details Modal */}
             {activePassApp && (

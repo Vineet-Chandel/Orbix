@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { createPortal } from "react-dom";
 import {
     Sparkles,
@@ -18,6 +19,7 @@ import {
     Lightbulb,
     AlertTriangle,
     X,
+    BookOpen,
 } from "lucide-react";
 import { useToast } from "../../context/ToastContext";
 import { useAppDispatch, updateUserProfile } from "../../store";
@@ -298,6 +300,16 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                 <UploadCloud className="w-4 h-4 stroke-[2.5]" />
                                 <span>{resumeData?.hasResume ? "Upload New Resume" : "Upload Resume"}</span>
                             </button>
+
+                            <Link
+                                to="/docs/resume-intelligence-algorithm"
+                                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white hover:bg-neutral-100 text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_#000] hover:shadow-[1px_1px_0px_#000] hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
+                                title="Open Resume Intelligence Algorithm Documentation"
+                            >
+                                <BookOpen className="w-4 h-4 stroke-[2.5]" />
+                                <span>Documentation</span>
+                                <ExternalLink className="w-3.5 h-3.5 stroke-[2.5]" />
+                            </Link>
                         </div>
                     </div>
 
@@ -574,6 +586,16 @@ export const ResumeManager: React.FC<ResumeManagerProps> = ({
                                     Follow this simple workflow to evaluate, optimize, and showcase your resume to top tech recruiters.
                                 </p>
                             </div>
+
+                            <Link
+                                to="/docs/resume-intelligence-algorithm"
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#FAF6EE] hover:bg-white text-black text-xs font-black uppercase tracking-wider border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[1px_1px_0px_#000] transition-all cursor-pointer self-start sm:self-center shrink-0"
+                                title="View Resume Intelligence Algorithm Documentation"
+                            >
+                                <BookOpen className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>Algorithm Docs</span>
+                                <ExternalLink className="w-3 h-3 stroke-[2.5]" />
+                            </Link>
                         </div>
 
                         {/* Step Cards Grid */}

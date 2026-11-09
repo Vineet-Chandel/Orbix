@@ -8,7 +8,10 @@ import { CertificatePdfService } from "./certificatePdfService.js";
 import { CertificateTemplateService } from "./certificateTemplateService.js";
 import { ClubCredibilityService } from "./clubCredibilityService.js";
 import { CertificateQueueService } from "./certificateQueueService.js";
+import { CertificateNotificationService, type UserAwardsEntry } from "./certificateNotificationService.js";
 import type { CertificateDesign, DynamicDataSnapshot } from "../../types/certificateStudio.js";
+
+export const MAX_RECIPIENTS_PER_BATCH = 5000;
 
 export interface BatchIssuanceRequest {
     clubId: string;
@@ -505,6 +508,22 @@ export class CertificateIssuanceService {
     }
 
     /**
+     * Verifies that a staff user has authorization (owner, admin, lead, coordinator) for a club
+     */
+    static async verifyClubRole(userId: string, clubId: string): Promise<boolean> {
+        const res = await query(
+            `SELECT vc.id
+             FROM verified_clubs vc
+             LEFT JOIN club_memberships cm ON cm.club_id = vc.id AND cm.user_id = $1 AND cm.status = 'active'
+             WHERE (vc.auth_user_id = $1 OR cm.access_role IN ('owner', 'admin', 'team_lead', 'advisor', 'coordinator', 'lead'))
+               AND vc.id = $2
+             LIMIT 1;`,
+            [userId, clubId]
+        );
+        return Boolean(res.rows[0]);
+    }
+
+    /**
      * Evaluates comprehensive participant eligibility for an event according to category rules (Phase 10)
      */
     static async evaluateEventEligibility(
@@ -730,6 +749,10 @@ export class CertificateIssuanceService {
             throw new Error("A valid certificate title is required (minimum 3 characters).");
         }
 
+        if (recipients.length > MAX_RECIPIENTS_PER_BATCH) {
+            throw new Error(`Batch size limit exceeded. Maximum allowable recipients per batch is ${MAX_RECIPIENTS_PER_BATCH}.`);
+        }
+
         // Phase 13: Rate Limit Check (max 10 batch submissions per minute per club)
         if (!CertificateQueueService.checkRateLimit(clubId)) {
             throw new Error("Rate limit exceeded. Please wait a moment before submitting another certificate batch.");
@@ -763,6 +786,14 @@ export class CertificateIssuanceService {
         );
         const club = clubRes.rows[0];
         if (!club) throw new Error("Issuing club not found.");
+
+        // Verify staff authorization for issuing club
+        if (staffUserId) {
+            const isAuthorized = await CertificateIssuanceService.verifyClubRole(staffUserId, clubId);
+            if (!isAuthorized) {
+                throw new Error("Access Denied: You do not have permission to issue certificates for this club.");
+            }
+        }
 
         // Resolve design: either from templateId or customDesign
         let design: CertificateDesign;
@@ -1150,6 +1181,9 @@ export class CertificateIssuanceService {
         let individualCertificatesCount = 0;
         const client = await pool.connect();
 
+        // Phase 15: Aggregate awards per user for bulk grouped notification delivery
+        const userAwardsMap = new Map<string, UserAwardsEntry>();
+
         try {
             await client.query("BEGIN");
 
@@ -1243,11 +1277,13 @@ export class CertificateIssuanceService {
                             batch_id, team_id, title, certificate_type, recipient_name,
                             recipient_email, description, credential_code, signer_name,
                             signer_role, issued_by_user_id, issue_date, design_snapshot,
-                            recipient_snapshot, sha256_hash, metadata, claim_status
+                            recipient_snapshot, sha256_hash, metadata, claim_status, version,
+                            recipient_type
                         ) VALUES (
                             $1, NULL, $2, $3, $4, $5, $6, $7, $8, $9,
                             NULL, $10, $11, $12, $13, $14, $15, $16::jsonb,
-                            $17::jsonb, $18, $19::jsonb, 'claimed'
+                            $17::jsonb, $18, $19::jsonb, 'claimed', 1,
+                            'team'
                         )
                         ON CONFLICT (club_id, team_id, COALESCE(event_id, '00000000-0000-0000-0000-000000000000'::uuid), certificate_type, title)
                         WHERE team_id IS NOT NULL AND user_id IS NULL AND claim_token IS NULL
@@ -1296,54 +1332,27 @@ export class CertificateIssuanceService {
                     });
                     teamCertificatesCount++;
 
-                    // Notify each registered team member
+                    // Collect for recipient notification delivery (Phase 15)
                     for (const member of tm.members || []) {
                         if (member.userId) {
-                            const teamNotifTitle = `🎓 Your team received a certificate!`;
-                            const teamNotifBody = `${club.name} has awarded your team "${tm.teamName}" the "${cleanTitle}" certificate${
-                                eventRecord ? ` for ${eventRecord.title}` : ""
-                            }. Tap to view.`;
-
-                            const teamNotifMeta = JSON.stringify({
-                                type: "club_certificate",
-                                certificateId: teamCert.id,
-                                credentialCode: teamCert.credential_code,
-                                clubId: club.id,
-                                clubName: club.name,
-                                clubSlug: club.slug,
-                                eventId: eventId || null,
-                                eventTitle: eventRecord?.title || null,
-                                certificateType,
+                            if (!userAwardsMap.has(member.userId)) {
+                                userAwardsMap.set(member.userId, {
+                                    user: { id: member.userId, username: member.username || member.name, name: member.name },
+                                    certs: [],
+                                });
+                            }
+                            userAwardsMap.get(member.userId)!.certs.push({
+                                id: teamCert.id,
+                                credential_code: teamCert.credential_code,
                                 title: cleanTitle,
-                                issueDate: teamCert.issue_date,
-                                isSpoiler: true,
-                                isRevealed: false,
+                                certificate_type: certificateType,
+                                recipient_name: tm.teamName,
+                                issue_date: teamCert.issue_date,
+                                sha256_hash: teamSha256Digest || undefined,
                                 isTeam: true,
-                                teamId: tm.teamId,
                                 teamName: tm.teamName,
+                                awardPosition: awardPosition || undefined,
                             });
-
-                            await client.query(
-                                `INSERT INTO user_notifications (
-                                    user_id, recipient_id, username, title, body,
-                                    type, notification_type, metadata, idempotency_key, is_read, created_at
-                                ) VALUES (
-                                    $1, $1, $2, $3, $4,
-                                    'club_certificate', 'team_certificate_awarded', $5::jsonb, $6, false, NOW()
-                                )
-                                ON CONFLICT (idempotency_key) DO UPDATE SET
-                                    title = EXCLUDED.title,
-                                    body = EXCLUDED.body,
-                                    metadata = EXCLUDED.metadata;`,
-                                [
-                                    member.userId,
-                                    member.username || member.name,
-                                    teamNotifTitle,
-                                    teamNotifBody,
-                                    teamNotifMeta,
-                                    `team-cert-${teamCert.id}-${member.userId}`,
-                                ]
-                            );
                         }
                     }
                 }
@@ -1356,7 +1365,7 @@ export class CertificateIssuanceService {
                 for (const user of eligibleUsers) {
                     // Find matching custom overrides from request if any
                     const customOverrides = recipients.find((r) => r.userId === user.id);
-                    const recipientDisplayName = customOverrides?.customName?.trim() || user.name;
+                    const recipientDisplayName = customOverrides?.customName?.trim() || customOverrides?.name?.trim() || user.name;
                     const recipientPosition = customOverrides?.customPosition?.trim() || awardPosition || "";
 
                     const userTeamId = user.teamId || teamRecord?.id;
@@ -1455,11 +1464,13 @@ export class CertificateIssuanceService {
                                 batch_id, team_id, title, certificate_type, recipient_name,
                                 recipient_email, description, credential_code, signer_name,
                                 signer_role, issued_by_user_id, issue_date, design_snapshot,
-                                recipient_snapshot, sha256_hash, metadata, claim_token, claim_status, claim_expires_at
+                                recipient_snapshot, sha256_hash, metadata, claim_token, claim_status, claim_expires_at,
+                                recipient_type
                             ) VALUES (
                                 $1, NULL, $2, $3, $4, $5, $6, $7, $8, $9,
                                 $10, $11, $12, $13, $14, $15, $16, $17::jsonb,
-                                $18::jsonb, $19, $20::jsonb, $21, 'pending_claim', NOW() + INTERVAL '60 days'
+                                $18::jsonb, $19, $20::jsonb, $21, 'pending_claim', NOW() + INTERVAL '60 days',
+                                'external'
                             ) RETURNING id, credential_code, title, certificate_type, issue_date;`,
                             [
                                 club.id,
@@ -1493,13 +1504,15 @@ export class CertificateIssuanceService {
                                 batch_id, team_id, title, certificate_type, recipient_name,
                                 recipient_email, description, credential_code, signer_name,
                                 signer_role, issued_by_user_id, issue_date, design_snapshot,
-                                recipient_snapshot, sha256_hash, metadata, claim_status
+                                recipient_snapshot, sha256_hash, metadata, claim_status, version,
+                                recipient_type
                             ) VALUES (
                                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                                 $11, $12, $13, $14, $15, $16, $17, $18::jsonb,
-                                $19::jsonb, $20, $21::jsonb, 'claimed'
+                                $19::jsonb, $20, $21::jsonb, 'claimed', 1,
+                                'individual'
                             )
-                            ON CONFLICT (club_id, user_id, COALESCE(event_id, '00000000-0000-0000-0000-000000000000'::uuid), certificate_type, title)
+                            ON CONFLICT (club_id, user_id, COALESCE(event_id, '00000000-0000-0000-0000-000000000000'::uuid), certificate_type, title, version)
                             DO UPDATE SET
                                 description = EXCLUDED.description,
                                 signer_name = EXCLUDED.signer_name,
@@ -1549,53 +1562,35 @@ export class CertificateIssuanceService {
                     });
                     individualCertificatesCount++;
 
-                    // Phase 15: Create in-app notification with spoiler preview if user exists
+                    // Phase 15: Collect for recipient notification delivery
                     if (user.id && !isExternal) {
-                        const notifTitle = `🎓 You've received a certificate!`;
-                        const notifBody = `${club.name} has awarded you the "${cleanTitle}" certificate${
-                            eventRecord ? ` for ${eventRecord.title}` : ""
-                        }. Tap to reveal your achievement.`;
-
-                        const notifMetadata = JSON.stringify({
-                            type: "club_certificate",
-                            certificateId: cert.id,
-                            credentialCode: cert.credential_code,
-                            clubId: club.id,
-                            clubName: club.name,
-                            clubSlug: club.slug,
-                            eventId: eventId || null,
-                            eventTitle: eventRecord?.title || null,
-                            certificateType,
+                        if (!userAwardsMap.has(user.id)) {
+                            userAwardsMap.set(user.id, {
+                                user: { id: user.id, username: user.username, name: recipientDisplayName },
+                                certs: [],
+                            });
+                        }
+                        userAwardsMap.get(user.id)!.certs.push({
+                            id: cert.id,
+                            credential_code: cert.credential_code,
                             title: cleanTitle,
-                            issueDate: cert.issue_date,
-                            isSpoiler: true,
-                            isRevealed: false,
+                            certificate_type: certificateType,
+                            recipient_name: recipientDisplayName,
+                            issue_date: cert.issue_date,
+                            sha256_hash: sha256Digest || undefined,
+                            awardPosition: recipientPosition || undefined,
                         });
-
-                        await client.query(
-                            `INSERT INTO user_notifications (
-                                user_id, recipient_id, username, title, body,
-                                type, notification_type, metadata, idempotency_key, is_read, created_at
-                            ) VALUES (
-                                $1, $1, $2, $3, $4,
-                                'club_certificate', 'certificate_awarded', $5::jsonb, $6, false, NOW()
-                            )
-                            ON CONFLICT (idempotency_key) DO UPDATE SET
-                                title = EXCLUDED.title,
-                                body = EXCLUDED.body,
-                                metadata = EXCLUDED.metadata;`,
-                            [
-                                user.id,
-                                user.username,
-                                notifTitle,
-                                notifBody,
-                                notifMetadata,
-                                `cert-${cert.id}`,
-                            ]
-                        );
                     }
                 }
             }
+
+            // Phase 15: Dispatch grouped bulk / individual certificate notifications
+            await CertificateIssuanceService.dispatchCertificateNotifications(client, {
+                club,
+                eventRecord,
+                batchId,
+                userAwardsMap,
+            });
 
             // Update batch record to completed
             await client.query(
@@ -1644,11 +1639,13 @@ export class CertificateIssuanceService {
                         staffUserId,
                         unv.id,
                         JSON.stringify({
+                            batchId: batchInsertRes.rows[0].id,
                             eventId,
                             userId: unv.id,
                             userName: unv.name,
                             certificateType,
                             reason: overrideReason?.trim() || "Manual coordinator override",
+                            overrideReason: overrideReason?.trim() || "Manual coordinator override",
                         }),
                     ]
                 );
@@ -1887,5 +1884,20 @@ export class CertificateIssuanceService {
             recipientName: cert.recipient_name,
             message: "Certificate claimed successfully and linked to your profile.",
         };
+    }
+
+    /**
+     * Dispatches certificate notifications to recipients (Phase 15)
+     */
+    static async dispatchCertificateNotifications(
+        dbClient: { query: (sql: string, params?: any[]) => Promise<any> },
+        params: {
+            club: { id: string; name: string; slug: string; logo_url?: string };
+            eventRecord: { id?: string; title: string } | null;
+            batchId: string;
+            userAwardsMap: Map<string, UserAwardsEntry>;
+        }
+    ): Promise<void> {
+        return CertificateNotificationService.dispatchCertificateNotifications(dbClient, params);
     }
 }

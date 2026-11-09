@@ -17,6 +17,51 @@ export interface RenderPdfResult {
 
 export class CertificatePdfService {
     /**
+     * Sanitizes string for WinAnsi-encoded StandardFonts (Helvetica, Times, Courier)
+     * Transliterates small caps, normalizes diacritics, strips unencodable characters
+     */
+    static sanitizeForPdf(text: string): string {
+        if (!text) return "";
+
+        // 1. NFKD normalization decomposes accents and letters
+        const normalized = text.normalize("NFKD");
+
+        // 2. Transliteration dictionary for small caps and common Unicode stylistic variants
+        const smallCapsMap: Record<string, string> = {
+            'ᴀ': 'A', 'ʙ': 'B', 'ᴄ': 'C', 'ᴅ': 'D', 'ᴇ': 'E', 'ꜰ': 'F', 'ɢ': 'G', 'ʜ': 'H',
+            'ɪ': 'I', 'ᴊ': 'J', 'ᴋ': 'K', 'ʟ': 'L', 'ᴍ': 'M', 'ɴ': 'N', 'ᴏ': 'O', 'ᴘ': 'P',
+            'ǫ': 'Q', 'ʀ': 'R', 'ꜱ': 'S', 'ᴛ': 'T', 'ᴜ': 'U', 'ᴠ': 'V', 'ᴡ': 'W', 'x': 'X',
+            'ʏ': 'Y', 'ᴢ': 'Z',
+            '’': "'", '‘': "'", '“': '"', '”': '"', '–': '-', '—': '-', '…': '...',
+            '•': '*', '·': '*', '‚': ',', '„': '"'
+        };
+
+        let result = "";
+        for (const char of normalized) {
+            if (smallCapsMap[char]) {
+                result += smallCapsMap[char];
+            } else {
+                const code = char.charCodeAt(0);
+                // Standard printable ASCII (0x20 to 0x7E) + newline/carriage return
+                if ((code >= 0x20 && code <= 0x7E) || code === 0x0A || code === 0x0D || code === 0x09) {
+                    result += char;
+                } else if (code >= 0xA0 && code <= 0xFF) {
+                    // Latin-1 Supplement supported by WinAnsi
+                    result += char;
+                } else if (code >= 0x0300 && code <= 0x036F) {
+                    // Skip decomposed combining diacritical marks
+                    continue;
+                } else {
+                    // Fallback to ASCII approximation or space
+                    result += " ";
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
      * Resolves a dynamic fieldKey token (e.g. "recipient.name") against the recipient snapshot
      */
     static resolveFieldKey(fieldKey: string | undefined, snapshot: DynamicDataSnapshot, fallback = ""): string {
@@ -35,16 +80,34 @@ export class CertificatePdfService {
         }
 
         // Check common aliases and fallback mappings
-        if ((fieldKey === "recipient.fullName" || fieldKey === "recipient.name") && (snapshot.recipient?.name || snapshot.recipient?.fullName)) {
+        if (
+            (fieldKey === "recipient.fullName" || fieldKey === "recipient.name" || fieldKey === "recipient_name" || fieldKey === "recipientName") &&
+            (snapshot.recipient?.name || snapshot.recipient?.fullName)
+        ) {
             return snapshot.recipient.name || snapshot.recipient.fullName || fallback;
         }
-        if (fieldKey === "recipient.institution" && snapshot.recipient?.collegeName) {
+        if ((fieldKey === "recipient.institution" || fieldKey === "recipient_institution") && snapshot.recipient?.collegeName) {
             return snapshot.recipient.collegeName;
         }
-        if ((fieldKey === "event.name" || fieldKey === "event.title") && (snapshot.event?.title || snapshot.event?.name)) {
+        if (
+            (fieldKey === "event.name" || fieldKey === "event.title" || fieldKey === "event_name" || fieldKey === "event_title") &&
+            (snapshot.event?.title || snapshot.event?.name)
+        ) {
             return snapshot.event.title || snapshot.event.name || fallback;
         }
-        if (fieldKey === "certificate.number" && snapshot.certificate?.credentialCode) {
+        if ((fieldKey === "award.position" || fieldKey === "position" || fieldKey === "award_position") && snapshot.award?.position) {
+            return snapshot.award.position;
+        }
+        if ((fieldKey === "award.title" || fieldKey === "award_title") && snapshot.award?.title) {
+            return snapshot.award.title;
+        }
+        if ((fieldKey === "award.achievement" || fieldKey === "achievement") && (snapshot.award as any)?.achievement) {
+            return (snapshot.award as any).achievement;
+        }
+        if ((fieldKey === "team.name" || fieldKey === "team_name" || fieldKey === "teamName") && snapshot.team?.name) {
+            return snapshot.team.name;
+        }
+        if ((fieldKey === "certificate.number" || fieldKey === "credential_code" || fieldKey === "credentialCode") && snapshot.certificate?.credentialCode) {
             return snapshot.certificate.credentialCode;
         }
         const customKey = parts[1];
@@ -74,13 +137,75 @@ export class CertificatePdfService {
         return rgb(isNaN(r) ? 0 : r, isNaN(g) ? 0 : g, isNaN(b) ? 0 : b);
     }
 
+    // Static asset cache for reusing fetched/decoded background artwork across multiple recipients in a batch (Phase 19)
+    private static assetCache = new Map<string, { buffer: Buffer; isPng: boolean; cachedAt: number }>();
+
+    /**
+     * Clears in-memory template asset cache
+     */
+    static clearAssetCache(): void {
+        this.assetCache.clear();
+    }
+
+    /**
+     * Returns current number of cached template assets
+     */
+    static getAssetCacheSize(): number {
+        return this.assetCache.size;
+    }
+
+    /**
+     * Prefetches and caches remote asset in memory to avoid repeated network round-trips
+     */
+    static async prefetchAsset(
+        url: string,
+        localCache?: Map<string, { buffer: Buffer; isPng: boolean }>
+    ): Promise<{ buffer: Buffer; isPng: boolean } | null> {
+        if (!url) return null;
+        const cached = localCache?.get(url) || this.assetCache.get(url);
+        if (cached && (Date.now() - (cached as any).cachedAt < 3600000 || !(cached as any).cachedAt)) {
+            return { buffer: cached.buffer, isPng: cached.isPng };
+        }
+
+        try {
+            if (url.startsWith("data:image/png;base64,")) {
+                const buffer = Buffer.from(url.replace("data:image/png;base64,", ""), "base64");
+                const entry = { buffer, isPng: true, cachedAt: Date.now() };
+                this.assetCache.set(url, entry);
+                if (localCache) localCache.set(url, { buffer, isPng: true });
+                return entry;
+            } else if (url.startsWith("data:image/jpeg;base64,") || url.startsWith("data:image/jpg;base64,")) {
+                const buffer = Buffer.from(url.replace(/^data:image\/(jpeg|jpg);base64,/, ""), "base64");
+                const entry = { buffer, isPng: false, cachedAt: Date.now() };
+                this.assetCache.set(url, entry);
+                if (localCache) localCache.set(url, { buffer, isPng: false });
+                return entry;
+            } else if (url.startsWith("http://") || url.startsWith("https://")) {
+                const fetchRes = await fetch(url);
+                if (fetchRes.ok) {
+                    const arrayBuf = await fetchRes.arrayBuffer();
+                    const buffer = Buffer.from(arrayBuf);
+                    const isPng = url.toLowerCase().endsWith(".png");
+                    const entry = { buffer, isPng, cachedAt: Date.now() };
+                    this.assetCache.set(url, entry);
+                    if (localCache) localCache.set(url, { buffer, isPng });
+                    return entry;
+                }
+            }
+        } catch (err) {
+            console.warn(`[CertificatePdfService] Asset prefetch failed for ${url}:`, err);
+        }
+        return null;
+    }
+
     /**
      * Renders a high-resolution PDF from a CertificateDesign and DynamicDataSnapshot
      */
     static async renderCertificatePdf(
         design: CertificateDesign,
         snapshot: DynamicDataSnapshot,
-        verificationBaseUrl: string = "https://orbix.dev"
+        verificationBaseUrl: string = "https://orbix.dev",
+        options?: { assetCache?: Map<string, { buffer: Buffer; isPng: boolean }> }
     ): Promise<RenderPdfResult> {
         const doc = await PDFDocument.create();
 
@@ -118,28 +243,39 @@ export class CertificatePdfService {
             warnings.push("Credential verification code is missing.");
         }
 
-        // Embed background image asset if present (Phase 9)
+        // Embed background image asset if present (Phase 9 & Phase 19 asset reuse)
         const bgImageUrl = bg.imageUrl || (bg as any).assetUrl;
         if (bgImageUrl) {
             try {
                 let bgImgBuffer: Buffer | null = null;
                 let isPng = false;
 
-                if (bgImageUrl.startsWith("data:image/png;base64,")) {
+                // Check cache first to avoid re-fetching on batch runs
+                const cached = options?.assetCache?.get(bgImageUrl) || this.assetCache.get(bgImageUrl);
+                if (cached) {
+                    bgImgBuffer = cached.buffer;
+                    isPng = cached.isPng;
+                } else if (bgImageUrl.startsWith("data:image/png;base64,")) {
                     bgImgBuffer = Buffer.from(bgImageUrl.replace("data:image/png;base64,", ""), "base64");
                     isPng = true;
+                    this.assetCache.set(bgImageUrl, { buffer: bgImgBuffer, isPng: true, cachedAt: Date.now() });
                 } else if (
                     bgImageUrl.startsWith("data:image/jpeg;base64,") ||
                     bgImageUrl.startsWith("data:image/jpg;base64,")
                 ) {
                     bgImgBuffer = Buffer.from(bgImageUrl.replace(/^data:image\/(jpeg|jpg);base64,/, ""), "base64");
                     isPng = false;
+                    this.assetCache.set(bgImageUrl, { buffer: bgImgBuffer, isPng: false, cachedAt: Date.now() });
                 } else if (bgImageUrl.startsWith("http://") || bgImageUrl.startsWith("https://")) {
                     const fetchRes = await fetch(bgImageUrl);
                     if (fetchRes.ok) {
                         const arrayBuf = await fetchRes.arrayBuffer();
                         bgImgBuffer = Buffer.from(arrayBuf);
                         isPng = bgImageUrl.toLowerCase().endsWith(".png");
+                        this.assetCache.set(bgImageUrl, { buffer: bgImgBuffer, isPng, cachedAt: Date.now() });
+                        if (options?.assetCache) {
+                            options.assetCache.set(bgImageUrl, { buffer: bgImgBuffer, isPng });
+                        }
                     }
                 }
 
@@ -274,10 +410,12 @@ export class CertificatePdfService {
             if (elem.type === "static-text" || elem.type === "dynamic-text") {
                 let textContent =
                     elem.type === "dynamic-text"
-                        ? this.resolveFieldKey(elem.fieldKey, snapshot, elem.fallbackValue || "")
-                        : elem.text || "";
+                        ? this.resolveFieldKey(elem.fieldKey, snapshot, elem.text || elem.fallbackValue || (elem as any).content || "")
+                        : elem.text || (elem as any).content || "";
 
                 if (!textContent) continue;
+                textContent = this.sanitizeForPdf(textContent);
+                if (!textContent.trim()) continue;
 
                 // Font selection
                 const isBold =
@@ -307,8 +445,8 @@ export class CertificatePdfService {
                     ? fontSansBold
                     : fontSans;
 
-                let fontSize = elem.style?.fontSize || 14;
-                const textColor = this.hexToRgb(elem.style?.color || "#000000");
+                let fontSize = elem.style?.fontSize || (elem as any).fontSize || 14;
+                const textColor = this.hexToRgb(elem.style?.color || (elem as any).color || "#000000");
                 const maxWidth = elem.width;
                 const maxHeight = elem.height;
 
@@ -353,17 +491,22 @@ export class CertificatePdfService {
                     // "shrink" or "warn"
                     let textWidth = font.widthOfTextAtSize(textContent, fontSize);
 
-                    if (policy === "shrink" || maxWidth > 0) {
+                    if (policy === "shrink") {
                         while (textWidth > maxWidth && fontSize > 7) {
                             fontSize -= 0.5;
                             textWidth = font.widthOfTextAtSize(textContent, fontSize);
                         }
-                    }
-
-                    if (policy === "warn" && textWidth > maxWidth) {
-                        warnings.push(
-                            `Element "${elem.id}" (${elem.fieldKey || elem.text}) overflows container width (${Math.round(textWidth)}pt > ${maxWidth}pt)`
-                        );
+                    } else if (policy === "warn") {
+                        if (textWidth > maxWidth) {
+                            warnings.push(
+                                `Element "${elem.id}" (${elem.fieldKey || elem.text}) overflows container width (${Math.round(textWidth)}pt > ${maxWidth}pt)`
+                            );
+                        }
+                    } else if (maxWidth > 0) {
+                        while (textWidth > maxWidth && fontSize > 7) {
+                            fontSize -= 0.5;
+                            textWidth = font.widthOfTextAtSize(textContent, fontSize);
+                        }
                     }
 
                     // Alignment calculation
@@ -410,7 +553,7 @@ export class CertificatePdfService {
                     color: badgeBg,
                 });
                 if (elem.text) {
-                    const badgeText = elem.text;
+                    const badgeText = this.sanitizeForPdf(elem.text);
                     const bFont = fontSansBold;
                     const bSize = elem.style?.fontSize || 12;
                     const bWidth = bFont.widthOfTextAtSize(badgeText, bSize);
@@ -489,9 +632,10 @@ export class CertificatePdfService {
                 });
 
                 // Signer Name
-                const signerName =
+                const signerName = this.sanitizeForPdf(
                     elem.signerName ||
-                    this.resolveFieldKey("certificate.signerName", snapshot, "Authorized Signatory");
+                    this.resolveFieldKey("certificate.signerName", snapshot, "Authorized Signatory")
+                );
                 const sNameFont = fontSansBold;
                 const sNameSize = 10;
                 const sNameWidth = sNameFont.widthOfTextAtSize(signerName, sNameSize);
@@ -504,9 +648,10 @@ export class CertificatePdfService {
                 });
 
                 // Signer Role / Title
-                const signerRole =
+                const signerRole = this.sanitizeForPdf(
                     elem.signerTitle ||
-                    this.resolveFieldKey("certificate.signerRole", snapshot, "Club Coordinator");
+                    this.resolveFieldKey("certificate.signerRole", snapshot, "Club Coordinator")
+                );
                 const sRoleFont = fontSans;
                 const sRoleSize = 8.5;
                 const sRoleWidth = sRoleFont.widthOfTextAtSize(signerRole, sRoleSize);

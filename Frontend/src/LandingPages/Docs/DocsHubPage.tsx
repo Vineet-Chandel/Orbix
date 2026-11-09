@@ -19,6 +19,7 @@ import {
     Terminal,
     Brain,
     ShieldCheck,
+    Building2,
 } from "lucide-react";
 
 export const DocsHubPage: React.FC = () => {
@@ -41,6 +42,9 @@ export const DocsHubPage: React.FC = () => {
             case "Shield":
             case "ShieldCheck":
                 return <ShieldCheck className="w-5 h-5 text-black" />;
+            case "Building2":
+            case "GraduationCap":
+                return <Building2 className="w-5 h-5 text-black" />;
             default:
                 return <Folder className="w-5 h-5 text-black" />;
         }
