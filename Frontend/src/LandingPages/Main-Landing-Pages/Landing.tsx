@@ -16,19 +16,12 @@ import { Footer } from './Footer';
  */
 function ShowcaseSection({
   children,
-  fallbackHeight = 600,
 }: {
   children: React.ReactNode;
   fallbackHeight?: number;
 }) {
   return (
-    <div
-      style={{
-        contentVisibility: 'auto',
-        containIntrinsicSize: `auto none auto ${fallbackHeight}px`,
-      }}
-      className="w-full"
-    >
+    <div className="w-full">
       {children}
     </div>
   );
