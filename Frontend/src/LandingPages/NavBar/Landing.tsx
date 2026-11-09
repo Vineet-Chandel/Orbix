@@ -1,9 +1,27 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import {
+    MoreHorizontal,
+    BookOpen,
+    Newspaper,
+    Bell,
+    User,
+    ArrowRight,
+    ArrowUpRight,
+    X,
+    ChevronDown,
+    ChevronUp,
+} from 'lucide-react';
 import { useAppSelector } from '../../store';
 import { NotificationBell } from '../../components/NotificationBell';
 import { OrbixLogo } from '../../components/OrbixLogo';
+import {
+    fetchNotifications,
+    fetchUnreadNotificationCount,
+    type UserNotification,
+} from '../../utils/profileApi';
+import { OrbixLoader } from '../../components/ui/loader';
 
 export interface NavItem {
     id: string;
@@ -43,6 +61,22 @@ interface NavBarProps {
     onTabChange?: (tabId: string) => void;
 }
 
+function formatRelativeTime(dateString: string): string {
+    try {
+        const date = new Date(dateString);
+        const now = new Date();
+        const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+        if (diffInSeconds < 60) return "Just now";
+        if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
+        if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
+        if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)}d ago`;
+        return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    } catch {
+        return "";
+    }
+}
+
 const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChange }) => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -61,21 +95,112 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
     const dropdownTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
     const navRef = useRef<HTMLElement>(null);
 
+    // Mobile Navigation & Notifications State
+    const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const [isMobileNotificationsOpen, setIsMobileNotificationsOpen] = useState(false);
+    const [unreadCount, setUnreadCount] = useState<number>(0);
+    const [mobileNotifications, setMobileNotifications] = useState<UserNotification[]>([]);
+    const [loadingMobileNotifs, setLoadingMobileNotifs] = useState(false);
+
     useEffect(() => {
         setInternalActiveTab(detectedTab);
     }, [detectedTab]);
 
     const activeTab = externalActiveTab !== undefined ? externalActiveTab : internalActiveTab;
 
+    const { user, loading, isAuthenticated } = useAppSelector((state) => state.user);
+
+    // Synchronous fallback from localStorage for immediate paint
+    const storedUser = React.useMemo(() => {
+        try {
+            const raw = localStorage.getItem("orbix_user");
+            return raw ? JSON.parse(raw) : null;
+        } catch {
+            return null;
+        }
+    }, []);
+
+    const currentUser = user || storedUser;
+    const isLoggedIn = Boolean(
+        (isAuthenticated && user) ||
+        (currentUser && (currentUser.username || currentUser.gmail || currentUser.id))
+    );
+
+    // Unread count synchronization for mobile menu badge
+    const updateUnreadCount = useCallback(async () => {
+        if (!isLoggedIn) {
+            setUnreadCount(0);
+            return;
+        }
+        try {
+            const count = await fetchUnreadNotificationCount();
+            setUnreadCount(count);
+        } catch {
+            // background poll silent catch
+        }
+    }, [isLoggedIn]);
+
+    useEffect(() => {
+        if (!isLoggedIn) return;
+        updateUnreadCount();
+
+        const interval = setInterval(updateUnreadCount, 25000);
+        const onSync = () => updateUnreadCount();
+
+        window.addEventListener("focus", onSync);
+        window.addEventListener("orbix_notifications_updated", onSync);
+
+        return () => {
+            clearInterval(interval);
+            window.removeEventListener("focus", onSync);
+            window.removeEventListener("orbix_notifications_updated", onSync);
+        };
+    }, [isLoggedIn, updateUnreadCount]);
+
+    // Close menus when clicking outside or pressing Escape
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (navRef.current && !navRef.current.contains(e.target as Node)) {
                 setOpenDropdown(null);
                 setIsClickOpen(false);
+                setIsMobileMenuOpen(false);
+                setIsMobileNotificationsOpen(false);
+            }
+        };
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setOpenDropdown(null);
+                setIsClickOpen(false);
+                setIsMobileMenuOpen(false);
+                setIsMobileNotificationsOpen(false);
             }
         };
         document.addEventListener('mousedown', handleClickOutside);
-        return () => document.removeEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
+
+    // Close dropdown on route change
+    useEffect(() => {
+        setIsMobileMenuOpen(false);
+        setIsMobileNotificationsOpen(false);
+        setOpenDropdown(null);
+        setIsClickOpen(false);
+    }, [location.pathname]);
+
+    // Close mobile menu on desktop resize
+    useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth >= 768) {
+                setIsMobileMenuOpen(false);
+                setIsMobileNotificationsOpen(false);
+            }
+        };
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
     const handleTabClick = (tabId: string) => {
@@ -97,24 +222,6 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
             navigate('/docs');
         }
     };
-
-    const { user, loading, isAuthenticated } = useAppSelector((state) => state.user);
-
-    // Synchronous fallback from localStorage for immediate paint
-    const storedUser = React.useMemo(() => {
-        try {
-            const raw = localStorage.getItem("orbix_user");
-            return raw ? JSON.parse(raw) : null;
-        } catch {
-            return null;
-        }
-    }, []);
-
-    const currentUser = user || storedUser;
-    const isLoggedIn = Boolean(
-        (isAuthenticated && user) ||
-        (currentUser && (currentUser.username || currentUser.gmail || currentUser.id))
-    );
 
     const displayName = currentUser?.firstName
         ? `${currentUser.firstName} ${currentUser.lastName || ""}`.trim()
@@ -168,6 +275,39 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
         }, 250);
     };
 
+    const toggleMobileMenu = () => {
+        setOpenDropdown(null);
+        setIsClickOpen(false);
+        setIsMobileMenuOpen((prev) => !prev);
+    };
+
+    const handleToggleMobileNotifications = async () => {
+        const nextState = !isMobileNotificationsOpen;
+        setIsMobileNotificationsOpen(nextState);
+
+        if (nextState && isLoggedIn) {
+            setLoadingMobileNotifs(true);
+            try {
+                const res = await fetchNotifications(true);
+                setMobileNotifications(res.notifications || []);
+                setUnreadCount(res.unreadCount || 0);
+                if (typeof window !== "undefined") {
+                    window.dispatchEvent(new Event("orbix_notifications_updated"));
+                }
+            } catch (err) {
+                console.error("Failed to fetch mobile notifications:", err);
+            } finally {
+                setLoadingMobileNotifs(false);
+            }
+        }
+    };
+
+    const handleOpenInbox = () => {
+        setIsMobileMenuOpen(false);
+        setIsMobileNotificationsOpen(false);
+        navigate("/dashboard?tab=inbox");
+    };
+
     return (
         <header className="fixed top-3 sm:top-6 left-0 right-0 z-50 flex justify-center px-2 sm:px-4 pointer-events-none">
             <nav
@@ -178,16 +318,16 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                 {/* Brand Logo & Title */}
                 <Link
                     to="/"
-                    className="flex items-center gap-2.5 py-1 mr-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20 hover:opacity-85 transition-opacity"
+                    className="flex items-center gap-2 sm:gap-2.5 py-1 mr-1 sm:mr-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-black/20 hover:opacity-85 transition-opacity shrink-0"
                 >
-                    <OrbixLogo className="w-9 h-9 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
-                    <span className="font-black text-2xl sm:text-3xl tracking-tight text-black leading-none">
+                    <OrbixLogo className="w-8 h-8 sm:w-10 sm:h-10 text-black group-hover:scale-105 transition-transform flex-shrink-0" />
+                    <span className="font-black text-xl sm:text-2xl md:text-3xl tracking-tight text-black leading-none">
                         Orbix
                     </span>
                 </Link>
 
-                {/* Navigation Items with Animated Slider */}
-                <div className="flex items-center gap-0.5 sm:gap-1">
+                {/* Navigation Items with Animated Slider (Desktop Only) */}
+                <div className="hidden md:flex items-center gap-0.5 sm:gap-1">
                     {NAV_ITEMS.map((item) => {
                         const isRouteActive = activeTab === item.id;
                         const isHovered = hoveredTab === item.id;
@@ -272,8 +412,8 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                 </div>
 
                 {/* Right Action Buttons */}
-                <div className="flex items-center gap-1.5 sm:gap-2.5 ml-1 sm:ml-2">
-                    {/* Demo Profile Link */}
+                <div className="flex items-center gap-1.5 sm:gap-2.5 ml-auto shrink-0">
+                    {/* Demo Profile Link (Desktop Only) */}
                     <Link
                         to="/profile/u/Vineet-Chandel"
                         className="hidden md:flex h-[36px] sm:h-[40px] px-3 sm:px-4 items-center justify-center text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-950 transition-colors rounded-full hover:bg-neutral-100 focus:outline-none whitespace-nowrap"
@@ -282,8 +422,34 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         Demo Profile
                     </Link>
 
-                    {/* Authenticated User Notification Bell */}
-                    {isLoggedIn && <NotificationBell variant="light" />}
+                    {/* Authenticated User Notification Bell (Desktop Only) */}
+                    {isLoggedIn && (
+                        <div className="hidden md:flex">
+                            <NotificationBell variant="light" />
+                        </div>
+                    )}
+
+                    {/* Mobile Three-Dots Overflow Menu Trigger (Mobile Only, directly left of Workspace / Sign in button) */}
+                    <button
+                        type="button"
+                        onClick={toggleMobileMenu}
+                        aria-label="Toggle navigation menu"
+                        aria-expanded={isMobileMenuOpen}
+                        className={`md:hidden relative flex items-center justify-center w-[36px] h-[36px] rounded-full border-2 border-black transition-all cursor-pointer shrink-0 ${
+                            isMobileMenuOpen
+                                ? "bg-[#FFE566] text-black shadow-[2px_2px_0px_#000]"
+                                : "bg-white hover:bg-neutral-100 text-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
+                        }`}
+                        title="Open menu (Docs, Blogs, Notifications)"
+                    >
+                        <MoreHorizontal className="w-4 h-4 stroke-[2.5]" />
+                        {isLoggedIn && unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5">
+                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-rose-600 border border-black" />
+                            </span>
+                        )}
+                    </button>
 
                     {/* Primary CTA Button: Workspace (with Avatar when logged in) or Sign in (when logged out) */}
                     <button
@@ -291,8 +457,9 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                         onClick={handleWorkspaceClick}
                         disabled={loading}
                         title={isLoggedIn ? `${displayName} - Open Workspace` : "Sign in to Orbix"}
-                        className={`group relative inline-flex items-center h-[36px] sm:h-[40px] gap-1.5 sm:gap-2 rounded-full bg-black text-white font-black text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden mr-0.5 sm:mr-1 ${isLoggedIn ? "pl-1 sm:pl-1.5 pr-2.5 sm:pr-3.5" : "pl-3.5 sm:pl-4 pr-2.5 sm:pr-3.5"
-                            }`}
+                        className={`group relative inline-flex items-center h-[36px] sm:h-[40px] gap-1 sm:gap-2 rounded-full bg-black text-white font-black text-xs sm:text-sm border-2 border-black shadow-[2px_2px_0px_#000] hover:shadow-[3px_3px_0px_#000] hover:bg-neutral-900 transition-all duration-200 active:translate-x-[1px] active:translate-y-[1px] focus:outline-none whitespace-nowrap cursor-pointer disabled:cursor-wait overflow-hidden mr-0.5 sm:mr-1 shrink-0 ${
+                            isLoggedIn ? "pl-1 sm:pl-1.5 pr-2.5 sm:pr-3.5" : "pl-3 sm:pl-4 pr-2.5 sm:pr-3.5"
+                        }`}
                     >
                         {isLoggedIn && (
                             <img
@@ -340,11 +507,250 @@ const NavBar: React.FC<NavBarProps> = ({ activeTab: externalActiveTab, onTabChan
                     </button>
                 </div>
 
-                {/* Full Megamenu Dropdown positioned below the navbar */}
+                {/* Mobile Dropdown Menu (Docs, Blogs, Notifications, Demo Profile) */}
+                <AnimatePresence>
+                    {isMobileMenuOpen && (
+                        <div
+                            className="absolute top-full left-0 right-0 mt-2.5 z-50 pointer-events-auto md:hidden"
+                        >
+                            <motion.div
+                                initial={{ opacity: 0, y: -8, scale: 0.97 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -6, scale: 0.97 }}
+                                transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+                                className="w-full bg-white text-black rounded-3xl p-3 sm:p-4 border-3 border-black shadow-[6px_6px_0px_#000] space-y-2.5 max-h-[82vh] overflow-y-auto select-none"
+                            >
+                                {/* Header Row */}
+                                <div className="flex items-center justify-between px-1.5 pb-2 border-b-2 border-black/10">
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-2 h-2 rounded-full bg-[#a2ff86] border border-black animate-pulse" />
+                                        <span className="text-[10px] font-mono font-black uppercase tracking-wider text-neutral-600">
+                                            Menu & Navigation
+                                        </span>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsMobileMenuOpen(false)}
+                                        className="p-1 rounded-lg hover:bg-neutral-100 text-neutral-500 hover:text-black cursor-pointer border border-transparent hover:border-black/20"
+                                        aria-label="Close menu"
+                                    >
+                                        <X className="w-3.5 h-3.5 stroke-[2.5]" />
+                                    </button>
+                                </div>
+
+                                {/* Item 1: Docs */}
+                                <Link
+                                    to="/docs"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className={`flex items-center justify-between p-2.5 rounded-2xl border-2 border-black transition-all ${
+                                        location.pathname.startsWith('/docs')
+                                            ? 'bg-[#FFE566] shadow-[2.5px_2.5px_0px_#000]'
+                                            : 'bg-[#FAF6EE] hover:bg-[#FFE566]/40 shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                                            <BookOpen className="w-4 h-4 text-black stroke-[2.5]" />
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="text-xs font-black text-black flex items-center gap-1.5">
+                                                <span>Docs & Architecture</span>
+                                                {location.pathname.startsWith('/docs') && (
+                                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-black text-[#FFE566] font-mono font-bold">
+                                                        ACTIVE
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[10px] text-neutral-600 font-medium">
+                                                Ranking algorithms, formulas & developer playbooks
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <ArrowRight className="w-4 h-4 text-black stroke-[2.5] shrink-0" />
+                                </Link>
+
+                                {/* Item 2: Blogs */}
+                                <Link
+                                    to="/blogs"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className={`flex items-center justify-between p-2.5 rounded-2xl border-2 border-black transition-all ${
+                                        location.pathname.startsWith('/blog') || location.pathname.startsWith('/blogs')
+                                            ? 'bg-[#a2ff86] shadow-[2.5px_2.5px_0px_#000]'
+                                            : 'bg-[#FAF6EE] hover:bg-[#a2ff86]/40 shadow-[2px_2px_0px_#000] active:translate-x-0.5 active:translate-y-0.5'
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                                            <Newspaper className="w-4 h-4 text-black stroke-[2.5]" />
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="text-xs font-black text-black flex items-center gap-1.5">
+                                                <span>Blogs & Workbooks</span>
+                                                {(location.pathname.startsWith('/blog') || location.pathname.startsWith('/blogs')) && (
+                                                    <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-black text-[#a2ff86] font-mono font-bold">
+                                                        ACTIVE
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-[10px] text-neutral-600 font-medium">
+                                                AWS Launchpad, EC2 guides & tutorials
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <ArrowRight className="w-4 h-4 text-black stroke-[2.5] shrink-0" />
+                                </Link>
+
+                                {/* Item 3: Notifications */}
+                                <div className="pt-0.5">
+                                    {isLoggedIn ? (
+                                        <div className="space-y-1.5">
+                                            <button
+                                                type="button"
+                                                onClick={handleToggleMobileNotifications}
+                                                className="w-full flex items-center justify-between p-2.5 rounded-2xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000] transition-all cursor-pointer text-left"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="relative w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                                                        <Bell className="w-4 h-4 text-black stroke-[2.5]" />
+                                                        {unreadCount > 0 && (
+                                                            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-rose-500 border border-black" />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-black text-black flex items-center gap-2">
+                                                            <span>Notifications</span>
+                                                            {unreadCount > 0 ? (
+                                                                <span className="px-1.5 py-0.5 rounded-full bg-[#FFE566] text-black text-[10px] font-mono font-black border border-black">
+                                                                    {unreadCount} NEW
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] text-neutral-500 font-bold">All caught up</span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[10px] text-neutral-600 font-medium">
+                                                            {isMobileNotificationsOpen ? "Tap to collapse notifications" : "Tap to expand notifications"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {isMobileNotificationsOpen ? (
+                                                    <ChevronUp className="w-4 h-4 text-neutral-600 stroke-[2.5] shrink-0" />
+                                                ) : (
+                                                    <ChevronDown className="w-4 h-4 text-neutral-600 stroke-[2.5] shrink-0" />
+                                                )}
+                                            </button>
+
+                                            {/* Expandable Notifications List */}
+                                            <AnimatePresence>
+                                                {isMobileNotificationsOpen && (
+                                                    <motion.div
+                                                        initial={{ opacity: 0, height: 0 }}
+                                                        animate={{ opacity: 1, height: "auto" }}
+                                                        exit={{ opacity: 0, height: 0 }}
+                                                        transition={{ duration: 0.18 }}
+                                                        className="rounded-2xl border-2 border-black bg-white p-2.5 space-y-2 overflow-hidden shadow-[2px_2px_0px_#000]"
+                                                    >
+                                                        {loadingMobileNotifs ? (
+                                                            <div className="py-4 flex flex-col items-center justify-center gap-2">
+                                                                <OrbixLoader size="sm" variant="inline" color="#000" />
+                                                                <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
+                                                                    Syncing alerts...
+                                                                </span>
+                                                            </div>
+                                                        ) : mobileNotifications.length === 0 ? (
+                                                            <div className="py-3 px-2 text-center text-xs font-bold text-neutral-500 bg-[#FAF6EE] rounded-xl border border-black/10">
+                                                                No notifications yet
+                                                            </div>
+                                                        ) : (
+                                                            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                                                                {mobileNotifications.slice(0, 4).map((item) => (
+                                                                    <div
+                                                                        key={item.id}
+                                                                        onClick={handleOpenInbox}
+                                                                        className="p-2 rounded-xl bg-[#FAF6EE] hover:bg-[#FFE566]/30 border border-black/20 text-left cursor-pointer transition-colors"
+                                                                    >
+                                                                        <div className="flex items-center justify-between gap-1">
+                                                                            <span className="text-[11px] font-black text-black truncate">{item.title}</span>
+                                                                            <span className="text-[9px] font-mono text-neutral-500 shrink-0">
+                                                                                {formatRelativeTime(item.createdAt)}
+                                                                            </span>
+                                                                        </div>
+                                                                        <p className="text-[10px] text-neutral-700 line-clamp-1 mt-0.5">
+                                                                            {item.body || item.metadata?.fullMessage || "New notification"}
+                                                                        </p>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleOpenInbox}
+                                                            className="w-full py-1.5 px-3 rounded-xl bg-black hover:bg-neutral-800 text-[#a2ff86] font-black text-xs border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center gap-1.5 cursor-pointer transition-transform active:translate-x-0.5 active:translate-y-0.5"
+                                                        >
+                                                            <span>Open Notifications Inbox</span>
+                                                            <ArrowUpRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                                                        </button>
+                                                    </motion.div>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+                                    ) : (
+                                        <Link
+                                            to="/auth/signin"
+                                            onClick={() => setIsMobileMenuOpen(false)}
+                                            className="flex items-center justify-between p-2.5 rounded-2xl bg-[#FAF6EE] hover:bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000] transition-all"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-xl bg-white border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                                                    <Bell className="w-4 h-4 text-neutral-400 stroke-[2.5]" />
+                                                </div>
+                                                <div className="text-left">
+                                                    <div className="text-xs font-black text-black">
+                                                        Notifications
+                                                    </div>
+                                                    <p className="text-[10px] text-neutral-600 font-medium">
+                                                        Sign in to view real-time developer notifications
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="px-2 py-0.5 rounded-full bg-black text-[#a2ff86] text-[10px] font-black border border-black shadow-[1px_1px_0px_#000]">
+                                                Sign In
+                                            </span>
+                                        </Link>
+                                    )}
+                                </div>
+
+                                {/* Item 4: Demo Profile */}
+                                <Link
+                                    to="/profile/u/Vineet-Chandel"
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className="flex items-center justify-between p-2.5 rounded-2xl bg-white hover:bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000] transition-all"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-9 h-9 rounded-xl bg-[#38BDF8] border-2 border-black flex items-center justify-center shadow-[1.5px_1.5px_0px_#000] shrink-0">
+                                            <User className="w-4 h-4 text-black stroke-[2.5]" />
+                                        </div>
+                                        <div className="text-left">
+                                            <div className="text-xs font-black text-black">
+                                                Demo Profile Showcase
+                                            </div>
+                                            <p className="text-[10px] text-neutral-600 font-medium">
+                                                View sample public developer profile (@Vineet-Chandel)
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <ArrowRight className="w-4 h-4 text-black stroke-[2.5] shrink-0" />
+                                </Link>
+                            </motion.div>
+                        </div>
+                    )}
+                </AnimatePresence>
+
+                {/* Full Megamenu Dropdown positioned below the navbar (Desktop Only) */}
                 <AnimatePresence>
                     {openDropdown === 'blogs' && (
                         <div
-                            className="absolute top-full left-1/2 -translate-x-1/2 pt-2.5 z-50 pointer-events-auto"
+                            className="hidden md:block absolute top-full left-1/2 -translate-x-1/2 pt-2.5 z-50 pointer-events-auto"
                             onMouseEnter={handleMouseEnterDropdown}
                             onMouseLeave={handleMouseLeaveDropdown}
                         >

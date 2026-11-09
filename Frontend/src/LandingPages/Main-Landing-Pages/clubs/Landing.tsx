@@ -24,6 +24,7 @@ import { InviteCampusLeadsModal } from "../../../components/InviteCampusLeadsMod
 import { CollegeEventDetailModal } from "../../../app/Events/CollegeEventDetailModal";
 import { NeoSelect } from "../../../components/NeoSelect";
 import { IndiaMapBackdrop, CampusPillarsBackdrop } from "../../../components/ScopeBackdrops";
+import { MobilePinnedHorizontalCards } from "./MobilePinnedHorizontalCards";
 import {
     MOCK_COLLEGES,
     MOCK_CLUBS_DATA,
@@ -238,7 +239,7 @@ export const ClubsShowcase: React.FC = () => {
     };
 
     return (
-        <section className="relative w-full bg-[#FAF6EE] text-neutral-900 py-16 sm:py-24 px-0 overflow-hidden font-sans select-none">
+        <section className="relative w-full bg-[#FAF6EE] text-neutral-900 py-16 sm:py-24 px-0 overflow-x-clip font-sans select-none">
             {/* Warm, eye-friendly dot grid matching Orbix platform canvas */}
             <div className="absolute inset-0 bg-[radial-gradient(#d3cbbe_1.2px,transparent_1.2px)] [background-size:20px_20px] pointer-events-none -z-10 opacity-70" />
 
@@ -555,7 +556,10 @@ export const ClubsShowcase: React.FC = () => {
                             </span>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <MobilePinnedHorizontalCards
+                            itemCount={filteredClubs.length}
+                            sectionTitle="Clubs"
+                        >
                             {filteredClubs.map((clubItem) => (
                                 <ClubCard
                                     key={clubItem.id}
@@ -564,7 +568,7 @@ export const ClubsShowcase: React.FC = () => {
                                     showCampusName={false}
                                 />
                             ))}
-                        </div>
+                        </MobilePinnedHorizontalCards>
                     </div>
                 </div>
 
@@ -726,12 +730,15 @@ export const ClubsShowcase: React.FC = () => {
                         </div>
 
                         {/* Campus Event Cards Grid (Image 3) */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        <MobilePinnedHorizontalCards
+                            itemCount={filteredCampusEvents.length}
+                            sectionTitle="Sessions"
+                        >
                             {filteredCampusEvents.map((ev) => (
                                 <div
                                     key={ev.id}
                                     onClick={() => setSelectedEventForModal(ev)}
-                                    className="relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer group"
+                                    className="relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:translate-x-[-1px] hover:translate-y-[-1px] transition-all cursor-pointer group h-full"
                                 >
                                     {/* Architectural Pillars Backdrop */}
                                     <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
@@ -865,7 +872,7 @@ export const ClubsShowcase: React.FC = () => {
                                 </div>
                             </div>
                             ))}
-                        </div>
+                        </MobilePinnedHorizontalCards>
                     </div>
 
                     {/* Pan-India National Arenas Section (Image 4) */}
@@ -892,12 +899,15 @@ export const ClubsShowcase: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            <MobilePinnedHorizontalCards
+                                itemCount={filteredPanIndiaEvents.length}
+                                sectionTitle="Arenas"
+                            >
                                 {filteredPanIndiaEvents.map((ev) => (
                                     <div
                                         key={ev.id}
                                         onClick={() => setSelectedEventForModal(ev)}
-                                        className="relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:border-[#FF9933] transition-all cursor-pointer group"
+                                        className="relative overflow-hidden p-5 rounded-2xl bg-white border-2 border-black shadow-[4px_4px_0px_#000] flex flex-col justify-between hover:border-[#FF9933] transition-all cursor-pointer group h-full"
                                     >
                                         {/* India Map Backdrop */}
                                         <div className="absolute inset-0 pointer-events-none overflow-hidden select-none z-0">
@@ -964,7 +974,7 @@ export const ClubsShowcase: React.FC = () => {
                                     </div>
                                 </div>
                             ))}
-                            </div>
+                            </MobilePinnedHorizontalCards>
                         </div>
                     )}
 

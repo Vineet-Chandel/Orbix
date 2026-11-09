@@ -26,7 +26,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "codexa",
         name: "Codexa",
         category: "AI Powered Project Management System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 270, // Top center (12 o'clock)
         description: "AI-driven project tracking, sprints, team velocity & automated code intelligence.",
@@ -57,7 +57,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "evolexa",
         name: "Evolexa",
         category: "AI Powered Career Management System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 30, // Bottom right (4 o'clock)
         description: "AI-powered career pathways, skill graphs, interview readiness & job matching.",
@@ -88,7 +88,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "flowexa",
         name: "Flowexa",
         category: "AI Powered Automation System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 150, // Bottom left (8 o'clock)
         description: "Automated developer workflows, agent pipelines & cross-tool orchestration.",

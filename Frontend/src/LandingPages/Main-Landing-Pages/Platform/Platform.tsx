@@ -23,7 +23,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "codexa",
         name: "Codexa",
         category: "AI Powered Project Management System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 270, // Top center (12 o'clock)
         description: "AI-driven project tracking, sprints, team velocity & automated code intelligence.",
@@ -54,7 +54,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "evolexa",
         name: "Evolexa",
         category: "AI Powered Career Management System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 30, // Bottom right (4 o'clock)
         description: "AI-powered career pathways, skill graphs, interview readiness & job matching.",
@@ -85,7 +85,7 @@ export const CONNECTABLE_PLATFORMS: PlatformItem[] = [
         id: "flowexa",
         name: "Flowexa",
         category: "AI Powered Automation System",
-        brandColor: "#ffffff",
+        brandColor: "#000000",
         ring: "inner",
         angleDeg: 150, // Bottom left (8 o'clock)
         description: "Automated developer workflows, agent pipelines & cross-tool orchestration.",
@@ -547,6 +547,25 @@ const getCanvasConfig = (width: number): CanvasConfig => {
     };
 };
 
+/**
+ * Ensures laser tracking lines and badge active outlines are always clearly visible
+ * on the light background (#FAF6EE). Guards against white, near-white, or empty colors.
+ */
+const getPlatformLaserColor = (brandColor: string | undefined): string => {
+    if (!brandColor) return "#000000";
+    const normalized = brandColor.trim().toLowerCase();
+    if (
+        normalized === "#ffffff" ||
+        normalized === "#fff" ||
+        normalized === "white" ||
+        normalized === "#faf6ee" ||
+        normalized === "transparent"
+    ) {
+        return "#000000";
+    }
+    return brandColor;
+};
+
 export const Platform: React.FC<PlatformShowcaseProps> = ({
     title = "All your platforms. Zero tab-switching.",
     subtitle = "Connect your handles once. We sync solved problems, contest ratings, badges and commits every few hours, automatically. New platforms keep joining.",
@@ -956,7 +975,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                     y1="0"
                                     x2={Math.round(Math.cos((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.outerRadius)}
                                     y2={Math.round(Math.sin((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.outerRadius)}
-                                    stroke={activePlatform.brandColor || "#000000"}
+                                    stroke={getPlatformLaserColor(activePlatform.brandColor)}
                                     strokeWidth="2.5"
                                     strokeDasharray="4 4"
                                     strokeLinecap="round"
@@ -965,7 +984,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                     cx={Math.round(Math.cos((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.outerRadius)}
                                     cy={Math.round(Math.sin((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.outerRadius)}
                                     r="4.5"
-                                    fill={activePlatform.brandColor || "#000000"}
+                                    fill={getPlatformLaserColor(activePlatform.brandColor)}
                                 />
                             </svg>
                         )}
@@ -1012,7 +1031,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                                 width: canvasConfig.outerBadgeSize,
                                                 height: canvasConfig.outerBadgeSize,
                                                 borderRadius: canvasConfig.badgeRadius,
-                                                outline: isActive ? `3px solid ${platform.brandColor || "#000"}` : "none",
+                                                outline: isActive ? `3px solid ${getPlatformLaserColor(platform.brandColor)}` : "none",
                                                 outlineOffset: "2px",
                                             }}
                                             aria-label={`${platform.name} integration`}
@@ -1050,7 +1069,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                     y1="0"
                                     x2={Math.round(Math.cos((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.innerRadius)}
                                     y2={Math.round(Math.sin((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.innerRadius)}
-                                    stroke={activePlatform.brandColor || "#FFA116"}
+                                    stroke={getPlatformLaserColor(activePlatform.brandColor)}
                                     strokeWidth="2.5"
                                     strokeDasharray="4 4"
                                     strokeLinecap="round"
@@ -1059,7 +1078,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                     cx={Math.round(Math.cos((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.innerRadius)}
                                     cy={Math.round(Math.sin((activePlatform.angleDeg * Math.PI) / 180) * canvasConfig.innerRadius)}
                                     r="4.5"
-                                    fill={activePlatform.brandColor || "#FFA116"}
+                                    fill={getPlatformLaserColor(activePlatform.brandColor)}
                                 />
                             </svg>
                         )}
@@ -1106,7 +1125,7 @@ export const Platform: React.FC<PlatformShowcaseProps> = ({
                                                 width: canvasConfig.innerBadgeSize,
                                                 height: canvasConfig.innerBadgeSize,
                                                 borderRadius: canvasConfig.badgeRadius,
-                                                outline: isActive ? `3px solid ${platform.brandColor || "#000"}` : "none",
+                                                outline: isActive ? `3px solid ${getPlatformLaserColor(platform.brandColor)}` : "none",
                                                 outlineOffset: "2px",
                                             }}
                                             aria-label={`${platform.name} integration`}
