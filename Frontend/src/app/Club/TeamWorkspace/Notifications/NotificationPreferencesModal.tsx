@@ -3,6 +3,8 @@ import React, { useState, useEffect } from "react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import type { WorkspaceNotificationPreferences } from "../../../../types/workspace";
 import { Bell, Check, Shield, X } from "lucide-react";
+import { NeoSelect } from "../../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 
 interface NotificationPreferencesModalProps {
     isOpen: boolean;
@@ -111,57 +113,57 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
 
                         {/* Email toggles */}
                         <div className="space-y-3 pt-2">
-                            <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/40 cursor-pointer transition">
+                            <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/40 transition">
                                 <div className="space-y-0.5">
                                     <span className="text-sm font-medium text-slate-200">Task Assignments</span>
                                     <p className="text-xs text-slate-400">Receive email when new tasks are delegated to you</p>
                                 </div>
-                                <input
-                                    type="checkbox"
+                                <NeoCheckbox
                                     checked={preferences?.emailTaskAssigned ?? true}
-                                    onChange={() => handleToggle("emailTaskAssigned")}
-                                    className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500"
+                                    onCheckedChange={() => handleToggle("emailTaskAssigned")}
+                                    colorScheme="cyan"
+                                    size="sm"
                                 />
-                            </label>
+                            </div>
 
-                            <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/40 cursor-pointer transition">
+                            <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/40 transition">
                                 <div className="space-y-0.5">
                                     <span className="text-sm font-medium text-slate-200">Task Reminders</span>
                                     <p className="text-xs text-slate-400">Receive email reminders 24h prior to task deadlines</p>
                                 </div>
-                                <input
-                                    type="checkbox"
+                                <NeoCheckbox
                                     checked={preferences?.emailTaskReminders ?? true}
-                                    onChange={() => handleToggle("emailTaskReminders")}
-                                    className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500"
+                                    onCheckedChange={() => handleToggle("emailTaskReminders")}
+                                    colorScheme="cyan"
+                                    size="sm"
                                 />
-                            </label>
+                            </div>
 
-                            <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/40 cursor-pointer transition">
+                            <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/40 transition">
                                 <div className="space-y-0.5">
                                     <span className="text-sm font-medium text-slate-200">Direct Mentions (@you)</span>
                                     <p className="text-xs text-slate-400">Receive email when tagged in discussions or comments</p>
                                 </div>
-                                <input
-                                    type="checkbox"
+                                <NeoCheckbox
                                     checked={preferences?.emailMentions ?? true}
-                                    onChange={() => handleToggle("emailMentions")}
-                                    className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500"
+                                    onCheckedChange={() => handleToggle("emailMentions")}
+                                    colorScheme="cyan"
+                                    size="sm"
                                 />
-                            </label>
+                            </div>
 
-                            <label className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/40 cursor-pointer transition">
+                            <div className="flex items-center justify-between p-2.5 rounded-xl border border-slate-800 hover:bg-slate-800/40 transition">
                                 <div className="space-y-0.5">
                                     <span className="text-sm font-medium text-slate-200">Watched Discussions</span>
                                     <p className="text-xs text-slate-400">Receive email on threads you have actively joined</p>
                                 </div>
-                                <input
-                                    type="checkbox"
+                                <NeoCheckbox
                                     checked={preferences?.emailDiscussions ?? true}
-                                    onChange={() => handleToggle("emailDiscussions")}
-                                    className="h-4 w-4 rounded border-slate-700 bg-slate-800 text-indigo-600 focus:ring-indigo-500"
+                                    onCheckedChange={() => handleToggle("emailDiscussions")}
+                                    colorScheme="cyan"
+                                    size="sm"
                                 />
-                            </label>
+                            </div>
                         </div>
 
                         {/* Digest Frequency */}
@@ -169,19 +171,20 @@ export const NotificationPreferencesModal: React.FC<NotificationPreferencesModal
                             <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1.5">
                                 Email Delivery Mode
                             </label>
-                            <select
+                            <NeoSelect
                                 value={preferences?.emailDigestFrequency || "instant"}
-                                onChange={(e) =>
+                                onChange={(val) =>
                                     setPreferences((prev) =>
-                                        prev ? { ...prev, emailDigestFrequency: e.target.value as any } : null
+                                        prev ? { ...prev, emailDigestFrequency: val as any } : null
                                     )
                                 }
-                                className="w-full rounded-xl border border-slate-800 bg-slate-800/70 px-3 py-2 text-sm text-slate-200 focus:border-indigo-500 focus:outline-none"
-                            >
-                                <option value="instant">Instant — Deliver emails immediately upon event</option>
-                                <option value="daily">Daily Digest — Batch non-urgent updates into daily digest</option>
-                                <option value="none">Mute Optional — In-app notifications only (no emails)</option>
-                            </select>
+                                options={[
+                                    { value: "instant", label: "Instant — Deliver emails immediately upon event" },
+                                    { value: "daily", label: "Daily Digest — Batch non-urgent updates into daily digest" },
+                                    { value: "none", label: "Mute Optional — In-app notifications only (no emails)" },
+                                ]}
+                                size="md"
+                            />
                         </div>
 
                         {/* Actions */}

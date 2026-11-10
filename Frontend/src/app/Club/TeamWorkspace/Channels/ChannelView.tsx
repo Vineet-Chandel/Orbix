@@ -148,7 +148,8 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                 setMessages((prev) => [...prev, res.message]);
             }
         } catch (err: any) {
-            toast.error(err.response?.data?.message || err.message || "Failed to post message.");
+            console.error("Failed to send message:", err);
+            toast.error(err.message || "Failed to send message.");
         } finally {
             setSending(false);
         }
@@ -156,11 +157,9 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
 
     // Edit message
     const handleSaveEdit = async (messageId: string) => {
-        const trimmed = editContent.trim();
-        if (!trimmed) return;
-
+        if (!editContent.trim()) return;
         try {
-            const res = await workspaceApi.editMessage(channel.id, messageId, trimmed, clubId);
+            const res = await workspaceApi.editMessage(messageId, editContent.trim(), clubId);
             if (res.success && res.message) {
                 setMessages((prev) =>
                     prev.map((m) => (m.id === messageId ? res.message : m))
@@ -176,62 +175,98 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
     // Delete message
     const handleDeleteMessage = async (messageId: string) => {
         if (!confirm("Are you sure you want to delete this message?")) return;
-
         try {
-            const res = await workspaceApi.deleteMessage(channel.id, messageId, clubId);
+            const res = await workspaceApi.deleteMessage(messageId, clubId);
             if (res.success) {
                 setMessages((prev) =>
                     prev.map((m) =>
                         m.id === messageId
-                            ? { ...m, isDeleted: true, content: "[This message was deleted]" }
+                            ? { ...m, isDeleted: true, content: "This message was deleted." }
                             : m
                     )
                 );
-                toast.success("Message deleted.");
             }
         } catch (err: any) {
             toast.error(err.message || "Failed to delete message.");
         }
     };
 
-    // Toggle pin
-    const handleTogglePin = async (message: WorkspaceMessage) => {
-        try {
-            const newPinState = !message.isPinned;
-            const res = await workspaceApi.togglePinMessage(
-                channel.id,
-                message.id,
-                newPinState,
-                clubId
-            );
-            if (res.success) {
-                setMessages((prev) =>
-                    prev.map((m) =>
-                        m.id === message.id ? { ...m, isPinned: newPinState } : m
-                    )
-                );
-                toast.success(newPinState ? "Message pinned." : "Message unpinned.");
-            }
-        } catch (err: any) {
-            toast.error(err.message || "Failed to toggle pin.");
-        }
-    };
-
     // Toggle reaction
     const handleToggleReaction = async (messageId: string, emoji: string) => {
         try {
-            setActiveEmojiPickerMsgId(null);
             const res = await workspaceApi.toggleReaction(channel.id, messageId, emoji, clubId);
             if (res.success) {
-                // Refresh local message reaction
-                fetchMessages();
+                setMessages((prev) =>
+                    prev.map((m) => {
+                        if (m.id !== messageId) return m;
+                        const existing = m.reactions || [];
+                        const found = existing.find((r) => r.emoji === emoji);
+                        const currentUserId = currentMember?.userId || "me";
+                        let updated;
+                        if (res.added) {
+                            if (found) {
+                                updated = existing.map((r) =>
+                                    r.emoji === emoji
+                                        ? {
+                                              ...r,
+                                              count: r.count + 1,
+                                              hasReacted: true,
+                                              users: r.users?.includes(currentUserId) ? r.users : [...(r.users || []), currentUserId],
+                                          }
+                                        : r
+                                );
+                            } else {
+                                updated = [
+                                    ...existing,
+                                    { emoji, count: 1, hasReacted: true, users: [currentUserId] },
+                                ];
+                            }
+                        } else {
+                            if (found && found.count > 1) {
+                                updated = existing.map((r) =>
+                                    r.emoji === emoji
+                                        ? {
+                                              ...r,
+                                              count: r.count - 1,
+                                              hasReacted: false,
+                                              users: (r.users || []).filter((u) => u !== currentUserId),
+                                          }
+                                        : r
+                                );
+                            } else {
+                                updated = existing.filter((r) => r.emoji !== emoji);
+                            }
+                        }
+                        return { ...m, reactions: updated };
+                    })
+                );
             }
         } catch (err: any) {
             toast.error(err.message || "Failed to react.");
+        } finally {
+            setActiveEmojiPickerMsgId(null);
         }
     };
 
-    // Handle Thread Start
+    // Toggle pin
+    const handleTogglePin = async (message: WorkspaceMessage) => {
+        try {
+            const nextPinned = !message.isPinned;
+            const res = await workspaceApi.togglePinMessage(channel.id, message.id, nextPinned, clubId);
+            if (res.success) {
+                setMessages((prev) =>
+                    prev.map((m) =>
+                        m.id === message.id ? { ...m, isPinned: nextPinned } : m
+                    )
+                );
+                toast.success(nextPinned ? "Message pinned!" : "Message unpinned.");
+            }
+        } catch (err: any) {
+            toast.error(err.message || "Failed to update pin.");
+        }
+    };
+
+    // Create thread from message
     const handleCreateThread = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!threadModalMsg || !threadName.trim()) return;
@@ -305,32 +340,32 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
         currentMember?.role?.slug !== "lead";
 
     return (
-        <div className="flex-1 flex flex-col h-full bg-[#0B0F17] overflow-hidden">
+        <div className="flex-1 flex flex-col h-full bg-[#FAF6EE] overflow-hidden">
             {/* 1. CHANNEL HEADER */}
-            <header className="px-6 py-3.5 border-b border-slate-800/80 bg-slate-900/40 flex items-center justify-between shrink-0">
+            <header className="px-6 py-3.5 border-b-2 border-black bg-white flex items-center justify-between shrink-0 shadow-xs">
                 <div className="flex items-center gap-3 min-w-0">
                     <div className="flex items-center gap-2">
                         {channel.channelType === "announcement" ? (
-                            <Volume2 className="w-5 h-5 text-amber-400 shrink-0" />
+                            <Volume2 className="w-5 h-5 text-amber-500 shrink-0" />
                         ) : channel.channelType === "forum" ? (
-                            <MessageSquare className="w-5 h-5 text-cyan-400 shrink-0" />
+                            <MessageSquare className="w-5 h-5 text-cyan-600 shrink-0" />
                         ) : channel.channelType === "task_discussion" ? (
-                            <CheckSquare className="w-5 h-5 text-emerald-400 shrink-0" />
+                            <CheckSquare className="w-5 h-5 text-emerald-600 shrink-0" />
                         ) : (
-                            <Hash className="w-5 h-5 text-indigo-400 shrink-0" />
+                            <Hash className="w-5 h-5 text-black shrink-0" />
                         )}
-                        <h2 className="text-base font-bold text-slate-100 truncate">
+                        <h2 className="text-base font-black text-black truncate">
                             {channel.name}
                         </h2>
                         {channel.isPrivate && (
-                            <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" title="Private Channel" />
+                            <Lock className="w-3.5 h-3.5 text-neutral-600 shrink-0" title="Private Channel" />
                         )}
                     </div>
 
                     {channel.topic && (
                         <>
-                            <span className="text-slate-600 hidden md:inline">|</span>
-                            <span className="text-xs text-slate-400 truncate max-w-sm hidden md:inline">
+                            <span className="text-neutral-300 hidden md:inline">|</span>
+                            <span className="text-xs font-bold text-neutral-600 truncate max-w-sm hidden md:inline">
                                 {channel.topic}
                             </span>
                         </>
@@ -338,24 +373,24 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                 </div>
 
                 {/* Right Header Actions */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                     {/* Category Permission Sync Badge */}
                     {channel.categoryId && (
                         <div>
                             {channel.isCategorySynced ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                                    <Check className="w-3 h-3" /> Synced
+                                <span className="inline-flex items-center gap-1 text-[11px] font-black text-black bg-[#A6FF70] px-2.5 py-1 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                                    <Check className="w-3 h-3 text-black" /> Synced
                                 </span>
                             ) : (
                                 <div className="flex items-center gap-1.5">
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                                        <AlertCircle className="w-3 h-3" /> Not Synced
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-black text-black bg-[#FFE566] px-2.5 py-1 rounded-full border-2 border-black shadow-[1.5px_1.5px_0px_#000]">
+                                        <AlertCircle className="w-3 h-3 text-black" /> Not Synced
                                     </span>
                                     {canManageChannels && (
                                         <button
                                             onClick={handleSyncWithCategory}
                                             disabled={syncing}
-                                            className="text-[11px] font-semibold text-indigo-400 hover:text-indigo-300 underline transition"
+                                            className="text-[11px] font-black text-black hover:underline transition"
                                         >
                                             {syncing ? "Syncing..." : "Sync Now"}
                                         </button>
@@ -368,10 +403,10 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                     {/* Pinned Messages Toggle */}
                     <button
                         onClick={() => setShowPinned(!showPinned)}
-                        className={`p-2 rounded-xl border transition ${
+                        className={`p-2 rounded-xl border-2 border-black transition ${
                             showPinned
-                                ? "bg-indigo-600/20 text-indigo-300 border-indigo-500/40"
-                                : "text-slate-400 hover:text-slate-200 border-slate-800 hover:bg-slate-800/60"
+                                ? "bg-[#FFE566] text-black shadow-[2px_2px_0px_#000]"
+                                : "bg-white text-black hover:bg-neutral-100 shadow-[2px_2px_0px_#000]"
                         }`}
                         title="View Pinned Messages"
                     >
@@ -386,15 +421,15 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 placeholder="Search in channel..."
-                                className="w-40 lg:w-56 pl-8 pr-3 py-1.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/50"
+                                className="w-40 lg:w-56 pl-8 pr-3 py-1.5 rounded-xl bg-white border-2 border-black text-xs font-bold text-black placeholder-neutral-400 focus:outline-none shadow-[2px_2px_0px_#000]"
                             />
-                            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                            <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
                         </form>
 
                         {/* Search Results Dropdown */}
                         {isSearching && (
-                            <div className="absolute right-0 top-full mt-2 w-72 bg-[#0f172a] border border-slate-800 rounded-xl p-3 shadow-2xl z-40 max-h-60 overflow-y-auto space-y-2">
-                                <div className="flex items-center justify-between text-[11px] font-semibold text-slate-400">
+                            <div className="absolute right-0 top-full mt-2 w-72 bg-white border-2 border-black rounded-xl p-3 shadow-neo z-40 max-h-60 overflow-y-auto space-y-2">
+                                <div className="flex items-center justify-between text-[11px] font-black text-black">
                                     <span>Search Results ({searchResults.length})</span>
                                     <button
                                         onClick={() => {
@@ -402,23 +437,23 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                             setSearchResults([]);
                                             setSearchQuery("");
                                         }}
-                                        className="text-slate-500 hover:text-slate-300"
+                                        className="text-neutral-500 hover:text-black"
                                     >
                                         <X className="w-3.5 h-3.5" />
                                     </button>
                                 </div>
                                 {searchResults.length === 0 ? (
-                                    <p className="text-xs text-slate-500 py-2">No matches found.</p>
+                                    <p className="text-xs font-semibold text-neutral-500 py-2">No matches found.</p>
                                 ) : (
                                     searchResults.map((sr) => (
                                         <div
                                             key={sr.id}
-                                            className="p-2 rounded-lg bg-slate-900/60 border border-slate-800/80 text-xs text-slate-300"
+                                            className="p-2 rounded-lg bg-[#FAF6EE] border border-black text-xs text-black"
                                         >
-                                            <div className="font-semibold text-slate-200">
+                                            <div className="font-black text-black">
                                                 {sr.sender?.firstName} {sr.sender?.lastName}
                                             </div>
-                                            <div className="mt-0.5 text-slate-400 line-clamp-2">{sr.content}</div>
+                                            <div className="mt-0.5 text-neutral-700 font-medium line-clamp-2">{sr.content}</div>
                                         </div>
                                     ))
                                 )}
@@ -430,38 +465,38 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
 
             {/* Pinned Messages Drawer */}
             {showPinned && (
-                <div className="bg-slate-900/90 border-b border-slate-800 p-4 max-h-48 overflow-y-auto space-y-2.5 animate-in slide-in-from-top duration-200">
-                    <div className="flex items-center justify-between text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                        <span className="flex items-center gap-1.5 text-indigo-400">
-                            <Pin className="w-3.5 h-3.5" /> Pinned Messages
+                <div className="bg-white border-b-2 border-black p-4 max-h-48 overflow-y-auto space-y-2.5 shadow-sm animate-in slide-in-from-top duration-200">
+                    <div className="flex items-center justify-between text-xs font-black text-black uppercase tracking-wider">
+                        <span className="flex items-center gap-1.5 text-black">
+                            <Pin className="w-3.5 h-3.5 text-black" /> Pinned Messages
                         </span>
                         <button
                             onClick={() => setShowPinned(false)}
-                            className="text-slate-500 hover:text-slate-300"
+                            className="text-neutral-500 hover:text-black"
                         >
                             <X className="w-4 h-4" />
                         </button>
                     </div>
                     {messages.filter((m) => m.isPinned).length === 0 ? (
-                        <p className="text-xs text-slate-500 italic">No pinned messages in this channel.</p>
+                        <p className="text-xs font-semibold text-neutral-500 italic">No pinned messages in this channel.</p>
                     ) : (
                         messages
                             .filter((m) => m.isPinned)
                             .map((pinned) => (
                                 <div
                                     key={pinned.id}
-                                    className="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-300 flex items-start justify-between gap-3"
+                                    className="p-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs text-black flex items-start justify-between gap-3 shadow-[1.5px_1.5px_0px_#000]"
                                 >
                                     <div>
-                                        <div className="font-semibold text-slate-200">
+                                        <div className="font-black text-black">
                                             {pinned.sender?.firstName} {pinned.sender?.lastName}
                                         </div>
-                                        <div className="mt-0.5">{pinned.content}</div>
+                                        <div className="mt-0.5 font-medium text-neutral-800">{pinned.content}</div>
                                     </div>
                                     {canManageChannels && (
                                         <button
                                             onClick={() => handleTogglePin(pinned)}
-                                            className="text-slate-500 hover:text-rose-400 shrink-0 text-[10px]"
+                                            className="text-neutral-600 hover:text-rose-600 font-bold shrink-0 text-[10px]"
                                         >
                                             Unpin
                                         </button>
@@ -473,24 +508,24 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
             )}
 
             {/* 2. MESSAGE FEED */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-5">
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
                 {/* Channel Header Welcome Banner */}
-                <div className="py-6 border-b border-slate-800/60 mb-6">
-                    <div className="w-12 h-12 rounded-2xl bg-indigo-600/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400 mb-3">
-                        <Hash className="w-6 h-6" />
+                <div className="py-6 border-b-2 border-black/10 mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center text-black mb-3">
+                        <Hash className="w-6 h-6 text-black" />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-100">Welcome to #{channel.name}!</h3>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <h3 className="text-xl font-black text-black">Welcome to #{channel.name}!</h3>
+                    <p className="text-xs font-semibold text-neutral-600 mt-1">
                         {channel.topic || "This is the start of the #" + channel.name + " channel."}
                     </p>
                 </div>
 
                 {loading ? (
-                    <div className="flex items-center justify-center py-12 text-slate-500 text-xs">
+                    <div className="flex items-center justify-center py-12 text-neutral-500 font-bold text-xs">
                         Loading messages...
                     </div>
                 ) : messages.length === 0 ? (
-                    <div className="text-center py-12 text-slate-500 text-xs">
+                    <div className="text-center py-12 text-neutral-500 font-bold text-xs">
                         No messages yet. Say hello to get the conversation started!
                     </div>
                 ) : (
@@ -502,37 +537,38 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                         return (
                             <div
                                 key={msg.id}
-                                className={`group relative flex items-start gap-3 p-2 -mx-2 rounded-xl transition ${
-                                    msg.isPinned ? "bg-indigo-500/5 border-l-2 border-indigo-500" : "hover:bg-slate-900/40"
+                                className={`group relative flex items-start gap-3 p-2.5 -mx-2 rounded-xl transition ${
+                                    msg.isPinned
+                                        ? "bg-[#FFF9D2] border-2 border-black shadow-[2px_2px_0px_#000]"
+                                        : "hover:bg-white hover:border-2 hover:border-black/15 border-2 border-transparent"
                                 }`}
                             >
                                 {/* Sender Avatar */}
-                                <div className="w-9 h-9 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center font-bold text-xs text-indigo-300 uppercase shrink-0 mt-0.5">
+                                <div className="w-9 h-9 rounded-full bg-[#FFE566] border-2 border-black shadow-[1.5px_1.5px_0px_#000] flex items-center justify-center font-black text-xs text-black uppercase shrink-0 mt-0.5">
                                     {msg.sender?.firstName?.[0] || "U"}
                                 </div>
 
                                 {/* Message Content Container */}
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <span className="text-sm font-semibold text-slate-200">
+                                        <span className="text-sm font-black text-black">
                                             {msg.sender?.firstName} {msg.sender?.lastName}
                                         </span>
 
                                         {/* Sender Role Badge */}
                                         {msg.senderRole && (
                                             <span
-                                                className="px-2 py-0.5 rounded-full text-[10px] font-semibold border"
+                                                className="px-2 py-0.5 rounded-full text-[10px] font-black border-2 border-black shadow-[1px_1px_0px_#000]"
                                                 style={{
-                                                    color: msg.senderRole.color || "#6366f1",
-                                                    borderColor: `${msg.senderRole.color || "#6366f1"}40`,
-                                                    backgroundColor: `${msg.senderRole.color || "#6366f1"}15`,
+                                                    color: "#000",
+                                                    backgroundColor: msg.senderRole.color || "#FFE566",
                                                 }}
                                             >
                                                 {msg.senderRole.name}
                                             </span>
                                         )}
 
-                                        <span className="text-[11px] text-slate-500">
+                                        <span className="text-[11px] font-bold text-neutral-500">
                                             {new Date(msg.createdAt).toLocaleTimeString([], {
                                                 hour: "2-digit",
                                                 minute: "2-digit",
@@ -540,10 +576,10 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                         </span>
 
                                         {msg.isEdited && (
-                                            <span className="text-[10px] text-slate-500 italic">(edited)</span>
+                                            <span className="text-[10px] text-neutral-400 italic">(edited)</span>
                                         )}
                                         {msg.isPinned && (
-                                            <Pin className="w-3 h-3 text-indigo-400 shrink-0" title="Pinned" />
+                                            <Pin className="w-3 h-3 text-black shrink-0" title="Pinned" />
                                         )}
                                     </div>
 
@@ -554,18 +590,18 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                                 value={editContent}
                                                 onChange={(e) => setEditContent(e.target.value)}
                                                 rows={2}
-                                                className="w-full p-2.5 rounded-xl bg-slate-950 border border-indigo-500/50 text-xs text-slate-200 focus:outline-none resize-none"
+                                                className="w-full p-2.5 rounded-xl bg-white border-2 border-black text-xs font-semibold text-black focus:outline-none resize-none shadow-[2px_2px_0px_#000]"
                                             />
                                             <div className="flex items-center gap-2">
                                                 <button
                                                     onClick={() => handleSaveEdit(msg.id)}
-                                                    className="px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold"
+                                                    className="px-3 py-1 bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black rounded-lg text-xs font-black shadow-[1.5px_1.5px_0px_#000]"
                                                 >
                                                     Save
                                                 </button>
                                                 <button
                                                     onClick={() => setEditingMessageId(null)}
-                                                    className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs"
+                                                    className="px-3 py-1 bg-white hover:bg-neutral-100 text-black border-2 border-black rounded-lg text-xs font-bold"
                                                 >
                                                     Cancel
                                                 </button>
@@ -573,8 +609,8 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                         </div>
                                     ) : (
                                         <div
-                                            className={`text-sm text-slate-300 leading-relaxed mt-1 whitespace-pre-wrap break-words ${
-                                                msg.isDeleted ? "text-slate-500 italic" : ""
+                                            className={`text-sm font-semibold text-neutral-900 leading-relaxed mt-1 whitespace-pre-wrap break-words ${
+                                                msg.isDeleted ? "text-neutral-400 italic font-normal" : ""
                                             }`}
                                         >
                                             {msg.content}
@@ -595,14 +631,14 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                                 <button
                                                     key={rx.emoji}
                                                     onClick={() => handleToggleReaction(msg.id, rx.emoji)}
-                                                    className={`px-2 py-0.5 rounded-lg border text-xs flex items-center gap-1 transition ${
+                                                    className={`px-2.5 py-1 rounded-lg border-2 border-black text-xs font-black flex items-center gap-1.5 transition ${
                                                         rx.hasReacted
-                                                            ? "bg-indigo-600/20 border-indigo-500 text-indigo-300"
-                                                            : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                                                            ? "bg-[#A6FF70] text-black shadow-[2px_2px_0px_#000]"
+                                                            : "bg-white hover:bg-neutral-100 text-black shadow-[1px_1px_0px_#000]"
                                                     }`}
                                                 >
                                                     <span>{rx.emoji}</span>
-                                                    <span className="text-[11px] font-semibold">{rx.count}</span>
+                                                    <span className="text-[11px] font-black">{rx.count}</span>
                                                 </button>
                                             ))}
                                         </div>
@@ -612,11 +648,11 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                     {msg.thread && (
                                         <button
                                             onClick={() => onOpenThread(msg.thread!)}
-                                            className="mt-2.5 px-3 py-1.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 text-xs text-indigo-300 flex items-center gap-2 transition"
+                                            className="mt-2.5 px-3 py-1.5 rounded-xl bg-white hover:bg-[#FFE566] border-2 border-black shadow-[2px_2px_0px_#000] text-xs font-black text-black flex items-center gap-2 transition"
                                         >
                                             <MessageCircle className="w-3.5 h-3.5" />
-                                            <span className="font-semibold">{msg.thread.name}</span>
-                                            <span className="text-[11px] text-indigo-400/80">
+                                            <span>{msg.thread.name}</span>
+                                            <span className="text-[11px] text-neutral-600 font-bold">
                                                 {msg.thread.messageCount || 0} replies
                                             </span>
                                         </button>
@@ -625,7 +661,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
 
                                 {/* Floating Hover Actions */}
                                 {!msg.isDeleted && (
-                                    <div className="opacity-0 group-hover:opacity-100 absolute right-3 -top-3.5 bg-slate-900 border border-slate-800 rounded-xl px-1.5 py-1 flex items-center gap-1 shadow-xl transition">
+                                    <div className="opacity-0 group-hover:opacity-100 absolute right-3 -top-3.5 bg-white border-2 border-black rounded-xl px-2 py-1 flex items-center gap-1 shadow-[3px_3px_0px_#000] transition z-10">
                                         {/* Quick Emoji Reaction Buttons */}
                                         <div className="relative">
                                             <button
@@ -634,7 +670,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                                         activeEmojiPickerMsgId === msg.id ? null : msg.id
                                                     )
                                                 }
-                                                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition"
+                                                className="p-1.5 text-black hover:bg-[#FAF6EE] rounded-lg transition"
                                                 title="Add Reaction"
                                             >
                                                 <Smile className="w-3.5 h-3.5" />
@@ -642,7 +678,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
 
                                             {/* Emoji Picker Popover */}
                                             {activeEmojiPickerMsgId === msg.id && (
-                                                <div className="absolute right-0 bottom-full mb-2 bg-[#0f172a] border border-slate-800 rounded-2xl p-2 flex items-center gap-1 shadow-2xl z-30">
+                                                <div className="absolute right-0 bottom-full mb-2 bg-white border-2 border-black rounded-2xl p-2 flex items-center gap-1 shadow-neo z-30">
                                                     {COMMON_EMOJIS.map((emoji) => (
                                                         <button
                                                             key={emoji}
@@ -666,7 +702,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                                     setThreadName(`Thread on: ${msg.content.slice(0, 30)}...`);
                                                 }
                                             }}
-                                            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition"
+                                            className="p-1.5 text-black hover:bg-[#FAF6EE] rounded-lg transition"
                                             title="Reply in Thread"
                                         >
                                             <MessageCircle className="w-3.5 h-3.5" />
@@ -676,7 +712,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                         {canManageChannels && (
                                             <button
                                                 onClick={() => handleTogglePin(msg)}
-                                                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition"
+                                                className="p-1.5 text-black hover:bg-[#FAF6EE] rounded-lg transition"
                                                 title={msg.isPinned ? "Unpin Message" : "Pin Message"}
                                             >
                                                 <Pin className="w-3.5 h-3.5" />
@@ -690,7 +726,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                                     setEditingMessageId(msg.id);
                                                     setEditContent(msg.content);
                                                 }}
-                                                className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition"
+                                                className="p-1.5 text-black hover:bg-[#FAF6EE] rounded-lg transition"
                                                 title="Edit Message"
                                             >
                                                 <Edit3 className="w-3.5 h-3.5" />
@@ -701,7 +737,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                         {canDelete && (
                                             <button
                                                 onClick={() => handleDeleteMessage(msg.id)}
-                                                className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition"
+                                                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition"
                                                 title="Delete Message"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />
@@ -717,24 +753,24 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
             </div>
 
             {/* 3. MESSAGE COMPOSER */}
-            <div className="p-4 border-t border-slate-800/80 bg-slate-900/30 shrink-0">
+            <div className="p-4 border-t-2 border-black bg-white shrink-0">
                 {isAnnouncementReadOnly ? (
-                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center text-xs text-amber-300">
+                    <div className="p-3 rounded-xl bg-[#FFE566] border-2 border-black text-center text-xs font-black text-black shadow-[2px_2px_0px_#000]">
                         Only chapter administrators and leads can post in announcement channels.
                     </div>
                 ) : (
                     <form onSubmit={handleSendMessage} className="space-y-2">
                         {/* Expandable Attachment Zone */}
                         {showAttachmentZone && (
-                            <div className="mb-3 p-3 bg-slate-900 border border-slate-800 rounded-2xl space-y-2 shadow-xl">
-                                <div className="flex items-center justify-between text-xs text-slate-300 font-medium">
-                                    <span className="flex items-center gap-1.5 text-purple-400 font-semibold">
+                            <div className="mb-3 p-3 bg-white border-2 border-black rounded-2xl space-y-2 shadow-neo">
+                                <div className="flex items-center justify-between text-xs text-black font-black">
+                                    <span className="flex items-center gap-1.5">
                                         <Paperclip className="w-3.5 h-3.5" /> Attach Media & Documents to #{channel.name}
                                     </span>
                                     <button
                                         type="button"
                                         onClick={() => setShowAttachmentZone(false)}
-                                        className="p-1 hover:bg-slate-800 rounded-md text-slate-400 hover:text-slate-200"
+                                        className="p-1 hover:bg-neutral-100 rounded-md text-neutral-600 hover:text-black"
                                     >
                                         <X className="w-3.5 h-3.5" />
                                     </button>
@@ -761,7 +797,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                             </div>
                         )}
 
-                        <div className="relative rounded-2xl bg-slate-950/70 border border-slate-800 focus-within:border-indigo-500/50 focus-within:ring-1 focus-within:ring-indigo-500/50 transition overflow-hidden">
+                        <div className="relative rounded-2xl bg-[#FAF6EE] border-2 border-black focus-within:shadow-[3px_3px_0px_#000] transition overflow-hidden">
                             <textarea
                                 ref={textareaRef}
                                 value={content}
@@ -774,18 +810,18 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                 }}
                                 placeholder={`Message #${channel.name}...`}
                                 rows={2}
-                                className="w-full px-4 pt-3 pb-10 bg-transparent text-sm text-slate-200 placeholder-slate-500 focus:outline-none resize-none"
+                                className="w-full px-4 pt-3 pb-12 bg-transparent text-sm font-semibold text-black placeholder-neutral-500 focus:outline-none resize-none"
                             />
 
                             {/* Composer Toolbar Footer */}
-                            <div className="absolute left-3 bottom-2.5 flex items-center gap-1.5 text-slate-400">
+                            <div className="absolute left-3 bottom-2.5 flex items-center gap-1.5">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         const emoji = prompt("Enter an emoji to insert:", "👋");
                                         if (emoji) setContent((prev) => prev + " " + emoji);
                                     }}
-                                    className="p-1.5 rounded-lg hover:text-slate-200 hover:bg-slate-800/60 transition"
+                                    className="p-1.5 rounded-lg border border-transparent hover:border-black hover:bg-white text-black transition"
                                     title="Add emoji"
                                 >
                                     <Smile className="w-4 h-4" />
@@ -793,10 +829,10 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setShowAttachmentZone((prev) => !prev)}
-                                    className={`p-1.5 rounded-lg transition ${
+                                    className={`p-1.5 rounded-lg border transition ${
                                         showAttachmentZone || pendingAttachments.length > 0
-                                            ? "text-purple-400 bg-purple-500/10"
-                                            : "hover:text-slate-200 hover:bg-slate-800/60"
+                                            ? "border-black bg-[#FFE566] text-black shadow-[1px_1px_0px_#000]"
+                                            : "border-transparent hover:border-black hover:bg-white text-black"
                                     }`}
                                     title="Attach File"
                                 >
@@ -808,7 +844,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                 <button
                                     type="submit"
                                     disabled={sending || !content.trim()}
-                                    className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 transition shadow-lg shadow-indigo-600/25"
+                                    className="p-2 rounded-xl bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black font-black disabled:opacity-40 transition shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
                                 >
                                     <Send className="w-4 h-4" />
                                 </button>
@@ -820,31 +856,31 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
 
             {/* Start Thread Modal */}
             {threadModalMsg && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
-                                <MessageCircle className="w-4 h-4 text-indigo-400" />
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+                    <div className="bg-white border-2 border-black rounded-2xl w-full max-w-md shadow-neo p-6 space-y-4">
+                        <div className="flex items-center justify-between pb-3 border-b-2 border-black">
+                            <h3 className="text-base font-black text-black flex items-center gap-2">
+                                <MessageCircle className="w-4 h-4 text-black" />
                                 Start a Thread
                             </h3>
                             <button
                                 onClick={() => setThreadModalMsg(null)}
-                                className="text-slate-400 hover:text-slate-200"
+                                className="text-neutral-500 hover:text-black p-1 hover:bg-neutral-100 rounded-lg transition"
                             >
                                 <X className="w-4 h-4" />
                             </button>
                         </div>
 
-                        <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs text-slate-400">
-                            <div className="font-semibold text-slate-300">
+                        <div className="p-3 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs text-black">
+                            <div className="font-black text-black">
                                 {threadModalMsg.sender?.firstName} {threadModalMsg.sender?.lastName}
                             </div>
-                            <div className="mt-0.5 line-clamp-2">{threadModalMsg.content}</div>
+                            <div className="mt-0.5 font-medium text-neutral-800 line-clamp-2">{threadModalMsg.content}</div>
                         </div>
 
                         <form onSubmit={handleCreateThread} className="space-y-4">
                             <div>
-                                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                                <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">
                                     Thread Title
                                 </label>
                                 <input
@@ -853,7 +889,7 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                     onChange={(e) => setThreadName(e.target.value)}
                                     placeholder="Give this thread a title..."
                                     required
-                                    className="w-full px-4 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-indigo-500/50"
+                                    className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-black font-semibold text-sm focus:outline-none focus:bg-white shadow-[2px_2px_0px_#000]"
                                 />
                             </div>
 
@@ -861,14 +897,14 @@ export const ChannelView: React.FC<ChannelViewProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => setThreadModalMsg(null)}
-                                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-slate-200"
+                                    className="px-4 py-2 rounded-xl text-xs font-black text-black bg-white hover:bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={creatingThread || !threadName.trim()}
-                                    className="px-4 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25"
+                                    className="px-4 py-2 rounded-xl text-xs font-black bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition disabled:opacity-50"
                                 >
                                     {creatingThread ? "Creating..." : "Start Thread"}
                                 </button>

@@ -480,6 +480,21 @@ export class WorkspaceRepository {
         return this.findDepartmentById(workspaceId, departmentId);
     }
 
+    static async reorderDepartments(
+        workspaceId: string,
+        departmentIds: string[]
+    ): Promise<boolean> {
+        for (let i = 0; i < departmentIds.length; i++) {
+            await query(
+                `UPDATE public.workspace_departments
+                 SET display_order = $1, updated_at = NOW()
+                 WHERE workspace_id = $2 AND id = $3;`,
+                [i, workspaceId, departmentIds[i]]
+            );
+        }
+        return true;
+    }
+
     // =========================================================================
     // 3. MULTI-DEPARTMENT MEMBERSHIP JUNCTION
     // =========================================================================
@@ -542,6 +557,36 @@ export class WorkspaceRepository {
             `DELETE FROM public.workspace_department_members
              WHERE workspace_id = $1 AND department_id = $2 AND member_id = $3;`,
             [workspaceId, departmentId, memberId]
+        );
+        return (res.rowCount ?? 0) > 0;
+    }
+
+    static async updateDepartmentMemberRole(
+        workspaceId: string,
+        departmentId: string,
+        memberId: string,
+        updates: { departmentRole?: "lead" | "co_lead" | "member"; roleTitle?: string }
+    ): Promise<boolean> {
+        const setClauses: string[] = [];
+        const params: any[] = [workspaceId, departmentId, memberId];
+        let idx = 4;
+
+        if (updates.departmentRole) {
+            setClauses.push(`department_role = $${idx++}`);
+            params.push(updates.departmentRole);
+        }
+        if (updates.roleTitle !== undefined) {
+            setClauses.push(`role_title = $${idx++}`);
+            params.push(updates.roleTitle);
+        }
+
+        if (setClauses.length === 0) return false;
+
+        const res = await query(
+            `UPDATE public.workspace_department_members
+             SET ${setClauses.join(", ")}
+             WHERE workspace_id = $1 AND department_id = $2 AND member_id = $3;`,
+            params
         );
         return (res.rowCount ?? 0) > 0;
     }
@@ -5818,25 +5863,56 @@ export class WorkspaceRepository {
         allowedDepartmentIds: string[] | null
     ): Promise<WorkspaceOverviewMetrics> {
         // 1. Members
-        const membersRes = await query(
-            `SELECT
-                COUNT(*)::int AS "totalMembers",
-                COUNT(*) FILTER (WHERE membership_status = 'active' AND is_suspended = false)::int AS "activeMembers"
-             FROM public.workspace_members
-             WHERE workspace_id = $1;`,
-            [workspaceId]
-        );
-        const totalMembers = Number(membersRes.rows[0]?.totalMembers || 0);
-        const activeMembers = Number(membersRes.rows[0]?.activeMembers || 0);
+        let totalMembers = 0;
+        let activeMembers = 0;
+        if (allowedDepartmentIds === null) {
+            const membersRes = await query(
+                `SELECT
+                    COUNT(*)::int AS "totalMembers",
+                    COUNT(*) FILTER (WHERE membership_status = 'active' AND is_suspended = false)::int AS "activeMembers"
+                 FROM public.workspace_members
+                 WHERE workspace_id = $1;`,
+                [workspaceId]
+            );
+            totalMembers = Number(membersRes.rows[0]?.totalMembers || 0);
+            activeMembers = Number(membersRes.rows[0]?.activeMembers || 0);
+        } else if (allowedDepartmentIds.length > 0) {
+            const membersRes = await query(
+                `SELECT
+                    COUNT(DISTINCT wm.id)::int AS "totalMembers",
+                    COUNT(DISTINCT wm.id) FILTER (WHERE wm.membership_status = 'active' AND wm.is_suspended = false)::int AS "activeMembers"
+                 FROM public.workspace_members wm
+                 LEFT JOIN public.workspace_department_members wdm ON wdm.member_id = wm.id
+                 WHERE wm.workspace_id = $1
+                   AND (wm.department_id = ANY($2::uuid[]) OR wdm.department_id = ANY($2::uuid[]));`,
+                [workspaceId, allowedDepartmentIds]
+            );
+            totalMembers = Number(membersRes.rows[0]?.totalMembers || 0);
+            activeMembers = Number(membersRes.rows[0]?.activeMembers || 0);
+        } else {
+            totalMembers = 1;
+            activeMembers = 1;
+        }
 
         // 2. Departments
-        const deptsRes = await query(
-            `SELECT COUNT(*)::int AS count
-             FROM public.workspace_departments
-             WHERE workspace_id = $1 AND status = 'active';`,
-            [workspaceId]
-        );
-        const totalDepartments = Number(deptsRes.rows[0]?.count || 0);
+        let totalDepartments = 0;
+        if (allowedDepartmentIds === null) {
+            const deptsRes = await query(
+                `SELECT COUNT(*)::int AS count
+                 FROM public.workspace_departments
+                 WHERE workspace_id = $1 AND status = 'active';`,
+                [workspaceId]
+            );
+            totalDepartments = Number(deptsRes.rows[0]?.count || 0);
+        } else {
+            const deptsRes = await query(
+                `SELECT COUNT(*)::int AS count
+                 FROM public.workspace_departments
+                 WHERE workspace_id = $1 AND status = 'active' AND id = ANY($2::uuid[]);`,
+                [workspaceId, allowedDepartmentIds]
+            );
+            totalDepartments = Number(deptsRes.rows[0]?.count || 0);
+        }
 
         // 3. Tasks scoped by permission
         let taskDeptCondition = "";
@@ -5869,6 +5945,35 @@ export class WorkspaceRepository {
         // 4. Top recent activities
         const { events } = await this.getActivityFeed(workspaceId, allowedDepartmentIds, { limit: 10 });
 
+        // 5. Recent Announcements
+        let announcements: any[] = [];
+        try {
+            const annRes = await query(
+                `SELECT
+                    wm.id,
+                    wm.content,
+                    wm.created_at AS "createdAt",
+                    wc.name AS "channelName",
+                    json_build_object(
+                        'firstName', u.firstname,
+                        'lastName', u.lastname,
+                        'username', u.username
+                    ) AS "sender"
+                 FROM public.workspace_messages wm
+                 JOIN public.workspace_channels wc ON wc.id = wm.channel_id
+                 LEFT JOIN public.users u ON u.id = wm.sender_id
+                 WHERE wm.workspace_id = $1
+                   AND (wm.message_type = 'announcement' OR wc.channel_type = 'announcement')
+                   AND wm.is_deleted = false
+                 ORDER BY wm.created_at DESC
+                 LIMIT 5;`,
+                [workspaceId]
+            );
+            announcements = annRes.rows;
+        } catch {
+            // Non-critical fallback if messages table query fails
+        }
+
         return {
             totalMembers,
             activeMembers,
@@ -5878,6 +5983,7 @@ export class WorkspaceRepository {
             overdueTasks,
             tasksAwaitingReview,
             recentActivity: events,
+            recentAnnouncements: announcements,
         };
     }
 
@@ -6263,6 +6369,82 @@ export class WorkspaceRepository {
             total: results.length,
             countsByType,
         };
+    }
+
+    // =========================================================================
+    // 12. PHASE 01: MEMBER-SIDE WORKSPACE DISCOVERY & CUSTOM PERMISSIONS
+    // =========================================================================
+
+    /**
+     * Updates granular member-specific permission overrides in workspace_members
+     */
+    static async updateMemberCustomPermissions(
+        workspaceId: string,
+        userId: string,
+        customPermissions: Record<string, boolean>
+    ): Promise<WorkspaceMember | null> {
+        await query(
+            `UPDATE public.workspace_members
+             SET custom_permissions = $3::jsonb,
+                 updated_at = NOW()
+             WHERE workspace_id = $1 AND user_id = $2;`,
+            [workspaceId, userId, JSON.stringify(customPermissions)]
+        );
+        return this.findMember(workspaceId, userId);
+    }
+
+    /**
+     * Finds all active club workspaces where the user is an active member
+     */
+    static async findUserWorkspaces(userId: string): Promise<any[]> {
+        const res = await query(
+            `SELECT
+                tw.id AS "workspaceId",
+                tw.name AS "workspaceName",
+                tw.slug AS "workspaceSlug",
+                tw.description AS "workspaceDescription",
+                tw.icon_url AS "workspaceIconUrl",
+                tw.created_at AS "workspaceCreatedAt",
+                vc.id AS "clubId",
+                vc.name AS "clubName",
+                vc.slug AS "clubSlug",
+                vc.logo_url AS "clubLogoUrl",
+                vc.college_name AS "collegeName",
+                wm.id AS "memberId",
+                wm.role_id AS "roleId",
+                wm.role_title AS "roleTitle",
+                wm.joined_at AS "joinedAt",
+                wm.is_suspended AS "isSuspended",
+                r.name AS "roleName",
+                r.slug AS "roleSlug",
+                r.rank AS "roleRank",
+                r.color AS "roleColor",
+                COALESCE((
+                    SELECT json_agg(json_build_object(
+                        'id', wd.id,
+                        'name', wd.name,
+                        'slug', wd.slug,
+                        'icon', wd.icon,
+                        'color', wd.color,
+                        'departmentRole', wdm.department_role,
+                        'roleTitle', wdm.role_title
+                    ))
+                    FROM public.workspace_department_members wdm
+                    JOIN public.workspace_departments wd ON wd.id = wdm.department_id
+                    WHERE wdm.member_id = wm.id AND wd.status = 'active'
+                ), '[]'::json) AS "departments"
+             FROM public.workspace_members wm
+             JOIN public.team_workspaces tw ON tw.id = wm.workspace_id
+             JOIN public.verified_clubs vc ON vc.id = tw.club_id
+             JOIN public.workspace_roles r ON r.id = wm.role_id
+             WHERE wm.user_id = $1
+               AND wm.membership_status = 'active'
+               AND wm.is_suspended = false
+               AND tw.workspace_status = 'active'
+             ORDER BY tw.created_at ASC;`,
+            [userId]
+        );
+        return res.rows;
     }
 }
 

@@ -15,6 +15,8 @@ import {
     ListTodo,
     CheckCircle2,
     Search,
+    ShieldAlert,
+    Menu,
 } from "lucide-react";
 import { workspaceApi } from "../../../api/workspaceApi";
 import { useToast } from "../../../context/ToastContext";
@@ -28,6 +30,7 @@ import type {
     WorkspaceChannel,
     WorkspaceThread,
     WorkspaceSearchResultItem,
+    MemberCapabilityResolution,
 } from "../../../types/workspace";
 import { DepartmentOverviewView } from "./Departments/DepartmentOverviewView";
 import { MemberDirectoryView } from "./Members/MemberDirectoryView";
@@ -56,14 +59,22 @@ interface WorkspaceShellProps {
         college_name?: string;
     };
     onOpenMobileSidebar?: () => void;
+    clubSelector?: React.ReactNode;
+    initialSection?: string;
 }
 
-export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
+export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({
+    club,
+    onOpenMobileSidebar,
+    clubSelector,
+    initialSection,
+}) => {
     const toast = useToast();
 
     // Data States
     const [workspace, setWorkspace] = useState<TeamWorkspace | null>(null);
     const [currentMember, setCurrentMember] = useState<WorkspaceMember | null>(null);
+    const [capabilities, setCapabilities] = useState<MemberCapabilityResolution | null>(null);
     const [roles, setRoles] = useState<WorkspaceRole[]>([]);
     const [members, setMembers] = useState<WorkspaceMember[]>([]);
     const [departments, setDepartments] = useState<WorkspaceDepartment[]>([]);
@@ -73,7 +84,13 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
     // Active Navigation Sub-tab
     const [activeSection, setActiveSection] = useState<
         "overview" | "departments" | "roster" | "invitations" | "channels" | "all-tasks" | "my-tasks" | "activity" | "audit"
-    >("overview");
+    >(() => (initialSection as any) || "overview");
+
+    useEffect(() => {
+        if (initialSection) {
+            setActiveSection(initialSection as any);
+        }
+    }, [initialSection]);
 
     // Phase 08 States: Search Modal
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -137,6 +154,9 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
             if (res.success) {
                 setWorkspace(res.workspace);
                 setCurrentMember(res.currentMember);
+                if (res.capabilities) {
+                    setCapabilities(res.capabilities);
+                }
                 setRoles(res.roles || []);
 
                 // Load members, departments, and channels concurrently
@@ -316,12 +336,25 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
         );
     }
 
-    const isOwner = currentMember?.role?.slug === "owner" || currentMember?.role?.rank === 1000;
-    const isAdmin = isOwner || (currentMember?.role?.rank || 0) >= 800;
-    const isWorkspaceManager = workspace.managerUserId === currentMember?.userId;
-    const canManageChannels =
+    const isOwner = Boolean(
+        currentMember?.role?.slug === "owner" ||
+        currentMember?.role?.rank === 1000 ||
+        capabilities?.isOwner
+    );
+    const isAdmin = Boolean(
+        isOwner ||
+        (currentMember?.role?.rank || 0) >= 800 ||
+        capabilities?.isAdmin
+    );
+    const isWorkspaceManager = Boolean(
+        (workspace.managerUserId && workspace.managerUserId === currentMember?.userId) ||
+        capabilities?.isWorkspaceManager
+    );
+    const canManageChannels = Boolean(
         isAdmin ||
-        (isWorkspaceManager && Boolean((workspace.managerPermissions as any)?.can_manage_channels));
+        (isWorkspaceManager && Boolean((workspace.managerPermissions as any)?.can_manage_channels)) ||
+        capabilities?.capabilities.channels.manage
+    );
     const managerMember = members.find((m) => m.userId === workspace.managerUserId);
 
     return (
@@ -358,6 +391,17 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
                     </div>
 
                     <div className="flex items-center gap-2.5 self-start md:self-auto flex-wrap">
+                        {onOpenMobileSidebar && (
+                            <button
+                                onClick={onOpenMobileSidebar}
+                                className="lg:hidden px-2.5 py-1.5 bg-white hover:bg-neutral-100 text-black border-2 border-black rounded-xl text-xs font-black shadow-neo-xs transition-all flex items-center gap-1.5"
+                                title="Open Navigation Menu"
+                            >
+                                <Menu className="w-3.5 h-3.5" />
+                                <span>Menu</span>
+                            </button>
+                        )}
+                        {clubSelector}
                         <div className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 border-2 border-black rounded-xl text-xs font-bold shadow-neo-xs">
                             <Shield className="w-3.5 h-3.5 text-blue-600" />
                             <span>Your Role: {currentMember?.roleTitle || "Member"}</span>
@@ -442,17 +486,19 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
                         Member Roster ({members.length})
                     </button>
 
-                    <button
-                        onClick={() => setActiveSection("invitations")}
-                        className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                            activeSection === "invitations"
-                                ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                        }`}
-                    >
-                        <Mail className="w-3.5 h-3.5" />
-                        Invitations
-                    </button>
+                    {(capabilities ? capabilities.navigation.canViewInvitations : (isAdmin || isWorkspaceManager)) && (
+                        <button
+                            onClick={() => setActiveSection("invitations")}
+                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
+                                activeSection === "invitations"
+                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
+                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
+                            }`}
+                        >
+                            <Mail className="w-3.5 h-3.5" />
+                            Invitations
+                        </button>
+                    )}
 
                     <button
                         onClick={() => setActiveSection("channels")}
@@ -466,17 +512,19 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
                         Channels & Chat
                     </button>
 
-                    <button
-                        onClick={() => setActiveSection("all-tasks")}
-                        className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
-                            activeSection === "all-tasks"
-                                ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
-                                : "bg-white hover:bg-neutral-50 shadow-neo-xs"
-                        }`}
-                    >
-                        <ListTodo className="w-3.5 h-3.5" />
-                        All Tasks
-                    </button>
+                    {(capabilities ? capabilities.navigation.canViewAllTasks : true) && (
+                        <button
+                            onClick={() => setActiveSection("all-tasks")}
+                            className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
+                                activeSection === "all-tasks"
+                                    ? "bg-[#A6FF70] shadow-neo-sm translate-x-[1px] translate-y-[1px]"
+                                    : "bg-white hover:bg-neutral-50 shadow-neo-xs"
+                            }`}
+                        >
+                            <ListTodo className="w-3.5 h-3.5" />
+                            All Tasks
+                        </button>
+                    )}
 
                     <button
                         onClick={() => setActiveSection("my-tasks")}
@@ -502,7 +550,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
                         Activity Log
                     </button>
 
-                    {isAdmin && (
+                    {(capabilities ? capabilities.navigation.canViewAuditLogs : isAdmin) && (
                         <button
                             onClick={() => setActiveSection("audit")}
                             className={`px-4 py-2 text-xs font-black rounded-xl border-2 border-black transition-all flex items-center gap-2 ${
@@ -518,7 +566,26 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
                 </div>
             </div>
 
-            {/* SECTION 1: OVERVIEW (PHASE 08) */}
+            {/* Section Access Authorization Enforcement */}
+            {capabilities && !capabilities.navigation.allowedTabs.includes(activeSection) ? (
+                <div className="bg-[#FAF6EE] border-2 border-black rounded-2xl p-8 text-center shadow-neo max-w-lg mx-auto my-8 animate-in fade-in duration-150">
+                    <div className="w-14 h-14 bg-rose-100 border-2 border-black rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-neo-xs">
+                        <ShieldAlert className="w-7 h-7 text-rose-600" />
+                    </div>
+                    <h3 className="text-xl font-black text-black">Section Restricted</h3>
+                    <p className="text-xs font-bold text-neutral-600 mt-2 max-w-sm mx-auto leading-relaxed">
+                        You do not possess permission to access the "{activeSection}" module in this workspace.
+                    </p>
+                    <button
+                        onClick={() => setActiveSection("overview")}
+                        className="mt-5 px-5 py-2.5 bg-[#A6FF70] hover:bg-[#95F55D] text-black font-black text-xs border-2 border-black rounded-xl shadow-neo-sm transition active:translate-x-[1px] active:translate-y-[1px]"
+                    >
+                        Return to Workspace Overview
+                    </button>
+                </div>
+            ) : (
+                <>
+                    {/* SECTION 1: OVERVIEW (PHASE 08) */}
             {activeSection === "overview" && (
                 <WorkspaceOverviewView
                     clubId={club.id}
@@ -538,6 +605,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
                     departments={departments}
                     allMembers={members}
                     isAdmin={isAdmin}
+                    capabilities={capabilities}
                     onReload={() => loadWorkspace(true)}
                 />
             )}
@@ -568,7 +636,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
 
             {/* SECTION 5: CHANNELS & REALTIME COLLABORATION (PHASE 04) */}
             {activeSection === "channels" && (
-                <div className="flex h-[720px] max-h-[calc(100vh-200px)] rounded-2xl border-2 border-black overflow-hidden shadow-neo bg-[#0B0F17]">
+                <div className="flex h-[720px] max-h-[calc(100vh-200px)] rounded-2xl border-2 border-black overflow-hidden shadow-neo bg-white">
                     {/* Left Channels Sidebar */}
                     <WorkspaceSidebar
                         categories={categories}
@@ -621,14 +689,16 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
                             }}
                         />
                     ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 bg-[#0B0F17]">
-                            <Hash className="w-12 h-12 text-slate-700 mb-3" />
-                            <p className="text-sm font-semibold text-slate-300">Select a channel to start messaging</p>
-                            <p className="text-xs text-slate-500 mt-1">Or create a new channel in the sidebar</p>
+                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-[#FAF6EE]">
+                            <div className="w-14 h-14 rounded-2xl bg-[#FFE566] border-2 border-black shadow-[3px_3px_0px_#000] flex items-center justify-center text-black mb-3">
+                                <Hash className="w-7 h-7 text-black" />
+                            </div>
+                            <p className="text-base font-black text-black">Select a channel to start messaging</p>
+                            <p className="text-xs font-semibold text-neutral-600 mt-1">Or create a new channel in the sidebar to collaborate</p>
                             {canManageChannels && (
                                 <button
                                     onClick={() => setIsCreateChannelOpen(true)}
-                                    className="mt-4 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold rounded-xl shadow-lg shadow-indigo-600/30 transition"
+                                    className="mt-4 px-4 py-2 bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black text-xs font-black rounded-xl shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition"
                                 >
                                     + Create Channel
                                 </button>
@@ -697,6 +767,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ club }) => {
                     clubId={club.id}
                     isAdmin={isAdmin}
                 />
+            )}
+            </>
             )}
 
             {/* Phase 04 Modals */}

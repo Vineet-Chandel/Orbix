@@ -879,6 +879,17 @@ export interface WorkspaceOverviewMetrics {
     overdueTasks: number;
     tasksAwaitingReview: number;
     recentActivity: WorkspaceActivityEvent[];
+    recentAnnouncements?: Array<{
+        id: string;
+        content: string;
+        createdAt: string;
+        channelName?: string;
+        sender?: {
+            firstName: string;
+            lastName: string;
+            username: string;
+        };
+    }>;
 }
 
 export interface WorkspaceDepartmentInsight {
@@ -969,6 +980,108 @@ export interface WorkspaceTemplateDefinition {
         }>;
     }>;
 }
+
+// ============================================================================
+// PHASE 01: MEMBER CAPABILITY RESOLUTION & NAVIGATION MAPPING
+// ============================================================================
+
+export interface WorkspaceModuleCapabilities {
+    workspace: {
+        view: boolean;
+        manageSettings: boolean;
+        manageRoles: boolean;
+        viewAuditLogs: boolean;
+    };
+    departments: {
+        viewAll: boolean;
+        viewAssigned: boolean;
+        create: boolean;
+        manageAll: boolean;
+        manageAssigned: boolean;
+        manageMembers: boolean;
+        manageableDepartmentIds: string[];
+        memberDepartmentIds: string[];
+    };
+    members: {
+        view: boolean;
+        invite: boolean;
+        manage: boolean;
+        assignRole: boolean;
+        highestManageableRank: number;
+    };
+    roles: {
+        view: boolean;
+        create: boolean;
+        manage: boolean;
+        assign: boolean;
+    };
+    channels: {
+        view: boolean;
+        create: boolean;
+        manage: boolean;
+        managePermissions: boolean;
+        sendMessages: boolean;
+        moderate: boolean;
+    };
+    tasks: {
+        viewAll: boolean;
+        viewAssigned: boolean;
+        create: boolean;
+        assign: boolean;
+        review: boolean;
+        approve: boolean;
+        delete: boolean;
+        manageableDepartmentIds: string[];
+    };
+    assets: {
+        view: boolean;
+        upload: boolean;
+        download: boolean;
+        manage: boolean;
+    };
+    audit: {
+        view: boolean;
+    };
+}
+
+export interface WorkspaceNavigationCapabilities {
+    canViewOverview: boolean;
+    canViewDepartments: boolean;
+    canViewMembers: boolean;
+    canViewInvitations: boolean;
+    canViewRoles: boolean;
+    canViewChannels: boolean;
+    canViewAllTasks: boolean;
+    canViewMyTasks: boolean;
+    canViewActivity: boolean;
+    canViewAuditLogs: boolean;
+    canViewSettings: boolean;
+    allowedTabs: string[];
+}
+
+export interface MemberCapabilityResolution {
+    workspaceId: string;
+    userId: string;
+    effectiveRole: {
+        id: string;
+        name: string;
+        slug: string;
+        rank: number;
+        isSystem: boolean;
+        color: string;
+    };
+    highestRank: number;
+    highestManageableRank: number;
+    isOwner: boolean;
+    isAdmin: boolean;
+    isWorkspaceManager: boolean;
+    leadDepartmentIds: string[];
+    memberDepartmentIds: string[];
+    effectivePermissions: string[];
+    capabilities: WorkspaceModuleCapabilities;
+    navigation: WorkspaceNavigationCapabilities;
+}
+
 
 
 

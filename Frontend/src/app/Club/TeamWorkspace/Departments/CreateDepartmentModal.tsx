@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
+import { NeoSelect } from "../../../../components/NeoSelect";
 import type { WorkspaceMember, WorkspaceDepartment } from "../../../../types/workspace";
 
 interface CreateDepartmentModalProps {
@@ -174,17 +175,13 @@ export const CreateDepartmentModal: React.FC<CreateDepartmentModalProps> = ({
                             <label className="block text-xs font-black uppercase text-neutral-700 mb-1">
                                 Icon
                             </label>
-                            <select
+                            <NeoSelect
                                 value={icon}
-                                onChange={(e) => setIcon(e.target.value)}
-                                className="w-full px-3 py-1.5 text-xs font-bold border-2 border-black rounded-xl bg-white focus:outline-none"
-                            >
-                                {ICONS.map((i) => (
-                                    <option key={i} value={i}>
-                                        {i}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => setIcon(val)}
+                                size="sm"
+                                triggerClassName="w-full text-xs font-bold"
+                                options={ICONS.map((i) => ({ value: i, label: i }))}
+                            />
                         </div>
                     </div>
 
@@ -193,18 +190,20 @@ export const CreateDepartmentModal: React.FC<CreateDepartmentModalProps> = ({
                         <label className="block text-xs font-black uppercase text-neutral-700 mb-1">
                             Designated Primary Lead (Optional)
                         </label>
-                        <select
+                        <NeoSelect
                             value={leadUserId}
-                            onChange={(e) => setLeadUserId(e.target.value)}
-                            className="w-full px-3 py-2 text-xs font-semibold border-2 border-black rounded-xl bg-white focus:outline-none"
-                        >
-                            <option value="">No Primary Lead (Assign Later)</option>
-                            {members.map((m) => (
-                                <option key={m.userId} value={m.userId}>
-                                    {m.user?.firstName} {m.user?.lastName} (@{m.user?.username}) — {m.roleTitle}
-                                </option>
-                            ))}
-                        </select>
+                            onChange={(val) => setLeadUserId(val)}
+                            size="sm"
+                            triggerClassName="w-full text-xs font-bold"
+                            options={[
+                                { value: "", label: "No Primary Lead (Assign Later)" },
+                                ...members.map((m) => ({
+                                    value: m.userId,
+                                    label: `${m.user?.firstName || ""} ${m.user?.lastName || ""}`.trim() || m.user?.username || m.userId,
+                                    description: m.roleTitle,
+                                })),
+                            ]}
+                        />
                     </div>
 
                     <div className="flex items-center justify-end gap-2.5 pt-4 border-t-2 border-black">

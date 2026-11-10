@@ -19,6 +19,8 @@ import type {
     WorkspaceChannel,
     WorkspaceChannelType,
 } from "../../../../types/workspace";
+import { NeoSelect } from "../../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 
 interface CreateChannelModalProps {
     isOpen: boolean;
@@ -163,22 +165,22 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white border-2 border-black rounded-2xl w-full max-w-xl shadow-neo overflow-hidden flex flex-col max-h-[90vh]">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+                <div className="flex items-center justify-between px-6 py-4 border-b-2 border-black bg-white">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                        <div className="w-10 h-10 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black">
                             <Hash className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-100">Create Channel</h3>
-                            <p className="text-xs text-slate-400">Configure channel type, privacy, and permissions</p>
+                            <h3 className="text-lg font-black text-black">Create Channel</h3>
+                            <p className="text-xs font-semibold text-neutral-600">Configure channel type, privacy, and permissions</p>
                         </div>
                     </div>
                     <button
                         onClick={handleClose}
-                        className="text-slate-400 hover:text-slate-200 p-2 rounded-lg hover:bg-slate-800/60 transition"
+                        className="text-neutral-500 hover:text-black p-2 rounded-lg hover:bg-neutral-100 border-2 border-transparent hover:border-black transition"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -188,7 +190,7 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                 <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto">
                     {/* Channel Type Selector */}
                     <div>
-                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2.5">
+                        <label className="block text-xs font-black text-black uppercase tracking-wider mb-2.5">
                             Channel Type
                         </label>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -199,18 +201,18 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                                         type="button"
                                         key={ct.type}
                                         onClick={() => setChannelType(ct.type)}
-                                        className={`p-3 rounded-xl border text-left transition flex items-start gap-3 ${
+                                        className={`p-3 rounded-xl border-2 text-left transition flex items-start gap-3 ${
                                             isSelected
-                                                ? "bg-indigo-600/15 border-indigo-500/80 ring-1 ring-indigo-500/50"
-                                                : "bg-slate-950/60 border-slate-800/80 hover:border-slate-700"
+                                                ? "bg-[#A6FF70] border-black shadow-[2px_2px_0px_#000]"
+                                                : "bg-[#FAF6EE] border-black/30 hover:border-black"
                                         }`}
                                     >
-                                        <div className="p-2 rounded-lg bg-slate-900/80 border border-slate-800 shrink-0">
+                                        <div className="p-2 rounded-lg bg-white border border-black shrink-0">
                                             {ct.icon}
                                         </div>
                                         <div>
-                                            <div className="text-sm font-semibold text-slate-200">{ct.label}</div>
-                                            <div className="text-xs text-slate-400 leading-snug mt-0.5">{ct.desc}</div>
+                                            <div className="text-sm font-black text-black">{ct.label}</div>
+                                            <div className="text-xs text-neutral-700 leading-snug mt-0.5 font-medium">{ct.desc}</div>
                                         </div>
                                     </button>
                                 );
@@ -220,11 +222,11 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
 
                     {/* Channel Name */}
                     <div>
-                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
-                            Channel Name <span className="text-rose-400">*</span>
+                        <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">
+                            Channel Name <span className="text-rose-500">*</span>
                         </label>
                         <div className="relative">
-                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 font-mono text-sm">
+                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-600 font-mono text-sm font-bold">
                                 #
                             </span>
                             <input
@@ -233,15 +235,15 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                                 onChange={(e) => setName(e.target.value)}
                                 placeholder="new-channel"
                                 required
-                                className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/50 text-sm font-medium transition"
+                                className="w-full pl-8 pr-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-black placeholder-neutral-400 focus:outline-none focus:bg-white text-sm font-semibold transition shadow-[2px_2px_0px_#000]"
                             />
                         </div>
-                        <p className="text-xs text-slate-500 mt-1">Spaces are automatically converted to hyphens.</p>
+                        <p className="text-xs text-neutral-500 font-medium mt-1">Spaces are automatically converted to hyphens.</p>
                     </div>
 
                     {/* Topic / Description */}
                     <div>
-                        <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                        <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">
                             Topic / Purpose (Optional)
                         </label>
                         <input
@@ -249,99 +251,98 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                             value={topic}
                             onChange={(e) => setTopic(e.target.value)}
                             placeholder="What is this channel about?"
-                            className="w-full px-4 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/50 text-sm transition"
+                            className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-black placeholder-neutral-400 focus:outline-none focus:bg-white text-sm font-semibold transition shadow-[2px_2px_0px_#000]"
                         />
                     </div>
 
                     {/* Category & Department selectors */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                            <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">
                                 Parent Category
                             </label>
-                            <select
+                            <NeoSelect
                                 value={categoryId || ""}
-                                onChange={(e) => setCategoryId(e.target.value ? e.target.value : null)}
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-indigo-500/50 transition"
-                            >
-                                <option value="">No Category</option>
-                                {categories.map((cat) => (
-                                    <option key={cat.id} value={cat.id}>
-                                        {cat.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => setCategoryId(val ? val : null)}
+                                options={[
+                                    { value: "", label: "No Category" },
+                                    ...categories.map((cat) => ({
+                                        value: cat.id,
+                                        label: cat.name,
+                                    })),
+                                ]}
+                                placeholder="No Category"
+                                size="md"
+                            />
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                            <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">
                                 Department Association
                             </label>
-                            <select
+                            <NeoSelect
                                 value={departmentId || ""}
-                                onChange={(e) => setDepartmentId(e.target.value ? e.target.value : null)}
-                                className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-indigo-500/50 transition"
-                            >
-                                <option value="">Club-Wide</option>
-                                {departments.map((dept) => (
-                                    <option key={dept.id} value={dept.id}>
-                                        {dept.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => setDepartmentId(val ? val : null)}
+                                options={[
+                                    { value: "", label: "Club-Wide" },
+                                    ...departments.map((dept) => ({
+                                        value: dept.id,
+                                        label: dept.name,
+                                    })),
+                                ]}
+                                placeholder="Club-Wide"
+                                size="md"
+                            />
                         </div>
                     </div>
 
                     {/* Category Permission Sync */}
                     {categoryId && (
-                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-950/40 border border-slate-800/80">
+                        <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#FAF6EE] border-2 border-black shadow-[2px_2px_0px_#000]">
                             <div className="flex items-center gap-2.5">
-                                <RefreshCw className="w-4 h-4 text-emerald-400" />
+                                <RefreshCw className="w-4 h-4 text-black" />
                                 <div>
-                                    <div className="text-sm font-medium text-slate-200">
+                                    <div className="text-sm font-black text-black">
                                         Sync Permissions with Category
                                     </div>
-                                    <div className="text-xs text-slate-400">
+                                    <div className="text-xs font-medium text-neutral-600">
                                         Inherit permission overrides from parent category
                                     </div>
                                 </div>
                             </div>
-                            <input
-                                type="checkbox"
+                            <NeoCheckbox
                                 checked={isCategorySynced}
-                                onChange={(e) => setIsCategorySynced(e.target.checked)}
-                                className="w-4 h-4 text-indigo-600 rounded border-slate-700 bg-slate-900 focus:ring-indigo-500 focus:ring-offset-slate-900"
+                                onCheckedChange={(checked) => setIsCategorySynced(checked)}
+                                colorScheme="cyan"
+                                size="sm"
                             />
                         </div>
                     )}
 
                     {/* Private Channel Toggle */}
-                    <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 space-y-3">
+                    <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-3 shadow-[2px_2px_0px_#000]">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2.5">
-                                <Lock className="w-4 h-4 text-amber-400" />
+                                <Lock className="w-4 h-4 text-black" />
                                 <div>
-                                    <div className="text-sm font-semibold text-slate-200">Private Channel</div>
-                                    <div className="text-xs text-slate-400">
+                                    <div className="text-sm font-black text-black">Private Channel</div>
+                                    <div className="text-xs font-medium text-neutral-600">
                                         Only selected roles and members can view this channel
                                     </div>
                                 </div>
                             </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={isPrivate}
-                                    onChange={(e) => setIsPrivate(e.target.checked)}
-                                    className="sr-only peer"
-                                />
-                                <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                            </label>
+                            <NeoCheckbox
+                                checked={isPrivate}
+                                onCheckedChange={(checked) => setIsPrivate(checked)}
+                                colorScheme="yellow"
+                                size="sm"
+                            />
                         </div>
 
                         {/* Role selection if private */}
                         {isPrivate && (
-                            <div className="pt-3 border-t border-slate-800/80 space-y-2 animate-in fade-in duration-150">
-                                <div className="text-xs font-semibold text-slate-400">
+                            <div className="pt-3 border-t-2 border-black/10 space-y-2 animate-in fade-in duration-150">
+                                <div className="text-xs font-black text-black">
                                     Allowed Roles (Admins & Owners have access automatically):
                                 </div>
                                 <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto">
@@ -352,15 +353,15 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                                                 type="button"
                                                 key={role.id}
                                                 onClick={() => toggleRole(role.id)}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition flex items-center gap-1.5 ${
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-black border-2 border-black transition flex items-center gap-1.5 ${
                                                     isSelected
-                                                        ? "bg-indigo-600/20 border-indigo-500 text-indigo-300"
-                                                        : "bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700"
+                                                        ? "bg-[#A6FF70] text-black shadow-[2px_2px_0px_#000]"
+                                                        : "bg-white text-black hover:bg-neutral-100 shadow-[1px_1px_0px_#000]"
                                                 }`}
                                             >
                                                 <span
-                                                    className="w-2 h-2 rounded-full"
-                                                    style={{ backgroundColor: role.color || "#6366f1" }}
+                                                    className="w-2 h-2 rounded-full border border-black"
+                                                    style={{ backgroundColor: role.color || "#000" }}
                                                 />
                                                 {role.name}
                                             </button>
@@ -372,18 +373,18 @@ export const CreateChannelModal: React.FC<CreateChannelModalProps> = ({
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+                    <div className="flex items-center justify-end gap-3 pt-3 border-t-2 border-black">
                         <button
                             type="button"
                             onClick={handleClose}
-                            className="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 transition"
+                            className="px-4 py-2 rounded-xl text-xs font-black text-black bg-white hover:bg-neutral-100 border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
                             disabled={submitting || !name.trim()}
-                            className="px-5 py-2 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-600/25 transition"
+                            className="px-5 py-2 rounded-xl text-xs font-black bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {submitting ? "Creating..." : "Create Channel"}
                         </button>

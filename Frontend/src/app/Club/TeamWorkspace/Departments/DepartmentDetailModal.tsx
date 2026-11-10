@@ -13,6 +13,7 @@ import {
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
 import { OrbixLoader } from "../../../../components/ui/loader";
+import { NeoSelect } from "../../../../components/NeoSelect";
 import type {
     WorkspaceDepartment,
     WorkspaceDepartmentMember,
@@ -25,6 +26,7 @@ interface DepartmentDetailModalProps {
     allDepartments: WorkspaceDepartment[];
     allMembers: WorkspaceMember[];
     isAdmin: boolean;
+    canManageDepartment?: boolean;
     onClose: () => void;
     onUpdated: () => void;
 }
@@ -35,6 +37,7 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
     allDepartments,
     allMembers,
     isAdmin,
+    canManageDepartment = false,
     onClose,
     onUpdated,
 }) => {
@@ -42,6 +45,8 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
     const [department, setDepartment] = useState<WorkspaceDepartment | null>(null);
     const [members, setMembers] = useState<WorkspaceDepartmentMember[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const canManage = isAdmin || canManageDepartment;
 
     // Add Member sub-state
     const [selectedAddMemberId, setSelectedAddMemberId] = useState("");
@@ -255,22 +260,26 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
 
                 {/* Change Lead Inline Form */}
                 {isChangingLead && (
-                    <div className="mt-3 p-3 bg-neutral-100 border border-black rounded-xl flex items-center gap-2">
-                        <select
-                            value={newLeadUserId}
-                            onChange={(e) => setNewLeadUserId(e.target.value)}
-                            className="flex-1 px-3 py-1.5 text-xs font-semibold border border-black rounded-lg bg-white"
-                        >
-                            <option value="">Remove Lead (Leave Unassigned)</option>
-                            {allMembers.map((m) => (
-                                <option key={m.userId} value={m.userId}>
-                                    {m.user?.firstName} {m.user?.lastName} (@{m.user?.username})
-                                </option>
-                            ))}
-                        </select>
+                    <div className="mt-3 p-3 bg-neutral-100 border-2 border-black rounded-xl flex items-center gap-2">
+                        <div className="flex-1">
+                            <NeoSelect
+                                value={newLeadUserId}
+                                onChange={(val) => setNewLeadUserId(val)}
+                                size="sm"
+                                triggerClassName="w-full text-xs font-bold"
+                                options={[
+                                    { value: "", label: "Remove Lead (Leave Unassigned)" },
+                                    ...allMembers.map((m) => ({
+                                        value: m.userId,
+                                        label: `${m.user?.firstName || ""} ${m.user?.lastName || ""}`.trim() || m.user?.username || m.userId,
+                                        description: `@${m.user?.username}`,
+                                    })),
+                                ]}
+                            />
+                        </div>
                         <button
                             onClick={handleSaveLead}
-                            className="px-3 py-1.5 bg-[#A6FF70] text-black font-bold text-xs border border-black rounded-lg"
+                            className="px-3 py-2 bg-[#A6FF70] text-black font-black text-xs border-2 border-black rounded-xl shadow-neo-xs hover:bg-[#92ec5d] transition"
                         >
                             Save Lead
                         </button>
@@ -278,20 +287,25 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
                 )}
 
                 {/* Add Member Bar */}
-                {isAdmin && department.status === "active" && (
+                {canManage && department.status === "active" && (
                     <div className="mt-5 flex items-center gap-2">
-                        <select
-                            value={selectedAddMemberId}
-                            onChange={(e) => setSelectedAddMemberId(e.target.value)}
-                            className="flex-1 px-3 py-2 text-xs font-semibold border-2 border-black rounded-xl bg-white focus:outline-none"
-                        >
-                            <option value="">Select workspace member to assign to {department.name}...</option>
-                            {candidateMembers.map((m) => (
-                                <option key={m.id} value={m.id}>
-                                    {m.user?.firstName} {m.user?.lastName} (@{m.user?.username}) — {m.roleTitle}
-                                </option>
-                            ))}
-                        </select>
+                        <div className="flex-1">
+                            <NeoSelect
+                                value={selectedAddMemberId}
+                                onChange={(val) => setSelectedAddMemberId(val)}
+                                size="sm"
+                                placeholder={`Select workspace member to assign to ${department.name}...`}
+                                triggerClassName="w-full text-xs font-bold"
+                                options={[
+                                    { value: "", label: `Select member to assign to ${department.name}...` },
+                                    ...candidateMembers.map((m) => ({
+                                        value: m.id,
+                                        label: `${m.user?.firstName || ""} ${m.user?.lastName || ""}`.trim() || m.user?.username || m.id,
+                                        description: m.roleTitle,
+                                    })),
+                                ]}
+                            />
+                        </div>
                         <button
                             onClick={handleAddMember}
                             disabled={!selectedAddMemberId || addingMember}
@@ -321,7 +335,7 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
                                     <th className="p-2.5">Member</th>
                                     <th className="p-2.5">Dept Role</th>
                                     <th className="p-2.5">Joined Dept</th>
-                                    {isAdmin && <th className="p-2.5 text-right">Actions</th>}
+                                    {canManage && <th className="p-2.5 text-right">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y border-black font-medium">
@@ -356,7 +370,7 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
                                                 })}
                                             </td>
 
-                                            {isAdmin && (
+                                            {canManage && (
                                                 <td className="p-2.5 text-right">
                                                     <div className="flex items-center justify-end gap-1.5">
                                                         {allDepartments.length > 1 && (
@@ -384,7 +398,7 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
 
                                 {members.length === 0 && (
                                     <tr>
-                                        <td colSpan={isAdmin ? 4 : 3} className="p-6 text-center text-neutral-500 font-bold">
+                                        <td colSpan={canManage ? 4 : 3} className="p-6 text-center text-neutral-500 font-bold">
                                             No members assigned to this department yet.
                                         </td>
                                     </tr>
@@ -401,24 +415,25 @@ export const DepartmentDetailModal: React.FC<DepartmentDetailModalProps> = ({
                             Transfer @{transferringMember.user?.username} to another department
                         </div>
                         <div className="flex items-center gap-2 mt-2">
-                            <select
-                                value={targetDeptId}
-                                onChange={(e) => setTargetDeptId(e.target.value)}
-                                className="flex-1 px-3 py-1.5 text-xs font-semibold border border-black rounded-lg bg-white"
-                            >
-                                <option value="">Select target department...</option>
-                                {allDepartments
-                                    .filter((d) => d.id !== departmentId && d.status === "active")
-                                    .map((d) => (
-                                        <option key={d.id} value={d.id}>
-                                            {d.name}
-                                        </option>
-                                    ))}
-                            </select>
+                            <div className="flex-1">
+                                <NeoSelect
+                                    value={targetDeptId}
+                                    onChange={(val) => setTargetDeptId(val)}
+                                    size="sm"
+                                    placeholder="Select target department..."
+                                    triggerClassName="w-full text-xs font-bold"
+                                    options={[
+                                        { value: "", label: "Select target department..." },
+                                        ...allDepartments
+                                            .filter((d) => d.id !== departmentId && d.status === "active")
+                                            .map((d) => ({ value: d.id, label: d.name })),
+                                    ]}
+                                />
+                            </div>
                             <button
                                 onClick={handleTransferMember}
                                 disabled={!targetDeptId || transferring}
-                                className="px-3 py-1.5 bg-[#A6FF70] text-black font-bold text-xs border border-black rounded-lg"
+                                className="px-3 py-2 bg-[#A6FF70] text-black font-black text-xs border-2 border-black rounded-xl shadow-neo-xs hover:bg-[#92ec5d] transition disabled:opacity-50"
                             >
                                 {transferring ? "Transferring..." : "Confirm Transfer"}
                             </button>

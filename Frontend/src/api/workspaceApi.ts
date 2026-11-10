@@ -36,6 +36,8 @@ import type {
     WorkspaceAuditLogEntry,
     WorkspaceSearchResponse,
     WorkspaceTemplateDefinition,
+    MemberCapabilityResolution,
+    UserClubWorkspaceSummary,
 } from "../types/workspace";
 
 export const workspaceApi = {
@@ -987,6 +989,36 @@ export const workspaceApi = {
             };
             message: string;
         }>("/club/workspace/templates/apply", { templateId, clubId }),
+
+    /**
+     * Phase 01: Resolves granular member capabilities & dynamic navigation
+     */
+    getCapabilities: (clubId: string) =>
+        apiClient.get<{ success: boolean; capabilities: MemberCapabilityResolution }>(
+            "/club/workspace/capabilities",
+            { params: { clubId } }
+        ),
+
+    /**
+     * Phase 01: Discovers all club workspaces the user belongs to
+     */
+    getMyWorkspaces: () =>
+        apiClient.get<{ success: boolean; workspaces: UserClubWorkspaceSummary[] }>(
+            "/club/workspace/my-workspaces"
+        ),
+
+    /**
+     * Phase 01: Updates custom permission overrides for a specific member
+     */
+    updateMemberCustomPermissions: (
+        clubId: string,
+        targetUserId: string,
+        customPermissions: Record<string, boolean>
+    ) =>
+        apiClient.patch<{ success: boolean; member: any; message: string }>(
+            `/club/workspace/members/${targetUserId}/custom-permissions`,
+            { clubId, customPermissions }
+        ),
 };
 
 export default workspaceApi;

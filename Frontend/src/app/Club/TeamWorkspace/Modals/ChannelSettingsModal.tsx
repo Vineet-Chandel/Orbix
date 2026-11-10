@@ -18,6 +18,8 @@ import type {
     WorkspaceChannelCategory,
     WorkspaceChannel,
 } from "../../../../types/workspace";
+import { NeoSelect } from "../../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 
 interface ChannelSettingsModalProps {
     isOpen: boolean;
@@ -187,30 +189,30 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#0f172a] border border-slate-800 rounded-2xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white border-2 border-black rounded-2xl w-full max-w-xl shadow-neo overflow-hidden flex flex-col max-h-[90vh]">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+                <div className="flex items-center justify-between px-6 py-4 border-b-2 border-black bg-white">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                        <div className="w-10 h-10 rounded-xl bg-[#FFE566] border-2 border-black flex items-center justify-center text-black">
                             <Hash className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-lg font-semibold text-slate-100">
+                            <h3 className="text-lg font-black text-black">
                                 Channel Settings: #{channel.name}
                             </h3>
                             <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-xs uppercase font-semibold text-slate-400">
+                                <span className="text-xs uppercase font-bold text-neutral-600">
                                     {channel.channelType}
                                 </span>
-                                <span className="text-slate-600">•</span>
+                                <span className="text-neutral-400">•</span>
                                 {isCategorySynced ? (
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                                        <Check className="w-3 h-3" /> Synced with Category
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-black text-black bg-[#A6FF70] px-2 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000]">
+                                        <Check className="w-3 h-3 text-black" /> Synced with Category
                                     </span>
                                 ) : (
-                                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
-                                        <AlertCircle className="w-3 h-3" /> Custom Overrides (Unsynced)
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-black text-black bg-[#FFE566] px-2 py-0.5 rounded-full border border-black shadow-[1px_1px_0px_#000]">
+                                        <AlertCircle className="w-3 h-3 text-black" /> Custom Overrides
                                     </span>
                                 )}
                             </div>
@@ -218,7 +220,7 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-slate-400 hover:text-slate-200 p-2 rounded-lg hover:bg-slate-800/60 transition"
+                        className="text-neutral-500 hover:text-black p-2 rounded-lg hover:bg-neutral-100 border-2 border-transparent hover:border-black transition"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -228,14 +230,14 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                 <div className="p-6 space-y-6 overflow-y-auto">
                     {/* Category Move Confirmation Modal/Prompt */}
                     {showCategoryMoveConfirm && (
-                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 space-y-3 animate-in fade-in duration-150">
+                        <div className="p-4 rounded-xl bg-[#FFF9D2] border-2 border-black text-black space-y-3 shadow-[2px_2px_0px_#000] animate-in fade-in duration-150">
                             <div className="flex items-start gap-3">
-                                <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                                <AlertCircle className="w-5 h-5 text-black shrink-0 mt-0.5" />
                                 <div>
-                                    <div className="text-sm font-semibold text-amber-200">
+                                    <div className="text-sm font-black text-black">
                                         Sync Permissions with New Parent Category?
                                     </div>
-                                    <div className="text-xs text-amber-300/80 mt-1 leading-relaxed">
+                                    <div className="text-xs text-neutral-800 mt-1 leading-relaxed font-medium">
                                         Do you want this channel to inherit the permission overrides of its new parent category, or keep its existing overrides?
                                     </div>
                                 </div>
@@ -244,14 +246,14 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                                 <button
                                     type="button"
                                     onClick={() => confirmCategoryMove(false)}
-                                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 border border-slate-700 text-slate-300 hover:text-white transition"
+                                    className="px-3.5 py-1.5 rounded-lg text-xs font-black bg-white border-2 border-black text-black hover:bg-neutral-100 shadow-[1.5px_1.5px_0px_#000] transition"
                                 >
                                     Keep Existing (Unsynced)
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => confirmCategoryMove(true)}
-                                    className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-md shadow-indigo-600/30 transition flex items-center gap-1.5"
+                                    className="px-3.5 py-1.5 rounded-lg text-xs font-black bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] transition flex items-center gap-1.5"
                                 >
                                     <RefreshCw className="w-3 h-3" /> Sync Now
                                 </button>
@@ -262,7 +264,7 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                     {/* General Settings Form */}
                     <form onSubmit={handleSaveGeneral} className="space-y-4">
                         <div>
-                            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                            <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">
                                 Channel Name
                             </label>
                             <input
@@ -271,12 +273,12 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                                 onChange={(e) => setName(e.target.value)}
                                 disabled={!canManageChannel}
                                 required
-                                className="w-full px-4 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 font-medium focus:outline-none focus:border-indigo-500/50 text-sm transition"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-black font-semibold focus:outline-none focus:bg-white text-sm transition shadow-[2px_2px_0px_#000]"
                             />
                         </div>
 
                         <div>
-                            <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                            <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">
                                 Topic / Description
                             </label>
                             <textarea
@@ -285,61 +287,63 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                                 disabled={!canManageChannel}
                                 rows={2}
                                 placeholder="Describe the purpose of this channel..."
-                                className="w-full px-4 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 focus:outline-none focus:border-indigo-500/50 text-sm transition resize-none"
+                                className="w-full px-4 py-2.5 rounded-xl bg-[#FAF6EE] border-2 border-black text-black font-semibold focus:outline-none focus:bg-white text-sm transition resize-none shadow-[2px_2px_0px_#000]"
                             />
                         </div>
 
                         {/* Category & Department */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                                <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">
                                     Parent Category
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={categoryId || ""}
-                                    onChange={(e) => handleCategoryChange(e.target.value ? e.target.value : null)}
+                                    onChange={(val) => handleCategoryChange(val ? val : null)}
                                     disabled={!canManageChannel}
-                                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-indigo-500/50 transition"
-                                >
-                                    <option value="">No Category</option>
-                                    {categories.map((cat) => (
-                                        <option key={cat.id} value={cat.id}>
-                                            {cat.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    options={[
+                                        { value: "", label: "No Category" },
+                                        ...categories.map((cat) => ({
+                                            value: cat.id,
+                                            label: cat.name,
+                                        })),
+                                    ]}
+                                    placeholder="No Category"
+                                    size="md"
+                                />
                             </div>
 
                             <div>
-                                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                                <label className="block text-xs font-black text-black uppercase tracking-wider mb-2">
                                     Department Association
                                 </label>
-                                <select
+                                <NeoSelect
                                     value={departmentId || ""}
-                                    onChange={(e) => setDepartmentId(e.target.value ? e.target.value : null)}
+                                    onChange={(val) => setDepartmentId(val ? val : null)}
                                     disabled={!canManageChannel}
-                                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate-950/70 border border-slate-800 text-slate-200 text-sm focus:outline-none focus:border-indigo-500/50 transition"
-                                >
-                                    <option value="">Club-Wide</option>
-                                    {departments.map((dept) => (
-                                        <option key={dept.id} value={dept.id}>
-                                            {dept.name}
-                                        </option>
-                                    ))}
-                                </select>
+                                    options={[
+                                        { value: "", label: "Club-Wide" },
+                                        ...departments.map((dept) => ({
+                                            value: dept.id,
+                                            label: dept.name,
+                                        })),
+                                    ]}
+                                    placeholder="Club-Wide"
+                                    size="md"
+                                />
                             </div>
                         </div>
 
                         {/* Permission Sync Panel (Discord Style) */}
-                        <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 space-y-3">
+                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black space-y-3 shadow-[2px_2px_0px_#000]">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2.5">
-                                    <RefreshCw className="w-4 h-4 text-emerald-400" />
+                                    <RefreshCw className="w-4 h-4 text-black" />
                                     <div>
-                                        <div className="text-sm font-semibold text-slate-200">
+                                        <div className="text-sm font-black text-black">
                                             Category Permission Synchronization
                                         </div>
-                                        <div className="text-xs text-slate-400">
+                                        <div className="text-xs font-medium text-neutral-600">
                                             {isCategorySynced
                                                 ? "This channel automatically inherits permissions from its category."
                                                 : "This channel has independent permission overrides."}
@@ -351,7 +355,7 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                                         type="button"
                                         onClick={handleSyncNow}
                                         disabled={syncing || !categoryId}
-                                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 transition flex items-center gap-1.5"
+                                        className="px-3 py-1.5 rounded-lg text-xs font-black bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black shadow-[1.5px_1.5px_0px_#000] transition flex items-center gap-1.5"
                                     >
                                         <RefreshCw className={`w-3 h-3 ${syncing ? "animate-spin" : ""}`} />
                                         Sync Now / Revert
@@ -361,22 +365,22 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                         </div>
 
                         {/* Private Channel Setting */}
-                        <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 flex items-center justify-between">
+                        <div className="p-4 rounded-xl bg-[#FAF6EE] border-2 border-black flex items-center justify-between shadow-[2px_2px_0px_#000]">
                             <div className="flex items-center gap-2.5">
-                                <Lock className="w-4 h-4 text-amber-400" />
+                                <Lock className="w-4 h-4 text-black" />
                                 <div>
-                                    <div className="text-sm font-semibold text-slate-200">Private Channel</div>
-                                    <div className="text-xs text-slate-400">
+                                    <div className="text-sm font-black text-black">Private Channel</div>
+                                    <div className="text-xs font-medium text-neutral-600">
                                         Restrict visibility to members with explicit roles or grants
                                     </div>
                                 </div>
                             </div>
-                            <input
-                                type="checkbox"
+                            <NeoCheckbox
                                 checked={isPrivate}
-                                onChange={(e) => setIsPrivate(e.target.checked)}
+                                onCheckedChange={(checked) => setIsPrivate(checked)}
                                 disabled={!canManageChannel}
-                                className="w-4 h-4 text-indigo-600 rounded border-slate-700 bg-slate-900 focus:ring-indigo-500"
+                                colorScheme="yellow"
+                                size="sm"
                             />
                         </div>
 
@@ -386,7 +390,7 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="px-5 py-2 rounded-xl text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition"
+                                    className="px-5 py-2 rounded-xl text-xs font-black bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition"
                                 >
                                     {submitting ? "Saving..." : "Save Changes"}
                                 </button>
@@ -396,11 +400,11 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
 
                     {/* Danger Zone: Delete Channel */}
                     {canManageChannel && (
-                        <div className="pt-6 border-t border-slate-800/80">
-                            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between">
+                        <div className="pt-6 border-t-2 border-black/15">
+                            <div className="p-4 rounded-xl bg-rose-50 border-2 border-rose-400 flex items-center justify-between">
                                 <div>
-                                    <div className="text-sm font-semibold text-rose-300">Delete Channel</div>
-                                    <div className="text-xs text-rose-400/80">
+                                    <div className="text-sm font-black text-rose-900">Delete Channel</div>
+                                    <div className="text-xs font-medium text-rose-700">
                                         Permanently delete this channel, its messages, attachments and threads
                                     </div>
                                 </div>
@@ -408,7 +412,7 @@ export const ChannelSettingsModal: React.FC<ChannelSettingsModalProps> = ({
                                     type="button"
                                     onClick={handleDeleteChannel}
                                     disabled={deleting}
-                                    className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-500 text-white transition flex items-center gap-1.5 shadow-lg shadow-rose-600/30"
+                                    className="px-3.5 py-2 rounded-xl text-xs font-black bg-rose-500 hover:bg-rose-600 text-white border-2 border-black transition flex items-center gap-1.5 shadow-[2px_2px_0px_#000]"
                                 >
                                     <Trash2 className="w-3.5 h-3.5" />
                                     {deleting ? "Deleting..." : "Delete Channel"}

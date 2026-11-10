@@ -18,6 +18,7 @@ import type {
 } from "../../../../types/workspace";
 import { ChangeRoleModal } from "./ChangeRoleModal";
 import { InviteMemberModal } from "./InviteMemberModal";
+import { NeoSelect } from "../../../../components/NeoSelect";
 
 interface MemberDirectoryViewProps {
     workspace: TeamWorkspace;
@@ -148,43 +149,47 @@ export const MemberDirectoryView: React.FC<MemberDirectoryViewProps> = ({
                     </div>
 
                     {/* Role Filter */}
-                    <select
-                        value={roleFilter}
-                        onChange={(e) => setRoleFilter(e.target.value)}
-                        className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white focus:outline-none"
-                    >
-                        <option value="all">All Roles ({roles.length})</option>
-                        {roles.map((r) => (
-                            <option key={r.id} value={r.id}>
-                                {r.name}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="min-w-[150px]">
+                        <NeoSelect
+                            value={roleFilter}
+                            onChange={(val) => setRoleFilter(val)}
+                            size="sm"
+                            triggerClassName="w-full text-xs font-bold"
+                            options={[
+                                { value: "all", label: `All Roles (${roles.length})` },
+                                ...roles.map((r) => ({ value: r.id, label: r.name })),
+                            ]}
+                        />
+                    </div>
 
                     {/* Department Filter */}
-                    <select
-                        value={departmentFilter}
-                        onChange={(e) => setDepartmentFilter(e.target.value)}
-                        className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white focus:outline-none"
-                    >
-                        <option value="all">All Departments ({departments.length})</option>
-                        {departments.map((d) => (
-                            <option key={d.id} value={d.id}>
-                                {d.name}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="min-w-[170px]">
+                        <NeoSelect
+                            value={departmentFilter}
+                            onChange={(val) => setDepartmentFilter(val)}
+                            size="sm"
+                            triggerClassName="w-full text-xs font-bold"
+                            options={[
+                                { value: "all", label: `All Departments (${departments.length})` },
+                                ...departments.map((d) => ({ value: d.id, label: d.name })),
+                            ]}
+                        />
+                    </div>
 
                     {/* Status Filter */}
-                    <select
-                        value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value)}
-                        className="px-2.5 py-1.5 text-xs font-bold border-2 border-black rounded-lg bg-white focus:outline-none"
-                    >
-                        <option value="all">All Statuses</option>
-                        <option value="active">Active Members</option>
-                        <option value="suspended">Suspended Only</option>
-                    </select>
+                    <div className="min-w-[140px]">
+                        <NeoSelect
+                            value={statusFilter}
+                            onChange={(val) => setStatusFilter(val)}
+                            size="sm"
+                            triggerClassName="w-full text-xs font-bold"
+                            options={[
+                                { value: "all", label: "All Statuses" },
+                                { value: "active", label: "Active Members" },
+                                { value: "suspended", label: "Suspended Only" },
+                            ]}
+                        />
+                    </div>
                 </div>
             </div>
 

@@ -4,6 +4,7 @@ import type {
     TeamWorkspace,
     WorkspaceOverviewMetrics,
     WorkspaceDepartmentInsight,
+    MemberCapabilityResolution,
 } from "../types/workspaceTypes.js";
 
 const DEFAULT_NAMESPACE = "orbix:team-workspace:";
@@ -113,6 +114,8 @@ export class WorkspaceRedisService {
             if (!redis || redis.status !== "ready") return;
             const key = this.buildKey("perms", workspaceId, userId);
             await redis.del(key);
+            // Invalidate capabilities cache simultaneously to prevent stale authorization
+            await this.invalidateMemberCapabilities(workspaceId, userId);
         } catch (err: any) {
             console.warn(`[WorkspaceRedis] Failed to invalidate member permissions for user ${userId}:`, err.message);
         }
@@ -136,8 +139,77 @@ export class WorkspaceRedisService {
                 stream.on("end", () => resolve());
                 stream.on("error", () => resolve());
             });
+            await this.invalidateAllWorkspaceCapabilities(workspaceId);
         } catch (err: any) {
             console.warn(`[WorkspaceRedis] Failed to sweep workspace permissions:`, err.message);
+        }
+    }
+
+    // =========================================================================
+    // 2.1 MEMBER CAPABILITIES CACHE (PHASE 01)
+    // =========================================================================
+
+    static async getCachedCapabilities(
+        workspaceId: string,
+        userId: string
+    ): Promise<MemberCapabilityResolution | null> {
+        try {
+            if (!redis || redis.status !== "ready") return null;
+            const key = this.buildKey("caps", workspaceId, userId);
+            const raw = await redis.get(key);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Failed to read capabilities cache for user ${userId}:`, err.message);
+            return null;
+        }
+    }
+
+    static async setCachedCapabilities(
+        workspaceId: string,
+        userId: string,
+        capabilities: MemberCapabilityResolution,
+        ttl = PERMISSIONS_TTL
+    ): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const key = this.buildKey("caps", workspaceId, userId);
+            await redis.setex(key, ttl, JSON.stringify(capabilities));
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Failed to cache capabilities for user ${userId}:`, err.message);
+        }
+    }
+
+    static async invalidateMemberCapabilities(workspaceId: string, userId: string): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const key = this.buildKey("caps", workspaceId, userId);
+            await redis.del(key);
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Failed to invalidate capabilities cache for user ${userId}:`, err.message);
+        }
+    }
+
+    static async invalidateAllWorkspaceCapabilities(workspaceId: string): Promise<void> {
+        try {
+            if (!redis || redis.status !== "ready") return;
+            const pattern = this.buildKey("caps", workspaceId, "*");
+            const stream = redis.scanStream({ match: pattern, count: 100 });
+            await new Promise<void>((resolve) => {
+                stream.on("data", async (keys: string[]) => {
+                    if (keys.length > 0) {
+                        try {
+                            await redis.del(...keys);
+                        } catch {
+                            // ignore
+                        }
+                    }
+                });
+                stream.on("end", () => resolve());
+                stream.on("error", () => resolve());
+            });
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Failed to sweep workspace capabilities:`, err.message);
         }
     }
 

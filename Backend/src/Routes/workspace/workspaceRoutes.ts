@@ -10,6 +10,7 @@ import { WorkspaceFileService } from "../../services/workspace/workspaceFileServ
 import { WorkspaceNotificationController } from "../../controllers/workspace/workspaceNotificationController.js";
 import { WorkspaceDashboardController } from "../../controllers/workspace/workspaceDashboardController.js";
 import { WorkspaceTemplateService } from "../../services/workspace/workspaceTemplateService.js";
+import { WorkspaceCapabilityService } from "../../services/workspace/workspaceCapabilityService.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
 import { query } from "../../database/client.js";
@@ -125,11 +126,18 @@ workspaceRouter.get("/", authenticate, async (req: Request, res: Response) => {
         const departments = await WorkspaceDepartmentService.listDepartments(workspace.id);
         const { total: memberCount } = await WorkspaceRepository.listMembers(workspace.id, { status: "active" });
 
+        // Phase 01: Resolve member capabilities & dynamic navigation
+        const capabilities = await WorkspaceCapabilityService.resolveMemberCapabilities(
+            workspace.id,
+            authUser.id
+        );
+
         return res.json({
             success: true,
             isNew,
             workspace,
             currentMember: member,
+            capabilities,
             memberCount,
             roles,
             departments,
@@ -139,6 +147,64 @@ workspaceRouter.get("/", authenticate, async (req: Request, res: Response) => {
         return res.status(err.statusCode || 500).json({
             success: false,
             message: err.message || "Failed to retrieve or provision workspace.",
+        });
+    }
+});
+
+/**
+ * GET /api/club/workspace/capabilities
+ * Resolves member's granular capabilities across all 12 modules
+ */
+workspaceRouter.get("/capabilities", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found for this club." });
+        }
+
+        const capabilities = await WorkspaceCapabilityService.resolveMemberCapabilities(
+            workspace.id,
+            authUser.id
+        );
+
+        return res.json({
+            success: true,
+            capabilities,
+        });
+    } catch (err: any) {
+        console.error("GET /api/club/workspace/capabilities error:", err);
+        return res.status(err.statusCode || 500).json({
+            success: false,
+            message: err.message || "Failed to resolve workspace capabilities.",
+        });
+    }
+});
+
+/**
+ * GET /api/club/workspace/my-workspaces
+ * Discovers all active club workspaces where the user is an active member
+ */
+workspaceRouter.get("/my-workspaces", authenticate, async (req: Request, res: Response) => {
+    try {
+        const authUser = (req as any).user;
+        if (!authUser || !authUser.id) {
+            return res.status(401).json({ success: false, message: "Authentication required." });
+        }
+
+        const workspaces = await WorkspaceRepository.findUserWorkspaces(authUser.id);
+        return res.json({
+            success: true,
+            workspaces,
+        });
+    } catch (err: any) {
+        console.error("GET /api/club/workspace/my-workspaces error:", err);
+        return res.status(500).json({
+            success: false,
+            message: err.message || "Failed to retrieve user workspaces.",
         });
     }
 });
@@ -723,6 +789,46 @@ workspaceRouter.patch("/members/:targetUserId/suspension", authenticate, async (
         });
     } catch (err: any) {
         return res.status(400).json({ success: false, message: err.message || "Failed to update suspension status." });
+    }
+});
+
+/**
+ * PATCH /api/club/workspace/members/:targetUserId/custom-permissions
+ * Updates granular grant/revocation overrides for a member
+ */
+workspaceRouter.patch("/members/:targetUserId/custom-permissions", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const targetUserId = req.params.targetUserId;
+        const customPermissions = req.body.customPermissions;
+
+        if (!customPermissions || typeof customPermissions !== "object") {
+            return res.status(400).json({ success: false, message: "Valid customPermissions object is required." });
+        }
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const auditCtx = getAuditContext(req);
+        const updated = await WorkspaceMemberService.updateMemberCustomPermissions(
+            workspace.id,
+            targetUserId,
+            authUser.id,
+            customPermissions,
+            auditCtx
+        );
+
+        return res.json({
+            success: true,
+            member: updated,
+            message: "Member custom permissions updated successfully.",
+        });
+    } catch (err: any) {
+        console.error("PATCH /api/club/workspace/members/:targetUserId/custom-permissions error:", err);
+        return res.status(400).json({ success: false, message: err.message || "Failed to update custom permissions." });
     }
 });
 

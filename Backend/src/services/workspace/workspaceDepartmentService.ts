@@ -258,6 +258,8 @@ export class WorkspaceDepartmentService {
             userAgent: reqMeta.userAgent || null,
         });
 
+        await WorkspaceRedisService.invalidateAllWorkspaceCapabilities(workspaceId);
+
         return updated;
     }
 
@@ -322,6 +324,40 @@ export class WorkspaceDepartmentService {
     }
 
     /**
+     * Reorders departments within workspace
+     */
+    static async reorderDepartments(
+        workspaceId: string,
+        actorUserId: string,
+        departmentIds: string[],
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<boolean> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        const isMgr = ctx?.isWorkspaceManager;
+        const canManage = ctx?.isAdmin || isMgr || ctx?.permissions.includes("departments:manage");
+
+        if (!ctx || !canManage) {
+            throw new Error("Unauthorized to reorder departments.");
+        }
+
+        const success = await WorkspaceRepository.reorderDepartments(workspaceId, departmentIds);
+
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "departments_reordered",
+            targetType: "department",
+            details: { departmentIds },
+            ipAddress: reqMeta.ipAddress || null,
+            userAgent: reqMeta.userAgent || null,
+        });
+
+        await WorkspaceRedisService.invalidateAllWorkspaceCapabilities(workspaceId);
+
+        return success;
+    }
+
+    /**
      * Adds a workspace member to a department
      * Satisfies: A member can belong to multiple departments without creating duplicate workspace memberships.
      */
@@ -378,6 +414,9 @@ export class WorkspaceDepartmentService {
             ipAddress: reqMeta.ipAddress || null,
             userAgent: reqMeta.userAgent || null,
         });
+
+        // Invalidate capabilities cache for target member
+        await WorkspaceRedisService.invalidateMemberCapabilities(workspaceId, targetMember.user_id);
 
         // Notify member of department assignment
         const actor = await WorkspaceRepository.findMemberByUserId(workspaceId, actorUserId);
@@ -437,6 +476,9 @@ export class WorkspaceDepartmentService {
             );
             const targetUserId = targetMemberRes.rows[0]?.user_id;
             if (targetUserId) {
+                // Invalidate capabilities cache for removed member
+                await WorkspaceRedisService.invalidateMemberCapabilities(workspaceId, targetUserId);
+
                 const actor = await WorkspaceRepository.findMemberByUserId(workspaceId, actorUserId);
                 const actorName = actor?.user ? `${actor.user.firstName || ""} ${actor.user.lastName || actor.user.username}`.trim() : "Workspace Lead";
                 const ws = await WorkspaceRepository.findById(workspaceId);
@@ -453,6 +495,57 @@ export class WorkspaceDepartmentService {
             }
         }
         return removed;
+    }
+
+    /**
+     * Updates a department member's scoped role and custom role title
+     */
+    static async updateDepartmentMemberRole(
+        workspaceId: string,
+        actorUserId: string,
+        departmentId: string,
+        memberId: string,
+        updates: { departmentRole?: "lead" | "co_lead" | "member"; roleTitle?: string },
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<boolean> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        const dept = await WorkspaceRepository.findDepartmentById(workspaceId, departmentId);
+        if (!dept) throw new Error("Department not found.");
+
+        const isLead =
+            dept.leadUserId === actorUserId ||
+            dept.coLeadUserIds?.includes(actorUserId) ||
+            ctx?.leadDepartmentIds?.includes(departmentId);
+        if (!ctx || (!ctx.isAdmin && !isLead && !ctx.permissions.includes("departments:manage"))) {
+            throw new Error("Unauthorized to manage members of this department.");
+        }
+
+        const success = await WorkspaceRepository.updateDepartmentMemberRole(
+            workspaceId,
+            departmentId,
+            memberId,
+            updates
+        );
+
+        if (success) {
+            const memberRow = await query(
+                `SELECT user_id FROM public.workspace_members WHERE workspace_id = $1 AND id = $2 LIMIT 1;`,
+                [workspaceId, memberId]
+            );
+            if (memberRow.rows[0]?.user_id) {
+                await WorkspaceRedisService.invalidateMemberCapabilities(workspaceId, memberRow.rows[0].user_id);
+            }
+            await WorkspaceRepository.logAudit(null, {
+                workspaceId,
+                actorId: actorUserId,
+                action: "department_member_role_updated",
+                targetType: "department_member",
+                details: { departmentId, memberId, updates },
+                ipAddress: reqMeta.ipAddress || null,
+                userAgent: reqMeta.userAgent || null,
+            });
+        }
+        return success;
     }
 
     /**

@@ -706,4 +706,70 @@ export class WorkspaceMemberService {
 
         return deleted;
     }
+
+    // =========================================================================
+    // 6. PHASE 01: MEMBER-SPECIFIC CUSTOM PERMISSION OVERRIDES
+    // =========================================================================
+
+    /**
+     * Updates member-specific custom permissions (grants or revocations)
+     */
+    static async updateMemberCustomPermissions(
+        workspaceId: string,
+        targetUserId: string,
+        actorUserId: string,
+        customPermissions: Record<string, boolean>,
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<WorkspaceMember> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("roles:manage") && !ctx.isOwner)) {
+            throw new Error("Unauthorized to modify member permissions.");
+        }
+
+        const targetMember = await WorkspaceRepository.findMember(workspaceId, targetUserId);
+        if (!targetMember) throw new Error("Target user is not a member of this workspace.");
+
+        const actorRank = ctx.member.role?.rank || 0;
+        const targetRank = targetMember.role?.rank || 0;
+        if (targetRank >= actorRank && !ctx.isOwner) {
+            throw new Error("Cannot modify permissions of a member with equal or higher rank.");
+        }
+
+        // Validate that actor cannot grant permissions they do not possess (unless Owner)
+        if (!ctx.isOwner && !ctx.permissions.includes("*")) {
+            for (const [perm, granted] of Object.entries(customPermissions)) {
+                if (granted && !ctx.permissions.includes(perm)) {
+                    throw new Error(`Cannot grant permission you do not possess: ${perm}`);
+                }
+            }
+        }
+
+        const updated = await WorkspaceRepository.updateMemberCustomPermissions(
+            workspaceId,
+            targetUserId,
+            customPermissions
+        );
+
+        if (!updated) throw new Error("Failed to update custom permissions.");
+
+        // Invalidate member permissions and capabilities in Redis
+        await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, targetUserId);
+        await WorkspaceRedisService.invalidateMemberCapabilities(workspaceId, targetUserId);
+
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "member_custom_permissions_updated",
+            targetType: "member",
+            targetId: targetMember.id,
+            details: {
+                targetUserId,
+                customPermissions,
+            },
+            ipAddress: reqMeta.ipAddress || null,
+            userAgent: reqMeta.userAgent || null,
+        });
+
+        return updated;
+    }
 }

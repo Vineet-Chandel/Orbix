@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
+import { NeoSelect } from "../../../../components/NeoSelect";
 import type {
     WorkspaceActivityEvent,
     WorkspaceDepartment,
@@ -252,50 +253,48 @@ export const ActivityFeedView: React.FC<ActivityFeedViewProps> = ({
                 </div>
 
                 {/* Event Type Filter */}
-                <div className="min-w-[140px]">
-                    <select
+                <div className="min-w-[160px]">
+                    <NeoSelect
                         value={selectedEventType}
-                        onChange={(e) => setSelectedEventType(e.target.value)}
-                        className="w-full text-xs font-bold bg-neutral-50 border-2 border-black rounded-lg px-2.5 py-1.5 focus:outline-none"
-                    >
-                        {EVENT_TYPE_OPTIONS.map((opt) => (
-                            <option key={opt.value} value={opt.value}>
-                                {opt.label}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={(val) => setSelectedEventType(val)}
+                        size="sm"
+                        triggerClassName="w-full text-xs font-bold"
+                        options={EVENT_TYPE_OPTIONS.map((opt) => ({
+                            value: opt.value,
+                            label: opt.label,
+                        }))}
+                    />
                 </div>
 
                 {/* Department Filter */}
-                <div className="min-w-[160px]">
-                    <select
+                <div className="min-w-[170px]">
+                    <NeoSelect
                         value={selectedDeptId}
-                        onChange={(e) => setSelectedDeptId(e.target.value)}
-                        className="w-full text-xs font-bold bg-neutral-50 border-2 border-black rounded-lg px-2.5 py-1.5 focus:outline-none"
-                    >
-                        <option value="">All Departments</option>
-                        {departments.map((dept) => (
-                            <option key={dept.id} value={dept.id}>
-                                {dept.name}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={(val) => setSelectedDeptId(val)}
+                        size="sm"
+                        triggerClassName="w-full text-xs font-bold"
+                        options={[
+                            { value: "", label: "All Departments" },
+                            ...departments.map((dept) => ({ value: dept.id, label: dept.name })),
+                        ]}
+                    />
                 </div>
 
                 {/* Actor Filter */}
-                <div className="min-w-[160px]">
-                    <select
+                <div className="min-w-[180px]">
+                    <NeoSelect
                         value={selectedActorId}
-                        onChange={(e) => setSelectedActorId(e.target.value)}
-                        className="w-full text-xs font-bold bg-neutral-50 border-2 border-black rounded-lg px-2.5 py-1.5 focus:outline-none"
-                    >
-                        <option value="">All Members</option>
-                        {members.map((mem) => (
-                            <option key={mem.userId} value={mem.userId}>
-                                {mem.user?.firstName} {mem.user?.lastName} (@{mem.user?.username})
-                            </option>
-                        ))}
-                    </select>
+                        onChange={(val) => setSelectedActorId(val)}
+                        size="sm"
+                        triggerClassName="w-full text-xs font-bold"
+                        options={[
+                            { value: "", label: "All Members" },
+                            ...members.map((mem) => ({
+                                value: mem.userId,
+                                label: `${mem.user?.firstName || ""} ${mem.user?.lastName || ""}`.trim() || mem.user?.username || mem.userId,
+                            })),
+                        ]}
+                    />
                 </div>
 
                 {/* Clear Filters Button */}

@@ -32,6 +32,7 @@ import type {
 import { useToast } from "../../../../context/ToastContext";
 import { FileUploadZone } from "../Files/FileUploadZone";
 import { AttachmentList } from "../Files/AttachmentList";
+import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 
 interface TaskDetailModalProps {
     isOpen: boolean;
@@ -562,13 +563,13 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                                         : "bg-white border-neutral-200 hover:border-black text-black"
                                                 }`}
                                             >
-                                                <input
-                                                    type="checkbox"
+                                                <NeoCheckbox
                                                     checked={item.isCompleted}
                                                     onChange={() => {}}
-                                                    className="w-4 h-4 accent-black mt-0.5 cursor-pointer rounded"
+                                                    size="sm"
+                                                    colorScheme="green"
                                                 />
-                                                <span className="flex-1">{item.text}</span>
+                                                <span className="flex-1 pt-0.5">{item.text}</span>
                                             </div>
                                         ))}
                                     </div>
@@ -1075,11 +1076,11 @@ export const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                                                             <span>
                                                                 {m.user?.firstName} {m.user?.lastName}
                                                             </span>
-                                                            <input
-                                                                type="checkbox"
+                                                            <NeoCheckbox
                                                                 checked={isChecked}
                                                                 onChange={() => {}}
-                                                                className="accent-black"
+                                                                size="sm"
+                                                                colorScheme="cyan"
                                                             />
                                                         </div>
                                                     );

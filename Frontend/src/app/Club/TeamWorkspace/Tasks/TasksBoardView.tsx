@@ -23,6 +23,8 @@ import type {
 import { CreateTaskModal } from "./CreateTaskModal";
 import { TaskDetailModal } from "./TaskDetailModal";
 import { useToast } from "../../../../context/ToastContext";
+import { NeoSelect } from "../../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 
 interface TasksBoardViewProps {
     clubId: string;
@@ -185,61 +187,68 @@ export const TasksBoardView: React.FC<TasksBoardViewProps> = ({
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Filter by title or keyword..."
-                            className="w-full pl-8 pr-3 py-1.5 bg-neutral-50 border border-black rounded-lg text-xs font-medium text-black focus:outline-none"
+                            className="w-full pl-8 pr-3 py-2 bg-neutral-50 border-2 border-black rounded-xl text-xs font-bold text-black focus:outline-none shadow-neo-xs placeholder:text-neutral-400 placeholder:font-normal"
                         />
                     </div>
 
                     {/* Department Filter */}
-                    <select
-                        value={selectedDepartment}
-                        onChange={(e) => setSelectedDepartment(e.target.value)}
-                        className="px-2.5 py-1.5 bg-white border border-black rounded-lg text-xs font-bold text-black focus:outline-none"
-                    >
-                        <option value="all">All Departments</option>
-                        {departments.map((d) => (
-                            <option key={d.id} value={d.id}>
-                                {d.name}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="min-w-[160px]">
+                        <NeoSelect
+                            value={selectedDepartment}
+                            onChange={(val) => setSelectedDepartment(val)}
+                            size="sm"
+                            triggerClassName="w-full text-xs font-bold"
+                            options={[
+                                { value: "all", label: "All Departments" },
+                                ...departments.map((d) => ({ value: d.id, label: d.name })),
+                            ]}
+                        />
+                    </div>
 
                     {/* Priority Filter */}
-                    <select
-                        value={selectedPriority}
-                        onChange={(e) => setSelectedPriority(e.target.value)}
-                        className="px-2.5 py-1.5 bg-white border border-black rounded-lg text-xs font-bold text-black focus:outline-none"
-                    >
-                        <option value="all">All Priorities</option>
-                        <option value="urgent">Urgent</option>
-                        <option value="high">High</option>
-                        <option value="medium">Medium</option>
-                        <option value="low">Low</option>
-                    </select>
+                    <div className="min-w-[140px]">
+                        <NeoSelect
+                            value={selectedPriority}
+                            onChange={(val) => setSelectedPriority(val)}
+                            size="sm"
+                            triggerClassName="w-full text-xs font-bold"
+                            options={[
+                                { value: "all", label: "All Priorities" },
+                                { value: "urgent", label: "Urgent" },
+                                { value: "high", label: "High" },
+                                { value: "medium", label: "Medium" },
+                                { value: "low", label: "Low" },
+                            ]}
+                        />
+                    </div>
 
                     {/* Assignee Filter */}
-                    <select
-                        value={selectedAssignee}
-                        onChange={(e) => setSelectedAssignee(e.target.value)}
-                        className="px-2.5 py-1.5 bg-white border border-black rounded-lg text-xs font-bold text-black focus:outline-none"
-                    >
-                        <option value="all">All Assignees</option>
-                        {members.map((m) => (
-                            <option key={m.id} value={m.userId}>
-                                {m.user?.firstName} {m.user?.lastName}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="min-w-[150px]">
+                        <NeoSelect
+                            value={selectedAssignee}
+                            onChange={(val) => setSelectedAssignee(val)}
+                            size="sm"
+                            triggerClassName="w-full text-xs font-bold"
+                            options={[
+                                { value: "all", label: "All Assignees" },
+                                ...members.map((m) => ({
+                                    value: m.userId,
+                                    label: `${m.user?.firstName || ""} ${m.user?.lastName || ""}`.trim() || m.user?.username || m.userId,
+                                })),
+                            ]}
+                        />
+                    </div>
 
                     {/* Archived toggle */}
-                    <label className="flex items-center gap-1.5 text-xs font-bold text-neutral-600 cursor-pointer ml-2">
-                        <input
-                            type="checkbox"
+                    <div className="flex items-center ml-1">
+                        <NeoCheckbox
                             checked={includeArchived}
-                            onChange={(e) => setIncludeArchived(e.target.checked)}
-                            className="accent-black rounded"
+                            onCheckedChange={(checked) => setIncludeArchived(checked)}
+                            size="sm"
+                            colorScheme="yellow"
+                            label={<span className="text-xs font-bold text-black">Archived</span>}
                         />
-                        <span>Archived</span>
-                    </label>
+                    </div>
                 </div>
             </div>
 

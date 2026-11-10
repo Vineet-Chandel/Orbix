@@ -47,7 +47,7 @@ const WorkspaceRedirect = () => {
     }
     return <Navigate to="/club/status" replace />;
   }
-  return <Navigate to="/dashboard" replace />;
+  return <Dashboard />;
 };
 
 const LegacyProfileRedirect = () => {
@@ -198,6 +198,9 @@ const App = () => {
             <Route path="/projects" element={<Dashboard />} />
             <Route path="/wallet" element={<Dashboard />} />
             <Route path="/certificates" element={<Dashboard />} />
+            <Route path="/workspace" element={<Dashboard />} />
+            <Route path="/workspace/:clubId" element={<Dashboard />} />
+            <Route path="/workspace/:clubId/:section" element={<Dashboard />} />
           </Route>
         </Routes>
           </Suspense>

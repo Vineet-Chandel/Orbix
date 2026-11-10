@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass, Award } from "lucide-react";
+import { Lock, ChevronDown, CalendarDays, BookOpen, Briefcase, Settings, Compass, Award, Plus } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAppDispatch, useAppSelector, clearUser } from "../../store";
 import { fetchUnreadNotificationCount } from "../../utils/profileApi";
 import { DEFAULT_AVATAR_URL } from "../../utils/avatarConstants";
 import { OrbixLogo } from "../../components/OrbixLogo";
 import { buildApiUrl } from "../../api/apiClient";
+import { workspaceApi } from "../../api/workspaceApi";
+import type { UserClubWorkspaceSummary } from "../../types/workspace";
 
 export type SidebarTab =
     | "home"
@@ -31,6 +33,7 @@ export type SidebarTab =
     | "codexa"
     | "evolexa"
     | "flowexa"
+    | "workspace"
     | "settings";
 
 export type CollapsibleSection = "events" | "documentation" | "workspaces";
@@ -79,8 +82,35 @@ export const Sidebar = ({
         ) {
             return "documentation";
         }
+        if (location.pathname.startsWith("/workspace")) {
+            return "workspaces";
+        }
         return "events";
     });
+
+    const [clubWorkspaces, setClubWorkspaces] = useState<UserClubWorkspaceSummary[]>([]);
+    const [loadingWorkspaces, setLoadingWorkspaces] = useState(false);
+
+    useEffect(() => {
+        let isMounted = true;
+        const fetchWorkspaces = async () => {
+            try {
+                setLoadingWorkspaces(true);
+                const res = await workspaceApi.getMyWorkspaces();
+                if (isMounted && res.success && res.workspaces) {
+                    setClubWorkspaces(res.workspaces);
+                }
+            } catch (err) {
+                console.warn("[Sidebar] Failed to load user workspaces:", err);
+            } finally {
+                if (isMounted) setLoadingWorkspaces(false);
+            }
+        };
+        fetchWorkspaces();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
 
     const handleToggleSection = (section: CollapsibleSection) => {
         setOpenSection((prev) => (prev === section ? null : section));
@@ -109,7 +139,13 @@ export const Sidebar = ({
             location.pathname.startsWith("/blogs")
         ) {
             setOpenSection("documentation");
-        } else if (activeTab === "codexa" || activeTab === "evolexa" || activeTab === "flowexa") {
+        } else if (
+            activeTab === "codexa" ||
+            activeTab === "evolexa" ||
+            activeTab === "flowexa" ||
+            activeTab === "workspace" ||
+            location.pathname.startsWith("/workspace")
+        ) {
             setOpenSection("workspaces");
         }
     }, [location.pathname, activeTab]);
@@ -408,45 +444,7 @@ export const Sidebar = ({
         },
     ];
 
-    // Workspace redirections: Codexa, Evolexa, Flowexa
-    const workspaceItems = [
-        {
-            id: "codexa" as SidebarTab,
-            name: "Codexa",
-            description: "Code & Compiler Workspace",
-            url: "https://github.com",
-            icon: (
-                <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 141 128" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M28.001 9.5L2.50104 54.5C0.998939 58.5834 0.64081 60.8842 0.501038 65C0.938524 68.5876 1.28381 70.4643 2.50104 73L30.001 120.5C35.4895 125.639 38.9529 126.875 45.501 127.5H99.001C105.055 125.113 108.146 123.091 113.001 118L138.001 74.5C137.555 72.8604 137.011 72.6945 136.001 72.5H120.501C115.678 74.645 113.297 76.327 109.501 80C100.469 95.3741 95.8945 104.483 85.001 118C79.395 121.617 75.9883 122.881 69.001 122.5C61.7381 121.647 58.3542 120.112 53.501 115.5L26.501 70C24.9477 65.1254 24.8433 61.7609 27.501 57L52.501 14.5C56.0812 9.93194 58.5322 7.57464 64.001 6H73.501C80.5078 6.26746 82.9476 8.58767 87.501 13C95.4738 21.4342 94.5253 25.7724 102.001 37C105.329 43.6932 111.503 52.4157 121.001 56H137.501C138.562 54.4501 138.56 53.4612 137.501 51.5L110.001 6.5C104.567 2.11059 101.303 0.697955 95.001 0.5H42.001C35.9066 2.76829 32.8347 4.72468 28.001 9.5Z" fill="currentColor" />
-                    <path d="M73.001 28.5L72.501 12.5C70.7058 11.0543 69.8735 11.3238 68.501 12.5V28.5C66.6181 38.531 63.7181 43.4648 56.501 51.5C48.4748 57.6826 43.6156 60.3666 33.501 62C31.6617 63.574 30.9902 64.4922 33.501 66.5C43.8214 67.5752 48.5852 70.34 56.501 76.5C62.7019 83.5583 65.51 88.1063 68.501 98V115.5C70.2071 116.947 71.1914 116.977 73.001 115.5V98C75.4015 88.542 78.0024 83.8767 84.501 76.5C91.0133 71.4181 95.0765 69.1031 103.501 66.5H139.001C140.933 64.5141 140.478 63.5826 139.001 62L103.501 61.5C95.2528 59.0485 91.2098 56.5163 84.501 51C78.304 44.7688 75.3678 39.8531 73.001 28.5Z" fill="currentColor" />
-                </svg>
-            ),
-        },
-        {
-            id: "evolexa" as SidebarTab,
-            name: "Evolexa",
-            description: "AI Evolution & Insights",
-            url: "https://huggingface.co",
-            icon: (
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" viewBox="0 0 121 89" fill="none">
-                    <path d="M1.70876 4.5C0.12191 2.90864 0.0724409 1.99494 1.70876 0.5H117.709C119.545 1.97671 119.977 2.8261 117.709 4.5C104.181 12.5622 98.954 17.9449 94.2088 29C92.6688 30.6466 91.6861 30.6173 89.7088 29C79.7437 10.5806 72.2203 6.69689 59.7088 6.5C45.4453 8.09559 38.2192 11.668 31.7088 27.5C30.4283 40.9054 30.4372 48.3489 31.7088 61.5C37.9917 76.5533 44.5975 80.7771 60.7088 82.5C77.7677 78.9809 83.6949 73.7856 89.7088 60.5C91.7028 57.2348 93.1523 57.7809 94.7085 60.5C102.674 75.3508 108.536 78.7372 119.209 84C119.834 85.9888 119.8 86.9752 117.709 88H1.70876C0.183632 86.2274 0.0547327 85.3401 1.70876 84C13.7194 76.5162 20.6745 70.4354 22.7088 61.5C24.6139 49.0868 24.218 41.4629 22.7088 27.5C18.6733 17.3207 14.491 12.1814 1.70876 4.5Z" fill="currentColor" />
-                    <path d="M62.7085 19C61.538 18.0534 60.879 17.5934 59.7088 19C53.2869 30.3265 48.6067 35.5219 37.2085 41.5C34.6732 43.3691 34.2664 44.4424 37.2085 46.5C48.0841 52.2247 52.886 56.9754 58.7085 68.5C60.5486 69.8018 61.5591 70.1832 63.2085 68.5C68.5928 57.3944 73.8336 52.8094 85.7085 46.5C87.027 45.0962 87.7324 44.308 85.7085 42.5C75.5879 36.7207 70.2354 32.5144 62.7085 19Z" fill="currentColor" />
-                </svg>
-            ),
-        },
-        {
-            id: "flowexa" as SidebarTab,
-            name: "Flowexa",
-            description: "Workflows & Automation",
-            url: "https://linear.app",
-            icon: (
-                <svg className="w-5 h-5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 475 462" fill="none">
-                    <path d="M121.238 43.9466C59.009 80.5035 33.1605 107.594 0.738281 165.947C105.26 197.551 137.021 234.274 172.238 314.947C184.063 377.952 179.633 409.761 153.238 460.447C214.254 425.34 239.644 395.514 273.738 329.447C304.125 246.736 306.738 196.516 281.238 98.9466C199.34 161.027 147.684 179.97 73.2383 165.947C130.596 158.31 160.167 149.436 207.738 124.447C274.352 86.5932 300.141 57.7559 338.738 1.44657C241.336 -2.43033 190.709 4.44276 121.238 43.9466Z" fill="currentColor" />
-                    <path d="M294.238 94.013C349.223 86.4663 369.977 68.9291 386.724 10.9463C395.658 59.6846 411.018 80.3366 474.238 94.013C426.713 105.579 402.401 115.84 386.724 178.946C371.021 121.546 348.728 105.363 294.238 94.013Z" fill="currentColor" />
-                </svg>
-            ),
-        },
-    ];
+
 
     const renderNavItem = (item: {
         id: SidebarTab;
@@ -735,7 +733,7 @@ export const Sidebar = ({
                 {/* Divider between Documentation & Workspaces */}
                 <div className={`my-1.5 h-0.5 bg-black/15 overflow-x-hidden ${isExpanded ? "w-full" : "w-8 mx-auto"}`} />
 
-                {/* Section 4: Workspaces Dropdown Accordion (Codexa, Evolexa, Flowexa) */}
+                {/* Section 4: Club Workspaces Accordion (Direct Member Workspaces) */}
                 <div className="space-y-1 overflow-x-hidden">
                     {(!isExpanded && openSection === "workspaces") ? null : (
                         <button
@@ -746,7 +744,7 @@ export const Sidebar = ({
                                     ? "w-full justify-between px-3 py-1.5 rounded-xl hover:bg-black/5"
                                     : "w-11 h-11 mx-auto justify-center rounded-xl hover:bg-black/5"
                             } ${openSection === "workspaces" ? "bg-black/[0.04]" : ""}`}
-                            title={!isExpanded ? "Workspaces" : undefined}
+                            title={!isExpanded ? "Club Workspaces" : undefined}
                             aria-expanded={openSection === "workspaces"}
                         >
                             <div className={`flex items-center min-w-0 ${isExpanded ? "" : "justify-center"}`}>
@@ -757,16 +755,25 @@ export const Sidebar = ({
                                 )}
                                 {isExpanded && (
                                     <span className="text-[11px] font-black tracking-wider uppercase whitespace-nowrap truncate text-neutral-800 group-hover:text-black">
-                                        Workspaces
+                                        Club Workspaces
                                     </span>
                                 )}
                             </div>
                             {isExpanded && (
-                                <ChevronDown
-                                    className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
-                                        openSection === "workspaces" ? "rotate-180" : ""
-                                    }`}
-                                />
+                                <div className="flex items-center gap-1.5">
+                                    {loadingWorkspaces ? (
+                                        <span className="w-2 h-2 rounded-full bg-neutral-400 animate-pulse" />
+                                    ) : clubWorkspaces.length > 0 ? (
+                                        <span className="px-1.5 py-0.2 bg-[#FFE566] text-black border border-black rounded-full text-[10px] font-black shadow-[1px_1px_0px_#000]">
+                                            {clubWorkspaces.length}
+                                        </span>
+                                    ) : null}
+                                    <ChevronDown
+                                        className={`w-3.5 h-3.5 text-neutral-600 group-hover:text-black transition-transform duration-200 stroke-[2.5] flex-shrink-0 ${
+                                            openSection === "workspaces" ? "rotate-180" : ""
+                                        }`}
+                                    />
+                                </div>
                             )}
                         </button>
                     )}
@@ -781,35 +788,93 @@ export const Sidebar = ({
                                 transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
                                 className="space-y-1.5 overflow-hidden pt-0.5 px-0.5 pr-1.5"
                             >
-                                {workspaceItems.map((item) => (
-                                    <div
-                                        key={item.id}
-                                        className="flex items-center h-11 rounded-xl text-xs sm:text-sm font-bold text-neutral-700 select-none overflow-x-hidden relative w-full cursor-default"
-                                        title={!isExpanded ? `${item.name} (Coming Soon)` : `${item.name} Workspace — Coming Soon`}
-                                    >
-                                        <div className="flex items-center overflow-x-hidden w-full min-w-0">
-                                            {/* SVG Icon: DEAD-CENTER in 44px container */}
-                                            <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
-                                                <span className="w-5 h-5 flex items-center justify-center text-neutral-700">
-                                                    {item.icon}
-                                                </span>
-                                            </div>
+                                {clubWorkspaces.length > 0 ? (
+                                    clubWorkspaces.map((ws) => {
+                                        const isCurrent =
+                                            location.pathname.startsWith(`/workspace/${ws.clubId}`) ||
+                                            (location.pathname === "/workspace" && clubWorkspaces[0]?.clubId === ws.clubId);
 
-                                            {isExpanded && (
-                                                <span className="whitespace-nowrap truncate overflow-x-hidden animate-fadeIn pl-0.5 text-neutral-800 font-bold">
-                                                    {item.name}
-                                                </span>
-                                            )}
-                                        </div>
+                                        return (
+                                            <Link
+                                                key={ws.workspaceId}
+                                                to={`/workspace/${ws.clubId}`}
+                                                onClick={() => {
+                                                    if (onTabChange) onTabChange("workspace" as any);
+                                                }}
+                                                className={`flex items-center h-11 rounded-xl text-xs sm:text-sm transition-all duration-150 group cursor-pointer relative w-full ${
+                                                    isCurrent
+                                                        ? "bg-[#a2ff86] text-black border-2 border-black shadow-[2.5px_2.5px_0px_#000] font-black z-10"
+                                                        : "text-neutral-800 hover:text-black hover:bg-black/5 border-2 border-transparent font-bold"
+                                                }`}
+                                                title={!isExpanded ? `${ws.clubName} Workspace` : undefined}
+                                            >
+                                                {/* Active vertical accent bar */}
+                                                <span
+                                                    className={`absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full transition-opacity duration-150 ${
+                                                        isCurrent && isExpanded ? "bg-black opacity-100" : "bg-transparent opacity-0"
+                                                    }`}
+                                                />
 
-                                        {isExpanded && (
-                                            <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border-2 border-black bg-[#FFE566] text-black text-[10px] font-black tracking-tight whitespace-nowrap flex-shrink-0 mr-1 shadow-[2px_2px_0px_#000] animate-fadeIn">
-                                                <Lock className="w-2.5 h-2.5 text-black stroke-[2.5] flex-shrink-0" />
-                                                <span>Coming soon</span>
+                                                <div className="flex items-center w-full min-w-0">
+                                                    {/* Club Icon / Avatar: DEAD-CENTER in 44px container */}
+                                                    <div className="w-11 h-11 flex items-center justify-center flex-shrink-0">
+                                                        <div className="w-6 h-6 rounded-md border border-black bg-neutral-100 flex items-center justify-center overflow-hidden font-black text-[10px] text-black shadow-[1px_1px_0px_#000]">
+                                                            {ws.clubLogoUrl ? (
+                                                                <img src={ws.clubLogoUrl} alt={ws.clubName} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                ws.clubName.slice(0, 2).toUpperCase()
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Text label only rendered when expanded */}
+                                                    {isExpanded && (
+                                                        <div className="min-w-0 flex-1 pr-1 animate-fadeIn">
+                                                            <p className={`whitespace-nowrap truncate text-xs ${isCurrent ? "font-black text-black" : "font-bold text-neutral-800"}`}>
+                                                                {ws.clubName}
+                                                            </p>
+                                                            <p className="whitespace-nowrap truncate text-[9px] font-bold text-neutral-500 uppercase tracking-wider">
+                                                                {ws.roleTitle || ws.roleName}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Tooltip when rail collapsed */}
+                                                {!isExpanded && (
+                                                    <div className="absolute left-[calc(100%+12px)] top-1/2 -translate-y-1/2 px-2.5 py-1 rounded-xl bg-black text-white text-xs font-black border-2 border-black shadow-[3px_3px_0px_#a2ff86] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-[90] whitespace-nowrap hidden sm:flex items-center gap-1.5">
+                                                        <span>{ws.clubName}</span>
+                                                        <span className="text-[10px] text-neutral-400">({ws.roleTitle || ws.roleName})</span>
+                                                    </div>
+                                                )}
+                                            </Link>
+                                        );
+                                    })
+                                ) : (
+                                    /* Zero club workspaces state */
+                                    <div className="p-2 text-center">
+                                        {isExpanded ? (
+                                            <div className="space-y-1.5 py-1">
+                                                <p className="text-[11px] font-bold text-neutral-600">No active club workspace</p>
+                                                <Link
+                                                    to="/clubs"
+                                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-black bg-[#FFE566] text-black border border-black rounded-lg shadow-neo-xs hover:bg-[#fedb30] transition"
+                                                >
+                                                    <Plus className="w-3 h-3 text-black" />
+                                                    <span>Explore Clubs</span>
+                                                </Link>
                                             </div>
+                                        ) : (
+                                            <Link
+                                                to="/clubs"
+                                                className="w-11 h-11 flex items-center justify-center rounded-xl hover:bg-black/5 text-neutral-600 hover:text-black"
+                                                title="Explore Clubs"
+                                            >
+                                                <Compass className="w-5 h-5 text-neutral-600" />
+                                            </Link>
                                         )}
                                     </div>
-                                ))}
+                                )}
                             </motion.div>
                         )}
                     </AnimatePresence>

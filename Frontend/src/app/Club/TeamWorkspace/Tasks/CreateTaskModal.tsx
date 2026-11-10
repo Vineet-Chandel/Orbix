@@ -25,6 +25,9 @@ import type {
 import { useToast } from "../../../../context/ToastContext";
 import { FileUploadZone } from "../Files/FileUploadZone";
 import { AttachmentList } from "../Files/AttachmentList";
+import { NeoSelect } from "../../../../components/NeoSelect";
+import { NeoDateTimePicker } from "../../../../components/NeoDateTimePicker";
+import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 
 interface CreateTaskModalProps {
     isOpen: boolean;
@@ -229,36 +232,32 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                             <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
                                 Department (Optional)
                             </label>
-                            <select
+                            <NeoSelect
                                 value={departmentId}
-                                onChange={(e) => setDepartmentId(e.target.value)}
-                                className="w-full px-3 py-2 bg-white border-2 border-black rounded-xl font-bold text-black focus:outline-none focus:ring-2 focus:ring-black shadow-neo-xs text-xs"
-                            >
-                                <option value="">Workspace-Wide</option>
-                                {departments.map((d) => (
-                                    <option key={d.id} value={d.id}>
-                                        {d.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => setDepartmentId(val)}
+                                size="sm"
+                                triggerClassName="w-full text-xs font-bold"
+                                options={[
+                                    { value: "", label: "Workspace-Wide" },
+                                    ...departments.map((d) => ({ value: d.id, label: d.name })),
+                                ]}
+                            />
                         </div>
 
                         <div>
                             <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
                                 Target Role (Optional)
                             </label>
-                            <select
+                            <NeoSelect
                                 value={assignedRoleId}
-                                onChange={(e) => setAssignedRoleId(e.target.value)}
-                                className="w-full px-3 py-2 bg-white border-2 border-black rounded-xl font-bold text-black focus:outline-none focus:ring-2 focus:ring-black shadow-neo-xs text-xs"
-                            >
-                                <option value="">Any Role</option>
-                                {roles.map((r) => (
-                                    <option key={r.id} value={r.id}>
-                                        {r.name}
-                                    </option>
-                                ))}
-                            </select>
+                                onChange={(val) => setAssignedRoleId(val)}
+                                size="sm"
+                                triggerClassName="w-full text-xs font-bold"
+                                options={[
+                                    { value: "", label: "Any Role" },
+                                    ...roles.map((r) => ({ value: r.id, label: r.name })),
+                                ]}
+                            />
                         </div>
 
                         <div>
@@ -299,22 +298,24 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                             <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
                                 <Calendar className="w-3.5 h-3.5 inline mr-1" /> Start Date
                             </label>
-                            <input
-                                type="date"
+                            <NeoDateTimePicker
+                                mode="date"
                                 value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                                className="w-full px-3 py-2 bg-white border-2 border-black rounded-xl font-medium text-black focus:outline-none shadow-neo-xs"
+                                onChange={(val) => setStartDate(val)}
+                                placeholder="Select start date..."
+                                className="w-full"
                             />
                         </div>
                         <div>
                             <label className="block text-xs font-black uppercase tracking-wider text-black mb-1.5">
                                 <Calendar className="w-3.5 h-3.5 inline mr-1 text-red-600" /> Due Date / Deadline
                             </label>
-                            <input
-                                type="date"
+                            <NeoDateTimePicker
+                                mode="date"
                                 value={dueDate}
-                                onChange={(e) => setDueDate(e.target.value)}
-                                className="w-full px-3 py-2 bg-white border-2 border-black rounded-xl font-medium text-black focus:outline-none shadow-neo-xs"
+                                onChange={(val) => setDueDate(val)}
+                                placeholder="Select deadline..."
+                                className="w-full"
                             />
                         </div>
                     </div>
@@ -358,59 +359,65 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                         )}
 
                         {/* Search & Filter */}
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                             <div className="relative flex-1">
-                                <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 top-2.5" />
+                                <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
                                 <input
                                     type="text"
                                     value={memberSearch}
                                     onChange={(e) => setMemberSearch(e.target.value)}
                                     placeholder="Search by name or username..."
-                                    className="w-full pl-8 pr-3 py-1.5 bg-neutral-50 border border-black rounded-lg text-xs font-medium text-black focus:outline-none"
+                                    className="w-full pl-9 pr-3 py-2 bg-neutral-50 border-2 border-black rounded-xl text-xs font-bold text-black focus:outline-none shadow-neo-xs placeholder:text-neutral-400 placeholder:font-normal"
                                 />
                             </div>
-                            <select
-                                value={memberDeptFilter}
-                                onChange={(e) => setMemberDeptFilter(e.target.value)}
-                                className="px-2 py-1.5 bg-neutral-50 border border-black rounded-lg text-xs font-bold text-black focus:outline-none"
-                            >
-                                <option value="all">All Departments</option>
-                                {departments.map((d) => (
-                                    <option key={d.id} value={d.id}>
-                                        {d.name}
-                                    </option>
-                                ))}
-                            </select>
+                            <div className="min-w-[170px]">
+                                <NeoSelect
+                                    value={memberDeptFilter}
+                                    onChange={(val) => setMemberDeptFilter(val)}
+                                    size="sm"
+                                    triggerClassName="w-full text-xs font-bold"
+                                    options={[
+                                        { value: "all", label: "All Departments" },
+                                        ...departments.map((d) => ({ value: d.id, label: d.name })),
+                                    ]}
+                                />
+                            </div>
                         </div>
 
                         {/* Member List Preview */}
-                        <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                        <div className="max-h-40 overflow-y-auto space-y-1.5 pr-1">
                             {filteredMembers.map((m) => {
                                 const isSelected = selectedAssigneeIds.includes(m.userId);
                                 return (
                                     <div
                                         key={m.id}
                                         onClick={() => toggleAssignee(m.userId)}
-                                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer border text-xs font-medium transition ${
+                                        className={`flex items-center justify-between p-2 rounded-xl cursor-pointer border-2 text-xs font-medium transition ${
                                             isSelected
-                                                ? "bg-indigo-100 border-indigo-600 text-indigo-950 font-bold"
+                                                ? "bg-indigo-50 border-black shadow-neo-xs text-black font-bold"
                                                 : "bg-white border-neutral-200 hover:border-black text-neutral-800"
                                         }`}
                                     >
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-full bg-neutral-200 border border-black flex items-center justify-center font-bold text-[10px]">
+                                        <div className="flex items-center gap-2.5">
+                                            <NeoCheckbox
+                                                checked={isSelected}
+                                                onChange={() => {}}
+                                                size="sm"
+                                                colorScheme="cyan"
+                                            />
+                                            <div className="w-6 h-6 rounded-full bg-neutral-200 border border-black flex items-center justify-center font-black text-[10px] text-black">
                                                 {m.user?.firstName?.charAt(0) || "?"}
                                             </div>
                                             <div>
-                                                <span>
+                                                <span className="font-bold text-black">
                                                     {m.user?.firstName} {m.user?.lastName}
                                                 </span>
-                                                <span className="text-[10px] text-neutral-500 ml-1.5">
+                                                <span className="text-[10px] text-neutral-500 ml-1.5 font-medium">
                                                     (@{m.user?.username})
                                                 </span>
                                             </div>
                                         </div>
-                                        <span className="text-[10px] px-2 py-0.5 bg-neutral-100 rounded border border-neutral-300 font-bold">
+                                        <span className="text-[10px] px-2 py-0.5 bg-neutral-100 rounded-lg border border-black font-black text-neutral-700">
                                             {m.role?.name || "Member"}
                                         </span>
                                     </div>
@@ -566,11 +573,11 @@ export const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
                                 </p>
                             </div>
                         </div>
-                        <input
-                            type="checkbox"
+                        <NeoCheckbox
                             checked={isRestricted}
-                            onChange={(e) => setIsRestricted(e.target.checked)}
-                            className="w-4 h-4 accent-black cursor-pointer rounded border-2 border-black"
+                            onCheckedChange={(checked) => setIsRestricted(checked)}
+                            colorScheme="yellow"
+                            size="sm"
                         />
                     </div>
 

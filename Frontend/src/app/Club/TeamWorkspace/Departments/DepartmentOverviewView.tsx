@@ -20,6 +20,7 @@ import { DepartmentDetailModal } from "./DepartmentDetailModal";
 import type {
     WorkspaceDepartment,
     WorkspaceMember,
+    MemberCapabilityResolution,
 } from "../../../../types/workspace";
 
 interface DepartmentOverviewViewProps {
@@ -27,6 +28,7 @@ interface DepartmentOverviewViewProps {
     departments: WorkspaceDepartment[];
     allMembers: WorkspaceMember[];
     isAdmin: boolean;
+    capabilities?: MemberCapabilityResolution | null;
     onReload: () => void;
 }
 
@@ -44,6 +46,7 @@ export const DepartmentOverviewView: React.FC<DepartmentOverviewViewProps> = ({
     departments,
     allMembers,
     isAdmin,
+    capabilities,
     onReload,
 }) => {
     const toast = useToast();
@@ -51,6 +54,8 @@ export const DepartmentOverviewView: React.FC<DepartmentOverviewViewProps> = ({
     const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
     const [seeding, setSeeding] = useState(false);
     const [showArchived, setShowArchived] = useState(false);
+
+    const canCreateDepartment = isAdmin || Boolean(capabilities?.capabilities.departments.create);
 
     const handleSeedDefaults = async () => {
         try {
@@ -92,7 +97,7 @@ export const DepartmentOverviewView: React.FC<DepartmentOverviewViewProps> = ({
                         {showArchived ? "Hide Archived" : "Show Archived"}
                     </button>
 
-                    {isAdmin && (
+                    {canCreateDepartment && (
                         <button
                             onClick={() => setIsCreateOpen(true)}
                             className="px-4 py-2 bg-[#A6FF70] hover:bg-[#95F55D] text-black font-black text-xs border-2 border-black rounded-xl shadow-neo-sm flex items-center gap-1.5 transition-all active:translate-x-[1px] active:translate-y-[1px]"
@@ -214,6 +219,11 @@ export const DepartmentOverviewView: React.FC<DepartmentOverviewViewProps> = ({
                     allDepartments={departments}
                     allMembers={allMembers}
                     isAdmin={isAdmin}
+                    canManageDepartment={
+                        isAdmin ||
+                        Boolean(capabilities?.capabilities.departments.manageAll) ||
+                        (selectedDeptId ? Boolean(capabilities?.leadDepartmentIds?.includes(selectedDeptId)) : false)
+                    }
                     onClose={() => setSelectedDeptId(null)}
                     onUpdated={() => {
                         onReload();

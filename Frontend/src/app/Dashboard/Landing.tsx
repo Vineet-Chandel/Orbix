@@ -18,6 +18,7 @@ import { CollegeEventsView } from "../Events/CollegeEventsView";
 import { StudentActivityView } from "../Events/StudentActivityView";
 import { ProjectsManagementView } from "../Projects/ProjectsManagementView";
 import { UserCertificateWalletView } from "../Certificates/UserCertificateWalletView";
+import { MemberWorkspaceView } from "../Club/TeamWorkspace/MemberWorkspaceView";
 import { SectionBottomIllustration } from "../common/SectionBottomIllustration";
 
 export default function Dashboard() {
@@ -42,6 +43,7 @@ export default function Dashboard() {
         if (path.includes("/docs")) return "docs";
         if (path.includes("/onboarding") || path.includes("/connect")) return "connect-platform";
         if (path.includes("/leaderboard")) return "leaderboard";
+        if (path.startsWith("/workspace")) return "workspace" as SidebarTab;
         return "dashboard";
     };
 
@@ -152,6 +154,7 @@ export default function Dashboard() {
                     if (tab === "docs") navigate("/docs");
                     if (tab === "leaderboard") navigate("/leaderboard");
                     if (tab === "connect-platform") navigate("/onboarding");
+                    if (tab === ("workspace" as any)) navigate("/workspace");
                 }}
                 isOpen={isMobileSidebarOpen}
                 onClose={() => setIsMobileSidebarOpen(false)}
@@ -210,6 +213,10 @@ export default function Dashboard() {
                 ) : activeTab === "wallet" || activeTab === "certificates" ? (
                     <div className="flex-1 w-full min-h-0 bg-[#FAF6EE] rounded-2xl border-2 border-black shadow-[6px_6px_0px_#000] overflow-y-auto scrollbar-none flex flex-col justify-between animate-in fade-in duration-200">
                         <UserCertificateWalletView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
+                    </div>
+                ) : activeTab === ("workspace" as any) || location.pathname.startsWith("/workspace") ? (
+                    <div className="flex-1 w-full min-h-0 flex flex-col animate-in fade-in duration-200">
+                        <MemberWorkspaceView onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)} />
                     </div>
                 ) : (
                     /* Default Dashboard View (Practice vs Development) */

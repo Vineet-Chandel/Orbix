@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
+import { NeoSelect } from "../../../../components/NeoSelect";
 import type { WorkspaceAuditLogEntry } from "../../../../types/workspace";
 
 interface AuditLogViewProps {
@@ -130,20 +131,22 @@ export const AuditLogView: React.FC<AuditLogViewProps> = ({ clubId, isAdmin }) =
                     />
                 </div>
 
-                <div className="min-w-[160px]">
-                    <select
+                <div className="min-w-[170px]">
+                    <NeoSelect
                         value={targetTypeFilter}
-                        onChange={(e) => setTargetTypeFilter(e.target.value)}
-                        className="w-full text-xs font-bold bg-neutral-50 border-2 border-black rounded-lg px-2.5 py-1.5 focus:outline-none"
-                    >
-                        <option value="">All Target Types</option>
-                        <option value="workspace_member">Member</option>
-                        <option value="workspace_role">Role</option>
-                        <option value="workspace_department">Department</option>
-                        <option value="workspace_channel">Channel</option>
-                        <option value="workspace_task">Task</option>
-                        <option value="workspace_file">File</option>
-                    </select>
+                        onChange={(val) => setTargetTypeFilter(val)}
+                        size="sm"
+                        triggerClassName="w-full text-xs font-bold"
+                        options={[
+                            { value: "", label: "All Target Types" },
+                            { value: "workspace_member", label: "Member" },
+                            { value: "workspace_role", label: "Role" },
+                            { value: "workspace_department", label: "Department" },
+                            { value: "workspace_channel", label: "Channel" },
+                            { value: "workspace_task", label: "Task" },
+                            { value: "workspace_file", label: "File" },
+                        ]}
+                    />
                 </div>
 
                 {(actionFilter || targetTypeFilter) && (

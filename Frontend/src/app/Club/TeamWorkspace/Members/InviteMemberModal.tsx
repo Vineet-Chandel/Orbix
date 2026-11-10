@@ -6,12 +6,11 @@ import {
     Copy,
     Check,
     Mail,
-    Shield,
-    Folder,
     Link as LinkIcon,
 } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
+import { NeoSelect } from "../../../../components/NeoSelect";
 import type { WorkspaceRole, WorkspaceDepartment } from "../../../../types/workspace";
 
 interface InviteMemberModalProps {
@@ -132,51 +131,41 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label className="block text-xs font-black uppercase text-neutral-700 mb-1">
                                     Assigned Role *
                                 </label>
-                                <div className="relative">
-                                    <Shield className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                                    <select
-                                        value={roleId}
-                                        onChange={(e) => setRoleId(e.target.value)}
-                                        className="w-full pl-9 pr-3 py-2 text-xs font-bold border-2 border-black rounded-xl bg-white focus:outline-none"
-                                        required
-                                    >
-                                        {roles
-                                            .filter((r) => r.slug !== "owner")
-                                            .map((r) => (
-                                                <option key={r.id} value={r.id}>
-                                                    {r.name} (Rank {r.rank})
-                                                </option>
-                                            ))}
-                                    </select>
-                                </div>
+                                <NeoSelect
+                                    value={roleId}
+                                    onChange={(val) => setRoleId(val)}
+                                    size="sm"
+                                    triggerClassName="w-full text-xs font-bold"
+                                    options={roles
+                                        .filter((r) => r.slug !== "owner")
+                                        .map((r) => ({
+                                            value: r.id,
+                                            label: `${r.name} (Rank ${r.rank})`,
+                                        }))}
+                                />
                             </div>
 
                             <div>
                                 <label className="block text-xs font-black uppercase text-neutral-700 mb-1">
                                     Department (Optional)
                                 </label>
-                                <div className="relative">
-                                    <Folder className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
-                                    <select
-                                        value={departmentId}
-                                        onChange={(e) => setDepartmentId(e.target.value)}
-                                        className="w-full pl-9 pr-3 py-2 text-xs font-bold border-2 border-black rounded-xl bg-white focus:outline-none"
-                                    >
-                                        <option value="">No Initial Department</option>
-                                        {departments
+                                <NeoSelect
+                                    value={departmentId}
+                                    onChange={(val) => setDepartmentId(val)}
+                                    size="sm"
+                                    triggerClassName="w-full text-xs font-bold"
+                                    options={[
+                                        { value: "", label: "No Initial Department" },
+                                        ...departments
                                             .filter((d) => d.status === "active")
-                                            .map((d) => (
-                                                <option key={d.id} value={d.id}>
-                                                    {d.name}
-                                                </option>
-                                            ))}
-                                    </select>
-                                </div>
+                                            .map((d) => ({ value: d.id, label: d.name })),
+                                    ]}
+                                />
                             </div>
                         </div>
 

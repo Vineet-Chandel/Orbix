@@ -147,24 +147,26 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
     };
 
     return (
-        <aside className="w-80 sm:w-96 bg-[#0f172a] border-l border-slate-800 flex flex-col h-full shadow-2xl z-20 shrink-0">
+        <aside className="w-80 sm:w-96 bg-white border-l-2 border-black flex flex-col h-full shadow-neo z-20 shrink-0">
             {/* Header */}
-            <div className="p-4 border-b border-slate-800 bg-slate-900/60 flex items-center justify-between">
+            <div className="p-4 border-b-2 border-black bg-[#FAF6EE] flex items-center justify-between">
                 <div className="flex items-center gap-2.5 min-w-0">
-                    <MessageCircle className="w-5 h-5 text-indigo-400 shrink-0" />
+                    <div className="p-1.5 bg-[#FFE566] border-2 border-black rounded-lg shadow-[1px_1px_0px_#000] shrink-0">
+                        <MessageCircle className="w-4 h-4 text-black" />
+                    </div>
                     <div className="min-w-0">
-                        <h4 className="text-sm font-semibold text-slate-100 truncate">
+                        <h4 className="text-sm font-black text-black truncate">
                             {thread.name}
                         </h4>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                        <div className="flex items-center gap-2 text-[11px] font-bold text-neutral-600">
                             <span>{messages.length} replies</span>
                             {thread.isLocked && (
-                                <span className="text-amber-400 flex items-center gap-0.5">
+                                <span className="text-amber-700 font-black flex items-center gap-0.5">
                                     <Lock className="w-3 h-3" /> Locked
                                 </span>
                             )}
                             {thread.isArchived && (
-                                <span className="text-slate-500 flex items-center gap-0.5">
+                                <span className="text-neutral-500 font-black flex items-center gap-0.5">
                                     <Archive className="w-3 h-3" /> Archived
                                 </span>
                             )}
@@ -172,38 +174,38 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                     </div>
                 </div>
 
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                     {canModify && (
                         <>
                             <button
                                 onClick={handleToggleLock}
                                 disabled={updatingThread}
                                 title={thread.isLocked ? "Unlock Thread" : "Lock Thread"}
-                                className={`p-1.5 rounded-lg border transition ${
+                                className={`p-1.5 rounded-lg border-2 border-black shadow-[1.5px_1.5px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition ${
                                     thread.isLocked
-                                        ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
-                                        : "text-slate-400 hover:text-slate-200 border-transparent hover:bg-slate-800"
+                                        ? "bg-[#FFE566] text-black"
+                                        : "bg-white text-black hover:bg-neutral-100"
                                 }`}
                             >
-                                <Lock className="w-4 h-4" />
+                                <Lock className="w-3.5 h-3.5" />
                             </button>
                             <button
                                 onClick={handleToggleArchive}
                                 disabled={updatingThread}
                                 title={thread.isArchived ? "Unarchive Thread" : "Archive Thread"}
-                                className={`p-1.5 rounded-lg border transition ${
+                                className={`p-1.5 rounded-lg border-2 border-black shadow-[1.5px_1.5px_0px_#000] active:translate-x-[1px] active:translate-y-[1px] transition ${
                                     thread.isArchived
-                                        ? "bg-slate-800 text-slate-300 border-slate-700"
-                                        : "text-slate-400 hover:text-slate-200 border-transparent hover:bg-slate-800"
+                                        ? "bg-neutral-300 text-black"
+                                        : "bg-white text-black hover:bg-neutral-100"
                                 }`}
                             >
-                                <Archive className="w-4 h-4" />
+                                <Archive className="w-3.5 h-3.5" />
                             </button>
                         </>
                     )}
                     <button
                         onClick={onClose}
-                        className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition"
+                        className="p-1.5 rounded-lg border-2 border-transparent hover:border-black text-black hover:bg-neutral-100 transition"
                     >
                         <X className="w-4 h-4" />
                     </button>
@@ -211,34 +213,34 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             </div>
 
             {/* Messages Feed */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#FAF6EE]">
                 {loading ? (
-                    <div className="flex items-center justify-center py-12 text-slate-500 text-xs">
+                    <div className="flex items-center justify-center py-12 text-neutral-500 font-bold text-xs">
                         Loading thread history...
                     </div>
                 ) : messages.length === 0 ? (
-                    <div className="text-center py-8 text-slate-500 text-xs">
+                    <div className="text-center py-8 text-neutral-500 font-bold text-xs">
                         No replies in this thread yet. Be the first to start the discussion!
                     </div>
                 ) : (
                     messages.map((msg) => (
                         <div key={msg.id} className="flex items-start gap-2.5 text-xs">
-                            <div className="w-7 h-7 rounded-full bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center font-bold text-[10px] text-indigo-300 uppercase shrink-0 mt-0.5">
+                            <div className="w-7 h-7 rounded-full bg-[#FFE566] border-2 border-black shadow-[1px_1px_0px_#000] flex items-center justify-center font-black text-[10px] text-black uppercase shrink-0 mt-0.5">
                                 {msg.sender?.firstName?.[0] || "U"}
                             </div>
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
-                                    <span className="font-semibold text-slate-200">
+                                    <span className="font-black text-black">
                                         {msg.sender?.firstName} {msg.sender?.lastName}
                                     </span>
-                                    <span className="text-[10px] text-slate-500">
+                                    <span className="text-[10px] font-bold text-neutral-500">
                                         {new Date(msg.createdAt).toLocaleTimeString([], {
                                             hour: "2-digit",
                                             minute: "2-digit",
                                         })}
                                     </span>
                                 </div>
-                                <div className="text-slate-300 leading-relaxed mt-0.5 whitespace-pre-wrap">
+                                <div className="text-neutral-900 font-semibold leading-relaxed mt-0.5 whitespace-pre-wrap">
                                     {msg.content}
                                 </div>
                             </div>
@@ -249,9 +251,9 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
             </div>
 
             {/* Composer */}
-            <div className="p-3 border-t border-slate-800 bg-slate-950/60">
+            <div className="p-3 border-t-2 border-black bg-white">
                 {thread.isLocked ? (
-                    <div className="py-2 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-center text-xs text-amber-300">
+                    <div className="py-2 px-3 rounded-xl bg-[#FFE566] border-2 border-black text-center text-xs font-black text-black shadow-[1.5px_1.5px_0px_#000]">
                         This thread has been locked. New replies are disabled.
                     </div>
                 ) : (
@@ -262,12 +264,12 @@ export const ThreadSidebar: React.FC<ThreadSidebarProps> = ({
                             onChange={(e) => setReplyContent(e.target.value)}
                             placeholder="Reply in thread..."
                             disabled={sending}
-                            className="flex-1 px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500/50"
+                            className="flex-1 px-3.5 py-2 rounded-xl bg-[#FAF6EE] border-2 border-black text-xs font-semibold text-black placeholder-neutral-500 focus:outline-none shadow-[1.5px_1.5px_0px_#000]"
                         />
                         <button
                             type="submit"
                             disabled={sending || !replyContent.trim()}
-                            className="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50 transition shadow-md shadow-indigo-600/30"
+                            className="p-2 rounded-xl bg-[#A6FF70] hover:bg-[#92f25a] text-black border-2 border-black font-black disabled:opacity-40 transition shadow-[2px_2px_0px_#000] active:translate-x-[1px] active:translate-y-[1px]"
                         >
                             <Send className="w-3.5 h-3.5" />
                         </button>

@@ -4,6 +4,8 @@ import { UserCog, X, Check, Trash2, ShieldCheck } from "lucide-react";
 import { workspaceApi } from "../../../../api/workspaceApi";
 import { useToast } from "../../../../context/ToastContext";
 import type { TeamWorkspace, WorkspaceMember } from "../../../../types/workspace";
+import { NeoSelect } from "../../../../components/NeoSelect";
+import { NeoCheckbox } from "../../../../components/NeoCheckbox";
 
 interface WorkspaceManagerModalProps {
     isOpen: boolean;
@@ -195,93 +197,69 @@ export const WorkspaceManagerModal: React.FC<WorkspaceManagerModalProps> = ({
                         <label className="block text-xs font-black uppercase text-neutral-700 mb-1">
                             Select Workspace Member *
                         </label>
-                        <select
+                        <NeoSelect
                             value={selectedUserId}
-                            onChange={(e) => setSelectedUserId(e.target.value)}
-                            className="w-full p-2.5 text-xs font-semibold border-2 border-black rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-black"
-                            required
-                        >
-                            <option value="">-- Choose Member to Appoint --</option>
-                            {candidateMembers.map((m) => {
-                                const name = `${m.user?.firstName || ""} ${m.user?.lastName || ""}`.trim() || m.user?.username;
-                                return (
-                                    <option key={m.userId} value={m.userId}>
-                                        {name} (@{m.user?.username}) — {m.roleTitle}
-                                    </option>
-                                );
-                            })}
-                        </select>
+                            onChange={(val) => setSelectedUserId(val)}
+                            options={[
+                                { value: "", label: "-- Choose Member to Appoint --" },
+                                ...candidateMembers.map((m) => {
+                                    const name = `${m.user?.firstName || ""} ${m.user?.lastName || ""}`.trim() || m.user?.username;
+                                    return {
+                                        value: m.userId,
+                                        label: `${name} (@${m.user?.username}) — ${m.roleTitle}`,
+                                    };
+                                }),
+                            ]}
+                            placeholder="-- Choose Member to Appoint --"
+                            size="md"
+                        />
                     </div>
 
                     <div>
                         <label className="block text-xs font-black uppercase text-neutral-700 mb-2">
                             Delegated Manager Permissions
                         </label>
-                        <div className="space-y-2 border-2 border-black rounded-xl p-3 bg-neutral-50 text-xs">
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={permissions.can_manage_departments}
-                                    onChange={() => togglePermission("can_manage_departments")}
-                                    className="w-4 h-4 rounded border-black accent-black"
-                                />
-                                <div>
-                                    <span className="font-bold text-black">Manage Departments</span>
-                                    <p className="text-[10px] text-neutral-500">Create, edit, archive and assign department leads</p>
-                                </div>
-                            </label>
-
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={permissions.can_manage_members}
-                                    onChange={() => togglePermission("can_manage_members")}
-                                    className="w-4 h-4 rounded border-black accent-black"
-                                />
-                                <div>
-                                    <span className="font-bold text-black">Manage Member Roles & Status</span>
-                                    <p className="text-[10px] text-neutral-500">Promote, demote and suspend non-admin members</p>
-                                </div>
-                            </label>
-
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={permissions.can_invite_members}
-                                    onChange={() => togglePermission("can_invite_members")}
-                                    className="w-4 h-4 rounded border-black accent-black"
-                                />
-                                <div>
-                                    <span className="font-bold text-black">Issue Workspace Invitations</span>
-                                    <p className="text-[10px] text-neutral-500">Generate cryptographic join tokens and invite team candidates</p>
-                                </div>
-                            </label>
-
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={permissions.can_manage_channels}
-                                    onChange={() => togglePermission("can_manage_channels")}
-                                    className="w-4 h-4 rounded border-black accent-black"
-                                />
-                                <div>
-                                    <span className="font-bold text-black">Manage Discussion Channels</span>
-                                    <p className="text-[10px] text-neutral-500">Create and configure public and department channels</p>
-                                </div>
-                            </label>
-
-                            <label className="flex items-center gap-2.5 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={permissions.can_manage_settings}
-                                    onChange={() => togglePermission("can_manage_settings")}
-                                    className="w-4 h-4 rounded border-black accent-black"
-                                />
-                                <div>
-                                    <span className="font-bold text-black">Workspace Branding & Settings</span>
-                                    <p className="text-[10px] text-neutral-500">Update general description, icon, and announcement banners</p>
-                                </div>
-                            </label>
+                        <div className="space-y-3 border-2 border-black rounded-xl p-3 bg-neutral-50 text-xs">
+                            <NeoCheckbox
+                                checked={permissions.can_manage_departments}
+                                onCheckedChange={() => togglePermission("can_manage_departments")}
+                                label="Manage Departments"
+                                description="Create, edit, archive and assign department leads"
+                                colorScheme="yellow"
+                                size="sm"
+                            />
+                            <NeoCheckbox
+                                checked={permissions.can_manage_members}
+                                onCheckedChange={() => togglePermission("can_manage_members")}
+                                label="Manage Member Roles & Status"
+                                description="Promote, demote and suspend non-admin members"
+                                colorScheme="yellow"
+                                size="sm"
+                            />
+                            <NeoCheckbox
+                                checked={permissions.can_invite_members}
+                                onCheckedChange={() => togglePermission("can_invite_members")}
+                                label="Issue Workspace Invitations"
+                                description="Generate cryptographic join tokens and invite team candidates"
+                                colorScheme="yellow"
+                                size="sm"
+                            />
+                            <NeoCheckbox
+                                checked={permissions.can_manage_channels}
+                                onCheckedChange={() => togglePermission("can_manage_channels")}
+                                label="Manage Discussion Channels"
+                                description="Create and configure public and department channels"
+                                colorScheme="yellow"
+                                size="sm"
+                            />
+                            <NeoCheckbox
+                                checked={permissions.can_manage_settings}
+                                onCheckedChange={() => togglePermission("can_manage_settings")}
+                                label="Workspace Branding & Settings"
+                                description="Update general description, icon, and announcement banners"
+                                colorScheme="yellow"
+                                size="sm"
+                            />
                         </div>
                     </div>
 
