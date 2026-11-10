@@ -1,5 +1,5 @@
 // Backend/src/repositories/workspaceRepository.ts
-import { query } from "../database/client.js";
+import { pool, query } from "../database/client.js";
 import type {
     TeamWorkspace,
     WorkspaceRole,
@@ -757,6 +757,119 @@ export class WorkspaceRepository {
             ]
         );
         return res.rows[0];
+    }
+
+    static async updateRole(
+        workspaceId: string,
+        roleId: string,
+        data: {
+            name?: string;
+            description?: string;
+            rank?: number;
+            color?: string;
+            permissions?: string[];
+        }
+    ): Promise<WorkspaceRole | null> {
+        const fields: string[] = [];
+        const params: any[] = [workspaceId, roleId];
+
+        if (data.name !== undefined) {
+            params.push(data.name);
+            fields.push(`name = $${params.length}`);
+        }
+        if (data.description !== undefined) {
+            params.push(data.description);
+            fields.push(`description = $${params.length}`);
+        }
+        if (data.rank !== undefined) {
+            params.push(data.rank);
+            fields.push(`rank = $${params.length}`);
+        }
+        if (data.color !== undefined) {
+            params.push(data.color);
+            fields.push(`color = $${params.length}`);
+        }
+        if (data.permissions !== undefined) {
+            params.push(JSON.stringify(data.permissions));
+            fields.push(`permissions = $${params.length}::jsonb`);
+        }
+
+        if (fields.length === 0) {
+            return this.findRoleById(workspaceId, roleId);
+        }
+
+        fields.push(`updated_at = NOW()`);
+
+        const res = await query(
+            `UPDATE public.workspace_roles
+             SET ${fields.join(", ")}
+             WHERE workspace_id = $1 AND id = $2 AND is_system = false
+             RETURNING
+                id,
+                workspace_id AS "workspaceId",
+                name,
+                slug,
+                description,
+                rank,
+                is_system AS "isSystem",
+                color,
+                permissions,
+                created_at AS "createdAt",
+                updated_at AS "updatedAt";`,
+            params
+        );
+
+        return res.rows[0] || null;
+    }
+
+    static async deleteRole(
+        workspaceId: string,
+        roleId: string,
+        fallbackRoleId: string
+    ): Promise<boolean> {
+        const client = await pool.connect();
+        try {
+            await client.query("BEGIN;");
+
+            // Reassign any members using this role to fallback role
+            await client.query(
+                `UPDATE public.workspace_members
+                 SET role_id = $3, updated_at = NOW()
+                 WHERE workspace_id = $1 AND role_id = $2;`,
+                [workspaceId, roleId, fallbackRoleId]
+            );
+
+            // Reassign tasks assigned to this role
+            await client.query(
+                `UPDATE public.workspace_tasks
+                 SET assigned_role_id = NULL, updated_at = NOW()
+                 WHERE workspace_id = $1 AND assigned_role_id = $2;`,
+                [workspaceId, roleId]
+            );
+
+            // Delete overrides referencing this role
+            await client.query(
+                `DELETE FROM public.workspace_channel_overrides
+                 WHERE role_id = $1;`,
+                [roleId]
+            );
+
+            // Delete the custom role
+            const delRes = await client.query(
+                `DELETE FROM public.workspace_roles
+                 WHERE workspace_id = $1 AND id = $2 AND is_system = false
+                 RETURNING id;`,
+                [workspaceId, roleId]
+            );
+
+            await client.query("COMMIT;");
+            return (delRes.rowCount || 0) > 0;
+        } catch (err) {
+            await client.query("ROLLBACK;");
+            throw err;
+        } finally {
+            client.release();
+        }
     }
 
     // =========================================================================
@@ -3468,6 +3581,345 @@ export class WorkspaceRepository {
             row.assignees = row.currentAssignees;
             return row as WorkspaceTask;
         });
+    }
+
+    /**
+     * Aggregates task accountability metrics: awaiting review, unassigned, nearing deadline, overdue, blocked,
+     * department workloads, and member workload distributions.
+     */
+    static async getTaskAccountability(
+        workspaceId: string,
+        allowedDepartmentIds: string[],
+        isGlobalManager: boolean
+    ): Promise<{
+        summary: {
+            awaitingReviewCount: number;
+            unassignedCount: number;
+            nearingDeadlineCount: number;
+            overdueCount: number;
+            blockedCount: number;
+        };
+        tasksAwaitingReview: any[];
+        tasksUnassigned: any[];
+        tasksNearingDeadline: any[];
+        tasksOverdue: any[];
+        tasksBlocked: any[];
+        departmentWorkload: Array<{
+            departmentId: string;
+            departmentName: string;
+            activeTasksCount: number;
+            unassignedCount: number;
+            blockedCount: number;
+            awaitingReviewCount: number;
+            overdueCount: number;
+            memberCount: number;
+        }>;
+        memberWorkload: Array<{
+            userId: string;
+            name: string;
+            username: string;
+            avatarUrl: string | null;
+            activeTasksCount: number;
+        }>;
+    }> {
+        let deptFilter = "";
+        const deptParams: any[] = [workspaceId];
+        if (!isGlobalManager) {
+            if (allowedDepartmentIds.length === 0) {
+                deptFilter = "AND wt.department_id IS NULL";
+            } else {
+                deptFilter = `AND (wt.department_id IS NULL OR wt.department_id = ANY($2::uuid[]))`;
+                deptParams.push(allowedDepartmentIds);
+            }
+        }
+
+        // 1. Tasks awaiting review (status = 'submitted')
+        const awaitingRes = await query(
+            `SELECT wt.id, wt.title, wt.priority, wt.status, wt.due_date AS "dueDate", wt.department_id AS "departmentId",
+                    wd.name AS "departmentName", cu.username AS "creatorUsername",
+                    (SELECT sub.created_at FROM public.workspace_task_submissions sub WHERE sub.task_id = wt.id ORDER BY sub.created_at DESC LIMIT 1) AS "submittedAt"
+             FROM public.workspace_tasks wt
+             LEFT JOIN public.workspace_departments wd ON wd.id = wt.department_id
+             JOIN public.users cu ON cu.id = wt.creator_id
+             WHERE wt.workspace_id = $1 AND wt.is_archived = false AND wt.status = 'submitted' ${deptFilter}
+             ORDER BY wt.updated_at DESC LIMIT 50;`,
+            deptParams
+        );
+
+        // 2. Unassigned tasks (status not completed/cancelled/archived, and no active assignees)
+        const unassignedRes = await query(
+            `SELECT wt.id, wt.title, wt.priority, wt.status, wt.due_date AS "dueDate", wt.department_id AS "departmentId",
+                    wd.name AS "departmentName", wt.created_at AS "createdAt"
+             FROM public.workspace_tasks wt
+             LEFT JOIN public.workspace_departments wd ON wd.id = wt.department_id
+             WHERE wt.workspace_id = $1 AND wt.is_archived = false
+               AND wt.status NOT IN ('completed', 'cancelled', 'archived')
+               AND NOT EXISTS (
+                   SELECT 1 FROM public.workspace_task_assignments wta 
+                   WHERE wta.task_id = wt.id AND wta.is_active = true
+               ) ${deptFilter}
+             ORDER BY wt.created_at DESC LIMIT 50;`,
+            deptParams
+        );
+
+        // 3. Nearing deadline (due in <= 48h, not completed/cancelled/archived)
+        const nearingRes = await query(
+            `SELECT wt.id, wt.title, wt.priority, wt.status, wt.due_date AS "dueDate", wt.department_id AS "departmentId",
+                    wd.name AS "departmentName"
+             FROM public.workspace_tasks wt
+             LEFT JOIN public.workspace_departments wd ON wd.id = wt.department_id
+             WHERE wt.workspace_id = $1 AND wt.is_archived = false
+               AND wt.status NOT IN ('completed', 'cancelled', 'archived')
+               AND wt.due_date IS NOT NULL
+               AND wt.due_date >= NOW()
+               AND wt.due_date <= NOW() + INTERVAL '48 hours' ${deptFilter}
+             ORDER BY wt.due_date ASC LIMIT 50;`,
+            deptParams
+        );
+
+        // 4. Overdue tasks (due < NOW(), not completed/cancelled/archived)
+        const overdueRes = await query(
+            `SELECT wt.id, wt.title, wt.priority, wt.status, wt.due_date AS "dueDate", wt.department_id AS "departmentId",
+                    wd.name AS "departmentName"
+             FROM public.workspace_tasks wt
+             LEFT JOIN public.workspace_departments wd ON wd.id = wt.department_id
+             WHERE wt.workspace_id = $1 AND wt.is_archived = false
+               AND wt.status NOT IN ('completed', 'cancelled', 'archived')
+               AND wt.due_date IS NOT NULL
+               AND wt.due_date < NOW() ${deptFilter}
+             ORDER BY wt.due_date ASC LIMIT 50;`,
+            deptParams
+        );
+
+        // 5. Blocked tasks (status = 'blocked')
+        const blockedRes = await query(
+            `SELECT wt.id, wt.title, wt.priority, wt.status, wt.due_date AS "dueDate", wt.department_id AS "departmentId",
+                    wd.name AS "departmentName", wt.updated_at AS "updatedAt"
+             FROM public.workspace_tasks wt
+             LEFT JOIN public.workspace_departments wd ON wd.id = wt.department_id
+             WHERE wt.workspace_id = $1 AND wt.is_archived = false
+               AND wt.status = 'blocked' ${deptFilter}
+             ORDER BY wt.updated_at DESC LIMIT 50;`,
+            deptParams
+        );
+
+        // 6. Department workload breakdown
+        const deptWorkloadQuery = `
+            SELECT 
+                wd.id AS "departmentId",
+                wd.name AS "departmentName",
+                COUNT(wt.id) FILTER (WHERE wt.status NOT IN ('completed', 'cancelled', 'archived'))::int AS "activeTasksCount",
+                COUNT(wt.id) FILTER (WHERE wt.status NOT IN ('completed', 'cancelled', 'archived') AND NOT EXISTS (
+                    SELECT 1 FROM public.workspace_task_assignments wta WHERE wta.task_id = wt.id AND wta.is_active = true
+                ))::int AS "unassignedCount",
+                COUNT(wt.id) FILTER (WHERE wt.status = 'blocked')::int AS "blockedCount",
+                COUNT(wt.id) FILTER (WHERE wt.status = 'submitted')::int AS "awaitingReviewCount",
+                COUNT(wt.id) FILTER (WHERE wt.due_date < NOW() AND wt.status NOT IN ('completed', 'cancelled', 'archived'))::int AS "overdueCount",
+                (SELECT COUNT(*)::int FROM public.workspace_department_members wdm WHERE wdm.department_id = wd.id) AS "memberCount"
+            FROM public.workspace_departments wd
+            LEFT JOIN public.workspace_tasks wt ON wt.department_id = wd.id AND wt.is_archived = false
+            WHERE wd.workspace_id = $1 ${!isGlobalManager && allowedDepartmentIds.length > 0 ? "AND wd.id = ANY($2::uuid[])" : ""}
+            GROUP BY wd.id, wd.name
+            ORDER BY wd.display_order ASC;
+        `;
+        const deptWorkloadRes = await query(deptWorkloadQuery, deptParams);
+
+        // 7. Member workload distribution (active assigned tasks per member)
+        const memberWorkloadRes = await query(
+            `SELECT 
+                u.id AS "userId",
+                COALESCE(NULLIF(TRIM(CONCAT(u.firstname, ' ', u.lastname)), ''), u.username, 'Member') AS "name",
+                u.username,
+                u.avatar_url AS "avatarUrl",
+                COUNT(wt.id)::int AS "activeTasksCount"
+             FROM public.workspace_task_assignments wta
+             JOIN public.users u ON u.id = wta.user_id
+             JOIN public.workspace_tasks wt ON wt.id = wta.task_id
+             WHERE wt.workspace_id = $1 
+               AND wta.is_active = true 
+               AND wt.is_archived = false 
+               AND wt.status NOT IN ('completed', 'cancelled', 'archived')
+               ${deptFilter}
+             GROUP BY u.id, u.firstname, u.lastname, u.username, u.avatar_url
+             ORDER BY "activeTasksCount" DESC
+             LIMIT 20;`,
+            deptParams
+        );
+
+        return {
+            summary: {
+                awaitingReviewCount: awaitingRes.rows.length,
+                unassignedCount: unassignedRes.rows.length,
+                nearingDeadlineCount: nearingRes.rows.length,
+                overdueCount: overdueRes.rows.length,
+                blockedCount: blockedRes.rows.length,
+            },
+            tasksAwaitingReview: awaitingRes.rows,
+            tasksUnassigned: unassignedRes.rows,
+            tasksNearingDeadline: nearingRes.rows,
+            tasksOverdue: overdueRes.rows,
+            tasksBlocked: blockedRes.rows,
+            departmentWorkload: deptWorkloadRes.rows,
+            memberWorkload: memberWorkloadRes.rows,
+        };
+    }
+
+    /**
+     * Retrieves chronological reassignment history for a specific task.
+     */
+    static async getTaskReassignments(
+        workspaceId: string,
+        taskId: string
+    ): Promise<Array<{
+        id: string;
+        taskId: string;
+        userId: string;
+        assignedBy: string;
+        assignedAt: Date;
+        unassignedAt: Date | null;
+        isActive: boolean;
+        user: {
+            id: string;
+            name: string;
+            username: string;
+            avatarUrl: string | null;
+        };
+        assignedByUser: {
+            id: string;
+            name: string;
+            username: string;
+        } | null;
+    }>> {
+        const res = await query(
+            `SELECT 
+                wta.id,
+                wta.task_id AS "taskId",
+                wta.user_id AS "userId",
+                wta.assigned_by AS "assignedBy",
+                wta.assigned_at AS "assignedAt",
+                wta.unassigned_at AS "unassignedAt",
+                wta.is_active AS "isActive",
+                json_build_object(
+                    'id', u.id,
+                    'name', COALESCE(NULLIF(TRIM(CONCAT(u.firstname, ' ', u.lastname)), ''), u.username, 'Member'),
+                    'username', u.username,
+                    'avatarUrl', u.avatar_url
+                ) AS "user",
+                CASE WHEN ab.id IS NOT NULL THEN
+                    json_build_object(
+                        'id', ab.id,
+                        'name', COALESCE(NULLIF(TRIM(CONCAT(ab.firstname, ' ', ab.lastname)), ''), ab.username, 'User'),
+                        'username', ab.username
+                    )
+                ELSE NULL END AS "assignedByUser"
+             FROM public.workspace_task_assignments wta
+             JOIN public.users u ON u.id = wta.user_id
+             LEFT JOIN public.users ab ON ab.id = wta.assigned_by
+             WHERE wta.workspace_id = $1 AND wta.task_id = $2
+             ORDER BY wta.assigned_at ASC;`,
+            [workspaceId, taskId]
+        );
+        return res.rows;
+    }
+
+    /**
+     * Records a member transfer between departments.
+     */
+    static async recordDepartmentTransfer(
+        clientOrNull: any,
+        data: {
+            workspaceId: string;
+            userId: string;
+            fromDepartmentId: string | null;
+            toDepartmentId: string;
+            transferredBy: string;
+            reason?: string | null;
+        }
+    ) {
+        const executor = clientOrNull || pool;
+        const res = await executor.query(
+            `INSERT INTO public.workspace_department_transfers (
+                workspace_id, user_id, from_department_id, to_department_id, transferred_by, reason
+             ) VALUES ($1, $2, $3, $4, $5, $6)
+             RETURNING id, workspace_id AS "workspaceId", user_id AS "userId",
+                       from_department_id AS "fromDepartmentId", to_department_id AS "toDepartmentId",
+                       transferred_by AS "transferredBy", reason, created_at AS "createdAt";`,
+            [
+                data.workspaceId,
+                data.userId,
+                data.fromDepartmentId || null,
+                data.toDepartmentId,
+                data.transferredBy,
+                data.reason || null,
+            ]
+        );
+        return res.rows[0];
+    }
+
+    /**
+     * Lists department transfer records for a workspace.
+     */
+    static async listDepartmentTransfers(
+        workspaceId: string,
+        options: {
+            userId?: string;
+            departmentId?: string;
+            limit?: number;
+            offset?: number;
+        } = {}
+    ) {
+        const params: any[] = [workspaceId];
+        let where = "wdt.workspace_id = $1";
+
+        if (options.userId) {
+            params.push(options.userId);
+            where += ` AND wdt.user_id = $${params.length}`;
+        }
+        if (options.departmentId) {
+            params.push(options.departmentId);
+            where += ` AND (wdt.from_department_id = $${params.length} OR wdt.to_department_id = $${params.length})`;
+        }
+
+        const limit = Math.min(options.limit || 50, 100);
+        const offset = options.offset || 0;
+        params.push(limit, offset);
+
+        const res = await query(
+            `SELECT 
+                wdt.id,
+                wdt.workspace_id AS "workspaceId",
+                wdt.user_id AS "userId",
+                wdt.from_department_id AS "fromDepartmentId",
+                wdt.to_department_id AS "toDepartmentId",
+                wdt.transferred_by AS "transferredBy",
+                wdt.reason,
+                wdt.created_at AS "createdAt",
+                json_build_object(
+                    'id', u.id,
+                    'name', COALESCE(NULLIF(TRIM(CONCAT(u.firstname, ' ', u.lastname)), ''), u.username, 'Member'),
+                    'username', u.username,
+                    'avatarUrl', u.avatar_url
+                ) AS "user",
+                json_build_object(
+                    'id', tb.id,
+                    'name', COALESCE(NULLIF(TRIM(CONCAT(tb.firstname, ' ', tb.lastname)), ''), tb.username, 'Admin'),
+                    'username', tb.username
+                ) AS "transferredByUser",
+                CASE WHEN fd.id IS NOT NULL THEN
+                    json_build_object('id', fd.id, 'name', fd.name, 'slug', fd.slug, 'color', fd.color)
+                ELSE NULL END AS "fromDepartment",
+                json_build_object('id', td.id, 'name', td.name, 'slug', td.slug, 'color', td.color) AS "toDepartment"
+             FROM public.workspace_department_transfers wdt
+             JOIN public.users u ON u.id = wdt.user_id
+             JOIN public.users tb ON tb.id = wdt.transferred_by
+             LEFT JOIN public.workspace_departments fd ON fd.id = wdt.from_department_id
+             JOIN public.workspace_departments td ON td.id = wdt.to_department_id
+             WHERE ${where}
+             ORDER BY wdt.created_at DESC
+             LIMIT $${params.length - 1} OFFSET $${params.length};`,
+            params
+        );
+        return res.rows;
     }
 
     /**

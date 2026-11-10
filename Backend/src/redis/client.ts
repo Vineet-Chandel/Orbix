@@ -1,19 +1,52 @@
+// Backend/src/redis/client.ts
 import { Redis } from "ioredis";
 
-const redis = new Redis({
-    host: process.env.REDIS_HOST,
-    port: Number(process.env.REDIS_PORT) || 6379,
-    username: process.env.REDIS_USERNAME,
-    password: process.env.REDIS_PASSWORD,
-});
+/**
+ * Creates an isolated Redis client instance.
+ * Supports dedicated REDIS_CACHE_URL, REDIS_QUEUE_URL, REDIS_RATELIMIT_URL or standard REDIS_URL.
+ */
+export function createRedisClient(customUrl?: string, role: "cache" | "queue" | "ratelimit" = "cache"): Redis {
+    const url =
+        customUrl ||
+        (role === "cache"
+            ? process.env.REDIS_CACHE_URL
+            : role === "queue"
+            ? process.env.REDIS_QUEUE_URL
+            : process.env.REDIS_RATELIMIT_URL) ||
+        process.env.REDIS_URL;
 
+    let client: Redis;
 
-redis.on("connect", () => {
-    console.log("Redis connected");
-});
+    if (url && (url.startsWith("redis://") || url.startsWith("rediss://"))) {
+        client = new Redis(url, {
+            maxRetriesPerRequest: role === "queue" ? null : 3,
+            enableReadyCheck: true,
+            lazyConnect: false,
+        });
+    } else {
+        client = new Redis({
+            host: process.env.REDIS_HOST || "127.0.0.1",
+            port: Number(process.env.REDIS_PORT) || 6379,
+            username: process.env.REDIS_USERNAME || undefined,
+            password: process.env.REDIS_PASSWORD || undefined,
+            maxRetriesPerRequest: role === "queue" ? null : 3,
+            enableReadyCheck: true,
+            lazyConnect: false,
+        });
+    }
 
-redis.on("error", (err: Error) => {
-    console.error("Redis error:", err);
-});
+    client.on("connect", () => {
+        console.log(`Redis connected [Role: ${role}]`);
+    });
 
-export default redis;
+    client.on("error", (err: Error) => {
+        console.warn(`Redis connection warning [Role: ${role}]:`, err.message);
+    });
+
+    return client;
+}
+
+// Default instance for application caching & single-flight operations
+const defaultRedis = createRedisClient(undefined, "cache");
+
+export default defaultRedis;

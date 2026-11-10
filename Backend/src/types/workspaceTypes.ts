@@ -946,5 +946,29 @@ export interface WorkspaceSearchResponse {
     countsByType: Record<string, number>;
 }
 
+export type WorkspaceTemplateType = "standard" | "tech" | "media" | "business";
+
+export interface WorkspaceTemplateDefinition {
+    id: string;
+    name: string;
+    description: string;
+    departments: Array<{
+        name: string;
+        slug: string;
+        description: string;
+        icon: string;
+        color: string;
+    }>;
+    categories: Array<{
+        name: string;
+        channels: Array<{
+            name: string;
+            slug: string;
+            topic: string;
+            channelType: "text" | "announcement" | "forum";
+        }>;
+    }>;
+}
+
 
 

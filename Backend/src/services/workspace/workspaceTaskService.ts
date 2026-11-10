@@ -358,6 +358,35 @@ export class WorkspaceTaskService {
         });
     }
 
+    /**
+     * Retrieves aggregated workload and accountability views:
+     * tasks awaiting review, unassigned tasks, tasks nearing deadlines, overdue tasks,
+     * blocked tasks, department workloads, and member workload distributions.
+     */
+    static async getAccountabilityOverview(workspaceId: string, actorUserId: string) {
+        const context = await this.getAuthorizedContext(workspaceId, actorUserId);
+        const isGlobalManager =
+            context.isOwner || context.isAdmin || context.isWorkspaceManager || context.permissions.includes("tasks:manage_all");
+
+        const myDepts = await WorkspaceRepository.listMemberDepartments(workspaceId, context.member.id);
+        const allowedDeptIds = Array.from(new Set([
+            ...myDepts.map((d) => d.id),
+            ...context.leadDepartmentIds,
+            ...(context.member.departmentId ? [context.member.departmentId] : []),
+        ]));
+
+        return WorkspaceRepository.getTaskAccountability(workspaceId, allowedDeptIds, isGlobalManager);
+    }
+
+    /**
+     * Retrieves detailed chronological reassignment history for a task.
+     */
+    static async getReassignmentHistory(workspaceId: string, actorUserId: string, taskId: string) {
+        // Assert caller can view this task
+        await this.getTask(workspaceId, actorUserId, taskId);
+        return WorkspaceRepository.getTaskReassignments(workspaceId, taskId);
+    }
+
     // =========================================================================
     // 3. TASK UPDATES & OPTIMISTIC CONCURRENCY
     // =========================================================================

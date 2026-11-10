@@ -1,4 +1,4 @@
-import validator from "validator";
+import validator from "../utils/validation.js";
 
 export class ProjectValidationError extends Error {
     constructor(message: string) {

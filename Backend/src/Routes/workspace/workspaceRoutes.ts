@@ -9,6 +9,7 @@ import { WorkspaceTaskService } from "../../services/workspace/workspaceTaskServ
 import { WorkspaceFileService } from "../../services/workspace/workspaceFileService.js";
 import { WorkspaceNotificationController } from "../../controllers/workspace/workspaceNotificationController.js";
 import { WorkspaceDashboardController } from "../../controllers/workspace/workspaceDashboardController.js";
+import { WorkspaceTemplateService } from "../../services/workspace/workspaceTemplateService.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
 import { query } from "../../database/client.js";
@@ -33,6 +34,22 @@ async function resolveClubId(req: Request, res: Response): Promise<string | null
 
     const requestedClubId = (req.query.clubId as string) || req.body?.clubId || req.params?.clubId;
     if (requestedClubId) {
+        // Strict tenant isolation: verify caller belongs to the requested club or workspace
+        const hasAccess = await query(
+            `SELECT 1 FROM public.verified_clubs vc
+             LEFT JOIN public.club_memberships cm ON cm.club_id = vc.id AND cm.user_id = $1 AND cm.status = 'active'
+             LEFT JOIN public.team_workspaces tw ON tw.club_id = vc.id
+             LEFT JOIN public.workspace_members wm ON wm.workspace_id = tw.id AND wm.user_id = $1 AND wm.membership_status = 'active' AND wm.is_suspended = false
+             WHERE vc.id = $2 AND (vc.auth_user_id = $1 OR cm.user_id = $1 OR wm.user_id = $1)
+             LIMIT 1;`,
+            [authUser.id, requestedClubId]
+        );
+
+        if (hasAccess.rows.length === 0) {
+            res.status(403).json({ success: false, message: "Access denied to the specified club workspace." });
+            return null;
+        }
+
         return requestedClubId;
     }
 
@@ -127,6 +144,55 @@ workspaceRouter.get("/", authenticate, async (req: Request, res: Response) => {
 });
 
 // =========================================================================
+// 2.1 WORKSPACE TEMPLATES
+// =========================================================================
+
+/**
+ * GET /api/club/workspace/templates
+ * List available templates
+ */
+workspaceRouter.get("/templates", authenticate, async (_req: Request, res: Response) => {
+    const templates = WorkspaceTemplateService.getAvailableTemplates();
+    return res.json({ success: true, templates });
+});
+
+/**
+ * POST /api/club/workspace/templates/apply
+ * Applies a template to the workspace
+ */
+workspaceRouter.post("/templates/apply", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const { templateId } = req.body;
+        if (!templateId) {
+            return res.status(400).json({ success: false, message: "templateId is required." });
+        }
+
+        const result = await WorkspaceTemplateService.applyTemplate(
+            workspace.id,
+            authUser.id,
+            templateId,
+            getAuditContext(req)
+        );
+
+        return res.json({
+            success: true,
+            data: result,
+            message: `Template '${result.template.name}' applied successfully.`,
+        });
+    } catch (err: any) {
+        const status = err.message?.includes("Unauthorized") ? 403 : err.message?.includes("Unknown template") ? 400 : 500;
+        return res.status(status).json({ success: false, message: err.message || "Failed to apply template." });
+    }
+});
+
+// =========================================================================
 // 3. WORKSPACE MANAGER DESIGNATION (CLUB OWNER ONLY)
 // =========================================================================
 
@@ -211,6 +277,12 @@ workspaceRouter.get("/departments", authenticate, async (req: Request, res: Resp
 
         const workspace = await WorkspaceRepository.findByClubId(clubId);
         if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const ctx = await WorkspaceService.resolveContext(workspace.id, authUser.id);
+        if (!ctx) {
+            return res.status(403).json({ success: false, message: "Workspace access denied." });
+        }
 
         const includeArchived = req.query.includeArchived === "true" || req.query.includeArchived === "1";
         const departments = await WorkspaceDepartmentService.listDepartments(workspace.id, includeArchived);
@@ -467,7 +539,7 @@ workspaceRouter.delete("/departments/:deptId/members/:memberId", authenticate, a
 
 /**
  * POST /api/club/workspace/departments/transfer
- * Transfer a member from one department to another
+ * Transfer a member from one department to another with historical preservation
  */
 workspaceRouter.post("/departments/transfer", authenticate, async (req: Request, res: Response) => {
     try {
@@ -477,7 +549,7 @@ workspaceRouter.post("/departments/transfer", authenticate, async (req: Request,
         const workspace = await WorkspaceRepository.findByClubId(clubId);
         if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
 
-        const { memberId, fromDeptId, toDeptId } = req.body;
+        const { memberId, fromDeptId, toDeptId, reason } = req.body;
         if (!memberId || !fromDeptId || !toDeptId) {
             return res.status(400).json({ success: false, message: "memberId, fromDeptId, and toDeptId are required." });
         }
@@ -490,12 +562,42 @@ workspaceRouter.post("/departments/transfer", authenticate, async (req: Request,
             memberId,
             fromDeptId,
             toDeptId,
+            reason,
             getAuditContext(req)
         );
 
         return res.json({ success: true, message: "Member transferred to new department successfully." });
     } catch (err: any) {
         return res.status(400).json({ success: false, message: err.message || "Failed to transfer member." });
+    }
+});
+
+/**
+ * GET /api/club/workspace/departments/transfers
+ * History of member department transfers
+ */
+workspaceRouter.get("/departments/transfers", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const { userId, departmentId, limit, offset } = req.query;
+
+        const transferOpts: any = {};
+        if (userId) transferOpts.userId = userId as string;
+        if (departmentId) transferOpts.departmentId = departmentId as string;
+        if (limit) transferOpts.limit = parseInt(limit as string, 10);
+        if (offset) transferOpts.offset = parseInt(offset as string, 10);
+
+        const transfers = await WorkspaceDepartmentService.getDepartmentTransfers(workspace.id, authUser.id, transferOpts);
+
+        return res.json({ success: true, transfers });
+    } catch (err: any) {
+        return res.status(400).json({ success: false, message: err.message || "Failed to load department transfers." });
     }
 });
 
@@ -715,6 +817,24 @@ workspaceRouter.post("/invitations/:invitationId/revoke", authenticate, async (r
 });
 
 /**
+ * GET /api/club/workspace/invitations/verify
+ * Public verification endpoint to inspect target workspace and intended role before acceptance
+ */
+workspaceRouter.get("/invitations/verify", async (req: Request, res: Response) => {
+    try {
+        const token = req.query.token as string;
+        if (!token) {
+            return res.status(400).json({ success: false, message: "Invitation token parameter is required." });
+        }
+
+        const result = await WorkspaceMemberService.verifyInvitation(token);
+        return res.json({ success: true, ...result });
+    } catch (err: any) {
+        return res.status(500).json({ success: false, message: err.message || "Failed to verify invitation." });
+    }
+});
+
+/**
  * POST /api/club/workspace/invitations/accept
  * Accept invitation using raw token
  */
@@ -759,10 +879,116 @@ workspaceRouter.get("/roles", authenticate, async (req: Request, res: Response) 
         const workspace = await WorkspaceRepository.findByClubId(clubId);
         if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
 
+        const authUser = (req as any).user;
+        const ctx = await WorkspaceService.resolveContext(workspace.id, authUser.id);
+        if (!ctx) {
+            return res.status(403).json({ success: false, message: "Workspace access denied." });
+        }
+
         const roles = await WorkspaceRepository.listRoles(workspace.id);
         return res.json({ success: true, roles });
     } catch (err: any) {
         return res.status(500).json({ success: false, message: err.message || "Failed to load roles." });
+    }
+});
+
+/**
+ * POST /api/club/workspace/roles
+ * Create custom role
+ */
+workspaceRouter.post("/roles", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const { name, description, rank, color, permissions } = req.body;
+
+        if (!name || rank === undefined) {
+            return res.status(400).json({ success: false, message: "Role name and rank are required." });
+        }
+
+        const role = await WorkspaceMemberService.createCustomRole(
+            workspace.id,
+            authUser.id,
+            { name, description, rank: Number(rank), color, permissions: permissions || [] },
+            getAuditContext(req)
+        );
+
+        return res.status(201).json({ success: true, role });
+    } catch (err: any) {
+        const status = err.message?.includes("Unauthorized") ? 403 : err.message?.includes("Cannot") ? 400 : 500;
+        return res.status(status).json({ success: false, message: err.message || "Failed to create role." });
+    }
+});
+
+/**
+ * PATCH /api/club/workspace/roles/:roleId
+ * Update custom role
+ */
+workspaceRouter.patch("/roles/:roleId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const roleId = String(req.params.roleId);
+        const { name, description, rank, color, permissions } = req.body;
+
+        const updateData: Record<string, any> = {};
+        if (name !== undefined) updateData.name = name;
+        if (description !== undefined) updateData.description = description;
+        if (rank !== undefined) updateData.rank = Number(rank);
+        if (color !== undefined) updateData.color = color;
+        if (permissions !== undefined) updateData.permissions = permissions;
+
+        const updated = await WorkspaceMemberService.updateCustomRole(
+            workspace.id,
+            authUser.id,
+            roleId,
+            updateData,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, role: updated });
+    } catch (err: any) {
+        const status = err.message?.includes("Unauthorized") ? 403 : err.message?.includes("Cannot") || err.message?.includes("System roles") ? 400 : err.message?.includes("not found") ? 404 : 500;
+        return res.status(status).json({ success: false, message: err.message || "Failed to update role." });
+    }
+});
+
+/**
+ * DELETE /api/club/workspace/roles/:roleId
+ * Delete custom role (reassigns members to default member role)
+ */
+workspaceRouter.delete("/roles/:roleId", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) return res.status(404).json({ success: false, message: "Workspace not found." });
+
+        const authUser = (req as any).user;
+        const roleId = String(req.params.roleId);
+
+        const deleted = await WorkspaceMemberService.deleteCustomRole(
+            workspace.id,
+            authUser.id,
+            roleId,
+            getAuditContext(req)
+        );
+
+        return res.json({ success: true, deleted, message: "Role deleted and members reassigned." });
+    } catch (err: any) {
+        const status = err.message?.includes("Unauthorized") ? 403 : err.message?.includes("System roles") || err.message?.includes("Cannot") ? 400 : err.message?.includes("not found") ? 404 : 500;
+        return res.status(status).json({ success: false, message: err.message || "Failed to delete role." });
     }
 });
 
@@ -786,7 +1012,8 @@ workspaceRouter.get("/categories", authenticate, async (req: Request, res: Respo
         const categories = await WorkspaceChannelService.listCategoriesWithChannels(workspace.id, authUser.id);
         return res.json({ success: true, categories });
     } catch (err: any) {
-        return res.status(500).json({ success: false, message: err.message || "Failed to list categories." });
+        const status = err.message?.includes("Unauthorized") ? 403 : 500;
+        return res.status(status).json({ success: false, message: err.message || "Failed to list categories." });
     }
 });
 
@@ -1575,19 +1802,20 @@ workspaceRouter.get("/tasks", authenticate, async (req: Request, res: Response) 
             offset,
         } = req.query;
 
-        const result = await WorkspaceTaskService.listTasks(workspace.id, authUser.id, {
-            departmentId: departmentId as string,
-            status: status ? (Array.isArray(status) ? (status as any) : (status as any)) : undefined,
-            priority: priority as any,
-            assigneeUserId: assigneeUserId as string,
-            creatorId: creatorId as string,
-            search: search as string,
-            isArchived: isArchived ? isArchived === "true" : undefined,
-            sortBy: sortBy as any,
-            sortDir: sortDir as any,
-            limit: limit ? parseInt(limit as string, 10) : undefined,
-            offset: offset ? parseInt(offset as string, 10) : undefined,
-        });
+        const filter: any = {};
+        if (departmentId) filter.departmentId = departmentId as string;
+        if (status) filter.status = status as any;
+        if (priority) filter.priority = priority as any;
+        if (assigneeUserId) filter.assigneeUserId = assigneeUserId as string;
+        if (creatorId) filter.creatorId = creatorId as string;
+        if (search) filter.search = search as string;
+        if (isArchived !== undefined) filter.isArchived = isArchived === "true";
+        if (sortBy) filter.sortBy = sortBy as any;
+        if (sortDir) filter.sortDir = sortDir as any;
+        if (limit) filter.limit = parseInt(limit as string, 10);
+        if (offset) filter.offset = parseInt(offset as string, 10);
+
+        const result = await WorkspaceTaskService.listTasks(workspace.id, authUser.id, filter);
 
         return res.json({ success: true, tasks: result.tasks, total: result.total });
     } catch (err: any) {
@@ -1622,6 +1850,30 @@ workspaceRouter.get("/tasks/my-tasks", authenticate, async (req: Request, res: R
 });
 
 /**
+ * GET /api/club/workspace/tasks/accountability
+ * Workload and task accountability metrics: awaiting review, unassigned, nearing deadline, overdue, blocked,
+ * department workload, and member distributions.
+ */
+workspaceRouter.get("/tasks/accountability", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const accountability = await WorkspaceTaskService.getAccountabilityOverview(workspace.id, authUser.id);
+        return res.json({ success: true, ...accountability });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 500;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
  * GET /api/club/workspace/tasks/:taskId
  * Retrieves full task details.
  */
@@ -1636,10 +1888,37 @@ workspaceRouter.get("/tasks/:taskId", authenticate, async (req: Request, res: Re
             return res.status(404).json({ success: false, message: "Workspace not found." });
         }
 
-        const task = await WorkspaceTaskService.getTask(workspace.id, authUser.id, req.params.taskId);
+        const task = await WorkspaceTaskService.getTask(workspace.id, authUser.id, req.params.taskId as string);
         return res.json({ success: true, task });
     } catch (err: any) {
         const status = err.message.includes("not found") ? 404 : err.message.includes("Unauthorized") ? 403 : 500;
+        return res.status(status).json({ success: false, message: err.message });
+    }
+});
+
+/**
+ * GET /api/club/workspace/tasks/:taskId/reassignments
+ * Chronological reassignment history.
+ */
+workspaceRouter.get("/tasks/:taskId/reassignments", authenticate, async (req: Request, res: Response) => {
+    try {
+        const clubId = await resolveClubId(req, res);
+        if (!clubId) return;
+
+        const authUser = (req as any).user;
+        const workspace = await WorkspaceRepository.findByClubId(clubId);
+        if (!workspace) {
+            return res.status(404).json({ success: false, message: "Workspace not found." });
+        }
+
+        const reassignments = await WorkspaceTaskService.getReassignmentHistory(
+            workspace.id,
+            authUser.id,
+            req.params.taskId as string
+        );
+        return res.json({ success: true, reassignments });
+    } catch (err: any) {
+        const status = err.message.includes("Unauthorized") ? 403 : 400;
         return res.status(status).json({ success: false, message: err.message });
     }
 });
@@ -1677,7 +1956,7 @@ workspaceRouter.patch("/tasks/:taskId", authenticate, async (req: Request, res: 
         const task = await WorkspaceTaskService.updateTask(
             workspace.id,
             authUser.id,
-            req.params.taskId,
+            req.params.taskId as string,
             {
                 title,
                 description,
@@ -1728,7 +2007,7 @@ workspaceRouter.post("/tasks/:taskId/transition", authenticate, async (req: Requ
         const task = await WorkspaceTaskService.transitionTaskStatus(
             workspace.id,
             authUser.id,
-            req.params.taskId,
+            req.params.taskId as string,
             targetStatus,
             expectedVersion,
             reason
@@ -1768,7 +2047,7 @@ workspaceRouter.post("/tasks/:taskId/assign", authenticate, async (req: Request,
         const task = await WorkspaceTaskService.setTaskAssignees(
             workspace.id,
             authUser.id,
-            req.params.taskId,
+            req.params.taskId as string,
             assigneeUserIds
         );
 
@@ -1802,7 +2081,7 @@ workspaceRouter.post("/tasks/:taskId/submit", authenticate, async (req: Request,
         const result = await WorkspaceTaskService.submitTask(
             workspace.id,
             authUser.id,
-            req.params.taskId,
+            req.params.taskId as string,
             content,
             attachments || [],
             expectedVersion
@@ -1841,7 +2120,7 @@ workspaceRouter.post("/tasks/:taskId/review", authenticate, async (req: Request,
         const result = await WorkspaceTaskService.reviewTask(
             workspace.id,
             authUser.id,
-            req.params.taskId,
+            req.params.taskId as string,
             submissionId,
             decision,
             comments,
@@ -1878,7 +2157,7 @@ workspaceRouter.post("/tasks/:taskId/comments", authenticate, async (req: Reques
         const comment = await WorkspaceTaskService.addComment(
             workspace.id,
             authUser.id,
-            req.params.taskId,
+            req.params.taskId as string,
             content,
             parentCommentId,
             mentions,
@@ -1907,7 +2186,7 @@ workspaceRouter.get("/tasks/:taskId/comments", authenticate, async (req: Request
             return res.status(404).json({ success: false, message: "Workspace not found." });
         }
 
-        const comments = await WorkspaceTaskService.getComments(workspace.id, authUser.id, req.params.taskId);
+        const comments = await WorkspaceTaskService.getComments(workspace.id, authUser.id, req.params.taskId as string);
         return res.json({ success: true, comments });
     } catch (err: any) {
         const status = err.message.includes("Unauthorized") ? 403 : 500;
@@ -1930,7 +2209,7 @@ workspaceRouter.post("/tasks/:taskId/watch", authenticate, async (req: Request, 
             return res.status(404).json({ success: false, message: "Workspace not found." });
         }
 
-        const result = await WorkspaceTaskService.toggleWatcher(workspace.id, authUser.id, req.params.taskId);
+        const result = await WorkspaceTaskService.toggleWatcher(workspace.id, authUser.id, req.params.taskId as string);
         return res.json({ success: true, isWatching: result.isWatching });
     } catch (err: any) {
         const status = err.message.includes("Unauthorized") ? 403 : 500;
@@ -1954,7 +2233,7 @@ workspaceRouter.get("/tasks/:taskId/activity", authenticate, async (req: Request
         }
 
         const limit = req.query.limit ? parseInt(req.query.limit as string, 10) : 50;
-        const activity = await WorkspaceTaskService.getActivity(workspace.id, authUser.id, req.params.taskId, limit);
+        const activity = await WorkspaceTaskService.getActivity(workspace.id, authUser.id, req.params.taskId as string, limit);
         return res.json({ success: true, activity });
     } catch (err: any) {
         const status = err.message.includes("Unauthorized") ? 403 : 500;
@@ -1985,7 +2264,7 @@ workspaceRouter.post("/tasks/:taskId/checklist", authenticate, async (req: Reque
         const task = await WorkspaceTaskService.updateChecklist(
             workspace.id,
             authUser.id,
-            req.params.taskId,
+            req.params.taskId as string,
             checklist,
             expectedVersion
         );
@@ -2016,7 +2295,7 @@ workspaceRouter.delete("/tasks/:taskId", authenticate, async (req: Request, res:
             return res.status(404).json({ success: false, message: "Workspace not found." });
         }
 
-        const task = await WorkspaceTaskService.archiveTask(workspace.id, authUser.id, req.params.taskId);
+        const task = await WorkspaceTaskService.archiveTask(workspace.id, authUser.id, req.params.taskId as string);
         return res.json({ success: true, task });
     } catch (err: any) {
         const status = err.message.includes("Unauthorized") ? 403 : 400;
@@ -2209,11 +2488,17 @@ workspaceRouter.get("/files/:fileId/delivery-url", authenticate, async (req: Req
         const download = req.query.download === "true";
         const page = req.query.page ? parseInt(req.query.page as string, 10) : undefined;
 
+        const deliveryOpts: { thumbnail?: boolean; download?: boolean; page?: number } = {
+            thumbnail,
+            download,
+        };
+        if (page !== undefined) deliveryOpts.page = page;
+
         const delivery = await WorkspaceFileService.getAuthorizedDeliveryUrl(
             workspace.id,
             authUser.id,
             String(req.params.fileId),
-            { thumbnail, download, page }
+            deliveryOpts
         );
 
         return res.json({ success: true, ...delivery });

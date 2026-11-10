@@ -1,7 +1,6 @@
 import fs from "fs";
 import path from "path";
-import dotenv from "dotenv";
-dotenv.config();
+if (typeof process.loadEnvFile === "function") { try { process.loadEnvFile(path.resolve(__dirname, "../.env")); } catch {} }
 
 import { query } from "../src/database/client.js";
 

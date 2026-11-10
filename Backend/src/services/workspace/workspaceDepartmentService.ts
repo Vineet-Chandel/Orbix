@@ -3,6 +3,7 @@ import { query } from "../../database/client.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceService } from "./workspaceService.js";
 import { WorkspaceNotificationService } from "./workspaceNotificationService.js";
+import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
 import type {
     WorkspaceDepartment,
     WorkspaceDepartmentMember,
@@ -73,6 +74,11 @@ export class WorkspaceDepartmentService {
         actorUserId: string,
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<WorkspaceDepartment[]> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.isWorkspaceManager && !ctx.permissions.includes("departments:create"))) {
+            throw new Error("Unauthorized to seed default departments.");
+        }
+
         const existing = await WorkspaceRepository.listDepartments(workspaceId, true);
         if (existing.length > 0) {
             return existing;
@@ -450,7 +456,8 @@ export class WorkspaceDepartmentService {
     }
 
     /**
-     * Transfers a member from one department to another
+     * Transfers a member from one department to another.
+     * Preserves former task history and records immutable transfer ledger.
      */
     static async transferMember(
         workspaceId: string,
@@ -458,6 +465,7 @@ export class WorkspaceDepartmentService {
         memberId: string,
         fromDeptId: string,
         toDeptId: string,
+        reason?: string,
         reqMeta: { ipAddress?: string; userAgent?: string } = {}
     ): Promise<boolean> {
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
@@ -488,18 +496,46 @@ export class WorkspaceDepartmentService {
         );
 
         if (success) {
+            // 1. Record transfer in durable ledger
+            await WorkspaceRepository.recordDepartmentTransfer(null, {
+                workspaceId,
+                userId: member.user_id,
+                fromDepartmentId: fromDeptId,
+                toDepartmentId: toDeptId,
+                transferredBy: actorUserId,
+                reason: reason || null,
+            });
+
+            // 2. Audit log
             await WorkspaceRepository.logAudit(null, {
                 workspaceId,
                 actorId: actorUserId,
                 action: "department_member_transferred",
                 targetType: "department_member",
-                details: { memberId, fromDeptId, toDeptId },
+                details: { memberId, fromDeptId, toDeptId, reason: reason || null },
                 ipAddress: reqMeta.ipAddress || null,
                 userAgent: reqMeta.userAgent || null,
             });
+
+            // 3. Dynamic cache invalidation
+            await WorkspaceRedisService.invalidateMemberPermissions(workspaceId, member.user_id);
+            await WorkspaceRedisService.invalidateDashboardMetrics(workspaceId);
         }
 
         return success;
+    }
+
+    /**
+     * Lists transfer history across departments in this workspace
+     */
+    static async getDepartmentTransfers(
+        workspaceId: string,
+        actorUserId: string,
+        options: { userId?: string; departmentId?: string; limit?: number; offset?: number } = {}
+    ) {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx) throw new Error("Unauthorized to view workspace department transfers.");
+        return WorkspaceRepository.listDepartmentTransfers(workspaceId, options);
     }
 
     /**

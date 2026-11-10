@@ -67,20 +67,15 @@ export class WorkspaceDashboardService {
         actorUserId: string
     ): Promise<WorkspaceOverviewMetrics> {
         const { allowedDepartmentIds, permissionTier } = await this.resolveDepartmentScope(workspaceId, actorUserId);
+        const cacheKey = WorkspaceRedisService.buildKey("dashboard", workspaceId, permissionTier);
 
-        // 1. Check Redis cache
-        const cached = await WorkspaceRedisService.getCachedDashboardMetrics(workspaceId, permissionTier);
-        if (cached) {
-            return cached;
-        }
-
-        // 2. Fetch fresh metrics from PostgreSQL
-        const metrics = await WorkspaceRepository.getWorkspaceOverviewMetrics(workspaceId, allowedDepartmentIds);
-
-        // 3. Store in Redis with 5-minute TTL
-        await WorkspaceRedisService.setCachedDashboardMetrics(workspaceId, permissionTier, metrics, 300);
-
-        return metrics;
+        return await WorkspaceRedisService.getOrComputeWithStampedeProtection(
+            cacheKey,
+            async () => {
+                return await WorkspaceRepository.getWorkspaceOverviewMetrics(workspaceId, allowedDepartmentIds);
+            },
+            300
+        );
     }
 
     /**
@@ -97,19 +92,19 @@ export class WorkspaceDashboardService {
             throw new Error("Forbidden: You do not have permission to view this department's insights.");
         }
 
-        // Check cache
-        const cached = await WorkspaceRedisService.getCachedDepartmentInsight(workspaceId, departmentId);
-        if (cached) {
-            return cached;
-        }
+        const cacheKey = WorkspaceRedisService.buildKey("deptinsight", workspaceId, departmentId);
 
-        const insight = await WorkspaceRepository.getDepartmentInsight(workspaceId, departmentId);
-        if (!insight) {
-            throw new Error("Department not found.");
-        }
-
-        await WorkspaceRedisService.setCachedDepartmentInsight(workspaceId, departmentId, insight, 300);
-        return insight;
+        return await WorkspaceRedisService.getOrComputeWithStampedeProtection(
+            cacheKey,
+            async () => {
+                const insight = await WorkspaceRepository.getDepartmentInsight(workspaceId, departmentId);
+                if (!insight) {
+                    throw new Error("Department not found.");
+                }
+                return insight;
+            },
+            300
+        );
     }
 
     /**

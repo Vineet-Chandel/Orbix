@@ -16,6 +16,7 @@ const MEMBER_STATE_TTL = 600;   // 10 minutes
 
 export class WorkspaceRedisService {
     private static namespace = NAMESPACE;
+    private static inFlight = new Map<string, Promise<any>>();
 
     /**
      * Builds namespaced key: orbix:team-workspace:<domain>:<segments>
@@ -122,13 +123,123 @@ export class WorkspaceRedisService {
             if (!redis || redis.status !== "ready") return;
             const pattern = this.buildKey("perms", workspaceId, "*");
             const stream = redis.scanStream({ match: pattern, count: 100 });
-            stream.on("data", async (keys: string[]) => {
-                if (keys.length > 0) {
-                    await redis.del(...keys);
-                }
+            await new Promise<void>((resolve) => {
+                stream.on("data", async (keys: string[]) => {
+                    if (keys.length > 0) {
+                        try {
+                            await redis.del(...keys);
+                        } catch {
+                            // ignore
+                        }
+                    }
+                });
+                stream.on("end", () => resolve());
+                stream.on("error", () => resolve());
             });
         } catch (err: any) {
             console.warn(`[WorkspaceRedis] Failed to sweep workspace permissions:`, err.message);
+        }
+    }
+
+    // =========================================================================
+    // 3. DISTRIBUTED MUTEX & CACHE STAMPEDE PROTECTION
+    // =========================================================================
+
+    /**
+     * Acquires a distributed lock using SET NX EX
+     */
+    static async acquireLock(lockName: string, ttlSeconds = 5): Promise<string | null> {
+        try {
+            if (!redis || redis.status !== "ready") return "fallback-token";
+            const token = Math.random().toString(36).substring(2) + Date.now().toString(36);
+            const key = this.buildKey("lock", lockName);
+            const res = await redis.set(key, token, "EX", ttlSeconds, "NX");
+            return res === "OK" ? token : null;
+        } catch {
+            return "fallback-token";
+        }
+    }
+
+    /**
+     * Atomically releases a distributed lock using Lua script verification
+     */
+    static async releaseLock(lockName: string, token: string): Promise<boolean> {
+        try {
+            if (!redis || redis.status !== "ready" || token === "fallback-token") return true;
+            const key = this.buildKey("lock", lockName);
+            const script = `
+                if redis.call("get", KEYS[1]) == ARGV[1] then
+                    return redis.call("del", KEYS[1])
+                else
+                    return 0
+                end
+            `;
+            const res = await redis.eval(script, 1, key, token);
+            return res === 1;
+        } catch {
+            return false;
+        }
+    }
+
+    /**
+     * Coalesces concurrent cache misses to protect PostgreSQL from cache stampedes / thundering herds.
+     * Uses in-process single-flight coalescing and distributed Redis mutex.
+     */
+    static async getOrComputeWithStampedeProtection<T>(
+        cacheKey: string,
+        computeFn: () => Promise<T>,
+        ttlSeconds: number
+    ): Promise<T> {
+        // 1. Try reading cache first
+        try {
+            if (redis && redis.status === "ready") {
+                const cached = await redis.get(cacheKey);
+                if (cached) {
+                    return JSON.parse(cached);
+                }
+            }
+        } catch (err: any) {
+            console.warn(`[WorkspaceRedis] Cache read error for ${cacheKey}:`, err.message);
+        }
+
+        // 2. In-process single-flight deduplication: coalesce identical concurrent requests in same event tick
+        if (this.inFlight.has(cacheKey)) {
+            return (await this.inFlight.get(cacheKey)) as T;
+        }
+
+        const computePromise = (async () => {
+            // 3. Distributed cross-instance mutex to avoid cluster stampede
+            const lockToken = await this.acquireLock(`compute:${cacheKey}`, 8);
+            try {
+                // Double-check cache in case another worker just populated it
+                if (redis && redis.status === "ready") {
+                    const cached = await redis.get(cacheKey);
+                    if (cached) {
+                        return JSON.parse(cached);
+                    }
+                }
+
+                // 4. Compute fresh value from database
+                const freshValue = await computeFn();
+
+                // 5. Populate cache
+                if (redis && redis.status === "ready" && freshValue !== undefined && freshValue !== null) {
+                    await redis.setex(cacheKey, ttlSeconds, JSON.stringify(freshValue));
+                }
+
+                return freshValue;
+            } finally {
+                if (lockToken) {
+                    await this.releaseLock(`compute:${cacheKey}`, lockToken);
+                }
+            }
+        })();
+
+        this.inFlight.set(cacheKey, computePromise);
+        try {
+            return await computePromise;
+        } finally {
+            this.inFlight.delete(cacheKey);
         }
     }
 

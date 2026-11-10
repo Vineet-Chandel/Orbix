@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import validator from "validator";
+import validator from "../../utils/validation.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { query, pool } from "../../database/client.js";

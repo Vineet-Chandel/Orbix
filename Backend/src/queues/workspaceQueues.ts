@@ -11,11 +11,29 @@ export const QUEUE_NAMES = {
 export type WorkspaceQueueName = typeof QUEUE_NAMES[keyof typeof QUEUE_NAMES];
 
 export function getBullMQConnectionOptions() {
+    const queueUrl = process.env.REDIS_QUEUE_URL || process.env.REDIS_URL;
+    if (queueUrl && (queueUrl.startsWith("redis://") || queueUrl.startsWith("rediss://"))) {
+        try {
+            const parsed = new URL(queueUrl);
+            return {
+                host: parsed.hostname,
+                port: Number(parsed.port) || 6379,
+                username: parsed.username ? decodeURIComponent(parsed.username) : undefined,
+                password: parsed.password ? decodeURIComponent(parsed.password) : undefined,
+                tls: queueUrl.startsWith("rediss://") ? {} : undefined,
+                maxRetriesPerRequest: null,
+                enableReadyCheck: false,
+            };
+        } catch {
+            // fallback
+        }
+    }
+
     return {
-        host: process.env.REDIS_HOST || "127.0.0.1",
-        port: Number(process.env.REDIS_PORT) || 6379,
-        username: process.env.REDIS_USERNAME || undefined,
-        password: process.env.REDIS_PASSWORD || undefined,
+        host: process.env.REDIS_QUEUE_HOST || process.env.REDIS_HOST || "127.0.0.1",
+        port: Number(process.env.REDIS_QUEUE_PORT || process.env.REDIS_PORT) || 6379,
+        username: process.env.REDIS_QUEUE_USERNAME || process.env.REDIS_USERNAME || undefined,
+        password: process.env.REDIS_QUEUE_PASSWORD || process.env.REDIS_PASSWORD || undefined,
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
     };

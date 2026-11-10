@@ -825,5 +825,49 @@ export interface WorkspaceSearchResponse {
     countsByType: Record<string, number>;
 }
 
+export type WorkspaceTemplateType =
+    | "technical"
+    | "coding"
+    | "design"
+    | "photography"
+    | "entrepreneurship"
+    | "general"
+    | "custom"
+    | "standard"
+    | "tech"
+    | "media"
+    | "business";
+
+export interface WorkspaceTemplateRole {
+    name: string;
+    description: string;
+    rank: number;
+    color: string;
+    permissions: string[];
+}
+
+export interface WorkspaceTemplateDefinition {
+    id: string;
+    name: string;
+    description: string;
+    departments: Array<{
+        name: string;
+        slug: string;
+        description: string;
+        icon: string;
+        color: string;
+    }>;
+    roles?: WorkspaceTemplateRole[];
+    categories: Array<{
+        name: string;
+        channels: Array<{
+            name: string;
+            slug: string;
+            topic: string;
+            channelType: "text" | "announcement" | "forum";
+        }>;
+    }>;
+}
+
 
 

@@ -3,6 +3,7 @@ import { EventEmitter } from "events";
 import { query } from "../../database/client.js";
 import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceService } from "./workspaceService.js";
+import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
 import type {
     WorkspaceChannel,
     WorkspaceChannelCategory,
@@ -34,16 +35,17 @@ export class WorkspaceChannelService {
         const ctx = await WorkspaceService.resolveContext(workspaceId, userId);
         if (!ctx || ctx.member.isSuspended) return false;
 
-        // Owner (1000) and Admins (800+) always have access
+        // Security Hardening: Verify channel exists and belongs strictly to this workspace first
+        const channel = await WorkspaceRepository.findChannelById(workspaceId, channelId);
+        if (!channel || channel.isArchived) return false;
+
+        // Owner (1000) and Admins (800+) always have access to channels within their own workspace
         if (ctx.isOwner || ctx.isAdmin) return true;
 
         // Workspace Manager with can_manage_channels
         if (ctx.isWorkspaceManager && (ctx.workspace.managerPermissions as any)?.can_manage_channels) {
             return true;
         }
-
-        const channel = await WorkspaceRepository.findChannelById(workspaceId, channelId);
-        if (!channel || channel.isArchived) return false;
 
         // 1. Department isolation check
         if (channel.departmentId) {
@@ -199,6 +201,11 @@ export class WorkspaceChannelService {
         actorUserId: string,
         departmentId?: string | null
     ): Promise<WorkspaceChannelCategory[]> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || ctx.member.isSuspended) {
+            throw new Error("Unauthorized: Workspace access denied.");
+        }
+
         const categories = await WorkspaceRepository.listCategories(workspaceId, departmentId);
         const allChannels = await WorkspaceRepository.listChannels(workspaceId, {
             includeArchived: false,
@@ -622,6 +629,17 @@ export class WorkspaceChannelService {
 
         const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
         if (!ctx) throw new Error("Sender is not a workspace member.");
+
+        // Boundary protection: max 4000 chars per message
+        if (data.content && data.content.length > 4000) {
+            throw new Error("Message content exceeds 4000 character limit.");
+        }
+
+        // Spam protection: max 30 messages per 10 seconds per user
+        const rate = await WorkspaceRedisService.checkRateLimit(`msg:${workspaceId}:${actorUserId}`, 30, 10);
+        if (!rate.allowed) {
+            throw new Error("You are sending messages too quickly. Please slow down.");
+        }
 
         // Extract mentions (@username, @role, @everyone)
         const mentions = this.extractMentions(data.content);

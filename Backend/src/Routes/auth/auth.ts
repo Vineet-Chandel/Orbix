@@ -1,7 +1,7 @@
 import express, { type Request, type Response } from 'express';
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import validator from "validator";
+import validator from "../../utils/validation.js";
 import SignupValidator, { ValidationError } from '../../validators/SignupValidator.js';
 import { query } from "../../database/client.js"
 import SigninValidator from '../../validators/SigninValidator.js';

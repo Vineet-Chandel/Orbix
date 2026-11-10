@@ -1,6 +1,4 @@
 import { Resend } from "resend";
-import nodemailer from "nodemailer";
-import type { Transporter } from "nodemailer";
 
 export interface SendVerificationEmailOptions {
   to: string;
@@ -26,12 +24,11 @@ export interface SendEmailResult {
   simulated?: boolean;
   messageId?: string;
   error?: string;
-  provider?: "resend" | "smtp" | "simulation";
+  provider?: "resend" | "simulation";
   sandboxRestricted?: boolean;
 }
 
 let resendClientInstance: Resend | null = null;
-let smtpTransporterInstance: Transporter | null = null;
 
 /**
  * Returns an authenticated Resend client instance if RESEND_API_KEY is configured.
@@ -48,42 +45,6 @@ export function getResendClient(): Resend | null {
 }
 
 /**
- * Returns a configured Nodemailer SMTP transporter if SMTP credentials are provided.
- * Supports standard SMTP (Gmail App Passwords, SendGrid, Amazon SES, Brevo, custom SMTP).
- */
-export function getSmtpTransporter(): Transporter | null {
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
-
-  if (!user || !pass || !user.trim() || !pass.trim()) {
-    return null;
-  }
-
-  if (!smtpTransporterInstance) {
-    const host = process.env.SMTP_HOST || (user.includes("@gmail.com") ? "smtp.gmail.com" : "localhost");
-    const port = Number(process.env.SMTP_PORT) || 465;
-    const secure = process.env.SMTP_SECURE !== undefined
-      ? process.env.SMTP_SECURE === "true"
-      : port === 465;
-
-    smtpTransporterInstance = nodemailer.createTransport({
-      host,
-      port,
-      secure,
-      auth: {
-        user: user.trim(),
-        pass: pass.trim().replace(/\s+/g, ""), // clean accidental spaces in app passwords
-      },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 15000,
-    });
-  }
-
-  return smtpTransporterInstance;
-}
-
-/**
  * Checks whether an error from Resend indicates trial sandbox recipient restriction.
  */
 function isResendSandboxError(errorMsg?: string): boolean {
@@ -94,42 +55,6 @@ function isResendSandboxError(errorMsg?: string): boolean {
     lower.includes("verify a domain at resend.com/domains") ||
     (lower.includes("validation_error") && lower.includes("domain"))
   );
-}
-
-/**
- * Sends an email using Nodemailer SMTP transporter.
- */
-async function sendViaSmtp(
-  transporter: Transporter,
-  options: { to: string; subject: string; html: string; text: string; fromName: string }
-): Promise<SendEmailResult> {
-  const { to, subject, html, text, fromName } = options;
-  const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.SMTP_USER;
-  const fromHeader = `"${fromName}" <${fromEmail}>`;
-
-  try {
-    const info = await transporter.sendMail({
-      from: fromHeader,
-      to,
-      subject,
-      html,
-      text,
-    });
-
-    console.log(`[SMTP Transporter] Email dispatched successfully to ${to} (MessageId: ${info.messageId})`);
-    return {
-      success: true,
-      provider: "smtp",
-      messageId: info.messageId,
-    };
-  } catch (smtpErr: any) {
-    console.error(`[SMTP Error] Failed sending email to ${to}:`, smtpErr.message || smtpErr);
-    return {
-      success: false,
-      provider: "smtp",
-      error: smtpErr.message || "Failed to dispatch email via SMTP",
-    };
-  }
 }
 
 interface DispatchEmailPayload {
@@ -143,22 +68,19 @@ interface DispatchEmailPayload {
 }
 
 /**
- * Unified Multi-Provider Email Dispatcher.
- * Intelligently chooses between Resend API, Nodemailer SMTP, and dev simulation.
- * Automatically fails over to SMTP if Resend sandbox restricts non-owner destinations.
+ * Unified Resend Email Dispatcher.
+ * Dispatches live transactional emails via Resend API, with robust local dev simulation.
  */
 async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailResult> {
   const { to, subject, html, text, fromName, defaultFromEmail, logContext } = payload;
   const normalizedTo = to.trim().toLowerCase();
 
   const resendClient = getResendClient();
-  const smtpTransporter = getSmtpTransporter();
-  const providerPref = (process.env.EMAIL_PROVIDER || "auto").toLowerCase();
 
-  // 0. Simulation Mode: Neither Resend nor SMTP is configured
-  if (!resendClient && !smtpTransporter) {
+  // 0. Simulation Mode: When RESEND_API_KEY is unset (e.g. local dev / automated test suite)
+  if (!resendClient) {
     console.log(`\n======================================================`);
-    console.log(`[EMAIL DISPATCHER] ⚠️ Neither Resend API key nor SMTP credentials configured.`);
+    console.log(`[EMAIL DISPATCHER] ℹ️ Resend API key unset or mock mode.`);
     console.log(`[DEV MODE SIMULATION] ${logContext} to ${normalizedTo}: ${subject}`);
     console.log(`======================================================\n`);
 
@@ -170,112 +92,62 @@ async function dispatchEmail(payload: DispatchEmailPayload): Promise<SendEmailRe
     };
   }
 
-  // 1. Explicit SMTP preference
-  if (providerPref === "smtp" && smtpTransporter) {
-    return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
-  }
+  // 1. Resend API Flow
+  const customFromEmail = process.env.RESEND_FROM_EMAIL;
+  try {
+    const from = customFromEmail
+      ? (customFromEmail.includes("<") ? customFromEmail : `${fromName} <${customFromEmail}>`)
+      : `${fromName} <${defaultFromEmail}>`;
+    const { data, error } = await resendClient.emails.send({
+      from,
+      to: [normalizedTo],
+      subject,
+      html,
+      text,
+    });
 
-  // 2. Resend API Flow
-  if (resendClient && providerPref !== "smtp") {
-    const customFromEmail = process.env.RESEND_FROM_EMAIL;
-    const isCustomDomain = Boolean(customFromEmail && !customFromEmail.includes("@resend.dev"));
+    if (error) {
+      const errorMsg = error.message || "Failed to dispatch via Resend";
+      console.error(`[Resend API Error]:`, error);
 
-    // If using Resend sandbox (@resend.dev), it only delivers to the owner's email or internal @resend.dev test emails
-    const isResendInternalTestAddress = normalizedTo.endsWith("@resend.dev");
-
-    // Proactive SMTP routing: If destination is outside sandbox and SMTP is configured, route directly via SMTP!
-    if (!isCustomDomain && !isResendInternalTestAddress && smtpTransporter) {
-      console.log(`[Email Dispatcher] Target (${normalizedTo}) is outside Resend sandbox. Routing directly via SMTP...`);
-      return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
-    }
-
-    try {
-      const from = customFromEmail
-        ? (customFromEmail.includes("<") ? customFromEmail : `${fromName} <${customFromEmail}>`)
-        : `${fromName} <${defaultFromEmail}>`;
-      const { data, error } = await resendClient.emails.send({
-        from,
-        to: [normalizedTo],
-        subject,
-        html,
-        text,
-      });
-
-      if (error) {
-        const errorMsg = error.message || "Failed to dispatch via Resend";
-        console.error(`[Resend API Error]:`, error);
-
-        // If trial sandbox limitation error:
-        if (isResendSandboxError(errorMsg)) {
-          // Immediate automated fallback to SMTP if configured
-          if (smtpTransporter) {
-            console.log(`[Email Dispatcher] Resend sandbox restriction encountered. Automatically failing over to SMTP for ${normalizedTo}...`);
-            return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
-          }
-
-          // Otherwise log detailed guidance
-          console.warn(`\n======================================================`);
-          console.warn(`[EMAIL DELIVERY LIMITATION: RESEND SANDBOX MODE]`);
-          console.warn(`Recipient: ${normalizedTo}`);
-          console.warn(`Reason: Resend test sandbox only permits sending to the account owner email.`);
-          console.warn(`To deliver live emails to any recipient in production:`);
-          console.warn(`  Option 1 (SMTP/Gmail): Add to Backend/.env:`);
-          console.warn(`     SMTP_USER=your_email@gmail.com`);
-          console.warn(`     SMTP_PASS=your_16_char_google_app_password`);
-          console.warn(`  Option 2 (Resend Custom Domain): Verify domain at resend.com/domains and set:`);
-          console.warn(`     RESEND_FROM_EMAIL=Orbix Security <support@yourdomain.com>`);
-          console.warn(`======================================================\n`);
-
-          return {
-            success: false,
-            sandboxRestricted: true,
-            provider: "resend",
-            error: errorMsg,
-          };
-        }
-
-        // If non-sandbox error and SMTP is available, attempt fallback
-        if (smtpTransporter) {
-          console.log(`[Email Dispatcher] Resend error (${errorMsg}). Attempting fallback to SMTP...`);
-          return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
-        }
+      if (isResendSandboxError(errorMsg)) {
+        console.warn(`\n======================================================`);
+        console.warn(`[EMAIL DELIVERY LIMITATION: RESEND SANDBOX MODE]`);
+        console.warn(`Recipient: ${normalizedTo}`);
+        console.warn(`Reason: Resend test sandbox only permits sending to the account owner email.`);
+        console.warn(`To deliver live emails to any recipient in production:`);
+        console.warn(`Verify domain at resend.com/domains and configure RESEND_FROM_EMAIL.`);
+        console.warn(`======================================================\n`);
 
         return {
           success: false,
+          sandboxRestricted: true,
           provider: "resend",
           error: errorMsg,
         };
       }
 
-      console.log(`[Resend API] ${logContext} sent successfully to ${normalizedTo} (ID: ${data?.id})`);
-      return {
-        success: true,
-        provider: "resend",
-        messageId: data?.id,
-      };
-    } catch (resendEx: any) {
-      console.error(`[Resend Exception]:`, resendEx);
-      if (smtpTransporter) {
-        console.log(`[Email Dispatcher] Resend exception. Failing over to SMTP...`);
-        return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
-      }
       return {
         success: false,
         provider: "resend",
-        error: resendEx.message || "Internal error sending email via Resend",
+        error: errorMsg,
       };
     }
-  }
 
-  // 3. SMTP-Only Flow
-  if (smtpTransporter) {
-    return sendViaSmtp(smtpTransporter, { to: normalizedTo, subject, html, text, fromName });
+    console.log(`[Resend API] ${logContext} sent successfully to ${normalizedTo} (ID: ${data?.id})`);
+    return {
+      success: true,
+      provider: "resend",
+      messageId: data?.id,
+    };
+  } catch (resendEx: any) {
+    console.error(`[Resend Exception]:`, resendEx);
+    return {
+      success: false,
+      provider: "resend",
+      error: resendEx.message || "Internal error sending email via Resend",
+    };
   }
-
-  return {
-    success: false,
-    error: "No usable email transport configured.",
-  };
 }
 
 /**

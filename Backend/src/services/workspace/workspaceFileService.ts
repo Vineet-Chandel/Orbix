@@ -6,6 +6,7 @@ import { WorkspaceRepository } from "../../repositories/workspaceRepository.js";
 import { WorkspaceService } from "./workspaceService.js";
 import { WorkspaceTaskService } from "./workspaceTaskService.js";
 import { WorkspaceChannelService } from "./workspaceChannelService.js";
+import { WorkspaceRedisService } from "../../redis/workspaceRedis.js";
 import { cloudinary, assertCloudinaryConfigured, destroyCloudinaryAsset } from "../../config/cloudinary.js";
 import {
     validateFileMetadata,
@@ -145,6 +146,12 @@ export class WorkspaceFileService {
         const context = await WorkspaceService.resolveContext(workspaceId, actorUserId);
         if (!context) {
             throw new Error("Unauthorized: Active workspace membership required.");
+        }
+
+        // Upload flooding rate limit: max 30 intents per 60 seconds per user
+        const rate = await WorkspaceRedisService.checkRateLimit(`upload:${workspaceId}:${actorUserId}`, 30, 60);
+        if (!rate.allowed) {
+            throw new Error("File upload rate limit reached. Please wait before uploading more files.");
         }
 
         // 1. Verify resource access

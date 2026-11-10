@@ -1,5 +1,9 @@
 
-import "dotenv/config";
+if (typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile();
+  } catch {}
+}
 import pg from "pg";
 import { performance } from "node:perf_hooks";
 

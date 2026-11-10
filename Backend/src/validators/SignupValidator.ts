@@ -520,7 +520,7 @@ const weakPatterns = [
     '0000000000',
 ];
 
-import validator from "validator";
+import validator from "../utils/validation.js";
 
 export class ValidationError extends Error {
     constructor(message: string) {

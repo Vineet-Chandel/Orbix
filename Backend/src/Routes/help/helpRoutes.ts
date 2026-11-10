@@ -1,6 +1,6 @@
 // Backend/src/Routes/help/helpRoutes.ts
 import express, { type Request, type Response } from "express";
-import validator from "validator";
+import validator from "../../utils/validation.js";
 import { query } from "../../database/client.js";
 import { authenticate } from "../../middlewares/auth.middleware.js";
 import { requireSupportStaff } from "../../middlewares/staff.middleware.js";

@@ -1,5 +1,9 @@
 
-import 'dotenv/config';
+if (typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile();
+  } catch {}
+}
 import express, { type Express, type Request, type Response } from 'express';
 import cookieParser from 'cookie-parser';
 import authRouter from './Routes/auth/auth.js';

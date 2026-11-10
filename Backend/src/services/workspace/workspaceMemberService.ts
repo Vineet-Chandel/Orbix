@@ -8,6 +8,7 @@ import type {
     WorkspaceMember,
     WorkspaceInvitation,
     TeamWorkspace,
+    WorkspaceRole,
 } from "../../types/workspaceTypes.js";
 
 export class WorkspaceMemberService {
@@ -208,6 +209,12 @@ export class WorkspaceMemberService {
             throw new Error("Unauthorized to invite members into this workspace.");
         }
 
+        // Rate limiting: max 20 invites per 60 seconds per actor
+        const rate = await WorkspaceRedisService.checkRateLimit(`inv:${workspaceId}:${actorUserId}`, 20, 60);
+        if (!rate.allowed) {
+            throw new Error("Invitation rate limit exceeded. Please wait a moment before sending more invitations.");
+        }
+
         const email = data.email.trim().toLowerCase();
         if (!email || !email.includes("@")) {
             throw new Error("Valid email address is required.");
@@ -351,6 +358,16 @@ export class WorkspaceMemberService {
             throw new Error("The associated workspace is no longer active.");
         }
 
+        // Revalidate inviter's status and invitation permissions at acceptance time
+        const inviterCtx = await WorkspaceService.resolveContext(invitation.workspaceId, invitation.inviterId);
+        if (!inviterCtx || inviterCtx.member.isSuspended || (!inviterCtx.isAdmin && !inviterCtx.permissions.includes("members:invite"))) {
+            await WorkspaceRepository.updateInvitationStatus(invitation.id, "revoked", {
+                revokedAt: new Date(),
+                revokedBy: invitation.inviterId,
+            });
+            throw new Error("This invitation is no longer valid because the inviting member's permissions have changed.");
+        }
+
         // Multi-record operation inside transaction
         const client = await pool.connect();
         try {
@@ -421,5 +438,272 @@ export class WorkspaceMemberService {
         } finally {
             client.release();
         }
+    }
+
+    /**
+     * Inspects and verifies an invitation token without consuming it.
+     * Exposes target workspace, club, and intended role for preview cards.
+     */
+    static async verifyInvitation(rawToken: string): Promise<{
+        isValid: boolean;
+        reason?: string;
+        invitation?: {
+            id: string;
+            email: string;
+            workspaceId: string;
+            workspaceName: string;
+            workspaceSlug: string;
+            clubName: string | null;
+            roleName: string;
+            roleRank: number;
+            departmentName: string | null;
+            inviterName: string;
+            invitationMessage: string | null;
+            expiresAt: Date;
+        };
+    }> {
+        if (!rawToken || !rawToken.trim()) {
+            return { isValid: false, reason: "Token is required." };
+        }
+
+        const tokenHash = crypto.createHash("sha256").update(rawToken.trim()).digest("hex");
+        const invitation = await WorkspaceRepository.findInvitationByTokenHash(tokenHash);
+
+        if (!invitation) {
+            return { isValid: false, reason: "Invalid or unrecognized invitation token." };
+        }
+
+        if (invitation.status !== "pending") {
+            return { isValid: false, reason: `This invitation has already been ${invitation.status}.` };
+        }
+
+        if (new Date(invitation.expiresAt) < new Date()) {
+            return { isValid: false, reason: "This invitation has expired." };
+        }
+
+        const workspace = await WorkspaceRepository.findById(invitation.workspaceId);
+        if (!workspace || workspace.workspaceStatus === "archived") {
+            return { isValid: false, reason: "The associated workspace is no longer active." };
+        }
+
+        // Revalidate inviter status
+        const inviterCtx = await WorkspaceService.resolveContext(invitation.workspaceId, invitation.inviterId);
+        if (!inviterCtx || inviterCtx.member.isSuspended || (!inviterCtx.isAdmin && !inviterCtx.permissions.includes("members:invite"))) {
+            return { isValid: false, reason: "The inviting member is no longer authorized to issue invitations." };
+        }
+
+        // Fetch club and inviter names
+        const clubRes = await query(`SELECT name FROM public.verified_clubs WHERE id = $1 LIMIT 1;`, [workspace.clubId]);
+        const inviterRes = await query(`SELECT firstname, lastname, username FROM public.users WHERE id = $1 LIMIT 1;`, [invitation.inviterId]);
+        const inviter = inviterRes.rows[0];
+        const inviterName = inviter
+            ? (inviter.firstname ? `${inviter.firstname} ${inviter.lastname || ""}`.trim() : inviter.username)
+            : "Workspace Member";
+
+        return {
+            isValid: true,
+            invitation: {
+                id: invitation.id,
+                email: invitation.email,
+                workspaceId: workspace.id,
+                workspaceName: workspace.name,
+                workspaceSlug: workspace.slug,
+                clubName: clubRes.rows[0]?.name || null,
+                roleName: invitation.role?.name || "Member",
+                roleRank: invitation.role?.rank || 100,
+                departmentName: invitation.department?.name || null,
+                inviterName,
+                invitationMessage: invitation.invitationMessage,
+                expiresAt: new Date(invitation.expiresAt),
+            },
+        };
+    }
+
+    // =========================================================================
+    // 5. CUSTOM ROLE MANAGEMENT & ESCALATION DEFENSES
+    // =========================================================================
+
+    static async createCustomRole(
+        workspaceId: string,
+        actorUserId: string,
+        data: {
+            name: string;
+            description?: string;
+            rank: number;
+            color?: string;
+            permissions: string[];
+        },
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<WorkspaceRole> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("roles:create"))) {
+            throw new Error("Unauthorized to create roles in this workspace.");
+        }
+
+        const actorRank = ctx.member.role?.rank || 0;
+
+        // Escalation Protection 1: Non-owners cannot create roles with rank >= their own rank
+        if (data.rank >= actorRank && !ctx.isOwner) {
+            throw new Error("Cannot create a role with rank equal to or greater than your own.");
+        }
+
+        // Escalation Protection 2: Max rank for custom roles is 799 (cannot match or exceed Admin rank 800)
+        if (data.rank >= 800 && !ctx.isOwner) {
+            throw new Error("Custom roles cannot exceed rank 799.");
+        }
+
+        // Escalation Protection 3: Cannot grant permissions that actor does not possess (unless Owner)
+        if (!ctx.isOwner && !ctx.permissions.includes("*")) {
+            const forbiddenPerms = data.permissions.filter((p) => !ctx.permissions.includes(p));
+            if (forbiddenPerms.length > 0) {
+                throw new Error(`Cannot grant permissions you do not possess: ${forbiddenPerms.join(", ")}`);
+            }
+        }
+
+        // Generate slug
+        const baseSlug = data.name.toLowerCase().replace(/[^a-z0-9]/g, "-").replace(/-+/g, "-");
+        const existingRole = await WorkspaceRepository.findRoleBySlug(workspaceId, baseSlug);
+        const slug = existingRole ? `${baseSlug}-${Date.now().toString(36)}` : baseSlug;
+
+        const rolePayload: any = {
+            workspaceId,
+            name: data.name.trim(),
+            slug,
+            rank: data.rank,
+            isSystem: false,
+            color: data.color || "#475569",
+            permissions: data.permissions || [],
+        };
+        if (data.description !== undefined) {
+            rolePayload.description = data.description;
+        }
+
+        const role = await WorkspaceRepository.createRole(null, rolePayload);
+
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "role_created",
+            targetType: "role",
+            targetId: role.id,
+            details: { name: role.name, rank: role.rank, permissions: role.permissions },
+            ipAddress: reqMeta.ipAddress || null,
+            userAgent: reqMeta.userAgent || null,
+        });
+
+        return role;
+    }
+
+    static async updateCustomRole(
+        workspaceId: string,
+        actorUserId: string,
+        roleId: string,
+        data: {
+            name?: string;
+            description?: string;
+            rank?: number;
+            color?: string;
+            permissions?: string[];
+        },
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<WorkspaceRole> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("roles:manage"))) {
+            throw new Error("Unauthorized to manage roles in this workspace.");
+        }
+
+        const existingRole = await WorkspaceRepository.findRoleById(workspaceId, roleId);
+        if (!existingRole) throw new Error("Role not found.");
+
+        if (existingRole.isSystem) {
+            throw new Error("System roles cannot be modified.");
+        }
+
+        const actorRank = ctx.member.role?.rank || 0;
+
+        // Actor must outrank existing role
+        if (existingRole.rank >= actorRank && !ctx.isOwner) {
+            throw new Error("Cannot modify a role with equal or higher rank than your own.");
+        }
+
+        // New rank cannot be >= actor's rank
+        if (data.rank !== undefined && data.rank >= actorRank && !ctx.isOwner) {
+            throw new Error("Cannot set role rank equal to or greater than your own.");
+        }
+
+        // Validate permissions: cannot grant permissions actor does not possess
+        if (data.permissions && !ctx.isOwner && !ctx.permissions.includes("*")) {
+            const forbiddenPerms = data.permissions.filter((p) => !ctx.permissions.includes(p));
+            if (forbiddenPerms.length > 0) {
+                throw new Error(`Cannot grant permissions you do not possess: ${forbiddenPerms.join(", ")}`);
+            }
+        }
+
+        const updated = await WorkspaceRepository.updateRole(workspaceId, roleId, data);
+        if (!updated) throw new Error("Failed to update role.");
+
+        // Invalidate all permissions caches in this workspace
+        await WorkspaceRedisService.invalidateAllWorkspacePermissions(workspaceId);
+
+        await WorkspaceRepository.logAudit(null, {
+            workspaceId,
+            actorId: actorUserId,
+            action: "role_updated",
+            targetType: "role",
+            targetId: roleId,
+            details: data,
+            ipAddress: reqMeta.ipAddress || null,
+            userAgent: reqMeta.userAgent || null,
+        });
+
+        return updated;
+    }
+
+    static async deleteCustomRole(
+        workspaceId: string,
+        actorUserId: string,
+        roleId: string,
+        reqMeta: { ipAddress?: string; userAgent?: string } = {}
+    ): Promise<boolean> {
+        const ctx = await WorkspaceService.resolveContext(workspaceId, actorUserId);
+        if (!ctx || (!ctx.isAdmin && !ctx.permissions.includes("roles:manage"))) {
+            throw new Error("Unauthorized to delete roles in this workspace.");
+        }
+
+        const role = await WorkspaceRepository.findRoleById(workspaceId, roleId);
+        if (!role) throw new Error("Role not found.");
+
+        if (role.isSystem) {
+            throw new Error("System roles cannot be deleted.");
+        }
+
+        const actorRank = ctx.member.role?.rank || 0;
+        if (role.rank >= actorRank && !ctx.isOwner) {
+            throw new Error("Cannot delete a role with equal or higher rank than your own.");
+        }
+
+        // Find fallback role (default member role)
+        const defaultMemberRole = await WorkspaceRepository.findRoleBySlug(workspaceId, "member");
+        if (!defaultMemberRole) throw new Error("Default member role not found.");
+
+        const deleted = await WorkspaceRepository.deleteRole(workspaceId, roleId, defaultMemberRole.id);
+
+        if (deleted) {
+            // Invalidate all permissions caches
+            await WorkspaceRedisService.invalidateAllWorkspacePermissions(workspaceId);
+
+            await WorkspaceRepository.logAudit(null, {
+                workspaceId,
+                actorId: actorUserId,
+                action: "role_deleted",
+                targetType: "role",
+                targetId: roleId,
+                details: { name: role.name, fallbackRoleId: defaultMemberRole.id },
+                ipAddress: reqMeta.ipAddress || null,
+                userAgent: reqMeta.userAgent || null,
+            });
+        }
+
+        return deleted;
     }
 }

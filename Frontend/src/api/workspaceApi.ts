@@ -35,6 +35,7 @@ import type {
     WorkspaceActivityEvent,
     WorkspaceAuditLogEntry,
     WorkspaceSearchResponse,
+    WorkspaceTemplateDefinition,
 } from "../types/workspace";
 
 export const workspaceApi = {
@@ -927,6 +928,65 @@ export const workspaceApi = {
             "/club/workspace/search",
             { params: { q: query, ...options } }
         ),
+
+    // =========================================================================
+    // ROLES & TEMPLATES (PHASE 09)
+    // =========================================================================
+
+    createRole: (
+        data: {
+            name: string;
+            description?: string;
+            rank: number;
+            color?: string;
+            permissions: string[];
+        },
+        clubId?: string
+    ) =>
+        apiClient.post<{ success: boolean; role: WorkspaceRole }>(
+            "/club/workspace/roles",
+            { ...data, clubId }
+        ),
+
+    updateRole: (
+        roleId: string,
+        data: {
+            name?: string;
+            description?: string;
+            rank?: number;
+            color?: string;
+            permissions?: string[];
+        },
+        clubId?: string
+    ) =>
+        apiClient.patch<{ success: boolean; role: WorkspaceRole }>(
+            `/club/workspace/roles/${roleId}`,
+            { ...data, clubId }
+        ),
+
+    deleteRole: (roleId: string, clubId?: string) =>
+        apiClient.delete<{ success: boolean; message: string }>(
+            `/club/workspace/roles/${roleId}`,
+            { params: clubId ? { clubId } : undefined }
+        ),
+
+    getTemplates: (clubId?: string) =>
+        apiClient.get<{ success: boolean; templates: WorkspaceTemplateDefinition[] }>(
+            "/club/workspace/templates",
+            { params: clubId ? { clubId } : undefined }
+        ),
+
+    applyTemplate: (templateId: string, clubId?: string) =>
+        apiClient.post<{
+            success: boolean;
+            data: {
+                template: WorkspaceTemplateDefinition;
+                departmentsCreated: number;
+                categoriesCreated: number;
+                channelsCreated: number;
+            };
+            message: string;
+        }>("/club/workspace/templates/apply", { templateId, clubId }),
 };
 
 export default workspaceApi;

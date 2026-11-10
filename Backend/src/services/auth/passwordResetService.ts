@@ -1,7 +1,6 @@
 import crypto from "crypto";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import validator from "validator";
 import redis from "../../redis/client.js";
 import { query } from "../../database/client.js";
 import { maskEmail } from "./twoFactorAuthService.js";

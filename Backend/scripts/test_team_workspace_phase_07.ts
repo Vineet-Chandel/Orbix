@@ -1,12 +1,11 @@
 // Backend/scripts/test_team_workspace_phase_07.ts
 import path from "path";
 import { fileURLToPath } from "url";
-import dotenv from "dotenv";
 import crypto from "crypto";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+if (typeof process.loadEnvFile === "function") { try { process.loadEnvFile(path.resolve(__dirname, "../.env")); } catch {} }
 
 import { pool, query } from "../src/database/client.js";
 import { WorkspaceService } from "../src/services/workspace/workspaceService.js";
