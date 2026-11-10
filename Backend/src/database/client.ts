@@ -5,27 +5,30 @@ import { performance } from "node:perf_hooks";
 
 const { Pool } = pg;
 
-const DATABASE_URL = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+import {
+    resolveDatabaseConfig,
+    type ResolvedDatabaseConfig,
+    sanitizeDatabaseError,
+} from "./config.js";
 
-if (!DATABASE_URL) {
-    throw new Error("SUPABASE_DB_URL (or DATABASE_URL) is not configured");
-}
+// Centralized, fail-closed database identity validation
+export const activeDbConfig: ResolvedDatabaseConfig = resolveDatabaseConfig();
 
 export const pool = new Pool({
-    connectionString: DATABASE_URL,
+    connectionString: activeDbConfig.connectionString,
     connectionTimeoutMillis: 20000,
     idleTimeoutMillis: 60000,
     max: 20,
     keepAlive: true,
     keepAliveInitialDelayMillis: 10000,
-    ssl: { rejectUnauthorized: false },
+    ssl: activeDbConfig.ssl,
 });
 
 // Detect unexpected errors on idle pooled connections.
 pool.on("error", (error) => {
     console.error(
         "Unexpected PostgreSQL pool error:",
-        error.message || error
+        sanitizeDatabaseError(error.message || String(error))
     );
 });
 
@@ -791,10 +794,10 @@ export const testDatabaseConnection = async () => {
         `);
 
         console.log("✅ Database schema verified for users, leaderboard_entries & user_links profile columns");
-    } catch (error) {
+    } catch (error: any) {
         console.error(
-            "❌ Supabase PostgreSQL connection failed:",
-            error
+            "❌ PostgreSQL connection failed:",
+            sanitizeDatabaseError(error.message || String(error))
         );
         throw error;
     }
