@@ -7,7 +7,7 @@
     "test": "tsx --env-file=.env scripts/test_certificate_studio_complete.ts && tsx --env-file=.env scripts/test_phase_20_acceptance.ts",
     "test:complete": "tsx --env-file=.env scripts/test_certificate_studio_complete.ts",
     "test:acceptance": "tsx --env-file=.env scripts/test_phase_20_acceptance.ts",
-    "dev": "tsx --env-file=.env watch src/index.ts",
+    "dev": "tsx watch --env-file=.env src/index.ts",
     "start": "tsx --env-file=.env src/index.ts",
     "migrate:institutions": "tsx --env-file=.env src/database/run_migration.ts",
     "seed:institutions": "tsx --env-file=.env data/seed_institutions.ts"
